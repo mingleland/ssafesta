@@ -54,15 +54,16 @@ public class EventShopController {
                     헤더에 **UUID** 를 담는다. 같은 구매 시도를 다시 보낼 때는 **같은 값을 그대로**
                     보내야 한다 — 매번 새로 만들면 재시도가 아니라 새 구매가 되어 두 번 차감된다.
 
-                    - 같은 키 + 같은 내용(경품·수량) → 아무 일도 일어나지 않고 처음 결과를 돌려준다
-                    - 같은 키 + 다른 경품·수량 → `409 IDEMPOTENCY_CONFLICT`
+                    - 같은 키 + 같은 내용(경품·수량·받는 자) → 아무 일도 일어나지 않고 처음 결과를 돌려준다
+                    - 같은 키 + 다른 경품·수량·받는 자 → `409 IDEMPOTENCY_CONFLICT`
 
                     가격은 서버가 정한다 — 요청에 금액을 넣지 않는다.
                     """)
     @ApiResponses({
             @ApiResponse(responseCode = "201", description = "구매 성공"),
             @ApiResponse(responseCode = "400",
-                    description = "`VALIDATION_FAILED` — `quantity` 가 1 미만이거나 `Idempotency-Key` 가 UUID 가 아니다"),
+                    description = "`VALIDATION_FAILED` — `quantity` 가 1 미만, `Idempotency-Key` 가 UUID 가 아니다, "
+                            + "또는 받는 자 정보(`campus`·`teamName`·`recipientName`)가 비었거나 캠퍼스가 목록 밖이다"),
             @ApiResponse(responseCode = "403", description = "`MEMBER_ONLY` — 게스트는 구매할 수 없다"),
             @ApiResponse(responseCode = "404",
                     description = "`EVENT_PRIZE_NOT_FOUND`(그런 경품이 없다) 또는 `WALLET_NOT_FOUND`(회원인데 지갑 행이 없다)"),
@@ -80,8 +81,10 @@ public class EventShopController {
             throw ApiException.fieldInvalid("prizeId", "필수입니다.");
         }
         int quantity = request.quantity() == null ? 1 : request.quantity();
+        PurchaseRecipient recipient = new PurchaseRecipient(request.campus(), request.teamName(),
+                request.recipientName());
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(shop.purchase(userId, request.prizeId(), quantity, operationId));
+                .body(shop.purchase(userId, request.prizeId(), quantity, recipient, operationId));
     }
 
     /** 지갑 조정과 같은 이유로 여기서 자른다 — 원장 칼럼이 {@code VARCHAR(100)} 이라 UUID 가 아니면 500 으로 샌다. */
@@ -97,6 +100,10 @@ public class EventShopController {
 
     public record PurchaseRequest(
             @Schema(description = "구매할 경품", example = "3") Long prizeId,
-            @Schema(description = "수량. 생략하면 1", example = "1") Integer quantity) {
+            @Schema(description = "수량. 생략하면 1", example = "1") Integer quantity,
+            @Schema(description = "받는 자의 캠퍼스. 서울·대전·광주·구미·부울경 중 하나",
+                    example = "대전") String campus,
+            @Schema(description = "받는 자의 조 이름", example = "A604") String teamName,
+            @Schema(description = "받는 자의 이름", example = "황덕") String recipientName) {
     }
 }

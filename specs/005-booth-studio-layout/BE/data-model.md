@@ -88,6 +88,8 @@
 
 **`LAPTOP`·`SURVEY_KIOSK`·`PROJECT_PANEL`은 `configId` 소유 질문이 성립하지 않는다.** 연결 대상이 부스당 하나뿐이라 부스 단위 술어로 답한다 — 노트북은 `booths.homepage_url` 등록 여부(016 C-01), 키오스크는 `surveys`에 그 부스 행이 있는지(010 C-06), 그래픽 패널은 `projects`에 그 부스 행이 있는지(009 C-01). 셋 다 `CONFIG_NOT_LINKED` warning 을 쓰고 `configId` 체인을 타지 않는다 (`S15P21A604-699`·`-765`, GitLab #181·#194).
 
+**`VIDEO_SCREEN` 은 네 번째지만 이유가 다르다** (`S15P21A604-889`, GitLab #194 ②): 부스 단위 술어로 옮긴 것이 아니라 **장식으로 내려갔다**. 영상 기능화를 이번 축제에서 하지 않기로 확정했으므로 가리킬 콘텐츠 자체가 없다. `configId` 가 실려 와도 저장만 하고 무시하며 `CONFIG_NOT_LINKED`·`CONFIG_UNVERIFIED` 둘 다 붙지 않는다 — 무시하면서 경고만 남기면 FE 는 고칠 것이 없는 경고를 영구히 본다. 관람 정면(`FRONT_BLOCKED`) 검사에서도 빠진다(장식에는 관람할 정면이 없다). 바운드는 그대로다.
+
 ---
 
 ## 4. 상태 전이

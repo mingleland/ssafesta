@@ -4,9 +4,13 @@
 
 ## Summary
 
-고정 파트 브랜치 CI/CD를 폐기한다. `feature/* → develop` MR의 Front·Back build·test merge gate는 GitLab CI/Runner가 `rules:changes`로 수행한다. Game 변경 MR은 Jenkins Unity agent가 MR head SHA에서 `ci/test`만 실행해 GitLab 필수 상태를 게시하며, `ci/test`의 Unity 스크립트 컴파일·EditMode 정적 검사를 통과해야 한다. 이 경로는 어떤 배포도 하지 않는다. Squash Merge된 `develop`에서 Jenkins는 변경 컴포넌트를 빌드·검증한 뒤 dev에만 자동 배포한다. 여러 컴포넌트 변경은 전부 Jenkins CI 성공 후 하나의 dev 배포 묶음으로 적용하고, 중간 실패면 이미 갱신한 묶음 구성원을 직전 known-good 상태로 복구한다. demo는 develop push와 분리된 수동 promotion job으로, dev 검증을 통과한 release만 배포한다.
+고정 파트 브랜치 CI/CD를 폐기한다. `feature/* → develop` MR의 Front·Back build·test merge gate는 GitLab CI/Runner가 `rules:changes`로 수행한다. Game 변경 MR은 Jenkins Unity agent가 MR head SHA에서 `ci/test`만 실행해 GitLab 필수 상태를 게시하며, `ci/test`의 Unity 스크립트 컴파일·EditMode 정적 검사를 통과해야 한다. 이 경로는 어떤 배포도 하지 않는다.
 
-기존 `.gitlab-ci.yml`, `ci/` build adapter, Jenkins controller/agent, release manifest, image provenance, Compose 기반 dev deploy/verify 도구를 재사용한다. WebGL은 Unity 담당자가 QA 완료 zip을 GitLab Generic Package Registry에 올린 뒤 업로드 도우미가 별도 Jenkins job을 호출한다. Jenkins deploy-agent가 package를 내려받아 검증하고 EC2 Nginx release pointer만 전환한다. Windows Jenkins Agent와 develop push WebGL 자동 빌드는 추가하지 않는다.
+실제 팀 운영 현실(demo 중심 검증)에 맞춰 별도의 `dev.ssafesta.world` 환경은 운영하지 않으며, `demo.ssafesta.world` 를 `develop` 기준 단일 활성 통합 환경(Staging)으로 확정한다. `develop` 에 머지된 변경은 Jenkins develop 파이프라인을 통해 컴포넌트별 필수 검증 후 `demo.ssafesta.world` 에 자동 배포된다. Demo 릴리스는 `candidate`(자동 검증 중) → `current`(자동 readiness 성공, 실제 demo 실행 중) → `known-good`(사람의 실제 서비스 검증 성공) 3단계로 엄격히 분리 관리한다.
+
+수동 승격(Production Promotion)은 가상의 dev→demo가 아니라 **`develop → main` 승격 정책**으로 전환하며, `main` 브랜치는 `https://ssafesta.world` 에서 서비스되는 실제 사용자 프로덕션(Production) 운영 환경을 나타낸다. 팀이 `demo.ssafesta.world` 에서 충분히 검증하여 known-good 으로 승인한 릴리스만 `main` 및 프로덕션으로 승격하며, **Architecture Invariant로 develop → main 승격 MR은 절대 Squash Merge를 금지(`squash=false` 강제, develop 계보 보존)**하고, demo에서 검증된 동일 아티팩트를 재빌드 없이 재사용한다(`Demo Artifact == Production Artifact`).
+
+기존 `.gitlab-ci.yml`, `ci/` build adapter, Jenkins controller/agent, release manifest, image provenance, Compose 기반 deploy/verify 도구를 재사용한다. WebGL은 Unity 담당자가 전달한 릴리스 zip 패키지 또는 Package Registry 업로드 산출물을 받아 배포하며, `deploy-game.sh` 의 프리팹 트리 대조 가드로 클라이언트-서버 정합성을 보장한다. Dedicated Server 배포는 스모크 러너 의존성을 제거하고 1~3단계(프로세스, 내부 포트, WSS 101) 통과로 current 승격을 확정한다. Redis는 40명 실측(1.27MB) 기반 `mem_limit: 256m` 상한 및 `appendonly yes` AOF 영속성을 적용한다.
 
 ## Technical Context
 
@@ -52,18 +56,20 @@ GitLab's `rules:changes` evaluates the MR diff. A Jenkins `develop` Squash merge
 
 1. GitLab CI accepts same-project `feature/* → develop` only. It uses `rules:changes` to run required Front·Back build/test gates; Game changes dispatch a Jenkins Unity test-only job for the MR head SHA. GitLab blocks merge unless every applicable status passes. `jira-*` definitions remain disabled.
 2. The Unity MR job calls only `ci/test`; it records the head SHA and test report, publishes success/failure to the matching GitLab MR commit, and has no deploy credential, Compose mutation, image package or promotion stage.
-3. Jenkins `develop` push job detects the Squash merge range, runs all selected CI first, then creates one candidate dev batch only if every selected CI succeeds.
-4. The dev batch transfers/verifies every candidate image before mutation. Under one batch lock it snapshots all affected component known-good state, deploys each selected component using existing service-scoped deploy/verify primitives, and promotes dev state only after all verify.
-5. If a reversible deploy/verify failure occurs, restore each component already changed by this batch from the snapshot and verify restoration. DB/schema, secret/config, irreversible, unknown, or restoration failure preserves evidence and requires manual action.
-6. Manual demo promotion selects an explicitly approved dev-verified full release manifest and reuses existing demo deploy → verify → promote/rollback logic. `develop` push never invokes it.
+3. Jenkins `develop` push job detects the merge range, runs all selected CI first, then creates one candidate batch for `demo.ssafesta.world` only if every selected CI succeeds.
+4. The demo batch transfers/verifies candidate images before mutation. Under batch lock it deploys selected components to `demo.ssafesta.world`, runs service-scoped readiness, and transitions the candidate to `current` only after all readiness checks pass.
+5. If an automated readiness failure occurs, candidate deployment is rolled back to previous state. After human verification of actual user journeys on `demo.ssafesta.world`, the release is explicitly approved as `known-good`.
+6. Production Promotion (`develop → main`) selects an explicitly human-approved `known-good` release, fast-forwards/merges to `main` without squash (`squash=false`), and promotes the identical verified artifacts to `ssafesta.world` without rebuilding.
 
 ### 3. Freshness and state invariants
 
-- A merge run rechecks that `develop` still points to its expected head before it obtains the dev batch lock. Superseded runs stop with no deploy.
-- A batch has one `batchId`, one source range, ordered selected components, a before-state snapshot and candidate content IDs.
-- The per-component dev current/known-good pointer changes only after its health verification; the batch promotion marker changes only after every selected component succeeds.
-- Rollback may use only the batch snapshot, not an arbitrary old manifest. This avoids weakening normal commit freshness checks.
+- A merge run rechecks that `develop` still points to its expected head before it obtains the batch lock. Superseded runs stop with no deploy.
+- Demo release lifecycle strictly adheres to 3 states: `candidate` (readiness in progress) → `current` (readiness passed, live on demo, `current ≠ known-good`) → `known-good` (human verified on demo).
+- Rollback uses the last human-verified `known-good` snapshot, never an unverified intermediate `current`.
+- **Architecture Invariant**: `develop → main` promotion MR MUST NOT squash (`squash=false` enforced, preserving develop ancestry).
+- **Artifact Invariant**: `Demo Artifact == Production Artifact` (no rebuild during production promotion).
 - Shared CI paths never deploy because no runtime component changed. Component runtime/deploy config counts as that component change.
+- Redis container enforces `mem_limit: 256m` based on 40-user peak empirical observation (1.27MB) and `appendonly yes` to safeguard login sessions across container restarts.
 
 ### 4. WebGL Package Registry delivery
 

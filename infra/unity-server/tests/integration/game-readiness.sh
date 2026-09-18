@@ -14,7 +14,7 @@ content_id='sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abc
 # readiness 가 GAME_IMAGE_REF 없이 compose 를 부르는 결함이 테스트를 그냥 통과했다.
 image_ref='festa-game:0123456789abcdef0123456789abcdef01234567'
 mkdir -p "${fixture}/bin" "${fixture}/state/releases" "${fixture}/artifacts"
-mkdir -p "${fixture}/env/dev/batches/known-good"
+mkdir -p "${fixture}/env/dev/batches/current"
 : >"${fixture}/game.env"
 printf 'PASS\n' >"${fixture}/approval.txt"
 cat >"${fixture}/state/candidate.json" <<JSON
@@ -80,9 +80,9 @@ assert_contains "${fixture}/artifacts/game-readiness.json" '"externalWebSocket":
 assert_contains "${fixture}/artifacts/game-readiness.json" '"approvedAdmission": "PASS"' 'readiness must record admission state'
 printf '{}' >"${fixture}/state/releases/game-ready.json"
 bash "${unity_server_dir}/scripts/promote-game.sh"
-assert_contains "${fixture}/state/current.json" '"state": "CURRENT/KNOWN_GOOD"' 'promotion must update current only after all gates pass'
-assert_contains "${fixture}/state/known-good.json" '"releaseId": "game-ready"' 'promotion must update known-good with the verified candidate'
-assert_file "${fixture}/env/dev/batches/known-good/game.json"
+assert_contains "${fixture}/state/current.json" '"state": "CURRENT"' 'promotion must update current only after readiness gates pass'
+[[ ! -e "${fixture}/state/known-good.json" ]] || fail 'promotion must not touch known-good (사람이 approve-known-good.sh 로 수행)'
+assert_file "${fixture}/env/dev/batches/current/game.json"
 
 # Test transport-only readiness when approval evidence is omitted
 unset APPROVAL_EVIDENCE_FILE
@@ -96,7 +96,7 @@ GAME_READINESS_PATH="${transport_output}" bash "${unity_server_dir}/scripts/prom
 
 mkdir -p "${fixture}/failed-state/releases"
 cp "${fixture}/state/releases/game-ready.json" "${fixture}/failed-state/releases/game-ready.json"
-sed 's/"state": "CURRENT\/KNOWN_GOOD"/"state": "CANDIDATE"/' "${fixture}/state/candidate.json" >"${fixture}/failed-state/candidate.json"
+sed 's/"state": "CURRENT"/"state": "CANDIDATE"/' "${fixture}/state/candidate.json" >"${fixture}/failed-state/candidate.json"
 sed 's/"externalWebSocket": "PASS"/"externalWebSocket": "FAIL"/' "${fixture}/artifacts/game-readiness.json" >"${fixture}/failed-readiness.json"
 if GAME_DEPLOY_STATE_DIR="${fixture}/failed-state" GAME_READINESS_PATH="${fixture}/failed-readiness.json" bash "${unity_server_dir}/scripts/promote-game.sh" >/dev/null 2>&1; then
   fail 'promotion must reject a candidate with a failed external WSS gate'

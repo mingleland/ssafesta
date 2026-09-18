@@ -9,8 +9,8 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  * Slot machine settlement policy (spec 021, GitLab #205).
  *
  * <p><b>The odds table is configuration, and that was the decision.</b> GitLab #205 확정값 1 adopted
- * the table Unity's {@code MockSlotMachineClient} already runs — 낙첨 78 · ×2 15 · ×3 5 · ×5 2,
- * RTP 0.55 — and said the balance knobs live in yml so a later change is a configuration edit
+ * the table approved for GitLab #235 — 낙첨 78.1 · ×2 20 · ×3 1 · ×10 0.9,
+ * base RTP 0.52 — and said the balance knobs live in yml so a later change is a configuration edit
  * rather than a code change. The defaults below are that table; nothing here invents a number.
  *
  * <p><b>낙첨 has no row.</b> It is whatever weight the tiers leave unclaimed, so the table cannot
@@ -18,7 +18,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  *
  * <p>{@link BigDecimal} weights rather than {@code double}, for the same reason
  * {@link MinigameProperties} uses them: the yml text <i>is</i> the policy, and a weight that reads
- * {@code 0.15} must not roll as {@code 0.15000000000000002}.
+ * {@code 0.20} must not roll as {@code 0.20000000000000002}.
  *
  * @param betCoins   the only accepted bet. Fixed server-side and the request is merely checked
  *                   against it (헌법 16조) — Unity's {@code SlotMachineSession.Bet} is a constant 10
@@ -75,7 +75,7 @@ public record SlotMachineProperties(int betCoins, List<String> machineIds, List<
             }
             units += tier.units();
             // 배수 오름차순이어야 tier 번호가 "약한 당첨 → 강한 당첨" 이다. Unity 는 tier 로 릴 프리셋을
-            // 고르므로(SlotMachineSession.PickPreset), 거꾸로 적힌 표는 ×5 에 가장 약한 연출을 준다.
+            // 고르므로(SlotMachineSession.PickPreset), 거꾸로 적힌 표는 ×10 에 가장 약한 연출을 준다.
             if (i > 0 && tier.multiplier() <= tiers.get(i - 1).multiplier()) {
                 throw new IllegalStateException("app.minigame.slot-machine.tiers 는 multiplier "
                         + "오름차순이어야 합니다 — [" + (i - 1) + "]=" + tiers.get(i - 1).multiplier()
@@ -103,7 +103,7 @@ public record SlotMachineProperties(int betCoins, List<String> machineIds, List<
      * Draws one outcome. {@code 0} is 낙첨 and carries whatever weight the tiers left over.
      *
      * <p>Drawn in whole ten-thousandths rather than from a float in [0,1): a cumulative comparison
-     * against 0.78 + 0.15 + ... accumulates representation error, and the tier that absorbs it is
+     * against 0.781 + 0.20 + ... accumulates representation error, and the tier that absorbs it is
      * whichever one happens to sit at the boundary.
      */
     public int rollTier() {

@@ -33,7 +33,9 @@ candidate, known_good = (json.loads(pathlib.Path(path).read_text(encoding='utf-8
 for state in (candidate, known_good):
     if state.get('targetId') != 'demo/game' or not isinstance(state.get('releaseId'), str) or not state['releaseId'].replace('-', '').replace('_', '').replace('.', '').isalnum():
         raise SystemExit('invalid demo/game release state')
-if candidate.get('state') != 'CANDIDATE' or known_good.get('state') != 'CURRENT/KNOWN_GOOD':
+# CURRENT/KNOWN_GOOD 는 known-good 이 자동으로 붙던 옛 promote-game.sh 의 상태값이다.
+# 이번 분리(spec §Session 2026-09-17) 이후 새로 승인되는 known-good 은 'KNOWN_GOOD' 하나만 쓴다 — 옛 파일과의 호환을 위해 둘 다 허용한다.
+if candidate.get('state') != 'CANDIDATE' or known_good.get('state') not in ('KNOWN_GOOD', 'CURRENT/KNOWN_GOOD'):
     raise SystemExit('candidate or known-good state is not eligible for rollback')
 if candidate['releaseId'] == known_good['releaseId']:
     print('NO_OP', candidate['releaseId'], known_good['releaseId'], '', '', sep='\t')

@@ -116,6 +116,35 @@ class SlotMachineSpinApiIntegrationTest {
     }
 
     @Test
+    void tenConsecutiveLedgerLossesForceTheNextSpinToTierOne() throws Exception {
+        Long userId = member("슬롯보장");
+        String bearer = bearerFor(userId);
+        int bet = properties.betCoins();
+        topUp(userId, 1_000);
+
+        // Pity is a derived fact, not a counter: seed the same ledger shape that ten actual losing
+        // spins leave behind — SLOT_BET rows with no matching SLOT_PAYOUT rows.
+        for (int loss = 0; loss < 10; loss++) {
+            String spinId = UUID.randomUUID().toString();
+            wallets.spend(new CoinSpendCommand(userId, bet, CoinReason.SLOT_BET,
+                    SlotMachineService.SPIN_REFERENCE_TYPE, spinId,
+                    "TEST_SLOT_PITY_LOSS:" + userId + ":" + loss));
+        }
+
+        int before = wallets.balanceOf(userId);
+        String body = spin(bearer, MACHINE, bet)
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        String forcedSpinId = text(body, "sessionId");
+        assertEquals(1, number(body, "tier"), "10연속 낙첨 뒤 다음 스핀은 tier 1이어야 합니다: " + body);
+        assertEquals(bet * 2, number(body, "payout"), "보장 당첨은 ×2여야 합니다: " + body);
+        assertEquals(before - bet + bet * 2, number(body, "balanceAfter"));
+        assertEquals(1, ledgerRows(userId, CoinReason.SLOT_PAYOUT, forcedSpinId));
+        assertBalanceMatchesLedger(wallets, userId);
+    }
+
+    @Test
     void anUnknownMachineIsRefusedWithoutTouchingTheWallet() throws Exception {
         Long userId = member("슬롯미등록");
         int before = wallets.balanceOf(userId);

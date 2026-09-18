@@ -169,7 +169,7 @@ describe('내 부스 관리창 개편 (-817)', () => {
     it('slot → default → 문구, 셋으로 끝난다', async () => {
       await renderOverlay();
       const img = () => document.querySelector('.bm-preview-img') as HTMLImageElement | null;
-      await waitFor(() => expect(img()?.getAttribute('src')).toBe('/booth-preview/F11-R06.png'));
+      await waitFor(() => expect(img()?.getAttribute('src')).toBe('/booth-preview/F11-R06.webp'));
       fireEvent.error(img()!);
       expect(img()?.getAttribute('src')).toBe('/booth-preview/default.webp');
       fireEvent.error(img()!);

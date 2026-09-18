@@ -105,7 +105,8 @@ mergeInto(LibraryManager.library, {
     } catch (error) {
       console.error('[FestaUnityBridge] onWorldLoadStart callback failed', error);
     }
-  },
+  }
+,
 
   // 디스플레이의 **실제** 주사율(Hz) 추정치. 아직 표본이 모자라면 0.
   //

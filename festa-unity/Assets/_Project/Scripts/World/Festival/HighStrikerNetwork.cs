@@ -123,8 +123,32 @@ namespace Festa.World
             }
             // 받는 즉시 잠근다 — 임팩트를 기다리는 사이에 옆 사람이 F 를 누르면 스윙이 겹친다.
             machine.BeginBusy(ImpactDelay + machine.SequenceSeconds);
+            // 서버가 승인한 판만 미션에 남긴다 — 여기까지 왔다는 것은 쿨다운을 통과했다는 뜻이다.
+            // 내 판만 보낸다(남의 스윙도 이 RPC 로 오고, 액세스 토큰은 소유자 클라이언트에만 있다).
+            if (IsOwner) ReportPlayForMissions(machineId.ToString(), score);
             // 스윙 애니메이션이 내려찍는 순간에 퍽이 튀어 오르게 — 받은 시점부터 임팩트까지 기다린다.
             StartCoroutine(PlayAtImpact(machine, hasVisual ? prop : null, power, score, nickname.ToString()));
+        }
+
+        /// <summary>
+        /// 일일 미션 <c>STRIKER_PLAY_3</c>·<c>STRIKER_SCORE</c> 의 근거를 Spring 에 남긴다 (GitLab #233).
+        ///
+        /// <para>이 게임은 점수를 서버 정적 표에서 굴려 RPC 로 뿌린 뒤 버린다 — 표시에는 그것으로 충분했지만
+        /// 미션은 오늘 기록을 세어 판정하므로 Spring 에 남는 것이 하나도 없으면 진행도가 영원히 0 이다.</para>
+        ///
+        /// <para><b>결과를 기다리지 않는다.</b> 기록용 왕복이 스윙 연출이나 이동 잠금 해제를 늦추면 안 된다.
+        /// 실패는 클라이언트가 로그로 남기고, 사용자에게는 아무것도 띄우지 않는다 — 이번 판이 미션에 안 세어질 뿐
+        /// 게임은 정상이다.</para>
+        /// </summary>
+        async void ReportPlayForMissions(string machineId, int score)
+        {
+            var client = Festa.Integration.ApiServices.HighStriker;
+            if (client == null) return;
+            try { await client.ReportPlayAsync(machineId, score); }
+            catch (System.Exception ex)
+            {
+                Debug.LogWarning($"[HighStriker] 미션 기록 보고가 예외로 끝났다 — {ex.Message}. 게임 진행에는 영향이 없다.");
+            }
         }
 
         void RestartLocalUnlock(AvatarStrikeProp prop, float timeout)

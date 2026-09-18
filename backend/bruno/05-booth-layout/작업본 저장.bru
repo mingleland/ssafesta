@@ -21,8 +21,8 @@ body:json {
     "template": "PROJECT_EXHIBITION",
     "objects": [
       {
-        "objectId": "screen-1",
-        "type": "VIDEO_SCREEN",
+        "objectId": "agent-1",
+        "type": "AI_AGENT",
         "position": { "x": 2.1, "y": 0.0, "z": 2.4 },
         "rotationY": 90.0,
         "configId": 152
@@ -109,7 +109,7 @@ docs {
 
   | `rule` | 의미 |
   |---|---|
-  | `CONFIG_NOT_LINKED` | 기능 오브젝트에 `configId`가 없다. 공개까지 막을지는 미정(C-04)이라 지금은 경고다 |
+  | `CONFIG_NOT_LINKED` | 기능 오브젝트에 `configId`가 없다. 공개까지 막을지는 미정(C-04)이라 지금은 경고다. 장식(`FURNITURE`·`DECORATION`·`VIDEO_SCREEN`)에는 붙지 않는다 — GitLab #194 ② |
 
   ### 오류 본문 필드
 

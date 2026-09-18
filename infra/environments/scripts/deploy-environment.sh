@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # infra-001 릴리스를 선택한 환경의 한 component에만 적용한다.
+# develop 머지의 기본 대상은 demo 다 (spec infra-001 §Session 2026-09-17: demo 가 단일 활성 통합 환경).
 set -euo pipefail
 
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -8,7 +9,7 @@ source "${repo_root}/infra/environments/tests/lib/assert.sh"
 docker_bin="${DOCKER_BIN:-docker}"
 
 usage() {
-  echo "usage: $0 --environment dev --component <ai|back|front|game> --release-manifest <path>" >&2
+  echo "usage: $0 --environment <dev|demo> --component <ai|back|front|game> --release-manifest <path>" >&2
 }
 
 environment=''
@@ -24,8 +25,10 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-[[ "${environment}" == dev ]] || { usage; fail 'only dev component deployment is implemented'; }
+case "${environment}" in dev|demo) ;; *) usage; fail 'environment must be dev or demo' ;; esac
 case "${component}" in ai|back|front|game) ;; *) usage; fail 'component must be ai, back, front, or game' ;; esac
+# demo 스택에는 game 오버레이가 없다 — Dedicated Server 는 infra-003 의 festa-demo-world 가 소유한다.
+[[ "${environment}" != demo || "${component}" != game ]] || fail 'demo game deployment belongs to infra-003 (festa-demo-world)'
 assert_file "${release_manifest}"
 
 python_bin="$(resolve_python)" || fail 'Python 3 is required'
@@ -89,7 +92,7 @@ case "${component}" in
     ;;
 esac
 
-environment_manifest="${repo_root}/infra/environments/config/manifests/dev.json"
+environment_manifest="${repo_root}/infra/environments/config/manifests/${environment}.json"
 bash "${script_dir}/preflight.sh" --manifest "${environment_manifest}" --stage contract --check-only >/dev/null
 "${python_bin}" - "${environment_manifest}" "${DEV_MOCK_COMPONENTS:-}" <<'PY'
 import json, pathlib, sys
@@ -114,19 +117,19 @@ snapshot() {
   sort -o "${output}" "${output}"
 }
 
-state_dir="${ENVIRONMENT_STATE_DIR:-/tmp/festa-environments}/dev/${component}"
+state_dir="${ENVIRONMENT_STATE_DIR:-/tmp/festa-environments}/${environment}/${component}"
 mkdir -p "${state_dir}"
 snapshot "${state_dir}/before.tsv"
 
 export COMPONENT_IMAGE_REF="${image_ref}" RELEASE_ID="${release_id}" SOURCE_COMMIT="${source_commit}"
-base="${repo_root}/infra/environments/compose/dev/base.yaml"
-overlay="${repo_root}/infra/environments/compose/dev/${component}.yaml"
-compose=("${docker_bin}" compose --project-name festa-dev --file "${base}" --file "${overlay}" --profile "${component}")
+base="${repo_root}/infra/environments/compose/${environment}/base.yaml"
+overlay="${repo_root}/infra/environments/compose/${environment}/${component}.yaml"
+compose=("${docker_bin}" compose --project-name "festa-${environment}" --file "${base}" --file "${overlay}" --profile "${component}")
 "${compose[@]}" config --quiet
 "${compose[@]}" up -d --no-deps --wait "${component}"
 snapshot "${state_dir}/after.tsv"
 printf '%s\t%s\t%s\t%s\t%s\n' "${release_id}" "${image_ref}" "${content_id}" "${source_commit}" "${DEV_MOCK_COMPONENTS:-}" \
   >"${state_dir}/deployment.tsv"
 
-printf '{"environment":"dev","component":"%s","releaseId":"%s","imageRef":"%s"}\n' \
-  "${component}" "${release_id}" "${image_ref}"
+printf '{"environment":"%s","component":"%s","releaseId":"%s","imageRef":"%s"}\n' \
+  "${environment}" "${component}" "${release_id}" "${image_ref}"

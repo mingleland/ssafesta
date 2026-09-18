@@ -1,4 +1,4 @@
-package com.example.ssafesta.game;
+package com.example.ssafesta.storage.image;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -29,9 +29,9 @@ import org.junit.jupiter.api.Test;
  * whose first frame is small, an SVG that is technically an image — each looks acceptable until the
  * browser tries to draw it or the process tries to decode it.
  */
-class GameAssetImageValidatorTest {
+class ImageBytesValidatorTest {
 
-    private final GameAssetImageValidator validator = new GameAssetImageValidator();
+    private final ImageBytesValidator validator = new ImageBytesValidator();
 
     /**
      * The WebP reader has to actually be installed.
@@ -67,7 +67,7 @@ class GameAssetImageValidatorTest {
         byte[] webp = HexFormat.of().parseHex(
                 "524946461A000000574542505650384C0D0000002F00000010071011118888FE0700");
 
-        GameAssetImageValidator.VerifiedImage verified = validator.verify(webp, webp.length);
+        ImageBytesValidator.VerifiedImage verified = validator.verify(webp, webp.length);
 
         assertEquals("image/webp", verified.contentType());
         assertEquals(1, verified.width());
@@ -78,7 +78,7 @@ class GameAssetImageValidatorTest {
     void aPlainPngIsAcceptedWithTheDimensionsItActuallyHas() {
         byte[] png = png(64, 32);
 
-        GameAssetImageValidator.VerifiedImage verified = validator.verify(png, png.length);
+        ImageBytesValidator.VerifiedImage verified = validator.verify(png, png.length);
 
         assertEquals("image/png", verified.contentType());
         assertEquals(64, verified.width());
@@ -97,7 +97,7 @@ class GameAssetImageValidatorTest {
     void aPlainJpegIsAcceptedAsAJpeg() {
         byte[] jpeg = jpeg(48, 24);
 
-        GameAssetImageValidator.VerifiedImage verified = validator.verify(jpeg, jpeg.length);
+        ImageBytesValidator.VerifiedImage verified = validator.verify(jpeg, jpeg.length);
 
         assertEquals("image/jpeg", verified.contentType());
         assertEquals(48, verified.width());
@@ -113,7 +113,7 @@ class GameAssetImageValidatorTest {
      */
     @Test
     void aFileOverTheSizeLimitIsRefusedBeforeItIsDecoded() {
-        assertRefusal(new byte[(int) GameAssetImageValidator.MAX_BYTES + 1],
+        assertRefusal(new byte[(int) ImageBytesValidator.MAX_BYTES + 1],
                 ErrorCode.GAME_ASSET_TOO_LARGE, "SIZE_EXCEEDED");
     }
 
@@ -135,7 +135,7 @@ class GameAssetImageValidatorTest {
     void anAnimatedGifWithinBudgetIsAccepted() {
         byte[] animated = gif(40, 20, 4);
 
-        GameAssetImageValidator.VerifiedImage verified = validator.verify(animated, animated.length);
+        ImageBytesValidator.VerifiedImage verified = validator.verify(animated, animated.length);
 
         assertEquals("image/gif", verified.contentType());
         assertEquals(40, verified.width());
