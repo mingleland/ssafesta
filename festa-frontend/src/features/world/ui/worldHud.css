@@ -41,12 +41,8 @@
   color: rgba(234, 238, 251, 0.6);
 }
 
-.world-hud-fullscreen {
+.world-hud-control {
   position: absolute;
-  /* 전체화면 토글 (S15P21A604-733). 상담 퀵액세스와 우상단 한 줄에 나란히 서고, 오른쪽 끝은
-     이 버튼이 쓴다 — 상담이 왼쪽 칸이다(2026-09-16). `.world-hud` 는 클릭을 통과시키므로
-     버튼만 다시 받는다. */
-  right: var(--festa-hud-margin-x);
   top: var(--festa-hud-margin-y);
   width: var(--festa-control-size);
   height: var(--festa-control-size);
@@ -61,10 +57,16 @@
   cursor: pointer;
   pointer-events: auto;
 }
-.world-hud-fullscreen svg { width: 48%; height: 48%; }
-.world-hud-fullscreen:hover { background: rgba(20, 26, 52, 0.85); }
-.world-hud-fullscreen:focus-visible { outline: 2px solid rgba(255, 255, 255, 0.9); outline-offset: 2px; }
+.world-hud-control svg { width: 48%; height: 48%; }
+.world-hud-control:hover { background: rgba(20, 26, 52, 0.85); }
+.world-hud-control:focus-visible { outline: 2px solid rgba(255, 255, 255, 0.9); outline-offset: 2px; }
+.world-hud-missions { left: var(--festa-hud-margin-x); }
+.world-hud-fullscreen {
+  /* 전체화면 토글 (S15P21A604-733). 상담 퀵액세스와 우상단 한 줄에 나란히 서고, 오른쪽 끝은
+     이 버튼이 쓴다 — 상담이 왼쪽 칸이다(2026-09-16). */
+  right: var(--festa-hud-margin-x);
+}
 @media (prefers-reduced-transparency: reduce) {
-  .world-hud-fullscreen { background: #10142a; backdrop-filter: none; }
+  .world-hud-control { background: #10142a; backdrop-filter: none; }
 }
 

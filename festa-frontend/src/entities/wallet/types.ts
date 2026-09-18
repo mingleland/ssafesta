@@ -51,6 +51,7 @@ const REASON_LABELS: Record<string, string> = {
   SURVEY_REWARD: '설문 보상',
   PURCHASE: '아이템 구매',
   MINIGAME_REWARD: '미니게임 보상',
+  DAILY_MISSION: '일일 미션 보상',
 };
 
 // 모르는 reasonType은 원문 코드 그대로 반환 — 항목을 숨기면 SC-005 위반
