@@ -116,6 +116,11 @@ class SecurityConfiguration {
                         // read at /booths/*/projects stays authenticated, and "*" spans one segment
                         // so it cannot reach it.
                         .requestMatchers(HttpMethod.GET, "/api/v1/booths/*/projects/published").permitAll()
+                        // 방문자의 <img> 가 들어오는 자리다 (GitLab #241). 게임 Asset 과 같은 구조로
+                        // 경로만 열고 판정은 서비스가 한다 — 게시된 프로젝트가 그 로고를 참조하고
+                        // 임대가 유효할 때만 누구나 볼 수 있고, 그 밖의 로고는 부스 편집자만이며
+                        // 나머지는 404 다. "*" 는 한 세그먼트라 다른 업로드 경로에 닿지 않는다.
+                        .requestMatchers(HttpMethod.GET, "/api/v1/booths/*/project-logos/*/content").permitAll()
                         .anyRequest().authenticated())
                 .oauth2Login(oauth -> oauth.successHandler(successHandler))
                 // The resource server installs its own entry point for bearer-token failures, so an

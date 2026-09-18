@@ -27,6 +27,10 @@ assert_contains "${compose_dir}/front.yaml" '127\.0\.0\.1:\$\{DEMO_FRONT_HOST_PO
 assert_contains "${compose_dir}/back.yaml" '127\.0\.0\.1:\$\{DEMO_BACK_HOST_PORT:-18081\}:8080' 'back must serve the api.* loopback port'
 assert_contains "${compose_dir}/ai.yaml" '127\.0\.0\.1:\$\{DEMO_AI_HOST_PORT:-18082\}:8000' 'ai must serve the /ai/v1 loopback port'
 
+# internal 네트워크에만 붙은 컨테이너는 ports 를 적어도 호스트에 게시되지 않는다 — front 가
+# healthy 인데 18080 이 안 열려 demo 가 502 였다 (2026-09-18 실측).
+assert_not_contains "${compose_dir}/base.yaml" 'internal: true' 'front-private must stay publishable for the Nginx loopback port'
+
 # 빈 PUBLIC_API_BASE_URL 로 뜬 프론트는 화면이 멀쩡한데 구글 로그인만 404 다 (2026-09-17 실측).
 # 기본값을 주지 말고 여기서 기동을 막는다.
 assert_contains "${compose_dir}/front.yaml" 'PUBLIC_API_BASE_URL: \$\{PUBLIC_API_BASE_URL:?' 'front API endpoint must fail closed when unset'

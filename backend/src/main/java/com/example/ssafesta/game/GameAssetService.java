@@ -3,8 +3,10 @@ package com.example.ssafesta.game;
 import com.example.ssafesta.common.ApiErrorDetail;
 import com.example.ssafesta.common.ApiException;
 import com.example.ssafesta.common.ErrorCode;
+import com.example.ssafesta.storage.ObjectDeleteQueue;
 import com.example.ssafesta.storage.ObjectStorage;
 import com.example.ssafesta.storage.StorageUnavailableException;
+import com.example.ssafesta.storage.image.ImageBytesValidator;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.security.SecureRandom;
@@ -66,14 +68,14 @@ public class GameAssetService {
     private final GamePublishedVersionRepository publishedVersions;
     private final GameDraftRepository drafts;
     private final GameAccessGuard guard;
-    private final GameAssetImageValidator imageValidator;
+    private final ImageBytesValidator imageValidator;
     private final ObjectStorage storage;
-    private final GameAssetDeleteQueue deleteQueue;
+    private final ObjectDeleteQueue deleteQueue;
 
     public GameAssetService(GameAssetRepository assets, GameRepository games,
                             GamePublishedVersionRepository publishedVersions, GameDraftRepository drafts,
-                            GameAccessGuard guard, GameAssetImageValidator imageValidator,
-                            ObjectStorage storage, GameAssetDeleteQueue deleteQueue) {
+                            GameAccessGuard guard, ImageBytesValidator imageValidator,
+                            ObjectStorage storage, ObjectDeleteQueue deleteQueue) {
         this.assets = assets;
         this.games = games;
         this.publishedVersions = publishedVersions;
@@ -101,13 +103,13 @@ public class GameAssetService {
         games.findByIdForUpdate(gameId).orElseThrow(() -> new ApiException(ErrorCode.GAME_NOT_FOUND));
 
         if (declaredContentType == null
-                || !GameAssetImageValidator.ALLOWED_CONTENT_TYPES.contains(declaredContentType)) {
+                || !ImageBytesValidator.ALLOWED_CONTENT_TYPES.contains(declaredContentType)) {
             throw refuse(ErrorCode.GAME_ASSET_TYPE_UNSUPPORTED, "MIME_NOT_ALLOWED",
                     "PNG · JPEG · GIF · WebP 만 올릴 수 있습니다.");
         }
-        if (declaredByteSize <= 0 || declaredByteSize > GameAssetImageValidator.MAX_BYTES) {
+        if (declaredByteSize <= 0 || declaredByteSize > ImageBytesValidator.MAX_BYTES) {
             throw refuse(ErrorCode.GAME_ASSET_TOO_LARGE, "SIZE_EXCEEDED",
-                    "이미지는 " + (GameAssetImageValidator.MAX_BYTES / 1024 / 1024) + "MB 이하만 올릴 수 있습니다.");
+                    "이미지는 " + (ImageBytesValidator.MAX_BYTES / 1024 / 1024) + "MB 이하만 올릴 수 있습니다.");
         }
 
         Instant now = Instant.now();
@@ -174,12 +176,12 @@ public class GameAssetService {
         // 1 KiB and uploaded 4 GiB is exactly the case a declared bound would not catch. An object
         // over the limit arrives one byte too long and the validator refuses it below with
         // SIZE_EXCEEDED — the same rule a too-large declared size gets.
-        byte[] content = readObject(asset, GameAssetImageValidator.MAX_BYTES);
+        byte[] content = readObject(asset, ImageBytesValidator.MAX_BYTES);
         if (content == null || content.length == 0) {
             return fail(asset, "UPLOAD_MISSING");
         }
 
-        GameAssetImageValidator.VerifiedImage verified;
+        ImageBytesValidator.VerifiedImage verified;
         try {
             verified = imageValidator.verify(content, asset.getDeclaredByteSize());
         } catch (ApiException refusal) {
