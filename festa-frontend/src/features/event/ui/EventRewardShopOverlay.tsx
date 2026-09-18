@@ -173,12 +173,13 @@ export function EventRewardShopOverlay() {
     return {
       id: `raffle-${raffle.raffleId}`,
       media: imageUrl === undefined ? IcRewardFallback : <img src={imageUrl} alt="" />,
+      // 추첨 시각은 chip 대신 사진 아래에 문구로 둔다(2026-09-18 확정) — 응모 버튼과 같은 줄 높이라 나란히 보인다
+      mediaNote: drawTimeChipLabel(raffle.drawAt),
       title: raffle.name,
       chips: (
         <>
           <span className="ov-chip ov-chip-coin">{raffle.priceCoin.toLocaleString()} C / 1장</span>
           <span className="ov-chip">{stockLabel(raffle.stock)}</span>
-          <span className="ov-chip">{drawTimeChipLabel(raffle.drawAt)}</span>
         </>
       ),
       action: (
