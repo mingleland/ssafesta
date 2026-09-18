@@ -259,12 +259,42 @@ namespace Festa.World
         /// <summary>예약된 접지 재측정 한 번. 정착 후 값이 선 자세의 진짜 기준이 된다.</summary>
         void RunScheduledReground()
         {
+            // **아직 떨어지는 중이면 재지 않는다.** 바닥 판독은 "루트보다 위 2u 아래에 있는 가장 높은 면" 인데,
+            // 공중에 있으면 그 조건에 **지나가는 면**이 걸린다 — 라운지 단상 위를 지나며 재면 글자 윗면(7.87)을
+            // 바닥으로 잡고, 실제로는 단상(3.08)에 내려서므로 외형이 4.8u 아래로 눌려 몸이 단상에 파묻힌다.
+            // 재접속·로그인에서 특히 잦은 이유가 이것이다 — 그때만 스폰 낙하가 있다 (T-268 미해결분).
+            // 못 믿을 순간이면 값을 굳히지 말고 뒤로 미룬다.
+            if (!GroundReadingSettled())
+            {
+                _regroundAt = Time.time + RegroundSettle;
+                _spawnRegroundAt = Time.time + RegroundSettle;
+                return;
+            }
             if (!GroundToCurrentPose() || !_baseNeedsRefresh) return;
             _baseNeedsRefresh = false;
             if (ChangesGroundContact(_player.EmoteId.Value)) return;
             _baseVisualLocalY = _currentVisual.transform.localPosition.y;
             _calibratedVisualLocalY = _baseVisualLocalY;
         }
+
+        /// <summary>
+        /// 지금 잰 바닥면을 믿어도 되는가 — <b>몸이 실제로 그 면에 올라서 있는가</b>.
+        ///
+        /// <para>소유자는 <see cref="CharacterController.isGrounded"/> 가 그대로 답이다. 원격 아바타는
+        /// 컨트롤러가 없으므로 루트와 바닥면의 거리로 본다 — 서 있으면 0 에 가깝고, 떨어지는 중이면 벌어진다.</para>
+        ///
+        /// <para>바닥을 아예 못 찾으면 <c>true</c> 다. 그 경우 <see cref="FootContactY"/> 가 캡슐 바닥으로
+        /// 떨어지는 폴백 경로를 타므로, 여기서 막으면 영원히 재측정이 미뤄진다.</para>
+        /// </summary>
+        bool GroundReadingSettled()
+        {
+            if (_controller != null && _controller.enabled) return _controller.isGrounded;
+            if (!TryFindGroundBelowFeet(out var groundY)) return true;
+            return Mathf.Abs(transform.position.y - groundY) <= MaxSettledGroundGap;
+        }
+
+        /// <summary>원격 아바타가 "바닥에 서 있다" 로 볼 최대 간격(u). 선 자세의 루트-바닥 오차는 0.10~0.22 다.</summary>
+        const float MaxSettledGroundGap = 2f;
 
         // 크로스페이드(0.2초)가 끝나 포즈가 자리잡은 뒤에 재야 한다. 섞이는 중에 재면
         // 선 자세와 앉은 자세의 **중간값**이 나온다.
