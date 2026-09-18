@@ -6,6 +6,8 @@ import com.example.ssafesta.user.AccountStatus;
 import com.example.ssafesta.user.User;
 import com.example.ssafesta.user.UserRepository;
 import java.time.Instant;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 
@@ -30,6 +32,8 @@ public class WorldChatService {
     static final int MAX_CONTENT_LENGTH = 100;
 
     static final String TOPIC = "/topic/world/chat";
+
+    private static final Logger log = LoggerFactory.getLogger(WorldChatService.class);
 
     private final SimpMessagingTemplate messaging;
     private final UserRepository users;
@@ -62,8 +66,30 @@ public class WorldChatService {
                 senderUserId, nicknameOf(senderUserId), content, Instant.now()));
     }
 
-    /** 인증된 STOMP 연결이 열린 사실을 시스템 알림으로 방송한다. 일반 채팅 rate limit은 적용하지 않는다. */
+    /**
+     * 인증된 STOMP 연결이 열린 사실을 시스템 알림으로 방송한다.
+     *
+     * <p><b>채팅의 창·벌칙이 아니라 간격 하나로 막는다</b> (S15P21A604-915 / GitLab #223 §5-5).
+     * 이 경로를 열어 두면 연결을 끊고 다시 붙기를 반복하는 것만으로 같은 토픽을 밀어 올릴 수 있다 —
+     * 본문을 보내지 않으므로 {@link #say} 의 제한에는 걸리지 않는다.
+     *
+     * <p><b>거절은 조용히 방송하지 않는 것으로 끝난다.</b> 입장 알림은 SEND 가 아니라 연결 이벤트라
+     * 클라이언트에 거절을 돌려줄 응답 경로가 없고, 연결 자체는 정상이다.
+     *
+     * <p><b>Redis 가 답하지 않으면 방송하지 않는다</b>(fail-closed). 입장 알림은 없어도 기능이
+     * 성립하는 반면, 판정할 수 없을 때 열어 두면 Redis 가 흔들리는 순간 토픽이 밀린다. 대신 흔적을
+     * 남긴다 — 조용히 삼키면 알림이 사라진 이유를 아무 데서도 찾을 수 없다 (T-24).
+     */
     public void announceJoin(Long userId) {
+        try {
+            if (!rateLimiter.tryAnnounceJoin(userId)) {
+                return;
+            }
+        } catch (WorldChatUnavailableException unavailable) {
+            log.warn("월드 채팅 입장 알림을 방송하지 않습니다 — 도배 판정이 불가능합니다. userId={}",
+                    userId, unavailable);
+            return;
+        }
         messaging.convertAndSend(TOPIC, (Object) WorldChatJoinNotice.of(nicknameOf(userId), Instant.now()));
     }
 

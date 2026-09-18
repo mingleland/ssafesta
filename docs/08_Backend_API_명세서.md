@@ -334,7 +334,8 @@ React 와 Unity 가 같은 Access Token 을 나눠 쓰기 때문이다 — 유�
     "logoUrl": null
   },
   "publishedLayoutVersion": 4,
-  "homepageUrl": "https://my-team-project.example.com"
+  "homepageUrl": "https://my-team-project.example.com",
+  "handoffEnabled": false
 }
 ```
 
@@ -342,6 +343,10 @@ React 와 Unity 가 같은 Access Token 을 나눠 쓰기 때문이다 — 유�
   - **등록값이 없으면 그 부스 프로젝트의 `deployUrl`(서비스 주소)로 폴백한다** (2026-09-14 결정). `booths.homepage_url`은 등록 endpoint만 있고 **화면이 없어** 실서비스에서는 늘 비어 있었고, 소유자가 실제로 주소를 입력하는 칸은 프로젝트 관리의 "서비스 주소" 하나다. 우선순위는 **등록값 > 프로젝트 `deployUrl`** — 폴백은 빈 자리만 메우므로 등록 화면이 생기면 저절로 사라진다.
   - 둘 다 없으면 `null`이라 FE는 여전히 `null` 하나로 "미등록/미공개" 안내 분기를 끝낸다.
   - `GET /booths/mine`(소유자 프리필)에는 **폴백을 적용하지 않는다** — 등록한 적 없는 값을 폼에 채우면 소유자가 그것을 다시 저장해 한 주소가 두 컬럼으로 복제된다.
+- `handoffEnabled`: 이 부스가 **사람 상담 연결을 받는가** (2026-09-18 신설, `S15P21A604-914` · GitLab #249). 방문자 FE 는 이 값으로 AI 채팅의 '사람 상담 요청' 버튼을 **누르기 전에** 감춘다. 값은 소유자용 `GET /booths/{boothId}/agents` 의 `handoffEnabled` 와 항상 같다.
+  - **AI 직원이 없는 부스는 `false`** — 상담을 넘겨받을 사람이 없다는 뜻이다.
+  - **`homepageUrl` 과 달리 published 게이트가 없다** — 미공개 부스도 저장된 값 그대로 내려간다. 방문자는 미공개 부스에 진입 자체가 불가능하고, 이 값은 밖으로 나가는 주소가 아니라 boolean 하나다.
+  - FE 계약은 optional 이다 — 값이 없으면(구버전 서버) 버튼을 **유지**하고, 명시적 `false` 일 때만 숨긴다.
 - ⚠️ **회차 필드명은 endpoint마다 다르고 합치지 않는다** (2026-08-26 리드 확정, #97). 이 Booth 상세는 **`publishedLayoutVersion`**, Layout Draft 조회·Publish 결과는 **`publishedVersion`**이다.
 
 ### DELETE `/booth-slots/{slotId}/leases/mine` — spec 004 신설 (D12, 2026-09-14)
