@@ -41,6 +41,14 @@ describe('이벤트 설문 로드', () => {
     expect(state.progress.total).toBe(state.questions.length);
   });
 
+  it('이벤트 상점 추가 물품 문항(V37 Q6)은 화면에 세우지 않는다 — 상점에 이미 물품이 있다', async () => {
+    await loadSurveyRun({ kind: 'event', surveyKey: MOCK_EVENT_SURVEY_KEY });
+
+    const { questions } = getSurveyRunSnapshot();
+    expect(questions.some((q) => q.prompt.includes('추가되었으면 하는 경품'))).toBe(false);
+    expect(questions).toHaveLength(5);
+  });
+
   it('보상이 0 인데도 회원 전용이다 — rewardCoin 으로 게스트를 판정하면 이 설문이 열려 버린다', async () => {
     await loadSurveyRun({ kind: 'event', surveyKey: MOCK_EVENT_SURVEY_KEY });
 
@@ -72,9 +80,8 @@ describe('이벤트 설문 로드', () => {
 describe('이미 참여한 설문', () => {
   it('참여 시각을 싣고 제출을 막는다 — 눌러서 409 를 받는 버튼을 두지 않는다', async () => {
     await loadSurveyRun({ kind: 'event', surveyKey: MOCK_EVENT_SURVEY_DONE });
-    setAnswer('q-single', { type: 'single', optionId: 'o1' });
-    setAnswer('q-multi', { type: 'multi', optionIds: ['o1'] });
-    setAnswer('q-rating', { type: 'rating', value: 5 });
+    setAnswer('ev-q3', { type: 'multi', optionIds: ['ev-q3-o0'] });
+    setAnswer('ev-q1', { type: 'rating', value: 5 });
 
     expect(getSurveyRunSnapshot().respondedAt).not.toBeNull();
     expect(canSubmit()).toBe(false);
