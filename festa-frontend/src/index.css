@@ -199,3 +199,13 @@ select,
   -webkit-user-select: text;
   user-select: text;
 }
+/* 폼 컨트롤 전역 font 리셋 (GitLab #246, S15P21A604-913).
+   input·button·select·textarea는 폰트를 상속하지 않아 규칙을 빠뜨리면 UA 기본 Arial 13.33px로 떨어진다.
+   컴포넌트별 font: inherit은 그대로 둬도 무해하다. */
+input,
+button,
+select,
+textarea,
+optgroup {
+  font: inherit;
+}
