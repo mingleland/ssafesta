@@ -7,6 +7,7 @@ import { showToast } from '../../../shared/ui/toast/toastStore';
 import { createAdjustmentDraft, draftProblem, editDraft, type AdjustmentDraft } from '../model/adjustmentKey';
 import { Empty, ErrorBanner, GatedButton, KeyValue, Loading, Pager, fmtCoin, fmtTime } from './common';
 import { MemberSearch } from './MemberSearch';
+import { useProfile } from '../../profile/model/profile';
 
 export function WalletsSection({ userId, onSelect }: { userId: number | null; onSelect: (userId: number | null) => void }) {
   return (
@@ -45,7 +46,12 @@ function WalletDetail({ userId }: { userId: number }) {
   const closeDraft = () => { setDraft(null); adjust.reset(); };
   const problem = draft === null ? null : draftProblem(draft);
   const conflict = adjust.isError && (adjust.error as { code?: string }).code === 'IDEMPOTENCY_CONFLICT';
-  const masterGate = member.data?.master ? '마스터 계정은 변경할 수 없습니다.' : null;
+  // 마스터 계정은 타 관리자에게 보호 대상이지만, 마스터 본인의 자기 조정은 BE 가 허용한다 —
+  // 화면 문구는 게이트가 막는 이유를 말하는 자리라 본인 여부를 함께 본다.
+  const myUserId = useProfile().account?.userId;
+  const masterGate = member.data?.master && member.data.userId !== myUserId
+    ? '마스터 계정은 변경할 수 없습니다. 본인 계정만 스스로 조정할 수 있습니다.'
+    : null;
 
   return (
     <section className="sc-card ad-work" aria-label="지갑 상세">

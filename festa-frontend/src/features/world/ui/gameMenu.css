@@ -27,16 +27,17 @@
   overflow-x: hidden;
   overflow-y: auto;
 }
+.gm-panel:focus,
+.gm-panel:focus-visible {
+  /* 포커스는 이 컨테이너가 받는다(위 GameMenu 효과) — UA 기본 링을 끊는 자리다.
+     항목들의 키보드 링(:focus-visible 라벤더)은 그대로 둔다 */
+  outline: none;
+}
 @media (prefers-reduced-transparency: reduce) {
   .gm-panel { background: #0e1228; }
   .gm-dim { background: rgba(5, 7, 20, 0.78); }
 }
 .gm-close {
-  /* 프로필 요약 행과 같은 높이에 맞춰 세로 중앙에 둔다 — 패널 맨 위 모서리에 떠 있으면
-     위쪽에 쓸모없는 띠가 한 줄 생긴다 */
-  position: absolute;
-  top: 22px;
-  right: 14px;
   width: 28px;
   height: 28px;
   display: grid;
@@ -49,6 +50,15 @@
 }
 .gm-close:hover { background: var(--festa-fill-strong); }
 
+.gm-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+.gm-title { font-size: 14.5px; font-weight: 700; }
+
 .gm-summary {
   display: grid;
   grid-template-columns: auto 1fr;
@@ -56,7 +66,7 @@
   gap: 12px;
   width: 100%;
   box-sizing: border-box;
-  padding: 18px 52px 18px 18px;
+  padding: 16px 18px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
   border-top: 0;
   border-left: 0;
@@ -90,11 +100,39 @@
 }
 .gm-sub { font-size: 12px; color: rgba(234, 238, 251, 0.6); }
 .gm-coin { font-size: 12.5px; color: #ffd66b; font-weight: 600; }
-.gm-system {
+.gm-body { padding: 10px 10px 12px; }
+.gm-section { padding: 2px 4px 8px; }
+.gm-section + .gm-section { border-top: 1px solid rgba(255, 255, 255, 0.06); }
+.gm-section-title {
+  margin: 8px 4px 10px;
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: rgba(234, 238, 251, 0.5);
+}
+.gm-shortcut-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+.gm-card {
   display: flex;
   flex-direction: column;
-  padding: 8px;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--festa-line);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--festa-ink);
+  font: inherit;
+  font-size: 13.5px;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
 }
+.gm-card:hover { background: rgba(255, 255, 255, 0.08); }
+.gm-card > svg { color: rgba(234, 238, 251, 0.72); }
 .gm-item {
   display: flex;
   align-items: center;

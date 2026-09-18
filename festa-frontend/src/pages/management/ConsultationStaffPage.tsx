@@ -15,7 +15,7 @@ import {
   useStaffConsultation,
 } from '../../features/consultation/model/staff';
 import { ScreenEmpty, ScreenError, ScreenLoading } from '../../features/shell/ui/PageShell';
-import { ManagementScreen } from '../../features/booth/ui/ManagementScreen';
+import { ManagementScreen, useManagementBoothId } from '../../features/booth/ui/ManagementScreen';
 import { Tooltip } from '../../shared/ui/tooltip/Tooltip';
 import './management.css';
 
@@ -25,10 +25,15 @@ function when(iso: string): string {
 
 export function ConsultationStaffPage() {
   const state = useStaffConsultation();
+  // 대기열 경로에 boothId 가 필요하다 — real 어댑터가 GET /booths/{boothId}/consultation/requests 를
+  // 만든다. 이 화면은 오버레이 패널로도, 옛 라우트로도 뜬다 — boothId 소스는 표면 훅이 가린다.
+  // **useParams 를 직접 쓰면 오버레이에서 undefined 다** — 월드 라우트에는 :boothId 가 없어
+  // NaN 이 되고, 가드에 걸려 loadStaffQueue 가 영영 불리지 않았다(2026-09-18 실측)
+  const boothId = useManagementBoothId();
 
   useEffect(() => {
-    void loadStaffQueue();
-  }, []);
+    if (Number.isFinite(boothId)) void loadStaffQueue(boothId);
+  }, [boothId]);
 
   const acceptable = canAccept();
 
@@ -40,7 +45,7 @@ export function ConsultationStaffPage() {
       {state.status === 'idle' || state.status === 'loading' ? (
         <ScreenLoading label="대기열을 불러오는 중..." />
       ) : state.status === 'error' ? (
-        <ScreenError title="대기열을 불러오지 못했습니다" message="잠시 후 다시 시도해 주세요." onRetry={() => void loadStaffQueue()} />
+        <ScreenError title="대기열을 불러오지 못했습니다" message="잠시 후 다시 시도해 주세요." onRetry={() => void loadStaffQueue(boothId)} />
       ) : (
         <>
           {/* 지금 어떤 상태인지부터 말한다. 서버가 주는 값만 쓴다 — "오늘 완료" 같은 지표는 없다 */}
@@ -92,7 +97,7 @@ export function ConsultationStaffPage() {
             <div className="mg-list-head">
               <span className="sc-section-title">요청 목록</span>
               {/* 보조 액션이다 — 하단 주요 액션 자리를 차지하지 않는다 */}
-              <button type="button" className="sc-btn sc-btn-sm" onClick={() => void loadStaffQueue()}>
+              <button type="button" className="sc-btn sc-btn-sm" onClick={() => void loadStaffQueue(boothId)}>
                 새로고침
               </button>
             </div>

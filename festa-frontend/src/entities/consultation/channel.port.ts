@@ -105,7 +105,8 @@ export interface ConsultationChannelPort {
 }
 
 export interface ConsultationStaffPort {
-  getQueue(): Promise<ConsultationRequestCard[]>;
+  /** boothId 는 화면(route)이 갖고 있다 — 어댑터가 대기열 경로를 만드는 데만 쓴다 */
+  getQueue(boothId: number): Promise<ConsultationRequestCard[]>;
   /** C-06 — 활성 상담이 있으면 서버도 409 로 거부한다. FE 는 호출 전에 게이트한다 */
   accept(requestId: string): Promise<ConsultationActiveSession>;
   end(): Promise<void>;

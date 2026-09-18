@@ -16,7 +16,7 @@ export function MenuPanelHost({ panel, onClose }: { panel: MenuPanel; onClose: (
   if (panel === 'missions') return <DailyMissionOverlay onClose={onClose} />;
   if (panel === 'guide') {
     return (
-      <OverlayFrame title="조작 안내" subtitle="월드에서 쓰는 키" size="s" onClose={onClose}>
+      <OverlayFrame title="조작 안내" subtitle="월드에서 사용하는 기본 조작" size="s" onClose={onClose}>
         <ControlGuideList />
       </OverlayFrame>
     );

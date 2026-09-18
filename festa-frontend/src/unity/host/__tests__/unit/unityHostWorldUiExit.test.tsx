@@ -104,6 +104,20 @@ describe('오버레이 종료가 Unity 초점 종료를 동반한다 (-642)', ()
     act(() => { closeGameMenu(); });
     expect(exitCalls(inst)).toHaveLength(0);
   });
+  it('아바타 화면은 닫지 않는다 — 메뉴에서 연 직후 닫으면 좀비 UI가 된다', async () => {
+    const { inst } = await renderBooted();
+    act(() => { openMenu(); });
+    act(() => { applyWorldUiStateJson('{\"focus\":false,\"minigame\":false,\"avatar\":true}'); });
+    act(() => { closeGameMenu(); });
+    expect(exitCalls(inst)).toHaveLength(0);
+  });
+  it('아바타 중 초점 신호가 와도 닫지 않는다', async () => {
+    const { inst } = await renderBooted();
+    act(() => { openMenu(); });
+    act(() => { applyWorldUiStateJson('{\"focus\":true,\"minigame\":false,\"avatar\":true}'); });
+    act(() => { closeGameMenu(); });
+    expect(exitCalls(inst)).toHaveLength(0);
+  });
 
   it('부팅 직후에는 보내지 않는다 — 새 인스턴스에는 모달이 없다', async () => {
     const { inst } = await renderBooted();

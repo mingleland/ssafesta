@@ -74,6 +74,13 @@ let socket: WebSocket | null = null;
 let connected = false;
 let stopped = true;
 let attempts = 0;
+/**
+ * 진행 중인 연결 시도 — 병렬 호출이 같은 promise 를 공유한다. 가드(`socket !== null`)와
+ * 할당(`socket = next`) 사이에 `await fetchToken()` 이 있어, 마운트 시점에 나란히 호출되면
+ * 둘 다 가드를 통과해 소켓이 두 개 열린다. 소켓이 두 개면 서버가 두 세션으로 보고 broadcast
+ * 마다 MESSAGE 를 두 번 보내 채팅이 두 줄씩 보인다(2026-09-18 실측).
+ */
+let connectTask: Promise<void> | null = null;
 let lastErrorMessage: string | null = null;
 let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 let nextId = 1;
@@ -161,6 +168,18 @@ function scheduleReconnect(why: string): void {
 
 /** 토큰을 새로 받아 소켓을 연다. 재연결마다 새 토큰이다 — 수명이 5분이라 재사용할 수 없다 */
 export async function connectRealtime(): Promise<void> {
+  if (socket !== null) return;
+  // 병렬 호출은 진행 중인 promise 를 공유한다 — 위 가드와 아래 socket 할당 사이에
+  // await fetchToken() 이 있어 둘 다 통과하면 소켓이 두 개 열린다. 소켓이 두 개면 서버가
+  // 두 세션으로 보고 broadcast 마다 MESSAGE 를 두 번 보내 채팅이 두 줄씩 보인다(2026-09-18).
+  if (connectTask !== null) return connectTask;
+  connectTask = doConnect().finally(() => {
+    connectTask = null;
+  });
+  return connectTask;
+}
+
+async function doConnect(): Promise<void> {
   if (socket !== null) return;
   stopped = false;
   setStatus('reconnecting');
@@ -287,6 +306,7 @@ export function __resetRealtimeForTests(): void {
   reconnectTimer = null;
   subscriptions.clear();
   socket = null;
+  connectTask = null;
   connected = false;
   stopped = true;
   attempts = 0;

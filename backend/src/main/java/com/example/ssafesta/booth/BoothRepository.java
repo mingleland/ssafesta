@@ -1,6 +1,7 @@
 package com.example.ssafesta.booth;
 
 import jakarta.persistence.LockModeType;
+import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
@@ -47,6 +48,14 @@ public interface BoothRepository extends JpaRepository<Booth, Long> {
      * partial on the same predicate, so the database enforces exactly what this signature promises.
      */
     Optional<Booth> findByOwnerUserIdAndAdminOwnedFalse(Long ownerUserId);
+
+    /**
+     * Every administrator booth on the floor (S15P21A604-933).
+     *
+     * <p>Not scoped to one administrator: the booth follows the <b>role</b> rather than the person
+     * who set it up (FR-023), so the console shows them all and any administrator may take one over.
+     */
+    List<Booth> findByAdminOwnedTrue();
 
     Optional<Booth> findByCurrentSlotId(Long currentSlotId);
 }

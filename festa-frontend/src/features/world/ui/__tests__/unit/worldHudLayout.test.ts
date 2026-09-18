@@ -24,6 +24,9 @@ describe('World HUD layout contract', () => {
   it('우상단은 상담·전체화면, 상단 중앙은 Toast, 하단 중앙은 클릭형 Exit으로 분리한다', () => {
     // 우상단은 한 줄이다 — 상담이 왼쪽 칸, 전체화면이 오른쪽 끝이다(2026-09-16)
     expect(hud).toContain("right: var(--festa-hud-margin-x);");
+    // 조작 안내는 우하단이다 — 전체화면과 같은 규격, 자리만 아래다
+    expect(hud).toContain('.world-hud-guide');
+    expect(hud).toContain('bottom: var(--festa-hud-margin-y);');
     expect(toast).toContain('.world-active .toast-host');
     expect(toast).toContain('left: 50%;');
     expect(exit).toContain('bottom: var(--festa-hud-context-bottom);');

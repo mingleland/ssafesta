@@ -48,11 +48,11 @@ export function useStaffConsultation(): StaffConsultationState {
   return useSyncExternalStore(subscribe, getStaffConsultationSnapshot);
 }
 
-export async function loadStaffQueue(): Promise<void> {
+export async function loadStaffQueue(boothId: number): Promise<void> {
   const seq = ++queueLoadSeq;
   setState({ status: 'loading' });
   try {
-    const queue = await consultationStaff.getQueue();
+    const queue = await consultationStaff.getQueue(boothId);
     if (seq !== queueLoadSeq) return; // 이후에 accept 등이 상태를 앞질렀다 — 낡은 목록을 버린다
     setState({ status: 'ready', queue });
   } catch {
