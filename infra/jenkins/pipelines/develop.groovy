@@ -23,11 +23,8 @@ def call() {
         return
     }
 
-    final String componentList = components.join(',')
     final String artifactRoot = 'artifacts/develop'
-    final String metadataDir = "${artifactRoot}/release-metadata"
-    final String releaseManifest = "${artifactRoot}/release-manifest.json"
-    final String transferBundle = "develop-${headSha}-${env.BUILD_NUMBER}"
+    final String releaseId = "develop-${headSha}-${env.BUILD_NUMBER}"
     final String transferDir = '/var/lib/festa-image-transfer'
     // `components` may be all components for a shared CI change. Only the
     // detector's deployComponents contract is allowed to mutate dev.
@@ -35,60 +32,81 @@ def call() {
     final String deployComponentList = deployComponents.join(',')
 
     echo "SELECTED_COMPONENTS: ${components.join(', ')}; dev batch targets: ${deployComponentList ?: 'none'}"
-    components.each { component ->
+
+    // game 은 Unity 실행기 하나를 독점하고 빌드가 45분을 넘는다. 그 빌드를 ai·back·front 배포보다
+    // 앞에 두면 unity 가 붐빌 때 무관한 파트 배포까지 함께 죽는다 — #468 은 unity 대기 50분 뒤
+    // 전체 타임아웃으로 ABORT 되며 이미 만들어 둔 back·front 이미지를 배포하지 못했다 (2026-09-18 실측).
+    // 그래서 앱 컴포넌트를 먼저 빌드·배포하고 game 은 뒤에 둔다. 배포 단위가 서로 다르므로
+    // release manifest 도 각자 만든다 (schema 는 minItems 1 을 허용한다).
+    final List appComponents = components.findAll { it != 'game' }
+    final String appComponentList = appComponents.join(',')
+    final boolean hasGame = components.contains('game')
+    // 배포 여부는 detector 의 deployComponents 계약만 결정한다. shared CI 변경은 네 컴포넌트를 모두
+    // 빌드하지만 배포 대상은 비운다 — 그때 game 을 배포하면 안 된다.
+    final boolean deployGame = (selection.deployComponents as List).contains('game')
+
+    if (deployComponents.isEmpty() && !hasGame) {
+        echo 'NO_OP: game deployment remains on the Phase 3 WebGL path; Dedicated Server deployment is infra-003'
+        return
+    }
+
+    final String appMetadataDir = "${artifactRoot}/release-metadata"
+    final String appManifest = "${artifactRoot}/release-manifest.json"
+    final String appBundle = "${releaseId}-app"
+    final String gameMetadataDir = "${artifactRoot}/release-metadata-game"
+    final String gameManifest = "${artifactRoot}/release-manifest-game.json"
+    final String gameBundle = "${releaseId}-game"
+
+    def buildComponent = { String component ->
         load('infra/jenkins/pipelines/component.groovy').call([
             component: component,
             sourceSha: selection.headSha,
             artifactDir: "artifacts/develop/build/${component}"
         ])
     }
-    if (components.contains('game')) {
-        stage('Collect Game Candidate Metadata') {
-            unstash 'candidate-metadata-game'
-        }
-    }
 
-    stage('Candidate Manifest') {
-        sh """
-            mkdir -p '${metadataDir}'
-            rm -f '${metadataDir}'/*.json
-            for component in ${componentList.replace(',', ' ')}; do
-                cp '${artifactRoot}/build/'\${component}'/image-metadata.json' '${metadataDir}/'\${component}'.json'
-            done
-        """
-        withEnv([
-            "DEPLOY_COMPONENTS=${componentList}",
-            "COMPONENT_METADATA_DIR=${metadataDir}",
-            "RELEASE_MANIFEST_PATH=${releaseManifest}",
-            "RELEASE_ID=develop-${headSha}-${env.BUILD_NUMBER}",
-            'SCM_PROVIDER=gitlab',
-            'SCM_REPOSITORY=s15-metaverse-game-sub1/S15P21A604',
-            'SCM_BRANCH=develop',
-            "CI_COMMIT_SHA=${headSha}",
-            "JENKINS_JOB=${env.JOB_NAME}",
-            "JENKINS_BUILD_NUMBER=${env.BUILD_NUMBER}",
-            "JENKINS_BUILD_URL=${env.BUILD_URL}"
-        ]) {
-            sh 'infra/deploy/scripts/build-release-manifest.sh'
-            sh "infra/jenkins/scripts/transfer-local-images.sh --export --bundle '${transferBundle}' --transfer-dir '${transferDir}' --manifest '${releaseManifest}'"
-            stash name: 'candidate-release-manifest', includes: releaseManifest, useDefaultExcludes: false
+    def candidateManifest = { String label, String comps, String metadataDir, String manifestPath, String bundle, String stashName ->
+        stage("Candidate Manifest (${label})") {
+            sh """
+                mkdir -p '${metadataDir}'
+                rm -f '${metadataDir}'/*.json
+                for component in ${comps.replace(',', ' ')}; do
+                    cp '${artifactRoot}/build/'\${component}'/image-metadata.json' '${metadataDir}/'\${component}'.json'
+                done
+            """
+            withEnv([
+                "DEPLOY_COMPONENTS=${comps}",
+                "COMPONENT_METADATA_DIR=${metadataDir}",
+                "RELEASE_MANIFEST_PATH=${manifestPath}",
+                "RELEASE_ID=${releaseId}",
+                'SCM_PROVIDER=gitlab',
+                'SCM_REPOSITORY=s15-metaverse-game-sub1/S15P21A604',
+                'SCM_BRANCH=develop',
+                "CI_COMMIT_SHA=${headSha}",
+                "JENKINS_JOB=${env.JOB_NAME}",
+                "JENKINS_BUILD_NUMBER=${env.BUILD_NUMBER}",
+                "JENKINS_BUILD_URL=${env.BUILD_URL}"
+            ]) {
+                sh 'infra/deploy/scripts/build-release-manifest.sh'
+                sh "infra/jenkins/scripts/transfer-local-images.sh --export --bundle '${bundle}' --transfer-dir '${transferDir}' --manifest '${manifestPath}'"
+                stash name: stashName, includes: manifestPath, useDefaultExcludes: false
+            }
         }
-    }
-
-    stage('Deploy Candidate Receipt') {
-        node('deploy') {
-            ws('/home/jenkins/agent/deploy/workspaces/develop-candidate-receipt') {
-                checkout scm
-                sh "git checkout --detach '${headSha}'"
-                unstash 'candidate-release-manifest'
-                sh "infra/jenkins/scripts/transfer-local-images.sh --import --bundle '${transferBundle}' --transfer-dir '${transferDir}'"
+        stage("Deploy Candidate Receipt (${label})") {
+            node('deploy') {
+                ws("/home/jenkins/agent/deploy/workspaces/develop-candidate-receipt-${label}") {
+                    checkout scm
+                    sh "git checkout --detach '${headSha}'"
+                    unstash stashName
+                    sh "infra/jenkins/scripts/transfer-local-images.sh --import --bundle '${bundle}' --transfer-dir '${transferDir}'"
+                }
             }
         }
     }
 
-    if (deployComponents.isEmpty() && !components.contains('game')) {
-        echo 'NO_OP: game deployment remains on the Phase 3 WebGL path; Dedicated Server deployment is infra-003'
-        return
+    if (!appComponents.isEmpty()) {
+        appComponents.each { component -> buildComponent(component) }
+        candidateManifest('app', appComponentList, appMetadataDir, appManifest, appBundle, 'candidate-release-manifest')
     }
 
     if (!deployComponents.isEmpty()) {
@@ -137,9 +155,9 @@ def call() {
                 }
 
                 withEnv([
-                    "DEV_BATCH_ID=develop-${headSha}-${env.BUILD_NUMBER}",
+                    "DEV_BATCH_ID=${releaseId}",
                     "DEPLOY_COMPONENTS=${deployComponentList}",
-                    "RELEASE_MANIFEST_PATH=${releaseManifest}",
+                    "RELEASE_MANIFEST_PATH=${appManifest}",
                     "CI_ARTIFACT_DIR=${artifactRoot}",
                     "FRESHNESS_EXPECTED_SHA=${headSha}",
                     'CI_BRANCH=develop',
@@ -156,39 +174,46 @@ def call() {
     }
     }
 
-    if ((selection.deployComponents as List).contains('game')) {
-        stage('Deploy Dedicated Server') {
-            node('deploy') {
-                ws('/home/jenkins/agent/deploy/workspaces/develop-game-deploy') {
-                    checkout scm
-                    sh "git checkout --detach '${headSha}'"
-                    unstash 'candidate-release-manifest'
-                    withEnv([
-                        "RELEASE_MANIFEST_PATH=${releaseManifest}",
-                        "GAME_ENV_FILE=${env.GAME_ENV_FILE ?: '/srv/festa/config/game.env'}",
-                        "CONNECTION_TOKEN_SECRET_FILE=${env.CONNECTION_TOKEN_SECRET_FILE ?: '/opt/festa/secrets/dev-game-connection-token-secret'}",
-                        "GAME_DEPLOY_STATE_DIR=${env.GAME_DEPLOY_STATE_DIR ?: '/var/lib/festa-environments/demo/game'}",
-                        "CI_ARTIFACT_DIR=${artifactRoot}"
-                    ]) {
-                        // deploy-game.sh 의 75 는 "배포된 WebGL 과 NGO 프리팹이 어긋나 교체하지 않았다" 는 뜻이다.
-                        // 실패가 아니라 건너뜀이다 — 돌고 있는 월드는 그대로이고, 무관한 커밋마다 빨간 빌드가 쌓이면
-                        // 사람이 검사를 꺼 버린다. deploy-dev-batch.sh 의 superseded 와 같은 관례를 쓴다.
-                        //
-                        // 각 스크립트를 개별 sh 스텝으로 부른다. 이전에는 한 덩어리 sh 문자열 안에 Groovy 의
-                        // error(...) 가 들어 있어 셸이 그것을 명령으로 실행했다 — 단계는 우연히 실패했지만
-                        // 의도한 메시지는 한 번도 나온 적이 없다.
-                        int deployStatus = sh(returnStatus: true, script: 'bash infra/unity-server/scripts/deploy-game.sh')
-                        if (deployStatus == 75) {
-                            currentBuild.result = 'NOT_BUILT'
-                            echo 'SKIPPED: deployed WebGL client and this game candidate disagree on the NGO prefab set; the running demo world was left untouched'
-                        } else if (deployStatus != 0) {
-                            error("Dedicated Server deployment failed with exit ${deployStatus}")
-                        } else if (sh(returnStatus: true, script: 'bash infra/unity-server/scripts/game-readiness.sh') == 0) {
-                            sh 'bash infra/unity-server/scripts/promote-game.sh'
-                        } else {
-                            sh 'bash infra/unity-server/scripts/rollback-game.sh'
-                            error('Dedicated Server deployment verification failed')
-                        }
+    if (!hasGame) { return }
+
+    // 여기서부터 game 이다. 위의 앱 배포가 이미 끝났으므로 Unity 대기가 그 배포를 막지 않는다.
+    buildComponent('game')
+    stage('Collect Game Candidate Metadata') {
+        unstash 'candidate-metadata-game'
+    }
+    candidateManifest('game', 'game', gameMetadataDir, gameManifest, gameBundle, 'candidate-release-manifest-game')
+
+    stage('Deploy Dedicated Server') {
+        node('deploy') {
+            ws('/home/jenkins/agent/deploy/workspaces/develop-game-deploy') {
+                checkout scm
+                sh "git checkout --detach '${headSha}'"
+                unstash 'candidate-release-manifest-game'
+                withEnv([
+                    "RELEASE_MANIFEST_PATH=${gameManifest}",
+                    "GAME_ENV_FILE=${env.GAME_ENV_FILE ?: '/srv/festa/config/game.env'}",
+                    "CONNECTION_TOKEN_SECRET_FILE=${env.CONNECTION_TOKEN_SECRET_FILE ?: '/opt/festa/secrets/dev-game-connection-token-secret'}",
+                    "GAME_DEPLOY_STATE_DIR=${env.GAME_DEPLOY_STATE_DIR ?: '/var/lib/festa-environments/demo/game'}",
+                    "CI_ARTIFACT_DIR=${artifactRoot}"
+                ]) {
+                    // deploy-game.sh 의 75 는 "배포된 WebGL 과 NGO 프리팹이 어긋나 교체하지 않았다" 는 뜻이다.
+                    // 실패가 아니라 건너뜀이다 — 돌고 있는 월드는 그대로이고, 무관한 커밋마다 빨간 빌드가 쌓이면
+                    // 사람이 검사를 꺼 버린다. deploy-dev-batch.sh 의 superseded 와 같은 관례를 쓴다.
+                    //
+                    // 각 스크립트를 개별 sh 스텝으로 부른다. 이전에는 한 덩어리 sh 문자열 안에 Groovy 의
+                    // error(...) 가 들어 있어 셸이 그것을 명령으로 실행했다 — 단계는 우연히 실패했지만
+                    // 의도한 메시지는 한 번도 나온 적이 없다.
+                    int deployStatus = sh(returnStatus: true, script: 'bash infra/unity-server/scripts/deploy-game.sh')
+                    if (deployStatus == 75) {
+                        currentBuild.result = 'NOT_BUILT'
+                        echo 'SKIPPED: deployed WebGL client and this game candidate disagree on the NGO prefab set; the running demo world was left untouched'
+                    } else if (deployStatus != 0) {
+                        error("Dedicated Server deployment failed with exit ${deployStatus}")
+                    } else if (sh(returnStatus: true, script: 'bash infra/unity-server/scripts/game-readiness.sh') == 0) {
+                        sh 'bash infra/unity-server/scripts/promote-game.sh'
+                    } else {
+                        sh 'bash infra/unity-server/scripts/rollback-game.sh'
+                        error('Dedicated Server deployment verification failed')
                     }
                 }
             }
