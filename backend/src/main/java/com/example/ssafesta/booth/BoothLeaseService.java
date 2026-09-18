@@ -49,17 +49,19 @@ public class BoothLeaseService {
     private final WalletService wallets;
     private final BoothDocumentDeactivationService aiDocuments;
     private final AdminGuard admins;
+    private final AdminBoothPurger purger;
     private final LeaseProperties properties;
 
     public BoothLeaseService(BoothSlotRepository slots, BoothRepository booths, BoothLeaseRepository leases,
                              WalletService wallets, BoothDocumentDeactivationService aiDocuments,
-                             AdminGuard admins, LeaseProperties properties) {
+                             AdminGuard admins, AdminBoothPurger purger, LeaseProperties properties) {
         this.slots = slots;
         this.booths = booths;
         this.leases = leases;
         this.wallets = wallets;
         this.aiDocuments = aiDocuments;
         this.admins = admins;
+        this.purger = purger;
         this.properties = properties;
     }
 
@@ -279,15 +281,21 @@ public class BoothLeaseService {
      * booth still points at the slot being released.
      */
     private void release(BoothLease lease, LeaseStatus to) {
+        Booth booth = booths.findById(lease.getBoothId()).orElse(null);
+        if (booth != null && booth.isAdminOwned()) {
+            releaseAdminBooth(lease, booth);
+            return;
+        }
+
         boolean cancelled = to == LeaseStatus.CANCELLED;
         if (cancelled) {
             lease.cancel();
         } else {
             lease.expire();
         }
-        booths.findById(lease.getBoothId())
-                .filter(booth -> lease.getSlotId().equals(booth.getCurrentSlotId()))
-                .ifPresent(Booth::detachSlot);
+        if (booth != null && lease.getSlotId().equals(booth.getCurrentSlotId())) {
+            booth.detachSlot();
+        }
         // The AI half of the same release (spec 007 FR-015·FR-041, S15P21A604-496). It is here rather
         // than in each caller because spec.md:71 wants it in this transaction, and because a second
         // place to end a lease is a second place to forget this.
@@ -300,6 +308,42 @@ public class BoothLeaseService {
                         ? "임대 반납 정리 — leaseId={}, slotId={}, boothId={}"
                         : "만료 임대 정리 — leaseId={}, slotId={}, boothId={}",
                 lease.getId(), lease.getSlotId(), lease.getBoothId());
+    }
+
+    /**
+     * An administrator's booth does not survive its lease — it is deleted, content and all
+     * (S15P21A604-905).
+     *
+     * <p><b>Why the member path does not apply here.</b> That path preserves everything (FR-010) and
+     * detaches the slot, because a member keeps one booth across leases and re-leasing continues
+     * their own content. An administrator gets a <i>new</i> booth for every slot, so the returned one
+     * has no future: leaving it behind piles up dormant booths that no screen can reach and no member
+     * owns. Transitioning its status or deactivating its AI documents would be bookkeeping on rows
+     * that are about to be gone.
+     *
+     * <p><b>The order is forced.</b> Content first through {@link AdminBoothPurger} (plain JDBC,
+     * fifteen foreign keys deep), then the lease and the booth through JPA so the persistence
+     * context knows they are gone. The flush before the purge is what stops Hibernate from writing
+     * this transaction's pending changes onto rows the purge has already deleted.
+     *
+     * <p><b>This destroys visitor-generated rows</b> — survey responses, visit metrics and
+     * consultation transcripts left in that booth. It is inherent to the booth disappearing: none of
+     * those foreign keys cascade, so a delete that spared them could not run at all.
+     */
+    private void releaseAdminBooth(BoothLease lease, Booth booth) {
+        Long boothId = booth.getId();
+        booth.detachSlot();
+        leases.flush();
+        booths.flush();
+
+        purger.purge(boothId);
+        leases.delete(lease);
+        booths.delete(booth);
+        leases.flush();
+        booths.flush();
+
+        log.info("관리자 부스 반납 — leaseId={}, slotId={}, boothId={} (부스 삭제)",
+                lease.getId(), lease.getSlotId(), boothId);
     }
 
     /**
@@ -353,11 +397,9 @@ public class BoothLeaseService {
      * code goes into the name so the several booths are told apart in the slot list without anyone
      * renaming them.
      *
-     * <p>ponytail: a returned administrator booth is left detached rather than reused, so an
-     * administrator who leases and returns repeatedly accumulates dormant booth rows. They are
-     * invisible (no slot, nothing published) and bounded by how often a person clicks. Reuse would
-     * need a rule for <i>which</i> dormant booth a new slot inherits, and inheriting the wrong one
-     * moves content between slots — worth writing only if the rows actually pile up.
+     * <p>Nothing accumulates: a returned administrator booth is deleted outright, content and all
+     * (see {@link #releaseAdminBooth}), so there is never a dormant one to reuse or to choose
+     * between.
      */
     private Booth newAdminBooth(Long userId, BoothSlot slot) {
         return booths.save(new Booth(userId, "관리자 부스 " + slot.getSlotCode(), true));

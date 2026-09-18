@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -160,8 +161,112 @@ class AdminPermanentLeaseIntegrationTest {
 
         leaseService.cancel(admin, drop.getSlotId());
 
-        assertEquals(LeaseStatus.CANCELLED, leases.findById(drop.getId()).orElseThrow().getStatus());
+        // 반납한 쪽은 임대 행까지 사라진다 — 부스가 통째로 지워지기 때문이다.
+        assertTrue(leases.findById(drop.getId()).isEmpty());
+        assertTrue(booths.findById(drop.getBoothId()).isEmpty());
         assertEquals(LeaseStatus.ACTIVE, leases.findById(keep.getId()).orElseThrow().getStatus());
+        assertTrue(booths.findById(keep.getBoothId()).isPresent());
+    }
+
+    /**
+     * 반납한 관리자 부스는 콘텐츠까지 사라진다 (확정 사항).
+     *
+     * <p>회원 부스와 정반대다 — 회원은 임대가 끝나도 전부 보존된다(FR-010). 관리자는 슬롯마다 새
+     * 부스를 받으므로 반납한 것을 남겨 두면 아무도 닿을 수 없는 부스가 쌓인다. <b>방문자가 남긴
+     * 행도 함께 지워진다</b> — 부스를 참조하는 15개 외래키 중 cascade 가 하나도 없어서, 그것들을
+     * 남기는 삭제는 애초에 실행되지 않는다.
+     */
+    @Test
+    void returningAnAdminBoothDeletesItAndItsContent() throws Exception {
+        Long admin = administrator("삭제운영자");
+        Long slotId = freeSlotId();
+        BoothLease lease = leaseService.lease(admin, slotId, 1).lease();
+        Long boothId = lease.getBoothId();
+
+        // 지워질 것이 실제로 있게 만든다 — 레이아웃 초안·게시본, 그리고 방문 계측 한 건.
+        BoothLayoutTestSupport.publishLayout(mockMvc, boothId, bearer(admin));
+        jdbc.update("""
+                INSERT INTO booth_visit_events (booth_id, visitor_user_id, world_channel, entered_at)
+                VALUES (?, ?, 'main', now())
+                """, boothId, admin);
+        assertEquals(1, countByBooth("booth_layout_drafts", boothId));
+        assertEquals(1, countByBooth("booth_layout_published_versions", boothId));
+        assertEquals(1, countByBooth("booth_visit_events", boothId));
+
+        leaseService.cancel(admin, slotId);
+
+        assertTrue(booths.findById(boothId).isEmpty(), "부스 행이 남으면 안 된다");
+        assertEquals(0, countByBooth("booth_leases", boothId));
+        assertEquals(0, countByBooth("booth_layout_drafts", boothId));
+        assertEquals(0, countByBooth("booth_layout_published_versions", boothId));
+        assertEquals(0, countByBooth("booth_visit_events", boothId));
+        // 슬롯은 곧바로 다시 빌릴 수 있어야 한다.
+        assertTrue(leases.findValidBySlotId(slotId, Instant.now()).isEmpty());
+        assertNotEquals(boothId, leaseService.lease(admin, slotId, 1).lease().getBoothId());
+    }
+
+    /**
+     * 회원 부스는 반대다 — 반납해도 부스와 콘텐츠가 그대로 남는다 (FR-010). 관리자 삭제 경로가
+     * 회원 경로로 새지 않는지 못 박는다.
+     */
+    @Test
+    void returningAMemberBoothStillPreservesEverything() throws Exception {
+        Long member = createMemberWithWallet(users, wallets, "보존회원");
+        Long slotId = freeSlotId();
+        BoothLease lease = leaseService.lease(member, slotId, 1).lease();
+        Long boothId = lease.getBoothId();
+        BoothLayoutTestSupport.publishLayout(mockMvc, boothId, bearer(member));
+
+        leaseService.cancel(member, slotId);
+
+        assertTrue(booths.findById(boothId).isPresent());
+        assertEquals(LeaseStatus.CANCELLED, leases.findById(lease.getId()).orElseThrow().getStatus());
+        assertEquals(1, countByBooth("booth_layout_drafts", boothId));
+        assertEquals(1, countByBooth("booth_layout_published_versions", boothId));
+        assertEquals(null, booths.findById(boothId).orElseThrow().getCurrentSlotId());
+    }
+
+    /**
+     * 마스터가 설치한 관리자 부스도 다른 관리자가 조작할 수 있어야 한다 (확정 사항).
+     *
+     * <p>마스터 보호는 마스터 <b>개인</b>의 부스를 지키는 규칙이다. 관리자 부스는 권한을 따라가므로
+     * 설치자가 마스터라는 이유로 막으면 운영 부스가 한 사람에게 묶인다.
+     */
+    @Test
+    void anAdminBoothInstalledByTheMasterIsStillOperableByOtherAdministrators() throws Exception {
+        Long master = administrator("마스터운영자");
+        jdbc.update("UPDATE users SET is_master=TRUE WHERE id=?", master);
+        Long boothId = leaseService.lease(master, freeSlotId(), 1).lease().getBoothId();
+        Long otherAdmin = administrator("후임운영자");
+
+        mockMvc.perform(put("/api/v1/booths/{id}/homepage", boothId)
+                        .header("Authorization", bearer(otherAdmin))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"homepageUrl\":\"https://successor.example.com\"}"))
+                .andExpect(status().isOk());
+
+        BoothLayoutTestSupport.publishLayout(mockMvc, boothId, bearer(otherAdmin));
+        mockMvc.perform(post("/api/v1/admin/booths/{id}/unpublish", boothId)
+                        .header("Authorization", bearer(otherAdmin))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"reason\":\"운영상 비공개\"}"))
+                .andExpect(status().isNoContent());
+    }
+
+    /** 마스터 <b>개인</b> 부스는 그대로 보호된다 — 위 예외가 보호 자체를 풀어 버리지 않았는지. */
+    @Test
+    void theMastersOwnOrdinaryBoothIsStillProtected() throws Exception {
+        Long master = createMemberWithWallet(users, wallets, "마스터개인");
+        Long boothId = leaseService.lease(master, freeSlotId(), 1).lease().getBoothId();
+        jdbc.update("UPDATE users SET account_type='ADMIN', is_master=TRUE WHERE id=?", master);
+        Long otherAdmin = administrator("침입운영자");
+
+        mockMvc.perform(put("/api/v1/booths/{id}/homepage", boothId)
+                        .header("Authorization", bearer(otherAdmin))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"homepageUrl\":\"https://intruder.example.com\"}"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("MASTER_PROTECTED"));
     }
 
     /** 일반 회원 경로는 그대로다 — 50 코인이 빠지고 24시간 뒤 끝난다. */
@@ -193,6 +298,10 @@ class AdminPermanentLeaseIntegrationTest {
         Long userId = createMemberWithWallet(users, wallets, prefix);
         jdbc.update("UPDATE users SET account_type='ADMIN' WHERE id=?", userId);
         return userId;
+    }
+
+    private int countByBooth(String table, Long boothId) {
+        return jdbc.queryForObject("SELECT COUNT(*) FROM " + table + " WHERE booth_id = ?", Integer.class, boothId);
     }
 
     private int countLedger(Long userId, String reason) {

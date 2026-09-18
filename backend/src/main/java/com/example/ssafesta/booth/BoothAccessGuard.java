@@ -85,7 +85,12 @@ public class BoothAccessGuard {
         if (!admins.isAdmin(userId)) {
             throw new BoothEditorForbiddenException();
         }
-        admins.requireOwnerNotMaster(booth.getOwnerUserId());
+        // 마스터 보호는 마스터 <b>개인</b>의 부스를 지키는 규칙이다. 관리자 부스는 누구의 것도
+        // 아니라 관리자 권한을 따라가므로(FR-023) 마스터가 설치했다는 이유로 다른 관리자를 막으면
+        // 운영 부스가 한 사람에게 묶인다 (S15P21A604-905).
+        if (!booth.isAdminOwned()) {
+            admins.requireOwnerNotMaster(booth.getOwnerUserId());
+        }
         adminActions.record(userId, AdminActionRecorder.BOOTH_EDIT,
                 AdminActionRecorder.TARGET_BOOTH, boothId, null);
         return booth;
