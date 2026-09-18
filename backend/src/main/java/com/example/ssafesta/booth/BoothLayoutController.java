@@ -193,6 +193,10 @@ public class BoothLayoutController {
         }
     }
 
+    // 게임 게시본(GameController.PublishedResponse)과 단순 이름이 같다. springdoc 은 단순
+    // 이름으로 스키마를 등록하므로 이름을 갈라 두지 않으면 한쪽 문서가 다른 쪽 본문이 된다
+    // (S15P21A604-614, GitLab #172).
+    @Schema(name = "PublishedLayoutResponse")
     public record PublishedResponse(
             @Schema(description = "공개한 부스", example = "7") Long boothId,
             @Schema(description = "새로 만들어진 공개 회차. 부스 상세에서는 `publishedLayoutVersion` 이라는 이름으로 같은 값을 본다",

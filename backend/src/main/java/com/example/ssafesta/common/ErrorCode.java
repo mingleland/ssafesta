@@ -19,10 +19,44 @@ public enum ErrorCode {
     // ── 인증 · 권한 ──────────────────────────────────────────────────────────
     UNAUTHORIZED(HttpStatus.UNAUTHORIZED, "Access Token이 필요합니다."),
     INVALID_MEMBER_TOKEN(HttpStatus.UNAUTHORIZED, "유효하지 않은 회원 토큰입니다."),
+    /**
+     * Distinguished from {@link #INVALID_MEMBER_TOKEN} on purpose — one is retryable, one is not
+     * (S15P21A604-764, GitLab #198), the same split {@link #OAUTH_HANDOFF_EXPIRED} makes.
+     *
+     * <p>The Refresh Token was rotated a moment ago and this request carried the one it replaced —
+     * a second tab that bootstrapped at the same time, not a stolen token. The session is alive and
+     * the cookie has already been refreshed, so sending it again succeeds; the client must not show
+     * "로그인이 끝났다". {@code INVALID_MEMBER_TOKEN} is deliberately not reused: it means
+     * "you are not logged in", and a client cannot tell the two apart from the status alone.
+     */
+    REFRESH_TOKEN_ROTATED(HttpStatus.UNAUTHORIZED, "로그인 정보가 방금 갱신되었습니다. 다시 시도해 주세요."),
     USER_NOT_FOUND(HttpStatus.UNAUTHORIZED, "존재하지 않는 회원입니다."),
     FORBIDDEN(HttpStatus.FORBIDDEN, "권한이 없습니다."),
     MEMBER_ONLY(HttpStatus.FORBIDDEN, "회원 계정만 이용할 수 있습니다."),
     UNTRUSTED_ORIGIN(HttpStatus.FORBIDDEN, "허용되지 않은 요청 출처입니다."),
+
+    // ── 일일 미션 ───────────────────────────────────────────────────────────
+    NOT_COMPLETED(HttpStatus.BAD_REQUEST, "아직 완료하지 않은 일일 미션입니다."),
+    ALREADY_CLAIMED(HttpStatus.CONFLICT, "오늘 이미 수령한 일일 미션입니다."),
+    DAILY_CAP_REACHED(HttpStatus.CONFLICT, "오늘의 일일 미션 보상 한도에 도달했습니다."),
+    WORLD_MISSION_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE,
+            "월드 입장 미션 진행도를 확인할 수 없습니다. 잠시 후 다시 시도해 주세요."),
+
+    // ── 관리자 (S15P21A604-742) ─────────────────────────────────────────────
+    /**
+     * The master account, or something it owns, was named as the target of an admin action
+     * (S15P21A604-743). Distinct from {@link #FORBIDDEN} on purpose: the caller <i>is</i> an admin,
+     * so a generic refusal would read as "your session is wrong" rather than "this target is
+     * off-limits", and the console cannot tell the two apart to explain either.
+     */
+    MASTER_PROTECTED(HttpStatus.FORBIDDEN, "보호된 계정입니다."),
+    /**
+     * Demoting, suspending or deleting this admin would leave the service with none — and the
+     * promotion API itself is behind the admin gate, so there would be no way back in short of a
+     * migration.
+     */
+    ADMIN_LAST_ONE(HttpStatus.CONFLICT, "마지막 관리자는 해제할 수 없습니다."),
+    ADMIN_ALREADY(HttpStatus.CONFLICT, "이미 관리자입니다."),
 
     // ── OAuth ───────────────────────────────────────────────────────────────
     OAUTH_PROVIDER_NOT_SUPPORTED(HttpStatus.NOT_FOUND, "지원하지 않는 소셜 로그인 제공자입니다."),
@@ -39,6 +73,15 @@ public enum ErrorCode {
     // ── 지갑 (spec 003) ─────────────────────────────────────────────────────
     WALLET_NOT_FOUND(HttpStatus.NOT_FOUND, "지갑을 찾을 수 없습니다."),
     INSUFFICIENT_COIN(HttpStatus.CONFLICT, "코인이 부족합니다."),
+    /**
+     * 같은 멱등키로 다른 내용의 요청이 왔다. 재시도는 <b>같은 요청</b>을 다시 보내는 것이라,
+     * 금액이나 사유가 달라졌다면 그건 재시도가 아니라 키를 재사용한 새 요청이다.
+     */
+    IDEMPOTENCY_CONFLICT(HttpStatus.CONFLICT, "같은 멱등성 키로 다른 요청이 이미 처리됐습니다."),
+    /** 관리자 동작의 대상 회원이 없다. {@code USER_NOT_FOUND} 는 401 이라 이 자리에 쓸 수 없다. */
+    ADMIN_TARGET_NOT_FOUND(HttpStatus.NOT_FOUND, "대상 회원을 찾을 수 없습니다."),
+    /** 지급 후 잔액이 int 표현 범위를 넘는다. 잔액 부족의 반대쪽이라 같은 409 다. */
+    COIN_BALANCE_OVERFLOW(HttpStatus.CONFLICT, "지급 후 잔액이 표현 범위를 넘습니다."),
 
     // ── 카탈로그 · 인벤토리 (spec 012) ──────────────────────────────────────
     CATALOG_ITEM_NOT_FOUND(HttpStatus.NOT_FOUND, "카탈로그 품목을 찾을 수 없습니다."),
@@ -46,12 +89,32 @@ public enum ErrorCode {
     ITEM_ALREADY_OWNED(HttpStatus.CONFLICT, "이미 보유한 품목입니다."),
     AVATAR_ITEM_NOT_OWNED(HttpStatus.CONFLICT, "보유하지 않은 파츠가 있습니다."),
 
+    // ── 이벤트 상점 (S15P21A604-832 후속, GitLab #217) ──────────────────────
+    EVENT_PRIZE_NOT_FOUND(HttpStatus.NOT_FOUND, "경품을 찾을 수 없습니다."),
+    /** 관리자가 판매를 내린 경품이다 — 삭제하지 않고 {@code active=false} 로 내린다. */
+    EVENT_PRIZE_INACTIVE(HttpStatus.CONFLICT, "현재 판매 중인 경품이 아닙니다."),
+    EVENT_PRIZE_OUT_OF_STOCK(HttpStatus.CONFLICT, "재고가 부족합니다."),
+    /**
+     * 처리 상태 전이 규칙(PURCHASED→PENDING/FULFILLED/CANCELLED, PENDING→FULFILLED/CANCELLED)을
+     * 벗어난 요청이다. {@code FULFILLED}·{@code CANCELLED} 는 종단 상태라 되돌리지 않는다.
+     */
+    EVENT_PURCHASE_FULFILLMENT_INVALID(HttpStatus.CONFLICT, "허용되지 않는 처리 상태 전이입니다."),
+
     // ── 부스 · 임대 (spec 004) ──────────────────────────────────────────────
     BOOTH_NOT_FOUND(HttpStatus.NOT_FOUND, "부스를 찾을 수 없습니다."),
     BOOTH_SLOT_NOT_FOUND(HttpStatus.NOT_FOUND, "슬롯을 찾을 수 없습니다."),
     BOOTH_SLOT_NOT_RENTABLE(HttpStatus.CONFLICT, "임대할 수 없는 슬롯입니다."),
     BOOTH_SLOT_ALREADY_LEASED(HttpStatus.CONFLICT, "이미 임대 중인 슬롯입니다."),
-    ACTIVE_LEASE_LIMIT(HttpStatus.CONFLICT, "이미 임대 중인 부스가 있습니다. 만료 후 다시 임대할 수 있습니다."),
+    ACTIVE_LEASE_LIMIT(HttpStatus.CONFLICT, "이미 임대 중인 부스가 있습니다. 반납하거나 만료된 뒤 다시 임대할 수 있습니다."),
+    /**
+     * Nothing of the caller's to hand back here (FR-020).
+     *
+     * <p>Deliberately does not separate "you hold no lease" from "your lease is on another
+     * slot": both mean the caller's screen is stale, and the client does the same thing about
+     * either — re-read the slot list. Which one it was is in the server log. A retried
+     * {@code DELETE} lands here too, and that is not an error worth showing.
+     */
+    ACTIVE_LEASE_NOT_FOUND(HttpStatus.NOT_FOUND, "반납할 활성 임대가 없습니다."),
     /**
      * Reused by the AI conversation contract (spec 008): "booth entry refused" and "AI question
      * refused" are the same event to a user, so they must not carry two different names
@@ -98,6 +161,21 @@ public enum ErrorCode {
      * 재시도가 아니라 <b>새 업로드 권한</b>이 필요하다는 뜻이라 409 와 구분한다.
      */
     DOCUMENT_UPLOAD_GONE(HttpStatus.GONE, "업로드가 만료되었습니다. 새로 업로드해 주세요."),
+    /**
+     * 수정본 교체를 지금 걸 수 없다 (FR-019, S15P21A604-386). 교체 대상은 {@code READY} 하나이고,
+     * 그 위에 이미 다른 교체가 진행 중이거나 같은 파일이 다른 문서로 등록돼 있으면 여기로 온다.
+     *
+     * <p>무엇이 막는지는 thrower 가 message 에 담는다 — 대상 상태·진행 중인 교체·다른 문서의 중복은
+     * 사용자가 할 일이 서로 다르다. {@link #DOCUMENT_LIMIT_EXCEEDED} 와 같은 결이다.
+     */
+    DOCUMENT_NOT_REPLACEABLE(HttpStatus.CONFLICT, "이 문서는 교체할 수 없습니다."),
+    /**
+     * 처리 중인 문서는 삭제할 수 없다 (FR-012, S15P21A604-831). 업로드가 끝난 {@code QUEUED}와
+     * {@code PROCESSING}은 살아 있는 {@code ai_document_jobs} 행을 가질 수 있어, 지금 지우면 CASCADE가
+     * 그 Job 행을 워커 밑에서 걷어 간다. 업로드 전 {@code QUEUED(uploaded_at IS NULL)}는 아직 Job이
+     * 없으므로 삭제할 수 있다. 완료(READY)나 이미 끝난 상태(FAILED·EXPIRED·DISABLED)도 안전하다.
+     */
+    DOCUMENT_NOT_DELETABLE(HttpStatus.CONFLICT, "처리 중인 문서는 삭제할 수 없습니다. 완료된 뒤 다시 시도해 주세요."),
     /**
      * 늦게 도착한 이전 attempt 의 결과다 (GitLab #119 §3, S15P21A604-400).
      *
@@ -202,6 +280,18 @@ public enum ErrorCode {
     GAME_ASSET_DELETED(HttpStatus.CONFLICT, "삭제된 자산입니다."),
     GAME_ASSET_IN_USE(HttpStatus.CONFLICT, "사용 중인 자산입니다."),
 
+    // ── 프로젝트 로고 업로드 (spec 009 C-03 개정, GitLab #241) ──────────────
+    // 게임 Asset 과 같은 흐름이지만 code 를 공유하지 않는다 — 같은 이름으로 두 도메인이 답하면
+    // 클라이언트가 "무엇에 대한 거절인가" 를 경로로만 추측하게 된다. 검증 실패의 구체값은 새 code 가
+    // 아니라 completed 응답의 failureRule 로 나간다.
+    PROJECT_LOGO_TYPE_UNSUPPORTED(HttpStatus.UNSUPPORTED_MEDIA_TYPE, "지원하지 않는 이미지 형식입니다."),
+    PROJECT_LOGO_TOO_LARGE(HttpStatus.PAYLOAD_TOO_LARGE, "이미지 용량이 너무 큽니다."),
+    PROJECT_LOGO_QUOTA_EXCEEDED(HttpStatus.CONFLICT,
+            "올렸지만 저장하지 않은 이미지가 너무 많습니다. 하나를 저장하거나 잠시 뒤 다시 시도해 주세요."),
+    // 없는 것과 볼 권한이 없는 것에 같은 답을 준다 — 있는지 여부가 남의 부스 편집 상태를 알려 주는
+    // 신호가 되면 안 된다.
+    PROJECT_LOGO_NOT_FOUND(HttpStatus.NOT_FOUND, "이미지를 찾을 수 없습니다."),
+
     // ── Survey (010) ────────────────────────────────────────────────────────
     // CLOSED · ALREADY_RESPONDED 는 docs/08 §18 이 예약해 둔 어휘다. 신설은 뒤 둘이다.
     SURVEY_NOT_FOUND(HttpStatus.NOT_FOUND, "설문을 찾을 수 없습니다."),
@@ -210,15 +300,76 @@ public enum ErrorCode {
     /** 응답이 있는 설문은 문항 구조가 잠긴다 (C-08). 제목·설명·보상·마감은 수정된다. */
     SURVEY_LOCKED(HttpStatus.CONFLICT, "응답이 있는 설문은 문항을 바꿀 수 없습니다."),
 
-    // ── 미니게임 (014) ──────────────────────────────────────────────────────
-    // 하나뿐이다. 판정 거부·일일 한도 도달·재제출은 전부 200 이라 오류 어휘가 필요 없고
+    // ── 미니게임 (014 타이밍 스톱 · 021 슬롯머신) ───────────────────────────
+    // 타이밍 스톱은 판정 거부·일일 한도 도달·재제출이 전부 200 이라 오류 어휘가 거의 없고
     // (spec 014 Acceptance Scenario 4), 게스트·요청 값 오류는 MEMBER_ONLY·VALIDATION_FAILED 를
     // 재사용한다. 남의 세션도 이 코드로 답한다 — 구분하면 세션의 존재를 알려주게 된다.
     MINIGAME_SESSION_NOT_FOUND(HttpStatus.NOT_FOUND, "게임 세션을 찾을 수 없습니다."),
+    /**
+     * 서버 화이트리스트에 없는 슬롯머신이다 (spec 021 FR-002).
+     *
+     * <p>{@code NOT_FOUND} 를 재사용하지 않는다 — Unity 는 경로가 아직 배포되지 않은 경우와 기계를
+     * 모르는 경우를 갈라야 하고, 그 분기가 code 하나에 달려 있다 (GitLab #205 게임 파트 회신).
+     */
+    SLOT_MACHINE_NOT_FOUND(HttpStatus.NOT_FOUND, "슬롯머신을 찾을 수 없습니다."),
+    /** 하이스트라이커 월드 기계 id가 서버가 아는 기계와 다르다 (GitLab #233). */
+    HIGH_STRIKER_NOT_FOUND(HttpStatus.NOT_FOUND, "하이스트라이커 게임기를 찾을 수 없습니다."),
+    /** 승인된 스윙보다 빠른 클라이언트 재전송은 미션 사실로 남기지 않는다. */
+    HIGH_STRIKER_TOO_FAST(HttpStatus.TOO_MANY_REQUESTS, "하이스트라이커 기록 요청이 너무 빠릅니다."),
 
     // ── 공통 ────────────────────────────────────────────────────────────────
     VALIDATION_FAILED(HttpStatus.BAD_REQUEST, "요청 값이 올바르지 않습니다."),
     NOT_FOUND(HttpStatus.NOT_FOUND, "요청한 리소스를 찾을 수 없습니다."),
+    // ── 상담 (spec 011 US1) ─────────────────────────────────────────────────
+    // specs/011-staff-consultation/contracts/staff-consultation-api.md §B 가 정본이다.
+    // 게스트 거부는 MEMBER_ONLY 를, 만료 부스는 BOOTH_LEASE_EXPIRED 를 재사용한다 — 같은 사건에
+    // 두 이름을 만들지 않는다.
+    CONSULTATION_NOT_FOUND(HttpStatus.NOT_FOUND, "상담 요청을 찾을 수 없습니다."),
+    /** 이 방문자가 그 부스에 걸어 둔 대기 중 요청이 이미 있다. */
+    CONSULTATION_REQUEST_PENDING(HttpStatus.CONFLICT, "이미 보낸 상담 요청이 기다리고 있습니다."),
+    /**
+     * 수락하려는 직원에게 이미 활성 상담이 있다 (C-06, FR-021).
+     *
+     * <p>{@code ux_consultations_active_staff} 가 DB 에서도 막으므로, 동시 요청에서도 둘째는
+     * 이 code 로 떨어진다.
+     */
+    CONSULTATION_ALREADY_ACTIVE(HttpStatus.CONFLICT, "이미 진행 중인 상담이 있습니다."),
+    /** 이미 다른 직원이 가져갔거나 만료·취소됐다. 만료는 스위퍼를 기다리지 않고 읽는 쪽이 본다. */
+    CONSULTATION_NOT_REQUESTED(HttpStatus.CONFLICT, "더 이상 수락할 수 없는 상담 요청입니다."),
+    /** 내 요청도, 내가 맡은 상담도 아니다. */
+    CONSULTATION_FORBIDDEN(HttpStatus.FORBIDDEN, "이 상담에 대한 권한이 없습니다."),
+
+    // ── Staff 초대·권한 (spec 011 US3) ──────────────────────────────────────
+    // specs/011-staff-consultation/contracts/staff-consultation-api.md §A 가 정본이다.
+    // BOOTH_EDITOR_FORBIDDEN·MEMBER_ONLY·VALIDATION_FAILED 는 위에 있는 것을 재사용한다.
+    /**
+     * 부스 운영진이 아니다 — 초대·역할 변경·직원 제거는 Owner 와 {@code ADMIN} 만 한다 (FR-001).
+     *
+     * <p>{@code BOOTH_EDITOR_FORBIDDEN} 과 가르는 이유는 물음이 다르기 때문이다. 저쪽은 "콘텐츠를
+     * 고칠 수 있는가", 이쪽은 "사람을 들이고 뺄 수 있는가" 다. {@code CONTENT_EDITOR} 는 앞의
+     * 답이 예이고 뒤의 답이 아니오라서, 한 code 로 묶으면 FE 가 그 둘을 구분할 수 없다.
+     */
+    STAFF_MANAGER_FORBIDDEN(HttpStatus.FORBIDDEN, "직원을 관리할 권한이 없습니다."),
+    /** 초대하려는 닉네임의 회원이 없다. {@code USER_NOT_FOUND} 는 401 이라 이 자리에 쓸 수 없다. */
+    STAFF_INVITEE_NOT_FOUND(HttpStatus.NOT_FOUND, "해당 닉네임의 회원이 없습니다."),
+    STAFF_INVITATION_NOT_FOUND(HttpStatus.NOT_FOUND, "초대를 찾을 수 없습니다."),
+    /** {@code ux_staff_invitations_pending} 이 DB 에서도 막는다. */
+    STAFF_INVITATION_PENDING(HttpStatus.CONFLICT, "이미 보낸 초대가 처리되기를 기다리고 있습니다."),
+    /** 수락·취소됐거나 48시간이 지났다 (C-07). 만료는 스위퍼를 기다리지 않고 읽는 쪽이 판정한다. */
+    STAFF_INVITATION_NOT_PENDING(HttpStatus.CONFLICT, "더 이상 수락할 수 없는 초대입니다."),
+    /** 내게 온 초대가 아니다. 존재 여부는 이미 아는 사람만 물을 수 있으므로 404 가 아니라 403 이다. */
+    STAFF_INVITATION_FORBIDDEN(HttpStatus.FORBIDDEN, "내게 온 초대가 아닙니다."),
+    STAFF_ALREADY_MEMBER(HttpStatus.CONFLICT, "이미 이 부스의 구성원입니다."),
+    /** Owner 는 {@code booth_staffs} 행이 아니다 (FR-018) — 역할 변경·제거 대상이 아니다. */
+    STAFF_OWNER_IMMUTABLE(HttpStatus.CONFLICT, "부스 소유자는 직원 목록에서 변경할 수 없습니다."),
+    STAFF_NOT_FOUND(HttpStatus.NOT_FOUND, "그 부스의 직원이 아닙니다."),
+
+    // 월드 공용 채팅 (spec 002 contracts, S15P21A604-687). STOMP 로만 나가지만 ErrorCode 를
+    // 싣는다 — 싣지 않으면 500 INTERNAL_ERROR 로 나가고, 보낸 쪽이 고칠 수 있는 거절과 서버
+    // 결함이 같은 모양이 된다 (DomainExceptionEnvelopeTest 가 지키는 규약).
+    CHAT_TOO_FAST(HttpStatus.TOO_MANY_REQUESTS, "잠시 후 다시 보내 주세요."),
+    CHAT_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "채팅을 잠시 사용할 수 없습니다."),
+
     METHOD_NOT_ALLOWED(HttpStatus.METHOD_NOT_ALLOWED, "허용되지 않은 요청 방식입니다."),
     UNSUPPORTED_MEDIA_TYPE(HttpStatus.UNSUPPORTED_MEDIA_TYPE, "지원하지 않는 요청 형식입니다."),
     INTERNAL_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "서버 오류가 발생했습니다.");
@@ -237,5 +388,30 @@ public enum ErrorCode {
 
     public String defaultMessage() {
         return defaultMessage;
+    }
+
+    /**
+     * The code that answers a bare HTTP status.
+     *
+     * <p>Two callers need this and they have to agree: {@code GlobalExceptionHandler} for a
+     * framework rejection that carries a status and nothing else, and {@code ApiErrorController}
+     * for a container ERROR dispatch, where the exception is already gone and the status is all
+     * that is left to answer from.
+     *
+     * @param status resolved HTTP status, or {@code null} for a non-standard code
+     */
+    public static ErrorCode of(HttpStatus status) {
+        if (status == null) {
+            return VALIDATION_FAILED;
+        }
+        return switch (status) {
+            case UNAUTHORIZED -> UNAUTHORIZED;
+            case FORBIDDEN -> FORBIDDEN;
+            case NOT_FOUND -> NOT_FOUND;
+            case METHOD_NOT_ALLOWED -> METHOD_NOT_ALLOWED;
+            case BAD_REQUEST -> VALIDATION_FAILED;
+            case UNSUPPORTED_MEDIA_TYPE -> UNSUPPORTED_MEDIA_TYPE;
+            default -> status.is5xxServerError() ? INTERNAL_ERROR : VALIDATION_FAILED;
+        };
     }
 }

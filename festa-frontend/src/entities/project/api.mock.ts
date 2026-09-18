@@ -21,8 +21,8 @@ let likeCount = 7;
 let likedByMe = false;
 let failNextLike = false;
 
-function apiError(code: string, message: string): ApiError {
-  return { code, message, errors: [], warnings: [] };
+function apiError(code: string, message: string, errors: ApiError['errors'] = []): ApiError {
+  return { code, message, errors, warnings: [] };
 }
 
 const EMPTY_PROJECT: ProjectView = {
@@ -85,6 +85,11 @@ export function __failNextLikeForTests(): void {
 export async function updateProject(projectId: number, patch: ProjectPatch): Promise<ProjectView> {
   if (!owned || owned.projectId !== projectId) throw apiError('PROJECT_NOT_FOUND', '프로젝트가 없습니다.');
   if (patch.name === 'FAIL') throw apiError('UNKNOWN', '일시적인 오류입니다.'); // 저장 실패 시나리오
+  if (patch.name === 'INVALID_NAME') {
+    throw apiError('VALIDATION_FAILED', '입력값을 확인해 주세요.', [
+      { rule: 'NotBlank', field: 'name', message: '프로젝트 이름을 입력해 주세요.' },
+    ]);
+  }
   lastUpdatePatch = { ...patch };
   owned = { ...owned, ...normalize(patch) };
   return { ...owned };
@@ -97,6 +102,10 @@ function normalize(patch: ProjectPatch): Partial<ProjectView> {
 
 export function __lastUpdatePatchForTests(): ProjectPatch | null {
   return lastUpdatePatch;
+}
+
+export function __setOwnedProjectForTests(patch: Partial<ProjectView>): void {
+  owned = { ...sample, ...patch };
 }
 
 export function __resetProjectMockForTests(): void {

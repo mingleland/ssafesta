@@ -3,15 +3,20 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { isApiError } from '../../../shared/api/client';
 import { leaseApi } from '../../../entities/booth/leaseApi.select';
+import { notifyBoothSlotChanged } from '../../../unity/host/boothLayoutBridge';
 
 export function useLeaseSlot() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (slotId: number) => leaseApi.leaseSlot(slotId),
-    onSuccess: () => {
+    onSuccess: (_result, slotId) => {
       queryClient.invalidateQueries({ queryKey: ['booth-slots'] });
       queryClient.invalidateQueries({ queryKey: ['wallet-balance'] });
       queryClient.invalidateQueries({ queryKey: ['my-booth'] });
+      // 임대만으로는 게시본이 생기지 않는다(BE 는 미게시를 LAYOUT_NOT_PUBLISHED 404 로 답한다). 그래도
+      // 상주 중인 Unity 가 이 슬롯의 간판·점유 상태를 다시 읽게 알린다 (-644). 월드 밖(mock·미진입)이면
+      // 아무 일도 없다: 다음 진입이 읽는다.
+      notifyBoothSlotChanged(slotId);
     },
     onError: (error) => {
       if (!isApiError(error)) return;

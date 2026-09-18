@@ -141,8 +141,14 @@ FE는 중간 `sequence` 불일치를 사용자에게 노출하지 않고 경고�
 - **FR-022**: `boothId`, `agentId`, 허용 문서 상태는 인증·Conversation에 연결된 서버 측 값으로 결정해야 하며 사용자 질문, Agent 지시문 또는 검색 문서에서 받은 값으로 덮어써서는 안 된다. 다른 Booth 데이터·시스템 프롬프트·비밀정보를 요구하는 질문도 동일한 검색 범위를 유지해야 한다.
 - **FR-023**: Prompt Injection 탐지 결과는 보조 신호로만 사용할 수 있으며 데이터 격리를 탐지 모델이나 키워드 차단에 의존해서는 안 된다. 시스템 프롬프트·API Key·내부 오류 상세를 응답이나 `source` 이벤트에 포함해서는 안 된다.
 - **FR-024**: Conversation 생성 시 FastAPI는 Spring을 서버 간 호출해 **Lease 유효성, `agentId`의 `boothId` 소속 여부, Agent의 `ACTIVE` 상태**를 검증하고 응답 본문의 `leaseEndsAt`을 Conversation에 저장해야 한다. 세 조건 중 하나라도 충족하지 않으면 Fail Closed로 Conversation 생성을 거부하고 검색·LLM 호출을 수행해서는 안 된다. 서명된 Snapshot은 사용하지 않으며, 이후 질문마다 Spring을 다시 호출하지 않고 FastAPI가 UTC 시각과 저장된 `leaseEndsAt`을 비교해야 한다 ([GitHub Issue #14](https://github.com/kanghyunsoon/ssafesta/issues/14)).
+
+  > **조기 반납과의 관계 (2026-09-14 확정).** spec 004 D12 가 임차인의 조기 반납을 열면서 **"P0 에서 `ends_at` 이 불변" 이라는 이 조항의 전제가 깨졌다.** 그래도 **이 조항은 그대로 둔다** — 반납 시 FastAPI 로 무효화를 push 하지 않고, 질문마다 Spring 을 다시 묻지도 않는다.
+  >
+  > 근거는 열린 대화가 **실질적으로 아무것도 내주지 못한다**는 것이다. 신규 Conversation 은 Spring 의 임대 검증이 막고(FR-024 전반), 이미 열린 대화도 반납 트랜잭션이 문서를 `DISABLED` 로 내려 FR-021 의 검색이 `200 + items: []` 를 돌려주므로 **"자료 미준비" 고정 안내만** 나간다. 창도 무한하지 않다 — **30분 유휴 TTL**(FR-028)이 지우므로 계속 질문하는 동안만 유지된다.
+  >
+  > 반면 push 무효화를 넣으면 재시도·outbox·멱등성·다중 인스턴스 일관성이 한꺼번에 따라붙고, 질문마다 재검증은 이 조항을 통째로 뒤집는다. **즉시 차단이 실제로 필요해지면 그때 열면 된다.**
 - **FR-025**: Spring Lease 검증 호출 timeout은 1초이며 1회만 재시도해 총 2초 안에 끝내야 한다. 최종 실패 시 신규 Conversation은 생성하지 않는 Fail Closed를 적용하고 검색·LLM 호출을 수행해서는 안 된다.
-- **FR-026**: 임대 만료 후 신규 Conversation과 신규 질문은 `BOOTH_LEASE_EXPIRED`로 즉시 차단해야 한다. 응답 도중 임대가 만료되면 이미 진행 중인 응답 1건만 기존 전체 응답 timeout인 최대 60초 안에서 완료하며, 별도의 만료 Push나 중간 종료 이벤트 없이 이후 질문부터 차단한다.
+- **FR-026**: 임대가 유효하지 않게 된 뒤(만료 또는 임차인의 조기 반납 — spec 004 D12) 신규 Conversation과 신규 질문은 `BOOTH_LEASE_EXPIRED`로 즉시 차단해야 한다. 응답 도중 임대가 만료되면 이미 진행 중인 응답 1건만 기존 전체 응답 timeout인 최대 60초 안에서 완료하며, 별도의 만료 Push나 중간 종료 이벤트 없이 이후 질문부터 차단한다.
 - **FR-027**: 게스트는 AI Conversation을 생성하거나 AI 상담을 이용할 수 없어야 한다. 게스트 요청은 로그인 안내와 함께 차단하고 검색·LLM 호출을 수행해서는 안 된다.
 - **FR-028**: React 오버레이가 정상적으로 닫힐 때는 명시적 종료 API로 Conversation을 종료하고 원문을 즉시 삭제해야 한다. 클라이언트 종료 호출이 유실되거나 비정상 종료된 경우에는 서버의 30분 유휴 TTL이 삭제를 보장해야 한다.
 - **FR-029**: 실패한 Stream의 재시도는 기존 `conversationId`를 유지하고 새 `requestId`·`messageId`를 발급해야 한다. `done`에 도달하지 못한 사용자 질문·부분 AI 응답은 대화 이력에 확정 저장해서는 안 된다.

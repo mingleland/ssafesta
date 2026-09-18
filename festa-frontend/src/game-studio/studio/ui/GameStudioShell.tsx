@@ -48,7 +48,7 @@ import { useResolvedAssetUrls } from '../assets/useResolvedAssetUrls.ts';
 import { resolveTilesetVisual, tileBackgroundStyle } from '../assets/tilesetVisual.ts';
 import { resolveStaticImageVisual, staticImageBackgroundStyle } from '../assets/staticImageVisual.ts';
 import { createBrowserDraftRepository, type DraftSaveReceipt, type GameDraftRepository } from '../ports/draftRepository.ts';
-import { GameAuthoringApiError, type GamePublisher } from '../ports/gameAuthoringApi.ts';
+import { GameAuthoringApiError, type GamePublisher, type GameVisibility, type GameVisibilityPort } from '../ports/gameAuthoringApi.ts';
 import {
   createBrowserRecoveryJournal,
   shouldOfferRecovery,
@@ -290,6 +290,7 @@ interface GameStudioShellProps {
   readonly initialProject?: GameProject;
   readonly repository?: GameDraftRepository | null;
   readonly publisher?: GamePublisher | null;
+  readonly visibilityPort?: GameVisibilityPort | null;
   readonly persistenceLabel?: string;
   readonly assetRepository?: GameAssetRepository | null;
 }
@@ -320,6 +321,7 @@ export const GameStudioShell = ({
   initialProject,
   repository: repositoryProp,
   publisher = null,
+  visibilityPort = null,
   persistenceLabel = '브라우저',
   assetRepository: assetRepositoryProp,
 }: GameStudioShellProps) => {
@@ -369,6 +371,10 @@ export const GameStudioShell = ({
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [lastPublishedVersion, setLastPublishedVersion] = useState<number | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [gameVisibility, setGameVisibility] = useState<GameVisibility | null>(null);
+  const [visibilityStatus, setVisibilityStatus] = useState<'idle' | 'loading' | 'saving' | 'error'>('idle');
+  // S15P21A604-630 — 다중 이미지 업로드 진행 표시. 파일이 1장이면 즉시 끝나 굳이 안 보여준다.
+  const [uploadProgress, setUploadProgress] = useState<{ readonly current: number; readonly total: number } | null>(null);
   const [zoom, setZoom] = useState(() => loadZoom(gameId));
   const [fitRequestToken, setFitRequestToken] = useState(0);
   const [focusRequestToken, setFocusRequestToken] = useState(0);
@@ -549,6 +555,27 @@ export const GameStudioShell = ({
       });
     return () => { active = false; };
   }, [gameId, persistenceLabel, recoveryJournal, repository, store]);
+
+  useEffect(() => {
+    let active = true;
+    if (visibilityPort === null) {
+      setGameVisibility(null);
+      return () => { active = false; };
+    }
+    setVisibilityStatus('loading');
+    visibilityPort.get(gameId)
+      .then((summary) => {
+        if (!active) return;
+        setGameVisibility(summary.visibility);
+        setVisibilityStatus('idle');
+      })
+      .catch((error: unknown) => {
+        if (!active) return;
+        setVisibilityStatus('error');
+        setNotice(error instanceof Error ? error.message : '공개설정을 불러오지 못했습니다.');
+      });
+    return () => { active = false; };
+  }, [gameId, visibilityPort]);
 
   useEffect(() => {
     if (!hasUnsavedChanges || saveStatus === 'loading' || saveStatus === 'saving' || recoveryJournal === null || recoveryCandidate !== null) return undefined;
@@ -742,17 +769,56 @@ export const GameStudioShell = ({
     }
   }, [apply, assetRepository, gameId, store]);
 
-  // S15P21A604-561 — 저장소 삭제(assetRepository.delete)와 프로젝트 참조 제거
-  // (removeAssetReference)를 한 동작으로 묶는다. removeAssetReference는 여전히 참조
-  // 중인 자산이면 validated()가 던지므로, 그 경우 저장소 쪽 삭제는 되돌리지 않고 그대로
-  // 두고(멱등이라 다음 시도에서 다시 지우면 됨) 에러만 보여준다 — 조용히 절반만 지운 채
-  // 넘어가지 않는다.
+  // S15P21A604-630 — 여러 파일을 한 번에 올릴 때 uploadAsset()을 병렬로(Promise.all/forEach)
+  // 부르면 안 된다. nextStableId가 await 이전의 store 상태를 보고 계산되므로, 두 파일이 거의
+  // 동시에 시작하면 같은 ID를 배정받고 로컬 저장소(IndexedDB)에서 같은 키를 두고 blob이 서로
+  // 덮어써 "프로젝트엔 등록됐는데 내용은 다른 파일" 이라는 조용한 오염이 생긴다. 그래서
+  // 한 파일의 상태 반영(uploadAsset 내부 apply)까지 끝난 뒤에야 다음 파일의 nextStableId를
+  // 계산하도록 반드시 순차(await)로 처리한다.
+  //
+  // 자산 300개 상한을 넘는 배치는 상한까지만 처리하고 초과분은 시작 전에 실패로 분류한다 —
+  // 한도 도달 시점까지 하나씩 시도하다 실패하는 것보다 사용자가 결과를 한 번에 볼 수 있다.
+  //
+  // uploadAsset 자체가 파일마다 setNotice로 토스트를 띄우므로, 배치가 끝난 뒤 마지막에
+  // 부르는 setNotice(summary)가 자연히 그 토스트들을 덮어써 요약만 남는다.
+  const uploadAssets = useCallback(async (
+    kind: AssetReference['kind'],
+    files: readonly File[],
+  ): Promise<void> => {
+    if (files.length === 0) return;
+    const remaining = Math.max(0, 300 - store.getState().project.assets.length);
+    const accepted = files.slice(0, remaining);
+    const rejectedByCap = files.slice(remaining);
+    const failures: string[] = rejectedByCap.map((file) => `${file.name}(자산 300개 상한 초과)`);
+    let succeeded = 0;
+    for (const [index, file] of accepted.entries()) {
+      if (accepted.length > 1) setUploadProgress({ current: index + 1, total: accepted.length });
+      const asset = await uploadAsset(kind, file);
+      if (asset === null) {
+        failures.push(`${file.name}(추가 실패)`);
+      } else {
+        succeeded += 1;
+      }
+    }
+    setUploadProgress(null);
+    if (accepted.length > 1 || failures.length > 0) {
+      setNotice(failures.length === 0
+        ? `${succeeded}개 자산을 추가했습니다.`
+        : `${succeeded}개 추가, ${failures.length}개 실패: ${failures.join(', ')}`);
+    }
+  }, [store, uploadAsset]);
+
+  // S15P21A604-561/709 — 저장소 삭제(assetRepository.delete)를 먼저 확정하고, 성공했을 때만
+  // 로컬 참조를 지운다. 원래는 순서가 반대였다 — 로컬을 먼저 지우고 저장소 삭제가 실패해도
+  // 되돌리지 않았는데, 그러면 화면에서는 자산이 사라졌지만 서버·스토리지엔 그대로 남는
+  // 상태 불일치가 생겼다(709에서 서버 DELETE endpoint 부재로 실제 재현됨). 서버가 먼저이므로
+  // GAME_ASSET_IN_USE로 거부되면 로컬 상태는 전혀 건드리지 않는다.
   const deleteAsset = useCallback(async (assetId: string): Promise<void> => {
     const asset = store.getState().project.assets.find((candidate) => candidate.id === assetId);
     if (asset === undefined) return;
     try {
-      apply(removeAssetReference(store.getState().project, assetId));
       if (assetRepository !== null) await assetRepository.delete(asset.source);
+      apply(removeAssetReference(store.getState().project, assetId));
       setNotice(`${assetDisplayLabel(asset)} 자산을 삭제했습니다.`);
     } catch (error) {
       setSaveStatus('error');
@@ -889,6 +955,23 @@ export const GameStudioShell = ({
       setNotice(error instanceof Error ? error.message : '게임을 게시하지 못했습니다.');
     }
   }, [gameId, publisher, save, store]);
+
+  const toggleVisibility = useCallback(async (): Promise<void> => {
+    if (visibilityPort === null || gameVisibility === null) return;
+    const next: GameVisibility = gameVisibility === 'PUBLIC' ? 'PRIVATE' : 'PUBLIC';
+    setVisibilityStatus('saving');
+    try {
+      const summary = await visibilityPort.set(gameId, next);
+      setGameVisibility(summary.visibility);
+      setVisibilityStatus('idle');
+      setNotice(summary.visibility === 'PUBLIC'
+        ? '이 게임을 공개로 전환했습니다. 게시된 버전을 누구나 플레이할 수 있습니다.'
+        : '이 게임을 비공개로 전환했습니다.');
+    } catch (error) {
+      setVisibilityStatus('error');
+      setNotice(error instanceof Error ? error.message : '공개설정을 변경하지 못했습니다.');
+    }
+  }, [gameId, gameVisibility, visibilityPort]);
 
   const openPreview = useCallback(async (performanceMode = false): Promise<void> => {
     if (hasUnsavedChanges && (await save()) === null) return;
@@ -1183,7 +1266,10 @@ export const GameStudioShell = ({
     <main className={`gss-root${focusMode ? ' is-focus-mode' : ''}`} data-game-studio-route="edit">
       <header className="gss-topbar">
         <div className="gss-brand-area">
-          <Link aria-label="홈으로 돌아가기" className="gss-back" to="/app/home">‹</Link>
+          {/* S15P21A604-824 — 목록(/app/games)이 이 화면의 URL 상위 리소스다. 진입 경로가
+              나중에 뭐가 되든(지금은 URL 직접 접근, 나중엔 다른 경로일 수도 있다) 뒤로가기는
+              항상 목록으로 돌아가는 게 자연스럽다. */}
+          <Link aria-label="목록으로 돌아가기" className="gss-back" to="/app/games">‹</Link>
           <div className="gss-file-menu-anchor">
             <button
               aria-expanded={showFileMenu}
@@ -1287,6 +1373,18 @@ export const GameStudioShell = ({
             title={publisher === null ? '서버 Draft/Publish 연결 시 자동 활성화됩니다.' : '현재 초안을 검증하고 새 공개 버전을 만듭니다.'}
             type="button"
           >게시하기</button>
+          {visibilityPort !== null && gameVisibility !== null && (
+            <button
+              aria-pressed={gameVisibility === 'PUBLIC'}
+              className="gss-guide-button"
+              disabled={visibilityStatus === 'loading' || visibilityStatus === 'saving'}
+              onClick={() => void toggleVisibility()}
+              title={gameVisibility === 'PUBLIC'
+                ? '클릭하면 비공개로 전환합니다. 게스트가 더 이상 플레이할 수 없습니다.'
+                : '클릭하면 공개로 전환합니다. 게시된 버전을 게스트도 플레이할 수 있게 됩니다.'}
+              type="button"
+            >{gameVisibility === 'PUBLIC' ? '🌐 공개됨' : '🔒 비공개'}</button>
+          )}
           {lastPublishedVersion !== null && (
             <button
               className="gss-guide-button"
@@ -1830,8 +1928,9 @@ export const GameStudioShell = ({
                   onDeleteAsset={(assetId: string) => { void deleteAsset(assetId); }}
                   onDeleteItem={deleteItem}
                   onDeleteVariable={deleteVariable}
-                  onUploadAsset={(kind: AssetReference['kind'], file: File) => { void uploadAsset(kind, file); }}
+                  onUploadAsset={(kind: AssetReference['kind'], files: readonly File[]) => { void uploadAssets(kind, files); }}
                   project={project}
+                  uploadProgress={uploadProgress}
                 />}
               </div>
             </>

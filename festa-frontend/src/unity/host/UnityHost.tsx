@@ -22,17 +22,24 @@ import {
   subscribeWorldLoadStart,
 } from '../bridge/events';
 import type { WorldConnectionState } from '../bridge/events';
-import { resetWorldUiState } from '../bridge/worldUiState';
+import { hasUnityModal, resetWorldUiState } from '../bridge/worldUiState';
+import { resetWorldContext } from '../../features/world/model/worldContext';
+import { discardPendingVisit } from '../../features/world/model/boothVisitTracker';
 import { acquireUnitySession, releaseUnitySession, restartUnitySession } from './sessionManager';
 import { syncAccessToken } from './authBridge';
+import { syncPendingNickname } from './profileBridge';
 import { syncInputLock } from './inputBridge';
-import { syncAudioMute } from './audioBridge';
+import { requestExitWorldUi } from './worldUiBridge';
+import { syncAudioMute, syncAudioVolume } from './audioBridge';
 import { watchDevicePixelRatio } from './loader';
 import { getScreenAudioSnapshot, subscribeScreenAudio } from '../../features/audio/model/screenAudio';
 import { useWorldScreen } from '../../features/world/model/worldScreen';
 import { useSession } from '../../features/auth/model/session';
 import { UNITY_BOOT_STALL_TIMEOUT_MS, WORLD_PREPARING_LONG_WAIT_MS } from '../../shared/config/unity';
 import { setHostPhase } from './hostPhase';
+import { getWorldMount, subscribeWorldMount } from './worldMount';
+import landingBackgroundUrl from '../../assets/festa/backgrounds/landing-background.webp';
+import ssafestaLogoUrl from '../../assets/festa/brand/ssafesta-logo.webp';
 import './unityHostStatus.css';
 import type { UnityInstance } from './types';
 
@@ -75,6 +82,18 @@ export function UnityHost() {
     () => getScreenAudioSnapshot().muted,
     () => getScreenAudioSnapshot().muted,
   );
+  // 볼륨도 같은 이유로 값 하나만 좁게 구독한다 (S15P21A604-733).
+  const screenVolume = useSyncExternalStore(
+    subscribeScreenAudio,
+    () => getScreenAudioSnapshot().volume,
+    () => getScreenAudioSnapshot().volume,
+  );
+  // 상주 월드가 지금 보이는가 (S15P21A604-643). muted 와 같은 이유로 visible 하나만 좁게 구독한다.
+  const worldVisible = useSyncExternalStore(
+    subscribeWorldMount,
+    () => getWorldMount().visible,
+    () => getWorldMount().visible,
+  );
 
   useEffect(() => {
     initUnityBridge(); // 멱등 — 재호출해도 window.FestaUnity를 다시 잇기만 한다
@@ -92,6 +111,12 @@ export function UnityHost() {
     // 새 인스턴스에는 모달이 없다 — 재시도 boot 뒤에도 옛 관측값이 남으면 ESC 가 닫을 수 없는
     // Unity 모달을 향해 명령만 보낸다(-450). 상태는 인스턴스마다 새로 시작한다.
     resetWorldUiState();
+    // 새 인스턴스는 부스 안에 있지 않다 — 옛 관측값이 남으면 밖인데도 나가기 버튼이
+    // 유령으로 떠 있게 된다 (S15P21A604-627).
+    // 방문 경계도 함께 버린다. 순서가 중요하다 — 먼저 버려야 뒤이은 OUTSIDE 신호가 있지도 않은
+    // 퇴장으로 읽히지 않는다 (S15P21A604-690).
+    discardPendingVisit();
+    resetWorldContext();
 
     // boot watchdog — 진행률이 멈춘 채 UNITY_BOOT_STALL_TIMEOUT_MS 가 지나면 실패. 진행률마다 다시 재고,
     // 인스턴스가 서면 해제한다. 이 타이머는 boot attempt 의 시간이지 사용자의 페이지 체류 시간이 아니다.
@@ -110,9 +135,9 @@ export function UnityHost() {
 
     // 첫 시도는 단순 획득, 재시도는 기존 인스턴스 종료를 기다린 뒤 새로 만든다(B-3).
     const start = attempt === 0 ? acquireUnitySession : restartUnitySession;
-    start(canvas, (p) => {
-      if (cancelled) return;
-      setProgress(p);
+    start(canvas, (nextProgress) => {
+      if (cancelled || !Number.isFinite(nextProgress)) return;
+      setProgress(Math.min(1, Math.max(0, nextProgress)));
       armWatchdog();
     }).then((instance) => {
       if (cancelled) return;
@@ -168,14 +193,26 @@ export function UnityHost() {
     return () => clearTimeout(id);
   }, [status]);
 
-  // 013a-AT(-91): 인스턴스가 서면 현재 세션의 Access Token 을 Unity 에 반영하고, 세션 종류·만료(refresh)가
-  // 바뀔 때마다 다시 밀어 넣는다. 입장 게이트 ready 에서도 한 번 더 — 초기 SendMessage 가 씬 로드보다 앞섰을
+  // 013a-AT(-91): 인스턴스가 서면 현재 세션의 Access Token 을 Unity 에 반영하고, **토큰이 바뀔 때마다**
+  // 다시 밀어 넣는다. 입장 게이트 ready 에서도 한 번 더 — 초기 SendMessage 가 씬 로드보다 앞섰을
   // 때의 보험(멱등). 회원·게스트 모두 전달하고 비로그인만 Clear 다(#128 §2).
+  //
+  // 의존성이 `expiresAt` 이던 것을 `tokenVersion` 으로 바꿨다 (S15P21A604-828). 만료 시각이 같은
+  // 갱신은 이 효과를 깨우지 못해 Unity 가 옛 토큰을 계속 들고 있었다. 서버는 refresh 마다 `sid` 를
+  // 회전시키고 그 순간 옛 토큰을 즉시 폐기하므로(MemberSessionService.issue), 재주입을 한 번 놓치면
+  // Unity 의 모든 호출이 401 이 된다.
   useEffect(() => {
     const instance = instanceRef.current;
     if (!instanceReady || instance === null) return;
     syncAccessToken(instance);
-  }, [instanceReady, status, session.kind, session.expiresAt]);
+  }, [instanceReady, status, session.kind, session.tokenVersion]);
+
+  // 프로필에서 이름을 바꾼 뒤 Unity가 재시도 boot를 하면, 새 인스턴스에도 마지막 확정 이름을 준다.
+  useEffect(() => {
+    const instance = instanceRef.current;
+    if (!instanceReady || instance === null) return;
+    syncPendingNickname(instance);
+  }, [instanceReady]);
 
   // G-8 입력 소유권 (-450, #132): 오버레이 개폐를 Unity 잠금에 반영한다. 인스턴스가 선 직후에도 한 번 —
   // 재시도 boot 로 새 인스턴스가 서면 그 인스턴스는 잠금 상태를 모르기 때문이다(상태는 인스턴스마다 새로 시작).
@@ -185,14 +222,49 @@ export function UnityHost() {
     syncInputLock(instance, screen !== 'world');
   }, [instanceReady, screen]);
 
-  // #151 음소거 승계 (-557): 화면에서 끈 채로 월드에 들어가면 BGM 이 다시 나던 것. 인스턴스가 선
-  // 직후 현재 값을 한 번 — 새 인스턴스는 음소거 상태를 모른다(재시도 boot 포함). 이후에는 값이
-  // 바뀔 때만 다시 밀어 넣는다. 볼륨은 보내지 않는다 — -463 · #140 축이다(audioBridge.ts 주석).
+  // Unity 초점과 짝이 된 레이어가 닫혔으면 Unity 모달도 함께 끝낸다 (-642, #132).
+  //
+  // 여는 것은 하나의 동작이다 — Unity `Interact()` 가 초점 줌과 상호작용 이벤트를 같은 동기
+  // 경로에서 한다(`LaptopInteractable.cs:43-44` 외 7종). 그런데 닫는 것은 ESC·배경 클릭·X 가
+  // 전부 FE 쪽에만 닿아 줌이 남았다. 남으면 `InputBridge` holders 에 "InteractionFocusCamera" 가
+  // 그대로 있어 `SetInputLocked('0')` 이 `LockedChanged` 를 발화시키지 못하고(owner-set),
+  // **월드 입력이 통째로 잠긴 채 끝난다** — WASD·F·재진입이 전부 죽는다.
+  //
+  // 합류점을 `closeOverlay()` 가 아니라 화면 소유권 전이로 잡는다. 관리 화면
+  // (`WORLD_MANAGEMENT_INTERACT`)도 초점을 쓰는데 그쪽은 Overlay Bus 가 아니라 gameClientUi 라,
+  // Bus 에 걸면 빠진다. `worldScreen` 은 둘을 합쳐 보는 유일한 판정이다.
+  //
+  // **상태를 보고 남의 것을 닫지 않는다.** 요청만 보내고 무엇을 닫을지는 Unity 가 정한다
+  // (worldUiBridge.ts 주석 — 2026-09-08 슬롯머신 사고). 관측값은 구독하지 않고 여기서 한 번
+  // 읽는다: 필요한 것은 화면이 바뀐 그 시점의 Unity 상태뿐이고, 구독하면 무관한 전이마다
+  // 이 호스트가 다시 그려진다.
+  useEffect(() => {
+    const instance = instanceRef.current;
+    if (!instanceReady || instance === null) return;
+    // 아직 짝이 되는 레이어가 떠 있다 — 오버레이 종류만 바뀐 경우를 포함한다(screen 이 안 변한다)
+    if (screen === 'visitor' || screen === 'management') return;
+    // 줌 없이 열린 레이어였다(이벤트 NPC·상담 Quick Access·월드 안내) — 보낼 것이 없다
+    if (!hasUnityModal()) return;
+    requestExitWorldUi(instance, 'overlay-closed');
+  }, [instanceReady, screen]);
+
+  // #151 음소거 승계 (-557) + 볼륨 승계 (-733): 화면에서 끄거나 줄인 채로 월드에 들어가면 Unity BGM 이
+  // 그 선호를 모른 채 나던 것. 인스턴스가 선 직후 현재 값을 한 번 — 새 인스턴스는 아무 상태도 모른다
+  // (재시도 boot 포함). 이후에는 값이 바뀔 때만 다시 밀어 넣는다. ready 전에 바꾼 값이 사라지지 않는
+  // 이유가 이것이다: 구독한 것은 store 의 현재 값이라 ready 시점의 최종 상태가 그대로 실린다.
   useEffect(() => {
     const instance = instanceRef.current;
     if (!instanceReady || instance === null) return;
     syncAudioMute(instance, screenMuted);
   }, [instanceReady, screenMuted]);
+
+  // 볼륨은 별도 effect 다. 한 effect 에 묶으면 mute 를 끄고 켤 때마다 같은 볼륨이 다시 나간다 —
+  // 멱등이라 해는 없지만 두 채널이 독립이라는 것이 배선에서도 보여야 한다.
+  useEffect(() => {
+    const instance = instanceRef.current;
+    if (!instanceReady || instance === null) return;
+    syncAudioVolume(instance, screenVolume);
+  }, [instanceReady, screenVolume]);
 
   // #143 화면 밀도 변화 반영 (-575). 렌더 해상도 상한은 부팅 때 한 번 정해지는데, 확대/축소나
   // 다른 밀도의 모니터로 창을 옮기면 그 값이 낡는다 — Unity 는 이 값을 1초 주기로 다시 읽으므로
@@ -204,17 +276,24 @@ export function UnityHost() {
     return watchDevicePixelRatio(instance);
   }, [instanceReady]);
 
-  // 최초 월드 진입 시 캔버스에 focus 를 준다 (-450, #132). !279 로 captureAllKeyboardInput=false 가 되면서
+  // 월드 진입 시 캔버스에 focus 를 준다 (-450, #132). !279 로 captureAllKeyboardInput=false 가 되면서
   // canvas 에 focus 가 없으면 WASD·F 가 Unity 에 들어가지 않는다 — 진입 직후 activeElement 가 SECTION 이라
   // 첫 키가 무시되는 것을 게임 파트가 실측했다(2026-09-05 23:00). tabIndex=-1 이라 프로그램 focus 가 된다(-421).
   // 월드가 주인이 아닌 채로 들어왔다면 뺏지 않는다 — 떠 있는 그쪽이 키보드 주인이다.
+  //
+  // **상주 월드로 돌아올 때도 준다** (S15P21A604-643). -620 이전에는 라우트 복귀가 곧 이 컴포넌트의
+  // 재마운트라 위 효과가 다시 돌았는데, 지금은 마운트가 유지되므로 visible 전이를 따로 봐야 한다 —
+  // 안 보면 /app/profile 에서 돌아온 뒤 캔버스를 클릭하기 전까지 WASD 가 죽어 있다(2026-09-11 실측).
+  // React 입력창이 focus 를 쥐고 있으면 침범하지 않는다 — 복귀 직후엔 body 라 그 경우만 받는다.
   useEffect(() => {
-    if (!instanceReady || screen !== 'world') return;
+    if (!instanceReady || !worldVisible || screen !== 'world') return;
+    const active = document.activeElement;
+    if (active !== null && active !== document.body && active !== canvasRef.current) return;
     canvasRef.current?.focus();
     // screen 을 의존성에 넣지 않는다: 오버레이를 닫을 때의 focus 복구는 -428(OverlayFrame)이 이미 하고 있고,
-    // 여기서 또 하면 두 곳이 같은 일을 다투게 된다. 이 효과는 boot attempt 당 1회다.
+    // 여기서 또 하면 두 곳이 같은 일을 다투게 된다. 이 효과는 boot attempt 당 1회 + 월드가 다시 보일 때 1회다.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [instanceReady]);
+  }, [instanceReady, worldVisible]);
 
   // 진짜 언마운트에서만 세션을 정리한다 — sessionManager의 예약 지연이 StrictMode의
   // mount→cleanup→mount 사이에서 다음 마운트의 acquire 호출로 취소된다(B-2).
@@ -260,16 +339,19 @@ export function UnityHost() {
         </div>
       )}
       {!connectionNotice && status === 'booting' && (
-        <div className="uh-status" role="status" aria-live="polite">
-          <span className="uh-status-spinner" aria-hidden="true" />
-          <strong className="uh-status-title">게임을 준비하고 있어요</strong>
-          {/* boot 구간은 진짜 진행률이 있다 — 여기서만 숫자를 보여준다 */}
-          <span className="uh-status-progress">{Math.round(progress * 100)}%</span>
+        <div className="uh-status uh-status--boot" role="status" aria-live="polite">
+          <img className="uh-boot-bg" src={landingBackgroundUrl} alt="" />
+          <div className="uh-boot-panel">
+            <img className="uh-boot-logo" src={ssafestaLogoUrl} alt="SSAFESTA" />
+            <strong className="uh-status-title">게임을 준비하고 있어요</strong>
+            <div className="uh-loading-bar" aria-hidden="true">
+              <span className="uh-loading-bar-fill" style={{ width: `${progress * 100}%` }} />
+            </div>
+          </div>
         </div>
       )}
       {!connectionNotice && status === 'preparing-world' && (
         <div className="uh-status" role="status" aria-live="polite">
-          {/* 진행률 신호가 없는 구간이다 — indeterminate 로 두고 가짜 백분율을 만들지 않는다 */}
           <span className="uh-status-spinner" aria-hidden="true" />
           <strong className="uh-status-title">
             {longWait ? '월드를 준비하고 있습니다' : '축제장을 불러오고 있어요'}

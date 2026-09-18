@@ -79,9 +79,11 @@ class BoothLayoutApiIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.templates.length()").value(1))
                 .andExpect(jsonPath("$.templates[0].template").value("PROJECT_EXHIBITION"))
-                .andExpect(jsonPath("$.templates[0].footprint.width").value(6.0))
+                // 9.4 × 6 × 5.9 — 검증 상수에서 유도된다 (S15P21A604-698, GitLab #181).
+                // width 와 depth 가 다른 것이 요점이다: 한 값을 양쪽에 쓰면 x 확장이 z 로 샌다.
+                .andExpect(jsonPath("$.templates[0].footprint.width").value(9.4))
                 .andExpect(jsonPath("$.templates[0].footprint.depth").value(6.0))
-                .andExpect(jsonPath("$.templates[0].footprint.height").value(2.72))
+                .andExpect(jsonPath("$.templates[0].footprint.height").value(5.9))
                 .andExpect(jsonPath("$.templates[0].maxObjects").value(12));
     }
 
@@ -318,7 +320,7 @@ class BoothLayoutApiIntegrationTest {
     @Test
     void theSeedFixesTwelveRoomsToAnchorNumbers() {
         assertEquals(12, jdbc.queryForObject(
-                "SELECT count(*) FROM booth_slots WHERE floor_no = 11", Integer.class));
+                "SELECT count(*) FROM booth_slots WHERE floor_no = 11 AND slot_code LIKE 'F11-R%'", Integer.class));
         assertEquals("EVENT", jdbc.queryForObject(
                 "SELECT slot_type FROM booth_slots WHERE id = 1", String.class),
                 "1번 방은 이벤트 자리다 (V28)");

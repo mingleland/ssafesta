@@ -40,6 +40,12 @@ namespace Festa.Booth
         public static event System.Action BoothsRebuilt;
 
         /// <summary>
+        /// 슬롯의 실제 게시 레이아웃이 적용된 직후 알린다. 씬에 직접 배치한 전시 오브젝트가
+        /// 같은 boothId/objectId/configId를 받아 FE 이벤트 계약에 참여할 때 쓴다.
+        /// </summary>
+        public static event System.Action<int, BoothLayoutDto> PublishedLayoutApplied;
+
+        /// <summary>
         /// 아직 못 채운 방만 다시 시도하는 주기. 조회가 한 번 실패하면 그 방은 세션 내내
         /// <see cref="BoothRuntime.IsLoaded"/> false 로 남아, 실제로는 게시돼 있는 부스인데도 포털이
         /// "아직 준비 중" 으로 막았다 (2026-09-08 조사). 채워진 방은 다시 부르지 않으므로
@@ -55,11 +61,45 @@ namespace Festa.Booth
         {
             if (Application.isBatchMode) return;   // 데디케이티드 서버 — 로컬 비주얼 없음
             SceneManager.sceneLoaded += (_, _) => { s_retries = 0; PublishedSlotResolution.Clear(); TryLoad(); };
+            Festa.Integration.AuthBridge.TokenChanged += OnAccessTokenChanged;
             TryLoad();   // 첫 씬이 이미 월드인 경우 (에디터에서 main 직접 실행)
             RetryLoopAsync();
         }
 
         static int s_retries;
+
+        /// <summary>
+        /// 새 Access Token 이 들어오면 <b>못 채운 방만</b> 곧바로 다시 묻는다 (GitLab #216).
+        ///
+        /// <para>왜 필요한가 — AT 는 React 와 Unity 가 나눠 쓰는데, 서버가 refresh 마다 <c>sid</c> 를
+        /// 회전시켜 직전 토큰을 즉시 폐기한다. 그 순간 Unity 가 던진 12슬롯 조회가 한꺼번에 401 을 맞고,
+        /// 부스는 기본 프레임으로 간판은 "N번 부스" 로 남았다 (FE 실측 2026-09-16).</para>
+        ///
+        /// <para>주기 재시도 루프만으로는 닫히지 않는다. 상한이 <see cref="MaxRetries"/> 회라 이미
+        /// 소진됐을 수 있고, 무엇보다 토큰이 도착한 시점과 무관하게 돈다 — 유효한 토큰을 들고도
+        /// 다음 주기까지 기다리거나 아예 안 묻는다.</para>
+        ///
+        /// <para>못 채운 방의 판정을 <b>일시 실패로 되돌린다.</b> 401 은 서버가 답을 준 것이라
+        /// 확정으로 기록될 수 있는데, 토큰이 바뀐 뒤에는 그 답이 더 이상 유효하지 않기 때문이다.
+        /// 이미 채워진 방과 미게시(404)로 확정된 방은 건드리지 않아 헛조회가 늘지 않는다.</para>
+        /// </summary>
+        static void OnAccessTokenChanged()
+        {
+            if (!Enabled || Application.isBatchMode) return;
+
+            int pending = 0;
+            foreach (var r in Object.FindObjectsByType<BoothRuntime>(FindObjectsSortMode.None))
+            {
+                if (r == null || r.IsLoaded) continue;
+                PublishedSlotResolution.Set(r.BoothId, transientFailure: true);
+                pending++;
+            }
+            if (pending == 0) return;
+
+            s_retries = 0;
+            Debug.Log($"[WorldBoothPublishedBootstrap] Access Token 이 새로 들어왔다 — 못 채운 {pending}실을 다시 조회한다 (GitLab #216)");
+            TryLoad(onlyUnresolved: true);
+        }
 
         /// <summary>슬롯별로 마지막에 적용한 레이아웃의 서명. 같은 서명이면 다시 짓지 않는다.</summary>
         static readonly Dictionary<int, string> s_appliedSignature = new();
@@ -73,6 +113,14 @@ namespace Festa.Booth
         public static async void RequestReload(int slotId)
         {
             if (!Enabled || !Application.isPlaying) return;
+
+            // 바깥 표현(간판 문구·부스 대표색)도 같이 다시 읽는다 — 그 값들은 **레이아웃 버전을 바꾸지 않아**
+            // 아래 서명 비교로는 걸러지지 않는다. 임대하고 돌아왔는데 간판이 그대로이던 자리다.
+            // 목록을 버리는 것은 여기 한 곳에서만 한다 (S15P21A604-659).
+            BoothSlotDirectory.Invalidate();
+            Festa.World.BoothSignPresenter.Refresh(slotId);
+            Festa.World.BoothFacadePresenter.Refresh(slotId);
+
             BoothRuntime target = null;
             foreach (var r in Object.FindObjectsByType<BoothRuntime>(FindObjectsSortMode.None))
                 if (r.BoothId == slotId) { target = r; break; }
@@ -81,11 +129,27 @@ namespace Festa.Booth
             try
             {
                 var layout = await Festa.Integration.ApiServices.Booth.GetPublishedLayoutBySlotAsync(slotId);
-                if (layout == null || target == null) return;
+                if (target == null) return;
+                if (layout == null)
+                {
+                    // 서버가 "게시본 없음" 을 **확정**으로 답했고(404 미게시·409 임대 만료·반납 — 네트워크 실패가 아님)
+                    // 이 칸이 아직 지어져 있으면 임차인이 반납한 것이다 (GitLab #199, S15P21A604-735).
+                    // 내부를 비우고 IsLoaded 를 내려야 BoothVacancyPresenter 가 직원·조명·포털을 끈다 —
+                    // 종전에는 여기서 그냥 돌아가 새로고침 전까지 "임대 중" 모습이 남았다.
+                    if (target.IsLoaded && !PublishedSlotResolution.NeedsRetry(slotId))
+                    {
+                        target.Clear();
+                        s_appliedSignature.Remove(slotId);
+                        Debug.Log($"[WorldBoothPublishedBootstrap] 슬롯 {slotId} 게시본이 사라짐(반납·만료) → 내부 비움, 빈 칸으로 전환");
+                        BoothsRebuilt?.Invoke();
+                    }
+                    return;
+                }
                 string sig = Signature(layout);
                 if (s_appliedSignature.TryGetValue(slotId, out var prev) && prev == sig) return;   // 변화 없음
                 target.Rebuild(layout);
                 s_appliedSignature[slotId] = sig;
+                PublishedLayoutApplied?.Invoke(slotId, layout);
                 Debug.Log($"[WorldBoothPublishedBootstrap] 슬롯 {slotId} 게시본 변경 감지 → 다시 지음 (v{layout.version}, 오브젝트 {layout.objects?.Length ?? 0})");
                 BoothsRebuilt?.Invoke();
             }
@@ -171,6 +235,7 @@ namespace Festa.Booth
                     if (runtime == null) continue;             // 씬 전환으로 파괴된 앵커
                     runtime.Rebuild(layout);
                     s_appliedSignature[slotId] = Signature(layout);   // 첫 입장 때 같은 것을 다시 짓지 않게
+                    PublishedLayoutApplied?.Invoke(slotId, layout);
                     built++;
                 }
                 Debug.Log($"[WorldBoothPublishedBootstrap] {slotIds.Count}실 중 {built}실 게시 렌더, 나머지는 기본 프레임");

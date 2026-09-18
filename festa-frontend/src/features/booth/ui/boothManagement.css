@@ -1,28 +1,102 @@
-/* Booth Management — 크고 관리성이 있으나 SaaS Dashboard 가 아니다. Booth 가 주인공. */
-.bm-body { display: flex; flex-direction: column; gap: 16px; }
-
-.bm-hero {
+/* Booth Management — 크고 관리성이 있으나 SaaS Dashboard 가 아니다. Booth 가 주인공.
+   레이아웃 정본: docs/LJH/ui-design/00_context/sources/booth-management*.png (S15P21A604-817)
+   왼쪽 미리보기 · 오른쪽 세로 스택(정체성 → [AI 에셋] → 운영 관리 → 반납). 운영 관리가 남는 높이를
+   채우므로 AI 에셋 섹션이 빠져도 별도 분기 없이 첫 번째 사진이 된다. */
+.bm-body {
   display: grid;
-  grid-template-columns: 260px 1fr;
-  gap: 22px;
-  padding: 18px;
+  grid-template-columns: minmax(0, 1.3fr) minmax(320px, 1fr);
+  gap: 16px;
+  /* 두 열의 바닥을 맞춘다. 남는 높이는 각 열 안에서 분배하고(카드 자체는 늘리지 않는다),
+     열에는 배경이 없어 빈 공간이 보이지 않는다. */
+  align-items: stretch;
+}
+.bm-main { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.bm-side { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+
+.bm-preview-card,
+.bm-identity,
+.bm-ai,
+.bm-ops {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 16px 18px;
   border-radius: 16px;
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid rgba(255, 255, 255, 0.08);
 }
-.bm-preview { min-width: 0; }
-.bm-identity {
+.bm-card-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--festa-ink);
+}
+
+/* 미리보기 — 16:9 캡처 위에 안내 칩. img 가 실패하면 문구가 같은 자리에 선다 */
+.bm-preview-frame {
+  position: relative;
+  margin-top: 8px;
+  aspect-ratio: 16 / 9;
+  border-radius: 12px;
+  overflow: hidden;
+  background: rgba(9, 14, 30, 0.55);
+  display: grid;
+  place-items: center;
+}
+.bm-preview-img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.bm-preview-missing { margin: 0; color: rgba(234, 238, 251, 0.6); font-size: 13.5px; }
+.bm-preview-chip {
+  position: absolute;
+  left: 12px;
+  bottom: 12px;
+  padding: 7px 12px;
+  border-radius: 999px;
+  background: rgba(6, 9, 20, 0.7);
+  color: rgba(234, 238, 251, 0.85);
+  font-size: 12px;
+  backdrop-filter: blur(6px);
+}
+
+/* 정체성 카드 — 썸네일 + 프로젝트명/부스 번호/상태/임대 + 이름 편집 */
+.bm-identity-head { display: flex; gap: 16px; align-items: flex-start; }
+/* 카드 오른쪽 게시 액션 — 썸네일·텍스트가 왼쪽에 붙고 이 칸이 남은 폭을 오른쪽 끝으로 민다 (S15P21A604-898) */
+.bm-identity-action { margin-left: auto; flex: none; display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
+.bm-identity-action .ov-note { text-align: right; max-width: 150px; word-break: keep-all; }
+.bm-thumb {
+  flex: none;
+  width: 96px;
+  height: 96px;
+  border-radius: 14px;
+  object-fit: cover;
+  background: rgba(255, 255, 255, 0.06);
+}
+/* 프로젝트 미등록 — 채우지 않고 비워 둔다. boothMiniPreview 의 bmp-logo-fallback 과 같은 결 */
+.bm-thumb-empty {
+  display: grid;
+  place-items: center;
+  border: 2px dashed rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.03);
+  color: rgba(255, 255, 255, 0.35);
+}
+.bm-identity-text {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 6px;
+  gap: 5px;
   min-width: 0;
 }
 .bm-name {
   margin: 0;
-  font-size: 21px;
+  font-size: 20px;
   font-weight: 700;
   color: var(--festa-ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
 }
 .bm-slot {
   font-size: 13px;
@@ -33,75 +107,175 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  margin-top: 4px;
-  font-size: 13px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: rgba(95, 211, 155, 0.14);
+  font-size: 12.5px;
   font-weight: 600;
   color: #7ee08a;
 }
-.bm-status-off { color: rgba(234, 238, 251, 0.55); }
+.bm-status-off { color: rgba(234, 238, 251, 0.55); background: var(--festa-fill-strong); }
 .bm-dot {
   width: 7px;
   height: 7px;
   border-radius: 50%;
   background: currentColor;
 }
-.bm-remaining { font-size: 12.5px; }
-.bm-studio { margin-top: auto; align-self: flex-start; }
+.bm-remaining { display: inline-flex; align-items: flex-start; gap: 6px; font-size: 12.5px; line-height: 1.45; }
+.bm-remaining svg { flex: none; margin-top: 2px; }
 
-.bm-rows {
+/* 부스 이름 인라인 편집 */
+.bm-name-field {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 8px 16px;
+  margin-top: 10px;
+  font-size: 13px;
+  color: rgba(234, 238, 251, 0.7);
+}
+.bm-name-input {
+  display: flex;
+  align-items: center;
+  border: 1px solid var(--festa-line);
+  border-radius: var(--festa-r-input, 10px);
+  background: rgba(9, 14, 30, 0.55);
+}
+.bm-name-input:focus-within { border-color: var(--festa-accent); outline: 2px solid rgba(77, 107, 255, 0.4); outline-offset: 1px; }
+.bm-name-input input {
+  flex: 1;
+  min-width: 0;
+  padding: 10px 12px;
+  border: 0;
+  background: none;
+  color: var(--festa-ink);
+  font: inherit;
+  font-size: 14px;
+}
+.bm-name-input input:focus { outline: none; }
+.bm-name-input input:disabled { color: rgba(234, 238, 251, 0.45); }
+.bm-name-input button {
+  display: grid;
+  place-items: center;
+  padding: 8px 12px;
+  border: 0;
+  background: none;
+  color: rgba(234, 238, 251, 0.7);
+  cursor: pointer;
+}
+.bm-name-input button:disabled { opacity: 0.4; cursor: not-allowed; }
+.bm-name-error { grid-column: 2; color: var(--festa-danger, #ef5d6c); font-size: 12.5px; }
+
+/* AI 전시 에셋 관리 — 잠금 자리표 */
+.bm-ai-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.bm-ai-badge {
+  padding: 2px 9px;
+  border-radius: 999px;
+  background: rgba(77, 107, 255, 0.22);
+  color: #aab6ff;
+  font-size: 11px;
+  font-weight: 600;
+}
+.bm-ai-lock { color: rgba(234, 238, 251, 0.45); }
+/* 케이스(남는 너비) + 동작 버튼(오른쪽 고정) 한 줄 */
+.bm-ai-body { display: flex; align-items: stretch; gap: 10px; margin-top: 8px; }
+.bm-ai-cases {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+.bm-ai-case {
   display: flex;
   flex-direction: column;
-  border-radius: 14px;
-  overflow: hidden;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-}
-.bm-row {
-  display: grid;
-  grid-template-columns: 132px 1fr auto;
   align-items: center;
-  gap: 14px;
-  padding: 15px 16px;
-  border: 0;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
-  background: rgba(255, 255, 255, 0.02);
+  gap: 3px;
+  padding: 12px 6px;
+  border-radius: 12px;
+  border: 1px dashed rgba(255, 255, 255, 0.14);
+  color: rgba(234, 238, 251, 0.35);
+  font-size: 12px;
+}
+.bm-ai-case em { font-style: normal; font-size: 11px; }
+.bm-ai-locked {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  margin: 0;
+  border-radius: 12px;
+  background: rgba(6, 9, 20, 0.45);
+  color: var(--festa-ink);
+  font-size: 13px;
+  font-weight: 600;
+}
+.bm-ai-actions {
+  flex: none;
+  width: 132px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 8px;
+}
+.bm-ai-actions .ov-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+
+/* 운영 관리 — 2×2 카드. 섹션의 남는 높이를 격자가 먹고 두 행이 똑같이 나눠 갖는다 */
+.bm-ops { flex: 1; }
+.bm-ops-grid {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: 1fr 1fr;
+  gap: 10px;
+  margin-top: 14px;
+}
+.bm-card {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  padding: 14px 15px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.03);
   color: var(--festa-ink);
   font: inherit;
   text-align: left;
   cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
 }
-.bm-row:last-child { border-bottom: 0; }
-.bm-row:hover { background: rgba(255, 255, 255, 0.07); }
-.bm-row-label {
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  color: rgba(234, 238, 251, 0.62);
+.bm-card:hover { background: rgba(255, 255, 255, 0.08); border-color: rgba(255, 255, 255, 0.16); }
+.bm-card-icon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
 }
-.bm-row-summary { font-size: 13.5px; color: rgba(234, 238, 251, 0.9); }
-.bm-row-cta {
-  display: inline-flex;
-  align-items: center;
-  gap: 2px;
-  font-size: 13px;
-  font-weight: 600;
-  color: rgba(234, 238, 251, 0.7);
-  white-space: nowrap;
-}
+.bm-card-icon svg { width: 25px; height: 25px; }
+.bm-card[data-kind='project'] .bm-card-icon { background: #5b5cf0; }
+.bm-card[data-kind='survey'] .bm-card-icon { background: #22b573; }
+.bm-card[data-kind='consultation'] .bm-card-icon { background: #f2892b; }
+.bm-card[data-kind='ai-agent'] .bm-card-icon { background: #b13bd6; }
+/* 카드가 세로로 늘어나도 내용은 가운데 — 위로 몰리지 않는다 */
+.bm-card-text { display: flex; flex-direction: column; justify-content: center; gap: 3px; min-width: 0; flex: 1; }
+.bm-card-text strong { font-size: 15.5px; }
+/* 부제는 값이 정한 줄 수만큼 쌓인다. keep-all 은 그래도 넘칠 때 낱말 가운데가 끊기지 않게 하는 보루다 */
+.bm-card-text > span { font-size: 13px; line-height: 1.35; color: rgba(234, 238, 251, 0.62); word-break: keep-all; }
+/* 2줄치를 비워 둔다 — 한 줄짜리 카드(상담)도 제목이 같은 높이에 서게 하는 장치다 */
+.bm-card-sub { display: flex; flex-direction: column; gap: 1px; min-height: 2.7em; }
+.bm-card > svg { flex: none; color: rgba(234, 238, 251, 0.55); }
 
-.bm-info {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  padding: 13px 16px;
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.06);
-}
-.bm-info-title {
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  color: rgba(234, 238, 251, 0.6);
+/* 반납은 파괴적이라 주 동작들과 같은 무게로 보이면 안 된다 — 열 맨 아래에 붙여 조용히 선다.
+   남는 높이가 여기로 모이므로 왼쪽 열 바닥과 같은 선에서 끝난다. */
+.bm-return { width: 100%; margin-top: auto; }
+
+.bm-cancel-error {
+  color: var(--sc-danger, #ef5d6c);
 }
 
 .bm-empty {
@@ -124,43 +298,175 @@
 .bm-empty strong { font-size: 16px; color: var(--festa-ink); }
 .bm-empty .ov-btn { margin-top: 6px; }
 
-.bm-agent { display: flex; flex-direction: column; gap: 14px; }
+.bm-agent { display: flex; flex-direction: column; gap: 16px; }
 .bm-agent-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.bm-step { display: flex; gap: 12px; }
+.bm-step-marker { flex: none; display: flex; flex-direction: column; align-items: center; }
+.bm-step-badge {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--festa-accent), var(--festa-accent-2));
+  box-shadow: 0 2px 10px rgba(77, 107, 255, 0.35);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  display: grid;
+  place-items: center;
+}
+.bm-step-line { flex: 1; width: 2px; min-height: 16px; margin: 6px 0; background: linear-gradient(var(--festa-accent-2), rgba(255, 255, 255, 0.08)); opacity: 0.5; }
+.bm-step-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 16px 18px;
+  border-radius: var(--festa-r-card);
+  background: var(--festa-fill);
+  border: 1px solid var(--festa-line);
+  box-shadow: 0 6px 18px rgba(4, 6, 16, 0.22);
+}
+.bm-step-title { margin: 0; font-size: 13px; font-weight: 700; letter-spacing: 0.02em; color: var(--festa-ink); }
 .bm-agent-head h3 { margin: 0 0 5px; font-size: 16px; color: var(--festa-ink); }
 .bm-agent-head p { margin: 0; }
-.bm-agent-state { flex: none; padding: 5px 8px; border-radius: 999px; background: rgba(255, 255, 255, 0.08); color: rgba(234, 238, 251, 0.65); font-size: 12px; }
-.bm-agent-state-on { background: rgba(104, 210, 133, 0.14); color: #83df99; }
+.bm-agent-state { flex: none; padding: 5px 10px; border-radius: 999px; background: var(--festa-fill-strong); color: rgba(234, 238, 251, 0.65); font-size: 12px; font-weight: 600; }
+.bm-agent-state-on { background: rgba(95, 211, 155, 0.16); color: var(--festa-ok); }
 .bm-field { display: flex; flex-direction: column; gap: 6px; min-width: 0; color: rgba(234, 238, 251, 0.84); font-size: 13px; font-weight: 600; }
 .bm-field em { color: rgba(234, 238, 251, 0.52); font-style: normal; font-weight: 400; }
-.bm-field input, .bm-field select, .bm-field textarea { width: 100%; box-sizing: border-box; border: 1px solid rgba(255, 255, 255, 0.14); border-radius: 9px; padding: 10px 11px; background: rgba(9, 14, 30, 0.7); color: var(--festa-ink); font: inherit; font-size: 13px; }
+.bm-field input, .bm-field select, .bm-field textarea { width: 100%; box-sizing: border-box; border: 1px solid var(--festa-line); border-radius: var(--festa-r-input); padding: 10px 11px; background: rgba(9, 14, 30, 0.55); color: var(--festa-ink); font: inherit; font-size: 13px; transition: border-color 0.15s ease, background 0.15s ease; }
 .bm-field textarea { resize: vertical; line-height: 1.45; }
-.bm-field input:focus, .bm-field select:focus, .bm-field textarea:focus { outline: 2px solid rgba(142, 173, 255, 0.65); outline-offset: 1px; }
+.bm-field input:hover, .bm-field select:hover, .bm-field textarea:hover { border-color: rgba(255, 255, 255, 0.24); }
+.bm-field input:focus, .bm-field select:focus, .bm-field textarea:focus { outline: 2px solid rgba(77, 107, 255, 0.5); outline-offset: 1px; border-color: var(--festa-accent); background: rgba(9, 14, 30, 0.75); }
 /* select 옵션 팝업은 OS 네이티브가 그려서 이 배경색을 안 탄다 — 명시 안 하면 흰 배경에 밝은
    글자가 상속돼 안 보인다(management.css 에서 실측한 것과 같은 버그, 여기도 선제 적용) */
 .bm-field select option { background-color: var(--festa-surface-solid); color: var(--festa-ink); }
 .bm-field-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
 .bm-check { display: flex; align-items: center; gap: 8px; color: rgba(234, 238, 251, 0.84); font-size: 13px; cursor: pointer; }
-.bm-check input { accent-color: #8eadff; }
-.bm-agent-error { margin: -2px 0 0; color: #ff9aa2; font-size: 13px; }
-.bm-document { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; margin-top: 4px; padding: 15px; border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; background: rgba(255, 255, 255, 0.025); }
+.bm-check input { accent-color: var(--festa-accent); }
+.bm-agent-error { margin: -2px 0 0; color: var(--festa-danger); font-size: 13px; }
+.bm-document {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  margin-top: 4px;
+  padding: 16px;
+  border: 1px solid var(--festa-line);
+  border-radius: var(--festa-r-panel);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.015));
+}
 .bm-document h4 { margin: 0 0 5px; color: var(--festa-ink); font-size: 14px; }
 .bm-document p { margin: 0; }
-.bm-upload { position: relative; overflow: hidden; cursor: pointer; }
+.bm-upload {
+  position: relative;
+  overflow: hidden;
+  cursor: pointer;
+  border: 1px dashed rgba(77, 107, 255, 0.5);
+  background: rgba(77, 107, 255, 0.1);
+  color: var(--festa-ink);
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+.bm-upload:hover { background: rgba(77, 107, 255, 0.18); border-color: var(--festa-accent); }
 .bm-upload input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
 .bm-upload-disabled { opacity: 0.48; cursor: not-allowed; }
 .bm-upload-disabled input { cursor: not-allowed; }
-.bm-upload-result { color: #83df99; font-size: 13px; }
+.bm-upload-result { color: var(--festa-ok); font-size: 13px; }
 .bm-document-list-wrap { display: flex; flex-direction: column; gap: 8px; width: 100%; margin-top: 4px; }
 .bm-document-quota { align-self: flex-end; }
 .bm-document-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; width: 100%; }
-.bm-document-row { display: grid; grid-template-columns: 1fr auto auto; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 8px; background: rgba(255, 255, 255, 0.03); font-size: 12.5px; }
+.bm-document-row {
+  display: grid;
+  grid-template-columns: 1fr auto auto auto;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 12px;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  background: rgba(255, 255, 255, 0.04);
+  font-size: 12.5px;
+  transition: background 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
+}
+.bm-document-row:hover { background: rgba(255, 255, 255, 0.08); border-color: var(--festa-line); transform: translateY(-1px); }
 .bm-document-name { color: var(--festa-ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .bm-document-meta { color: rgba(234, 238, 251, 0.55); white-space: nowrap; }
-.bm-document-status { color: rgba(234, 238, 251, 0.75); font-weight: 600; white-space: nowrap; }
+.bm-document-status {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-weight: 600;
+  white-space: nowrap;
+  background: var(--festa-fill-strong);
+  color: rgba(234, 238, 251, 0.75);
+}
+.bm-document-status-ready { background: rgba(95, 211, 155, 0.16); color: var(--festa-ok); }
+.bm-document-status-processing, .bm-document-status-queued { background: rgba(255, 214, 107, 0.16); color: var(--festa-warn); }
+.bm-document-status-failed { background: rgba(255, 143, 143, 0.16); color: var(--festa-danger); }
+.bm-document-status-expired, .bm-document-status-disabled { background: var(--festa-fill-strong); color: rgba(234, 238, 251, 0.5); }
+.bm-document-remove {
+  border: 1px solid rgba(255, 143, 143, 0.35);
+  border-radius: 6px;
+  padding: 4px 9px;
+  background: none;
+  color: var(--festa-danger);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+.bm-document-remove:hover:not(:disabled) { background: rgba(255, 143, 143, 0.14); border-color: var(--festa-danger); }
+.bm-document-remove:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* 이 팝업이 뜨는 내 부스 관리 OverlayFrame 자체가 z-index: var(--festa-z-overlay)(100)다 —
+   그보다 낮으면 팝업이 뒤에 깔려 클릭은 되는데(state는 바뀐다) 화면엔 전혀 안 보인다
+   (S15P21A604-763). 그 OverlayFrame 위에 뜨는 중첩 다이얼로그라 한 단만 더 높인다. */
+.bm-gate-backdrop { position: fixed; inset: 0; z-index: 101; display: grid; place-items: center; background: rgba(6, 9, 20, 0.6); padding: 20px; }
+.bm-gate-dialog { width: min(360px, 100%); display: flex; flex-direction: column; gap: 8px; padding: 22px; border-radius: 16px; background: var(--festa-surface-solid); border: 1px solid rgba(255, 255, 255, 0.1); }
+.bm-gate-dialog h3 { margin: 0; font-size: 16px; color: var(--festa-ink); }
+.bm-gate-dialog p { margin: 0 0 6px; color: rgba(234, 238, 251, 0.72); font-size: 13.5px; }
+.bm-gate-actions { display: flex; justify-content: flex-end; gap: 8px; }
+/* 이 팝업은 OverlayFrame 의 **형제**라 .festa-overlay 안이 아니다 — 거기 스코프된 --ov-* 를 못 받아
+   .ov-btn 을 쓰면 테두리·배경·반경이 전부 빈 값이 된다(2026-09-16 실측). 다이얼로그 본체가 이미
+   쓰는 전역 --festa-* 토큰으로 여기서 직접 세운다. */
+.bm-gate-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 36px;
+  padding: 0 15px;
+  border: 1px solid var(--festa-line, rgba(255, 255, 255, 0.12));
+  border-radius: var(--festa-r-input, 10px);
+  background: var(--festa-fill, rgba(255, 255, 255, 0.06));
+  color: var(--festa-ink);
+  font: inherit;
+  font-size: 13.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: filter 0.12s ease, transform 0.08s ease;
+}
+.bm-gate-btn:hover { filter: brightness(1.15); }
+.bm-gate-btn:active { transform: translateY(1px); }
+.bm-gate-btn:focus-visible { outline: 2px solid var(--festa-accent); outline-offset: 2px; }
+.bm-gate-btn-primary {
+  background: var(--festa-accent);
+  border-color: var(--festa-accent);
+  color: #fff;
+}
 
 @media (max-width: 900px) {
-  .bm-hero { grid-template-columns: 1fr; }
-  .bm-row { grid-template-columns: 1fr auto; }
-  .bm-row-summary { grid-column: 1 / -1; }
+  .bm-body { grid-template-columns: 1fr; }
+  .bm-ops-grid { grid-template-columns: 1fr; }
+  .bm-ai-body { flex-direction: column; }
+  .bm-ai-actions { width: auto; }
   .bm-field-grid { grid-template-columns: 1fr; }
+}
+
+/* Studio 는 자기 Shell 이 화면 전체를 쓴다 — OverlayFrame 에 넣으면 캔버스가 갇힌다.
+   월드 위 최상단 레이어로 띄우고 프레임은 씌우지 않는다 (S15P21A604-755). */
+.bm-panel-full {
+  position: fixed;
+  inset: 0;
+  z-index: var(--festa-z-overlay, 60);
 }

@@ -9,7 +9,7 @@ import { isApiError } from '../../shared/api/client';
 import { authApi } from '../../entities/auth/api.select';
 import { mockStartOAuth } from '../../entities/auth/api.mock';
 import { setGuestSession, useSession } from '../../features/auth/model/session';
-import { consumeReturnTo } from '../../features/auth/model/returnTo';
+import { consumeReturnTo, peekReturnTo } from '../../features/auth/model/returnTo';
 import { authBaseUrl } from '../../shared/config/runtime';
 import { warmUpUnityAssets } from '../../unity/host/warmup';
 import { ScreenControls } from '../../features/audio/ui/ScreenControls';
@@ -17,8 +17,9 @@ import { DevEntryButton } from '../../features/devEntry/ui/DevEntryButton';
 import { showToast } from '../../shared/ui/toast/toastStore';
 import { authProviders, guestProvider, isConfiguredOAuth } from '../../entities/auth/providers';
 import type { AuthProviderId, AuthProviderVM } from '../../shared/contracts/auth';
-import loginBackgroundUrl from '../../assets/festa/backgrounds/login-background.png';
-import ssafestaLogoUrl from '../../assets/festa/brand/ssafesta-logo.png';
+// WebP 전환 (S15P21A604-733) — 배경 2.86MB→328KB, 로고 1.77MB→246KB. 원본 PNG 는 남겨 둔다.
+import loginBackgroundUrl from '../../assets/festa/backgrounds/login-background.webp';
+import ssafestaLogoUrl from '../../assets/festa/brand/ssafesta-logo.webp';
 import './LoginPage.css';
 
 const USE_MOCK = import.meta.env.VITE_USE_MOCK === 'true';
@@ -57,8 +58,14 @@ function providerIcon(provider: AuthProviderVM) {
   }
 }
 
-/* 푸터 좌측 그룹 아이콘 — 레퍼런스(login.png)의 안내·이벤트·문의 3종.
-   링크 대상이 아직 없어 span 그대로 두고 표시만 맞춘다(대상이 생기면 a 로 바꾼다). */
+/* 푸터 5항목(축제 안내·이벤트·고객센터·개인정보처리방침·이용약관)을 숨겼다 (S15P21A604-815).
+
+   레퍼런스(login.png) 를 맞추려고 표시만 해 둔 것인데 다섯 개 다 갈 곳이 없다. 눌러도 아무 일이
+   없는 것을 사용자가 먼저 발견하는 것보다 안 보이는 편이 낫다.
+
+   지우지 않고 주석으로 두는 이유: 레퍼런스 대조 근거이고, 대상이 생기면 span 을 a 로 바꿔
+   그대로 되살린다. CSS(.login-footer*)도 남겨 둔다.
+
 const footerIcon = (path: string) => (
   <svg
     className="login-footer-icon"
@@ -81,6 +88,7 @@ const footerLinks = [
   { label: '이벤트', icon: footerIcon('M12 3l2.1 5.4L20 9.3l-4 3.9 1 5.8-5-2.7-5 2.7 1-5.8-4-3.9 5.9-.9z') },
   { label: '고객센터', icon: footerIcon('M11 4a7 7 0 100 14 7 7 0 000-14M20 21l-4.2-4.2') },
 ];
+*/
 
 export function LoginPage() {
   const navigate = useNavigate();
@@ -91,6 +99,13 @@ export function LoginPage() {
   // framework 까지 넓힌다. 소셜 로그인은 전체 페이지 이동이라 그 순간 요청이 끊기지만, 받아 둔 만큼은
   // HTTP 캐시에 남아 복귀 후 다시 쓰인다. 게스트 입장은 SPA 이동이라 그대로 이어진다.
   useEffect(() => warmUpUnityAssets('intent'), []);
+
+  // WorldPage chunk 선로드 (S15P21A604-850). 인증 뒤 목적지는 저장된 returnTo 아니면 /app/world 라, 월드로
+  // 갈 사용자에게만 route 도달 전에 받아 둔다 — 실측에서 이 chunk 가 route 전환 뒤에야 시작돼 1.3s 를 더 썼다.
+  // 다른 화면 딥링크(게임 편집 등)로 가는 사용자는 받지 않는다. 실패해도 route 가 다시 요청하므로 결과를 버린다.
+  useEffect(() => {
+    if (peekReturnTo().startsWith('/app/world')) void import('../world/WorldPage').catch(() => undefined);
+  }, []);
 
   // 진입 맥락 안내(세션 만료·게스트 재입장)를 패널 안에 두면 버튼이 아래로 밀린다 —
   // 낮은 화면에서는 그것만으로 푸터를 뚫는다. 알림은 레이아웃 밖으로 보낸다 (S15P21A604-465).
@@ -113,7 +128,13 @@ export function LoginPage() {
     }
     // 일반 API 와 다른 base 를 쓴다 — 인가 요청·provider 콜백·complete 가 같은 호스트여야
     // host-only 인 JSESSIONID·oauth_handoff 가 이어진다 (S15P21A604-564, entities/auth/api.ts).
-    window.location.href = `${authBaseUrl()}/api/v1/auth/oauth/${provider}`;
+    //
+    // `return` 은 **지금 이 FE 가 어느 origin 인지**를 BE 에 알리는 값이다 (S15P21A604-649, #177).
+    // BE 는 이 값을 그대로 믿지 않는다 — local deployment 에서 요청 자신의 origin 과 정확히 일치할
+    // 때만 세션에 보관했다가 로그인 완료 후 그 origin 의 /auth/callback 으로 돌려보내고, 그 밖에는
+    // 무시하고 기존 frontend-base-url 로 간다. 없으면 오늘과 동일하므로 어느 BE 에 붙여도 안전하다.
+    const returnOrigin = encodeURIComponent(window.location.origin);
+    window.location.href = `${authBaseUrl()}/api/v1/auth/oauth/${provider}?return=${returnOrigin}`;
   }
 
   async function handleGuestEnter() {
@@ -140,8 +161,9 @@ export function LoginPage() {
       <ScreenControls />
       {/* 개발자 입장구 — 제품 로그인 버튼을 빌려 쓰지 않는다. 패널 밖이라 버튼 좌표를 밀지 않는다 */}
       <DevEntryButton />
-      <img className="login-bg" src={loginBackgroundUrl} alt="" />
-      <img className="login-logo" src={ssafestaLogoUrl} alt="SSAFESTA" />
+      <link rel="preload" as="image" href={loginBackgroundUrl} fetchPriority="high" />
+      <img className="login-bg" src={loginBackgroundUrl} alt="" width={1672} height={941} fetchPriority="high" decoding="async" />
+      <img className="login-logo" src={ssafestaLogoUrl} alt="SSAFESTA" width={1986} height={792} decoding="async" />
       <h1 className="sr-only" style={{ position: 'absolute', width: 1, height: 1, overflow: 'hidden', clip: 'rect(0 0 0 0)' }}>
         로그인
       </h1>
@@ -172,6 +194,7 @@ export function LoginPage() {
         </button>
       </div>
 
+      {/* 링크 대상이 생기면 되살린다 (S15P21A604-815)
       <footer className="login-footer">
         <div className="login-footer-group">
           {footerLinks.map((link) => (
@@ -187,6 +210,7 @@ export function LoginPage() {
           <span>이용약관</span>
         </div>
       </footer>
+      */}
     </div>
   );
 }

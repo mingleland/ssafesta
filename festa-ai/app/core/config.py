@@ -191,6 +191,9 @@ class Settings(BaseSettings):
     # 응답 timeout (spec 008 FR-007, 헌법 19조) — 첫 token까지 15초, 전체 응답 60초.
     llm_ttft_timeout_seconds: float = Field(default=15.0, gt=0)
     llm_total_timeout_seconds: float = Field(default=60.0, gt=0)
+    # Handoff Summary(S15P21A604-139)는 스트리밍 채팅과 달리 Spring이 응답을 기다리는
+    # 단발 호출이라 llm_total_timeout_seconds(60초, 토큰별 UX용)를 그대로 물려받지 않는다.
+    handoff_summary_timeout_seconds: float = Field(default=20.0, gt=0)
     # 문서 처리 결과 전달(S15P21A604-124) — heartbeat/batch/finalize/failed 공통 timeout.
     spring_document_result_timeout_seconds: float = Field(default=5.0, gt=0)
     # 한 번의 Embedding Provider 호출에 담을 최대 chunk 개수 — HTTP 결과 전송 batch(최대

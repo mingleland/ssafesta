@@ -47,6 +47,21 @@ namespace Festa.Integration
             return body == null ? null : BoothProjectParser.Parse(body);
         }
 
+        public async Task<BoothSlotDto[]> GetSlotsAsync()
+        {
+            var url = $"{_baseUrl}/api/v1/booth-slots";
+            var body = await GetAsync(url, "Booth slots", "slot list");
+            if (body == null) return null;
+
+            var slots = BoothSlotListParser.Parse(body);
+            if (slots == null)
+            {
+                Debug.LogError("[HttpBoothApiClient] 슬롯 목록 파싱 실패");
+                return null;
+            }
+            return slots;
+        }
+
         public async Task<BoothLayoutDto> GetPublishedLayoutAsync(int boothId)
         {
             var url = $"{_baseUrl}/api/v1/booths/{boothId}/layouts/published";

@@ -1,92 +1,59 @@
 // World 위 React HUD — hud-decisions.md 가 허용한 것만 그린다 (S15P21A604-406).
-// 허용 4종: 이동·조작 안내 / 미니게임 score·progress(해당 콘텐츠 중에만) / Toast·Notification /
-//          Consultation Quick Access(우상단, 상시 — 상담만의 예외).
+// 허용 6종: 이동·조작 안내 / 미니게임 score·progress(해당 콘텐츠 중에만) / Toast·Notification /
+//          Consultation Quick Access / 월드 채팅 / 전체화면.
 // 금지: minimap · HP · quest tracker · hotbar · crosshair · mission panel · 기능 launcher.
 // F 상호작용 prompt·하이라이트·이름표는 Unity 소관이라 여기서 만들지 않는다.
 //
-// 조작 안내 항목은 Unity 카드(S15P21A604-451)와 같은 어휘를 쓴다 — 같은 조작을 두 파트가 다른
-// 말로 설명하지 않게 한다. FE 임베드에서는 Unity 카드가 숨겨져(-456) 이 목록이 유일한 안내다.
-// 그래서 사용자 테스트에서 실제로 묻는 것을 기준으로 고른다(GitLab #132, S15P21A604-460):
-// 이동·달리기·점프·시야·상호작용·감정 표현·창 닫기. 여기 없는 조작을 임의로 늘리지 않는다.
-//
-// F 항목에 부스 입장·나가기를 명시한다 (S15P21A604-592). Unity 카드에는 "F — 상호작용 · 부스
-// 입장" 이 있는데 FE 목록에는 그 말이 없어, 부스에 들어가고 나오는 방법을 안내에서 찾을 수
-// 없었다. 나가기도 같은 F 다 — 내부 공간 출구에 BoothPortal 이 하나 더 있다(festa-unity
-// World/Festival/BoothPortal.cs: "외부 부스와 내부 공간 출구에 하나씩").
-import { useState } from 'react';
+// **조작 안내는 여기서 걷었다** (2026-09-16). ESC 메뉴의 조작 안내 오버레이가 같은 목록
+// (`ControlGuideList`)을 그리므로 상시 카드로 화면 한 귀퉁이를 계속 차지할 이유가 없다.
+import { BoothExitButton } from './BoothExitButton';
 import { ConsultationQuickAccess } from './ConsultationQuickAccess';
-import { WorldGuideLauncher } from './WorldGuideLauncher';
+import { toggleFullscreen, useFullscreen } from '../../../shared/ui/fullscreen';
+import { Tooltip } from '../../../shared/ui/tooltip/Tooltip';
 import './worldHud.css';
 
-interface Props {
-  /** 월드가 목업 정지 화면인지 — 안내 문구를 사실대로 바꾼다 */
-  mock?: boolean;
+export function WorldHud() {
+  // HUD 의 버튼은 마우스로 눌러도 focus 를 가져가지 않는다 (S15P21A604-648). 브라우저 기본은 mousedown
+  // 에서 그 버튼으로 focus 를 옮기는데, 그러면 canvas 가 focus 를 잃어 WASD·F 가 Unity 에 안 들어간다
+  // (!279 captureAllKeyboardInput=false). 나가기 버튼은 눌린 뒤 사라져 focus 가 body 로 떨어지고,
+  // 이용 안내 버튼은 -428 이 "연 요소" 인 그 버튼으로 focus 를 돌려준다 — 둘 다 캔버스를 다시 클릭하기
+  // 전까지 키가 죽는다(2026-09-11 5173 실측). mousedown 의 기본 동작만 막는다: click 은 mouseup 뒤에
+  // 그대로 오고, Tab 으로 HUD 버튼에 가는 키보드 경로도 그대로다. HUD 안에는 입력창이 없다.
+  return (
+    <div className="world-hud" onMouseDown={(event) => event.preventDefault()}>
+      {/* 우상단 한 줄 — 상담 · 전체화면 (2026-09-16). 세로로 쌓던 것을 가로로 폈다.
+          순서는 DOM 그대로다: .cqa 가 row-reverse 라 상담이 오른쪽 끝에 서고 전체화면이 그 왼쪽에 붙는다. */}
+      <ConsultationQuickAccess />
+      <FullscreenToggle />
+
+      {/* 컨텍스트 액션 — 부스 안일 때만 뜬다. 상시 HUD 가 아니다 (S15P21A604-627, #174) */}
+      <BoothExitButton />
+    </div>
+  );
 }
 
-export function WorldHud({ mock = false }: Props) {
-  const [guideOpen, setGuideOpen] = useState(true);
-
+// 상태의 정본은 브라우저다 — F11 이나 ESC 로 빠져나가도 `fullscreenchange` 로 아이콘이 따라간다.
+// FE 가 자기 state 로 들고 있으면 그 두 경로에서 곧바로 어긋난다.
+function FullscreenToggle() {
+  const full = useFullscreen();
+  const label = full ? '전체화면 끄기' : '전체화면';
   return (
-    <div className="world-hud">
-      {/* 허용 4번 — 상담 상태 즉시 접근 */}
-      <ConsultationQuickAccess />
-
-      {guideOpen && (
-        <section className="world-hud-guide" aria-label="조작 안내">
-          <header className="world-hud-guide-head">
-            <span>조작 안내</span>
-            <button type="button" onClick={() => setGuideOpen(false)} aria-label="조작 안내 닫기">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" aria-hidden="true">
-                <path d="M6 6l12 12M18 6L6 18" />
-              </svg>
-            </button>
-          </header>
-          <ul className="world-hud-keys">
-            <li>
-              <span className="world-key">W</span>
-              <span className="world-key">A</span>
-              <span className="world-key">S</span>
-              <span className="world-key">D</span>
-              이동
-            </li>
-            <li>
-              <span className="world-key">Shift</span>
-              달리기
-            </li>
-            <li>
-              <span className="world-key">Space</span>
-              점프
-            </li>
-            <li>
-              <span className="world-key">마우스 우클릭</span>
-              드래그해서 시야 돌리기
-            </li>
-            <li>
-              <span className="world-key">F</span>
-              부스 입장·나가기 · 가까운 오브젝트와 상호작용
-            </li>
-            <li>
-              <span className="world-key">Alt</span>
-              <span className="world-key">클릭</span>
-              감정 표현
-            </li>
-            <li>
-              <span className="world-key">Esc</span>
-              열린 창 닫기 · 메뉴 열기
-            </li>
-          </ul>
-          {mock && <p className="world-hud-note">월드는 목업 정지 화면입니다 — 실제 이동은 Unity 연결 후 동작합니다.</p>}
-        </section>
-      )}
-
-      {!guideOpen && (
-        <button type="button" className="world-hud-guide-open" onClick={() => setGuideOpen(true)}>
-          조작 안내
-        </button>
-      )}
-
-      {/* 이용 안내(무엇을 할 수 있는가) — 위 조작 안내(어떻게 움직이는가)와 다른 축이다 (-599) */}
-      <WorldGuideLauncher />
-    </div>
+    <Tooltip content={label} placement="bottom">
+      <button
+        type="button"
+        className="world-hud-fullscreen"
+        onClick={() => { void toggleFullscreen(); }}
+        aria-pressed={full}
+        aria-label={label}
+      >
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          {full ? (
+            <path d="M3 8h3a2 2 0 0 0 2-2V3M21 8h-3a2 2 0 0 1-2-2V3M3 16h3a2 2 0 0 1 2 2v3M21 16h-3a2 2 0 0 0-2 2v3" />
+          ) : (
+            <path d="M8 3H5a2 2 0 0 0-2 2v3M16 3h3a2 2 0 0 1 2 2v3M8 21H5a2 2 0 0 1-2-2v-3M16 21h3a2 2 0 0 0 2-2v-3" />
+          )}
+        </svg>
+      </button>
+    </Tooltip>
   );
 }

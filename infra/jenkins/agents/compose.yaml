@@ -86,6 +86,10 @@ services:
       WEBGL_RELEASE_ROOT: /srv/festa/webgl
       WEBGL_PUBLIC_BASE_URL: ${WEBGL_PUBLIC_BASE_URL:-https://demo.ssafesta.world/unity}
       WEBGL_RETENTION_COUNT: ${WEBGL_RETENTION_COUNT:-5}
+      R2_BACKUP_ENDPOINT: ${R2_BACKUP_ENDPOINT:-}
+      R2_BACKUP_BUCKET: ${R2_BACKUP_BUCKET:-}
+      GAME_ENV_FILE: ${GAME_ENV_FILE:-/srv/festa/config/game.env}
+      CONNECTION_TOKEN_SECRET_FILE: ${CONNECTION_TOKEN_SECRET_FILE:-/opt/festa/secrets/dev-game-connection-token-secret}
     depends_on:
       image-transfer-init:
         condition: service_completed_successfully
@@ -94,6 +98,9 @@ services:
       - image_transfer:/var/lib/festa-image-transfer
       - deploy_state:/var/lib/festa-environments
       - ${WEBGL_RELEASE_ROOT:-/srv/festa/webgl}:/srv/festa/webgl
+      # Dedicated Server 배포는 compose env 파일과 connection token secret 을 agent 안에서 읽는다.
+      - ${GAME_ENV_FILE:-/srv/festa/config/game.env}:${GAME_ENV_FILE:-/srv/festa/config/game.env}:ro
+      - ${CONNECTION_TOKEN_SECRET_FILE:-/opt/festa/secrets/dev-game-connection-token-secret}:${CONNECTION_TOKEN_SECRET_FILE:-/opt/festa/secrets/dev-game-connection-token-secret}:ro
       - /var/run/docker.sock:/var/run/docker.sock
 
   unity-agent:

@@ -117,6 +117,9 @@ namespace Festa.EditorTools
             // 이미지 태그(소스 스탬프)는 **어떤 에셋도 건드리기 전**에 읽는다. 아래 ForceApiEnvironment 가
             // ApiConfig.asset 을 디스크에 저장하므로, 3/3 단계에서 읽으면 깨끗한 체크아웃도 항상 -dirty 가 된다.
             var sourceStamp = SourceStamp(ProjectRoot());
+            // manifest 의 소스 출처도 같은 이유로 여기서 찍는다 — 빌드가 에셋을 고친 뒤에 읽으면
+            // 깨끗한 체크아웃에서 뽑아도 dirty 가 되어 배포 게이트를 통과할 수 없다.
+            var scm = FestaWebBuilder.ReadScmStamp();
 
             // 되돌릴 것들. 여기서 놓치면 이후 에디터 작업이 조용히 어긋난다.
             var prevTarget = EditorUserBuildSettings.activeBuildTarget;
@@ -137,7 +140,7 @@ namespace Festa.EditorTools
                 if (!ForceApiEnvironment(apiConfig, Festa.Integration.ApiEnvironment.Prod)) return;
 
                 if (!BuildLinuxServer()) return;
-                if (!BuildWebGL()) return;
+                if (!BuildWebGL(scm)) return;
 
                 if (!EnsureDockerAvailable())
                 {
@@ -325,7 +328,7 @@ namespace Festa.EditorTools
 
         // ── WebGL 클라이언트 ──────────────────────────────────
 
-        static bool BuildWebGL()
+        static bool BuildWebGL(FestaWebBuilder.ScmStamp scm)
         {
             // Unity 는 재빌드 시 이전 해시 파일을 지우지 않는다 (실측: 서로 다른 날짜 빌드의
             // loader/framework/data/wasm 8개 공존). 배포본에 낡은 파일이 섞이면 manifest 가
@@ -386,7 +389,7 @@ namespace Festa.EditorTools
             if (!VerifyRenderPipelineAssetsPacked(report)) return false;
 
             // FE 는 해시 파일명을 알 수 없어 manifest.json 으로만 빌드 URL 을 찾는다.
-            FestaWebBuilder.WriteManifest(WebOutDir);
+            FestaWebBuilder.WriteManifest(WebOutDir, scm);
             return true;
         }
 

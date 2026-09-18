@@ -160,15 +160,16 @@ class SpringAgentConfigClient:
 def _parse_project_facts(value: object) -> ProjectFacts | None:
     if value is None:
         return None
-    if not isinstance(value, Mapping) or set(value) != {
+    allowed_fields = {
         "introduction",
         "targetAudience",
         "techStack",
-    }:
+    }
+    if not isinstance(value, Mapping) or not set(value) <= allowed_fields:
         raise SpringAgentConfigUnavailable(
             "Spring agent-config projectFacts shape is invalid"
         )
-    facts = (value["introduction"], value["targetAudience"], value["techStack"])
+    facts = tuple(value.get(field) for field in allowed_fields)
     if any(
         item is not None and (type(item) is not str or not item.strip())
         for item in facts
@@ -178,9 +179,9 @@ def _parse_project_facts(value: object) -> ProjectFacts | None:
         )
     try:
         return ProjectFacts(
-            introduction=value["introduction"],
-            target_audience=value["targetAudience"],
-            tech_stack=value["techStack"],
+            introduction=value.get("introduction"),
+            target_audience=value.get("targetAudience"),
+            tech_stack=value.get("techStack"),
         )
     except ValueError as exc:
         raise SpringAgentConfigUnavailable(

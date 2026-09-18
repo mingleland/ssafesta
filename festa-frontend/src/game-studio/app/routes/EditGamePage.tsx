@@ -1,6 +1,8 @@
 import { useMemo } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
-import { createApiGameDraftRepository, createApiGamePublisher } from '../../studio/ports/gameAuthoringApi.ts';
+import { createApiGameDraftRepository, createApiGamePublisher, createApiGameVisibilityPort } from '../../studio/ports/gameAuthoringApi.ts';
+import { createBrowserAssetRepository } from '../../studio/assets/localAssetRepository.ts';
+import { createApiGameAssetRepository } from '../../studio/assets/remoteAssetRepository.ts';
 import { createBrowserPublicationPorts } from '../../studio/ports/localPublicationRepository.ts';
 import { GameStudioShell } from '../../studio/ui/GameStudioShell.tsx';
 import { createEditorStressProject } from '../../studio/model/createEditorStressProject.ts';
@@ -24,6 +26,19 @@ export const EditGamePage = () => {
   const serverPublisher = useMemo(() => (
     serverAuthoringEnabled ? createApiGamePublisher() : undefined
   ), [serverAuthoringEnabled]);
+  const serverVisibilityPort = useMemo(() => (
+    serverAuthoringEnabled ? createApiGameVisibilityPort() : undefined
+  ), [serverAuthoringEnabled]);
+  // S15P21A604-116 — 서버 저작이 켜지면 자산도 서버로 간다. 여기가 비어 있던 동안 편집기는
+  // assetRepository=null 을 받아 업로드가 "로컬 저장소를 사용할 수 없습니다" 로 막혔다 —
+  // 원격 어댑터는 이미 있었고 부르는 쪽이 없었다(GitLab #69).
+  // local 을 함께 넘기는 이유는 기존 프로젝트의 asset://local/ 참조가 편집 중에는 계속
+  // 보여야 하기 때문이다. 업로드는 항상 서버로 가고, 로컬은 옛 참조 읽기·삭제에만 쓰인다.
+  const serverAssetRepository = useMemo(() => (
+    serverAuthoringEnabled
+      ? createApiGameAssetRepository({ local: createBrowserAssetRepository() })
+      : undefined
+  ), [serverAuthoringEnabled]);
   const browserPublicationPorts = useMemo(() => (
     browserPublicationEnabled ? createBrowserPublicationPorts() : null
   ), [browserPublicationEnabled]);
@@ -35,13 +50,14 @@ export const EditGamePage = () => {
   }
   return (
     <GameStudioShell
-      assetRepository={serverAuthoringEnabled ? null : undefined}
+      assetRepository={serverAssetRepository}
       gameId={parsedGameId}
       initialProject={initialProject}
       key={parsedGameId}
       persistenceLabel={stressFixtureEnabled ? '최대 부하 검증' : serverAuthoringEnabled ? '서버' : browserPublicationEnabled ? '브라우저(Mock)' : '브라우저'}
       publisher={stressFixtureEnabled ? null : serverPublisher ?? browserPublicationPorts?.publisher}
       repository={stressFixtureEnabled ? null : serverDraftRepository}
+      visibilityPort={stressFixtureEnabled ? null : serverVisibilityPort ?? null}
     />
   );
 };

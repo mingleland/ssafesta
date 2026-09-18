@@ -13,6 +13,7 @@ import {
   closeGameMenu,
 } from '../../../../features/world/model/gameClientUi';
 import { openManagement, openMenu } from '../../../../features/world/model/worldScreen';
+import { __resetWorldMountForTests, showWorld } from '../../worldMount';
 
 type Boot = { resolve: (i: UnityInstance) => void };
 const boots: Boot[] = [];
@@ -26,14 +27,15 @@ vi.mock('../../sessionManager', () => {
 vi.mock('../../authBridge', () => ({ syncAccessToken: () => 'cleared' }));
 // 음소거 승계(-557, #151)도 같은 인스턴스를 쓴다. 입력과 무관한 축이라 같은 이유로 뺀다 —
 // 이 파일의 마지막 단정이 "잠금 말고 다른 **입력** SendMessage 를 만들지 않는다" 이기 때문이다.
-vi.mock('../../audioBridge', () => ({ syncAudioMute: () => {} }));
+vi.mock('../../audioBridge', () => ({ syncAudioMute: () => {}, syncAudioVolume: () => {} }));
 
 const instance = (): UnityInstance => ({ SendMessage: vi.fn(), SetFullscreen: vi.fn(), Quit: async () => {} });
 const lockCalls = (i: UnityInstance) =>
   (i.SendMessage as ReturnType<typeof vi.fn>).mock.calls.filter((c) => c[1] === 'SetInputLocked');
 
-beforeEach(() => { boots.length = 0; closeOverlay(); __resetGameClientUiForTests(); });
-afterEach(() => { cleanup(); closeOverlay(); __resetGameClientUiForTests(); });
+// 제품에서 UnityHost 는 PersistentWorld 가 showWorld() 한 뒤에만 뜬다 (-620·-643) — 그 전제를 세운다
+beforeEach(() => { boots.length = 0; closeOverlay(); __resetGameClientUiForTests(); __resetWorldMountForTests(); showWorld(); });
+afterEach(() => { cleanup(); closeOverlay(); __resetGameClientUiForTests(); __resetWorldMountForTests(); });
 
 async function renderBooted() {
   const { UnityHost } = await import('../../UnityHost');

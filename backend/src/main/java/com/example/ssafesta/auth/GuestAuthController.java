@@ -9,7 +9,10 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.HttpServletRequest;
 import java.time.Instant;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.ResponseCookie;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -24,6 +27,14 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/v1/auth")
 @Tag(name = "Auth")
 public class GuestAuthController {
+
+    /**
+     * 쿠키가 아예 안 온 것과, 와서 거절된 것을 로그에서 갈라야 한다 (GitLab #211). 이 갈래만
+     * {@code INFO} 인 이유는 <b>이것이 정상 상태이기 때문</b>이다 — 비로그인 방문자는 페이지를 열
+     * 때마다 여기로 떨어진다. {@code WARN} 으로 올리면 정상 트래픽이 경고를 채우고, 진짜 경고가
+     * 그 사이에 묻힌다.
+     */
+    private static final Logger log = LoggerFactory.getLogger(GuestAuthController.class);
 
     private final AccessTokenService accessTokenService;
     private final MemberSessionService memberSessionService;
@@ -68,20 +79,32 @@ public class GuestAuthController {
                     그것이 설계 의도다(헌법 13조). 따라서 **비로그인·게스트 방문자는 매번 `401` 을 받으며 그것이 정상 상태다** —
                     서버 오류로 취급하면 안 된다.
 
-                    쿠키가 **없는 경우·만료된 경우·이미 쓰인 경우**가 모두 같은 `401 INVALID_MEMBER_TOKEN` 이다.
+                    쿠키가 **없는 경우·만료된 경우·계보가 폐기된 경우**가 모두 같은 `401 INVALID_MEMBER_TOKEN` 이다.
                     사용자에게는 "로그인돼 있지 않다" 하나의 사건이라 이름을 나누지 않았다.
+
+                    **한 가지만 갈라져 있다 — `401 REFRESH_TOKEN_ROTATED`.** 방금 회전된 토큰이 다시 온 경우이고
+                    (탭을 하나 더 열면 그 탭도 부트스트랩에서 이 endpoint 를 부른다), **세션은 살아 있다.**
+                    쿠키는 이미 새 값으로 교체돼 있으므로 **한 번 더 보내면 성공한다** — 로그인 화면으로 보내면 안 된다.
+
+                    다만 **즉시 한 번이 아니라 짧은 backoff 를 둔 제한 재시도**로 붙여야 한다. 이 401 이 이긴 쪽의
+                    `Set-Cookie` 보다 먼저 도착할 수 있고, 그때 곧바로 재시도하면 옛 쿠키를 다시 보내게 된다.
+                    서버가 보장하는 것은 "이 401 은 재시도 가능하다" 까지이고, 언제 재시도할지는 클라이언트 몫이다
+                    (S15P21A604-764, GitLab #198).
 
                     Bruno 로 시험할 때는 쿠키 jar 에 저장된 값이 자동 전송된다. Refresh Token 을 본문이나 환경변수에 넣지 않는다.
                     """)
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "새 Access Token 발급. 응답의 `Set-Cookie` 로 refresh 쿠키가 교체된다"),
-            @ApiResponse(responseCode = "401", description = "`INVALID_MEMBER_TOKEN` — 쿠키가 없거나 만료·이미 사용됐다. 비로그인 방문자의 정상 응답이다"),
+            @ApiResponse(responseCode = "401", description = """
+                    `INVALID_MEMBER_TOKEN` — 쿠키가 없거나 만료·계보가 폐기됐다. 비로그인 방문자의 정상 응답이다.                     `REFRESH_TOKEN_ROTATED` — 방금 회전된 토큰이 다시 왔다. 세션은 살아 있고, 짧은 backoff 뒤 재시도하면 성공한다"""),
             @ApiResponse(responseCode = "403", description = "`UNTRUSTED_ORIGIN` — `Origin` 이 허용된 프론트 주소가 아니다. 쿠키를 보기 전에 먼저 거절한다")})
     @PostMapping("/refresh")
     public ResponseEntity<GuestTokenResponse> refresh(@Parameter(hidden = true) @CookieValue(name = "refresh_token", required = false) String refreshToken,
-                                                        @Parameter(hidden = true) @RequestHeader(name = "Origin", required = false) String origin) {
-        requireTrustedOrigin(origin, properties);
+                                                        @Parameter(hidden = true) @RequestHeader(name = "Origin", required = false) String origin,
+                                                        HttpServletRequest request) {
+        requireTrustedOrigin(request, origin);
         if (refreshToken == null) {
+            log.info("refresh 거절 — refresh_token 쿠키가 요청에 없다");
             throw new InvalidRefreshTokenException();
         }
         MemberSessionService.MemberSession session = memberSessionService.refresh(refreshToken);
@@ -108,8 +131,9 @@ public class GuestAuthController {
     @SecurityRequirement(name = "bearerAuth")
     @PostMapping("/logout")
     public ResponseEntity<Void> logout(@AuthenticationPrincipal Jwt jwt,
-                                       @Parameter(hidden = true) @RequestHeader(name = "Origin", required = false) String origin) {
-        requireTrustedOrigin(origin, properties);
+                                       @Parameter(hidden = true) @RequestHeader(name = "Origin", required = false) String origin,
+                                       HttpServletRequest request) {
+        requireTrustedOrigin(request, origin);
         if (jwt != null && "MEMBER".equals(jwt.getClaimAsString("role"))) {
             try {
                 memberSessionService.revoke(Long.valueOf(jwt.getSubject()));
@@ -132,8 +156,10 @@ public class GuestAuthController {
             Instant expiresAt) {
     }
 
-    private void requireTrustedOrigin(String origin, AuthProperties properties) {
-        if (!properties.frontendBaseUrl().equals(origin)) {
+    // 판단은 RequestOrigins 가 소유한다 — refresh·logout·OAuth 시작이 같은 규칙을 봐야 하고,
+    // 여기에 두면 OAuth 쪽이 두 번째 사본을 만든다 (GitLab #177).
+    private void requireTrustedOrigin(HttpServletRequest request, String origin) {
+        if (!RequestOrigins.isTrusted(request, origin, properties)) {
             throw new ApiException(ErrorCode.UNTRUSTED_ORIGIN);
         }
     }

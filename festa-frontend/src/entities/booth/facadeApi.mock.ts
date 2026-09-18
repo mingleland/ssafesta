@@ -6,8 +6,9 @@ import type { ApiError } from '../../shared/api/client';
 import { THEME_CODES, isPaletteColor } from './types';
 import type { BoothDetail, BoothFacade, FacadePutRequest } from './types';
 import { getMockHomepageUrl } from './homepageApi.mock';
+import { getMockPublishedVersion } from './layoutApi.mock';
 
-// layout mock(entities/layout/api.mock.ts)과 같은 sentinel 값 — 임대 만료 UX 수동 검증용.
+// 999 sentinel — 임대 만료 UX 수동 검증용 (옛 layout mock 과 같은 관용구).
 // 실 BE에는 없는 값이라 real facadeApi.ts에는 이 분기가 없다.
 const LEASE_EXPIRED_BOOTH_ID = 999;
 
@@ -55,13 +56,19 @@ function defaultFacade(): BoothFacade {
   return { themeCode: 'DEFAULT', primaryColor: null, signText: null, logoUrl: null };
 }
 
+// 부스 이름 (S15P21A604-756). facade 와 저장소가 다르다 — 서버도 booths.name 컬럼이고
+// 응답 facade 에는 실리지 않는다. 세션 유지는 하지 않는다: mock 의 목적은 계약 재현이다.
+const names = new Map<number, string>();
+const DEFAULT_BOOTH_NAME = 'AI 프로젝트 전시관';
+
 export async function getBooth(boothId: number): Promise<BoothDetail> {
   return {
     boothId,
-    name: 'AI 프로젝트 전시관',
+    name: names.get(boothId) ?? DEFAULT_BOOTH_NAME,
     leaseStatus: boothId === LEASE_EXPIRED_BOOTH_ID ? 'EXPIRED' : 'ACTIVE',
     facade: facades.get(boothId) ?? defaultFacade(),
     homepageUrl: getMockHomepageUrl(boothId), // 016 — 등록 mock 저장소가 정본
+    publishedLayoutVersion: getMockPublishedVersion(boothId), // -898 — 게시 mock 저장소가 정본
   };
 }
 
@@ -82,9 +89,18 @@ export async function putFacade(boothId: number, body: FacadePutRequest): Promis
   if (body.logoUrl !== null && (!HTTPS_URL.test(body.logoUrl) || body.logoUrl.length > 2048)) {
     throw fieldError('logoUrl', '로고 URL은 https:// 형식 2048자 이하여야 합니다.');
   }
+  // name 은 선택 필드다 — 생략은 "비우기" 가 아니라 **현재 이름 유지**다(booths.name NOT NULL).
+  if (body.name !== undefined) {
+    if (body.name.length < 1 || body.name.length > 100) {
+      throw fieldError('name', '부스 이름은 1자 이상 100자 이하여야 합니다.');
+    }
+    names.set(boothId, body.name);
+  }
 
   // BE와 동일한 대문자 정규화(PR #71) — 소문자 hex로 저장해도 대문자로 돌아온다
-  const saved: BoothFacade = { ...body, primaryColor: body.primaryColor?.toUpperCase() ?? null };
+  // name 은 응답 밖이라 저장 객체에서 걷어낸다 — 남기면 facade 캐시에 계약 밖 필드가 섞인다.
+  const { name: _name, ...facade } = body;
+  const saved: BoothFacade = { ...facade, primaryColor: body.primaryColor?.toUpperCase() ?? null };
   facades.set(boothId, saved);
   persistFacades();
   return saved;

@@ -5,6 +5,10 @@ import {
   __resetGameClientUiForTests,
   getGameClientUiSnapshot,
 } from '../../../world/model/gameClientUi.ts';
+import {
+  __resetWorldContextForTests,
+  getWorldContext,
+} from '../../../world/model/worldContext.ts';
 
 // vitest 환경이 'node'라 jsdom 없이는 window가 없다 — 실 DOM은 필요 없고 initUnityBridge가
 // FestaUnity 콜백을 걸 대상 객체 하나만 있으면 되므로 최소 폴리필로 대체한다(jsdom 의존성 추가 없음).
@@ -24,6 +28,7 @@ describe('initInteractionDispatcher', () => {
   beforeEach(() => {
     closeOverlay();
     __resetGameClientUiForTests();
+    __resetWorldContextForTests();
   });
 
   it('BOOTH_LAPTOP_INTERACT를 LAPTOP 오버레이로 연다 — url 필드는 계약에서 제거됐다(-297, 정본은 booth 조회)', () => {
@@ -65,6 +70,18 @@ describe('initInteractionDispatcher', () => {
     expect(getCurrentOverlay()).toEqual({
       type: 'GAME',
       payload: { boothId: 7, objectId: 'game-npc-01', configId: 42 },
+    });
+    unsubscribe();
+  });
+
+  it('WORLD_ARCADE_INTERACT도 같은 GAME 오버레이를 열되 machineId만 싣는다(S15P21A604-712, #135)', () => {
+    const unsubscribe = initInteractionDispatcher();
+    emit(JSON.stringify({ type: 'WORLD_ARCADE_INTERACT', machineId: 'plaza-arcade-02' }));
+
+    // 부스 필드를 만들어 넣지 않는다 — 오락기는 월드 고정물이라 boothId 가 없다.
+    expect(getCurrentOverlay()).toEqual({
+      type: 'GAME',
+      payload: { machineId: 'plaza-arcade-02' },
     });
     unsubscribe();
   });
@@ -114,6 +131,35 @@ describe('initInteractionDispatcher', () => {
 
     expect(getGameClientUiSnapshot().managementOverlay).toBe(true);
     expect(getCurrentOverlay()).toBeNull();
+    unsubscribe();
+  });
+
+  // 위치 알림 — 화면을 열지 않는 유일한 이벤트다 (S15P21A604-627, GitLab #174)
+  it('WORLD_BOOTH_CONTEXT 는 오버레이를 열지 않고 월드 컨텍스트만 갱신한다', () => {
+    const unsubscribe = initInteractionDispatcher();
+    emit(JSON.stringify({ type: 'WORLD_BOOTH_CONTEXT', insideBooth: true, boothId: 3 }));
+
+    expect(getWorldContext()).toEqual({ insideBooth: true, boothId: 3 });
+    expect(getCurrentOverlay()).toBeNull(); // 상호작용이 아니다 — 여는 화면이 없다
+    unsubscribe();
+  });
+
+  it('부스 밖 payload 에는 boothId 키가 없다 — Unity 가 0 을 보내지 않는 계약 그대로 받는다', () => {
+    const unsubscribe = initInteractionDispatcher();
+    emit(JSON.stringify({ type: 'WORLD_BOOTH_CONTEXT', insideBooth: true, boothId: 3 }));
+    emit(JSON.stringify({ type: 'WORLD_BOOTH_CONTEXT', insideBooth: false }));
+
+    expect(getWorldContext()).toEqual({ insideBooth: false, boothId: null });
+    unsubscribe();
+  });
+
+  // 안내데스크 NPC — 새 화면이 아니라 이미 있는 이용 안내 오버레이를 다시 연다
+  // (S15P21A604-688, GitLab #184). payload 는 없다 — 화면이 읽을 값이 없다
+  it('WORLD_GUIDE_INTERACT 는 이용 안내 오버레이를 payload 없이 연다', () => {
+    const unsubscribe = initInteractionDispatcher();
+    emit(JSON.stringify({ type: 'WORLD_GUIDE_INTERACT' }));
+
+    expect(getCurrentOverlay()).toEqual({ type: 'WORLD_GUIDE', payload: {} });
     unsubscribe();
   });
 });

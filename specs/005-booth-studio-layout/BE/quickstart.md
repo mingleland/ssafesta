@@ -98,3 +98,29 @@ cd backend && ./mvnw test
 - `docs/HDD/작업일지.md`에 결과 기록, 문제는 해결 여부와 무관하게 `docs/HDD/트러블슈팅.md`에 T-번호로 등록 (헌법 29조)
 - `docs/08`에 `PUT /booths/{boothId}/facade` 반영 (신설 endpoint 통보 — 헌법 24조)
 - `docs/09 §7·§9`를 실물 스키마에 맞게 정정 (research R-01·R-08)
+
+---
+
+## 5. 부스 치수 확장 확인 (`S15P21A604-698`)
+
+`9.4 × 6 × 5.9` 로 넓힌 뒤, **넓어진 것과 넓어지지 않은 것이 각각 그대로인지** 본다.
+
+```bash
+cd backend
+./mvnw test -Dtest=BoothLayoutValidationTest,BoothLayoutApiIntegrationTest
+```
+
+| 확인 | 어디서 |
+|---|---|
+| 앵커 x = 4.7 통과 / 4.8 거부 | `BoothLayoutValidationTest.theAnchorBoundIsWiderOnXThanOnZ` |
+| 앵커 z = 3.0 통과 / 3.1 거부 — **x 가 넓어졌다고 z 가 열리면 안 된다** | 같은 테스트 (`z = 4.7` 도 거부) |
+| 실물(회전 AABB)이 축별 경계를 각자 본다 | `theExtentBoundIsWiderOnXThanOnZ` · `anExtentTouchingTheWallsIsAllowed` |
+| 회전 뒤에도 판정이 **월드 축** 기준 — 로컬 x 가 월드 z 를 채울 때 x 경계가 z 로 새지 않는다 | `rotationMovesTheExtent` |
+| 높이는 실물 **상단**으로 판정 (5.9 통과 / 5.91 거부) | `theCeilingIsJudgedOnTheObjectTop` |
+| 카탈로그가 `width: 9.4` · `depth: 6.0` · `height: 5.9` | `BoothLayoutApiIntegrationTest` (검증 상수에서 유도되므로 상수만 고치면 따라온다) |
+| 통행 격자가 실제로 넓어졌다 — 옛 6m 벽은 이제 부스를 가로막지 못한다 | `BoothLayoutPassageTest.theOldSixMetreWallNoLongerCrossesTheBooth` |
+| 기존 6m 안쪽 배치에 회귀 없음 | 백엔드 전체 `./mvnw test` |
+
+**수동으로 한 번 볼 것**: 편집기(FE)를 로컬 서버에 붙여 캔버스 우하단 치수가 `9.4 × 6 × 5.9 m` 로 뜨는지. FE 는 값을 하드코딩하지 않고 `template.footprint` 에서 받으므로 이 숫자가 **서버 응답 실측값**이다.
+
+**Consumer 반영 상태를 확인하기 전에는 develop 에 넣지 않는다** (헌법 24조). FE 는 `S15P21A604-785` 로 먼저 들어갔다 — 순서가 반대가 되면 사용자가 편집기에서 허용된 자리에 다 꾸며 놓고 게시 버튼에서 막힌다.

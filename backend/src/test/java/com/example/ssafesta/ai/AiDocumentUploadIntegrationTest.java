@@ -1,7 +1,6 @@
 package com.example.ssafesta.ai;
 
 import com.example.ssafesta.storage.FakeObjectStorage;
-import com.example.ssafesta.storage.FakeObjectStorageConfiguration;
 import static com.example.ssafesta.booth.BoothLayoutTestSupport.expireLease;
 import static com.example.ssafesta.booth.BoothLayoutTestSupport.grantLease;
 import static com.example.ssafesta.booth.BoothTestSupport.createMemberWithWallet;
@@ -14,6 +13,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -50,8 +50,7 @@ import tools.jackson.databind.json.JsonMapper;
  * <p>T030 — 파일은 Spring 을 통과하지 않는다. 브라우저가 저장소로 직접 PUT 하므로, 여기서
  * "업로드했다"는 것은 {@link FakeObjectStorage#putObject} 다.
  */
-@Import({TestcontainersConfiguration.class, FakeObjectStorageConfiguration.class,
-        FakeDocumentProcessingClientConfiguration.class})
+@Import(TestcontainersConfiguration.class)
 @SpringBootTest
 @AutoConfigureMockMvc
 class AiDocumentUploadIntegrationTest {
@@ -532,10 +531,14 @@ class AiDocumentUploadIntegrationTest {
                 .andExpect(jsonPath("$.documents[0].uploadedAt").doesNotExist())
                 .andExpect(jsonPath("$.documents[1].documentId").value(idOf(old)))
                 .andExpect(jsonPath("$.documents[1].status").value("EXPIRED"))
-                // 상한은 서버 설정이라 클라이언트가 알 수 없다. 쓴 양은 위 배열에서 읽는다.
+                // 교체로 물러난 것이 아니라 업로드가 안 끝난 만료다 — 이 칸이 둘을 가른다 (FR-027a).
+                .andExpect(jsonPath("$.documents[1].replacedAt").doesNotExist())
+                // 상한은 서버 설정이라 클라이언트가 알 수 없고, 쓴 양은 활성 3상태만 센다 —
+                // 만료된 행은 빠지므로 목록이 둘이어도 usedCount 는 하나다.
                 .andExpect(jsonPath("$.quota.countLimit").value(10))
                 .andExpect(jsonPath("$.quota.bytesLimit").value(100L * 1024 * 1024))
-                .andExpect(jsonPath("$.quota.count").doesNotHaveJsonPath());
+                .andExpect(jsonPath("$.quota.usedCount").value(1))
+                .andExpect(jsonPath("$.quota.usedBytes").value(2 * ONE_MB));
     }
 
     /** 업로드가 확인되면 그 시각이 채워진다 — 화면이 "업로드 중" 과 "대기 중" 을 나누는 근거다. */
@@ -821,7 +824,443 @@ class AiDocumentUploadIntegrationTest {
         assertEquals("QUEUED", untouched.getProcessingStatus());
     }
 
+    // ── 수정본 교체 (FR-019 · FR-027a, S15P21A604-386) ──────────────────────
+
+    /**
+     * 교체는 <b>새 문서</b>를 하나 더 만드는 일이고, 원본은 그 자리에 그대로 있다.
+     *
+     * <p>여기서 원본을 물리면 처리에 실패했을 때 AI 직원이 답할 근거가 통째로 사라진다. 퇴역은
+     * 교체본이 실제로 {@code READY} 가 된 뒤에만 일어난다 (FR-027a,
+     * {@code AiDocumentResultApiIntegrationTest}).
+     */
+    @Test
+    void aReplacementGrantLeavesTheOriginalReady() throws Exception {
+        Owner owner = agentOwner("교체발급");
+        long original = seedActive(owner, "READY", SHA_A, ONE_MB);
+
+        String json = mockMvc.perform(replacement(owner, original,
+                        body("v2.pdf", "application/pdf", 2 * ONE_MB, SHA_B)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.duplicate").value(false))
+                .andExpect(jsonPath("$.uploadUrl").exists())
+                .andReturn().getResponse().getContentAsString();
+
+        long replacement = idOf(json);
+        assertNotEquals(original, replacement, "교체가 원본 행을 덮어썼다");
+        AiDocument fresh = documentRepository.findById(replacement).orElseThrow();
+        assertEquals("QUEUED", fresh.getProcessingStatus());
+        assertNull(fresh.getUploadedAt());
+        assertEquals(original, replacesOf(replacement), "교체본이 원본을 가리키지 않는다");
+
+        AiDocument kept = documentRepository.findById(original).orElseThrow();
+        assertEquals("READY", kept.getProcessingStatus(), "교체를 걸자마자 원본이 물러났다");
+        assertNull(kept.getReplacedAt());
+    }
+
+    /**
+     * 2단계 완료만으로는 원본이 물러나지 않는다.
+     *
+     * <p>완료는 "바이트가 도착했다" 일 뿐이고, 그 파일이 읽히는지·청킹되는지는 아직 아무도 모른다.
+     * 여기서 물리면 파싱 불가 파일 하나로 멀쩡하던 문서가 사라진다.
+     */
+    @Test
+    void completingAReplacementDoesNotRetireTheOriginal() throws Exception {
+        Owner owner = agentOwner("완료만");
+        long original = seedActive(owner, "READY", SHA_A, ONE_MB);
+        String grant = replacementJson(owner, original,
+                body("v2.pdf", "application/pdf", ONE_MB, SHA_B));
+        storage.putObject(keyOf(grant), ONE_MB);
+
+        mockMvc.perform(complete(owner, idOf(grant)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.processingStatus").value("QUEUED"));
+
+        AiDocument kept = documentRepository.findById(original).orElseThrow();
+        assertEquals("READY", kept.getProcessingStatus(), "완료만으로 원본이 물러났다");
+        assertNull(kept.getReplacedAt());
+    }
+
+    /**
+     * 교체 대상은 {@code READY} 하나다 (FR-019).
+     *
+     * <p>나머지 다섯은 각자 빠져나갈 길이 따로 있다 — {@code QUEUED}·{@code PROCESSING} 은 이미
+     * 사용자가 원하는 버전이 되는 중이고, {@code FAILED}·{@code EXPIRED}·{@code DISABLED} 는 중복
+     * 판정 밖이라 같은 파일을 그냥 새 문서로 올리면 된다 (FR-019b). 여기까지 열면 "이 파일을
+     * 올려라" 에 답이 둘이 되고 어느 쪽을 뜻했는지 알 방법이 없다.
+     *
+     * <p>판정은 <b>행 잠금 안에서</b> 한다. 밖에서 읽은 상태는 몇 분 전 것일 수 있다 — 임대 만료가
+     * 자기 트랜잭션에서 이 문서를 {@code DISABLED} 로 옮기는 것이 대표적이라 {@code DISABLED} 도
+     * 이 표에 있다.
+     */
+    @ParameterizedTest
+    @CsvSource({"QUEUED", "PROCESSING", "FAILED", "EXPIRED", "DISABLED"})
+    void onlyAReadyDocumentCanBeReplaced(String status) throws Exception {
+        Owner owner = agentOwner("대상상태" + status);
+        long target = seedActive(owner, status, SHA_A, ONE_MB);
+
+        mockMvc.perform(replacement(owner, target,
+                        body("v2.pdf", "application/pdf", ONE_MB, SHA_B)))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("DOCUMENT_NOT_REPLACEABLE"));
+
+        assertEquals(0, countBy("SELECT COUNT(*) FROM ai_documents WHERE replaces_document_id = ?",
+                target), "거절했는데 교체본 행이 남았다");
+    }
+
+    /** 대상 문서 자신과 같은 파일이면 할 일이 없다 — 행을 만들지 않고 200 이다 (FR-019c 와 같은 결). */
+    @Test
+    void replacingADocumentWithItselfIsADuplicate() throws Exception {
+        Owner owner = agentOwner("자기동일");
+        long original = seedActive(owner, "READY", SHA_A, ONE_MB);
+
+        mockMvc.perform(replacement(owner, original,
+                        body("same.pdf", "application/pdf", ONE_MB, SHA_A)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.duplicate").value(true))
+                .andExpect(jsonPath("$.documentId").value(original))
+                .andExpect(jsonPath("$.uploadUrl").doesNotExist());
+
+        assertEquals(1, countBy("SELECT COUNT(*) FROM ai_documents WHERE agent_id = ?",
+                owner.agentId()), "no-op 인데 행이 생겼다");
+        assertEquals("READY", documentRepository.findById(original).orElseThrow()
+                .getProcessingStatus());
+    }
+
+    /**
+     * 같은 AI 직원의 <b>다른</b> 활성 문서와 같은 파일이면 거절한다.
+     *
+     * <p>{@code ux_ai_documents_agent_active_sha} 가 (직원, 해시) 를 활성 상태 안에서 유일하게
+     * 잡으므로 그대로 밀면 삽입 자체가 안 된다 — 인덱스가 터지면 500 이고, 여기서 막으면 어느
+     * 문서가 걸리는지 말해 줄 수 있다.
+     */
+    @Test
+    void replacingWithAFileAnotherDocumentAlreadyHoldsIsRefused() throws Exception {
+        Owner owner = agentOwner("타문서동일");
+        long original = seedActive(owner, "READY", SHA_A, ONE_MB);
+        seedActive(owner, "READY", SHA_B, ONE_MB);
+
+        mockMvc.perform(replacement(owner, original,
+                        body("other.pdf", "application/pdf", ONE_MB, SHA_B)))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("DOCUMENT_NOT_REPLACEABLE"));
+
+        assertEquals(0, countBy("SELECT COUNT(*) FROM ai_documents WHERE replaces_document_id = ?",
+                original));
+    }
+
+    /** 아직 안 올린 교체본에 같은 파일로 다시 부르면 <b>같은 행에 새 URL</b> 이다 (#84 멱등 재발급). */
+    @Test
+    void askingAgainForAnUnfinishedReplacementReissuesTheSameRow() throws Exception {
+        Owner owner = agentOwner("교체재발급");
+        long original = seedActive(owner, "READY", SHA_A, ONE_MB);
+        String request = body("v2.pdf", "application/pdf", ONE_MB, SHA_B);
+        String first = replacementJson(owner, original, request);
+
+        String second = replacementJson(owner, original, request);
+
+        assertEquals(idOf(first), idOf(second), "교체본이 둘 생겼다");
+        assertNotEquals(urlOf(first), urlOf(second), "URL 이 재발급되지 않았다");
+        assertEquals(1, countBy("SELECT COUNT(*) FROM ai_documents WHERE replaces_document_id = ?",
+                original));
+    }
+
+    /** 해시는 같은데 파일 정보가 다르면 400 이다 — 서명한 것과 다른 파일이 올라간다 (2026-08-31 확정). */
+    @Test
+    void aReplacementResumeWithDifferentFileFactsIsRefused() throws Exception {
+        Owner owner = agentOwner("교체다른정보");
+        long original = seedActive(owner, "READY", SHA_A, ONE_MB);
+        replacementJson(owner, original, body("v2.pdf", "application/pdf", ONE_MB, SHA_B));
+
+        mockMvc.perform(replacement(owner, original,
+                        body("v2.pdf", "application/pdf", 2 * ONE_MB, SHA_B)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"))
+                .andExpect(jsonPath("$.errors[0].field").value("contentSha256"));
+    }
+
+    /**
+     * 아직 안 올린 교체본에 <b>다른 파일</b>로 다시 부르면 그것을 버리고 새로 시작한다.
+     *
+     * <p>버려진 쪽에 {@code replaced_at} 을 찍지 않는 것이 이 테스트의 핵심이다. 그 칸은 "더 새
+     * 버전이 자리를 넘겨받았다" 는 뜻이고, 이 행은 아무것도 공개하지 못한 채 버려진 발급일 뿐이다 —
+     * 찍어 두면 만료 복구 경로(FR-027)가 이 행을 교체 원본으로 오해한다.
+     */
+    @Test
+    void changingTheReplacementFileAbandonsTheOldGrantWithoutStampingIt() throws Exception {
+        Owner owner = agentOwner("교체파일변경");
+        long original = seedActive(owner, "READY", SHA_A, ONE_MB);
+        long abandoned = idOf(replacementJson(owner, original,
+                body("v2.pdf", "application/pdf", ONE_MB, SHA_B)));
+
+        long fresh = idOf(replacementJson(owner, original,
+                body("v3.pdf", "application/pdf", ONE_MB, shaOf(42))));
+
+        assertNotEquals(abandoned, fresh, "다른 파일인데 같은 행을 재사용했다");
+        AiDocument dropped = documentRepository.findById(abandoned).orElseThrow();
+        assertEquals("EXPIRED", dropped.getProcessingStatus());
+        assertNull(dropped.getReplacedAt(), "버려진 발급에 replaced_at 이 찍혔다 — 복구 판정이 어긋난다");
+        assertEquals(original, replacesOf(fresh));
+        assertEquals(1, countBy("SELECT COUNT(*) FROM ai_documents WHERE replaces_document_id = ?"
+                + " AND processing_status IN ('QUEUED', 'PROCESSING', 'READY')", original),
+                "활성 교체본이 하나가 아니다");
+    }
+
+    /** 업로드가 끝난 교체본에 같은 파일로 다시 부르면 그 교체본의 현재 상태를 돌려준다. */
+    @Test
+    void askingAgainAfterTheReplacementUploadedIsADuplicate() throws Exception {
+        Owner owner = agentOwner("교체업로드후");
+        long original = seedActive(owner, "READY", SHA_A, ONE_MB);
+        String request = body("v2.pdf", "application/pdf", ONE_MB, SHA_B);
+        String grant = replacementJson(owner, original, request);
+        storage.putObject(keyOf(grant), ONE_MB);
+        mockMvc.perform(complete(owner, idOf(grant))).andExpect(status().isOk());
+
+        mockMvc.perform(replacement(owner, original, request))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.duplicate").value(true))
+                .andExpect(jsonPath("$.documentId").value(idOf(grant)));
+    }
+
+    /**
+     * 진행 중인 교체가 있으면 다른 파일로 끼어들 수 없다.
+     *
+     * <p>업로드가 끝났거나({@code QUEUED} + 업로드 확인) 워커가 파일을 쥔({@code PROCESSING})
+     * 상태다. 하던 일을 취소하는 것은 교체를 <b>시작하는</b> 것과 다른 동작이고 아무도 그것을
+     * 요청하지 않았다.
+     */
+    @ParameterizedTest
+    @CsvSource({"QUEUED", "PROCESSING"})
+    void aReplacementAlreadyUnderWayBlocksAnotherFile(String status) throws Exception {
+        Owner owner = agentOwner("교체진행" + status);
+        long original = seedActive(owner, "READY", SHA_A, ONE_MB);
+        String grant = replacementJson(owner, original,
+                body("v2.pdf", "application/pdf", ONE_MB, SHA_B));
+        storage.putObject(keyOf(grant), ONE_MB);
+        mockMvc.perform(complete(owner, idOf(grant))).andExpect(status().isOk());
+        jdbc.update("UPDATE ai_documents SET processing_status = ? WHERE id = ?",
+                status, idOf(grant));
+
+        mockMvc.perform(replacement(owner, original,
+                        body("v3.pdf", "application/pdf", ONE_MB, shaOf(43))))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("DOCUMENT_NOT_REPLACEABLE"));
+    }
+
+    /** 활성 쓰기 provider 가 바뀌면 교체본도 새 행으로 다시 시작한다 — 교체 의도는 그대로다 (FR-032). */
+    @Test
+    void aProviderSwitchRestartsTheReplacementAndKeepsItsTarget() throws Exception {
+        Owner owner = agentOwner("교체provider");
+        long original = seedActive(owner, "READY", SHA_A, ONE_MB);
+        String request = body("v2.pdf", "application/pdf", ONE_MB, SHA_B);
+        long before = idOf(replacementJson(owner, original, request));
+
+        storage.switchActiveProvider("MINIO_LOCAL", "fallback-bucket");
+        long after = idOf(replacementJson(owner, original, request));
+
+        assertNotEquals(before, after, "provider 가 바뀌었는데 같은 행을 재사용했다");
+        AiDocument fresh = documentRepository.findById(after).orElseThrow();
+        assertEquals("MINIO_LOCAL", fresh.getStorageProvider());
+        assertEquals(original, replacesOf(after), "새로 시작하면서 교체 대상을 잃었다");
+        assertEquals("EXPIRED", documentRepository.findById(before).orElseThrow()
+                .getProcessingStatus());
+    }
+
+    /**
+     * 10개를 다 쓴 AI 직원도 교체할 수 있다 (FR-018).
+     *
+     * <p>발급 전에 상한을 물으면 교체본이 열한 번째 행이라 무조건 걸린다 — 자리가 없을수록 교체가
+     * 절실한데 바로 그때 막힌다. 교체본이 원본의 자리를 이어받으므로 논리 합계는 열이다.
+     */
+    @Test
+    void aFullAgentCanStillReplaceADocument() throws Exception {
+        Owner owner = agentOwner("만원교체");
+        long original = seedActive(owner, "READY", shaOf(0), ONE_MB);
+        for (int i = 1; i < 10; i++) {
+            seedActive(owner, "READY", shaOf(i), ONE_MB);
+        }
+
+        mockMvc.perform(replacement(owner, original,
+                        body("v2.pdf", "application/pdf", ONE_MB, SHA_B)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.uploadUrl").exists());
+
+        assertEquals(10, documentRepository.countActive(owner.agentId()),
+                "교체 중인데 논리 합계가 열을 넘었다");
+        assertEquals(11, countBy("SELECT COUNT(*) FROM ai_documents WHERE agent_id = ?",
+                owner.agentId()), "행 자체는 열하나다 — 그래서 서버가 세어 준다");
+    }
+
+    /** 총량을 넘기는 교체는 삽입까지 갔다가 <b>롤백</b>된다 — 행이 남으면 다음 시도까지 막힌다. */
+    @Test
+    void aReplacementOverTheByteCapRollsBackItsRow() throws Exception {
+        Owner owner = agentOwner("교체총량");
+        long original = seedActive(owner, "READY", SHA_A, ONE_MB);
+        seedActive(owner, "READY", shaOf(50), 95L * ONE_MB);
+
+        mockMvc.perform(replacement(owner, original,
+                        body("huge.pdf", "application/pdf", 6L * ONE_MB, SHA_B)))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("DOCUMENT_LIMIT_EXCEEDED"));
+
+        assertEquals(0, countBy("SELECT COUNT(*) FROM ai_documents WHERE replaces_document_id = ?",
+                original), "거절했는데 교체본 행이 남았다");
+        assertEquals("READY", documentRepository.findById(original).orElseThrow()
+                .getProcessingStatus());
+    }
+
+    /**
+     * 목록은 원본과 교체본을 <b>둘 다</b> 보여 주고, 쓴 양은 서버가 센다.
+     *
+     * <p>숨기지 않는 이유는 FR-006 이다 — 사용자가 올린 것이 조용히 사라지면 "어디 갔지" 가 된다.
+     * 대신 활성 상태 행이 열하나여도 {@code usedCount} 는 열이다. 클라이언트가 배열을 세면 "11/10"
+     * 이 뜨고, 그러면 실제로는 성공할 업로드 앞에서 상한을 넘었다고 잘못 안내한다.
+     */
+    @Test
+    void theListKeepsBothRowsAndTheServerCountsTheQuota() throws Exception {
+        Owner owner = agentOwner("교체목록");
+        long original = seedActive(owner, "READY", SHA_A, ONE_MB);
+        long replacement = idOf(replacementJson(owner, original,
+                body("v2.pdf", "application/pdf", 2 * ONE_MB, SHA_B)));
+
+        mockMvc.perform(documents(owner))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.documents.length()").value(2))
+                .andExpect(jsonPath("$.documents[0].documentId").value(replacement))
+                .andExpect(jsonPath("$.documents[1].documentId").value(original))
+                // 아직 물러나지 않았으므로 교체됨 표시가 붙으면 안 된다.
+                .andExpect(jsonPath("$.documents[1].replacedAt").doesNotExist())
+                .andExpect(jsonPath("$.quota.usedCount").value(1))
+                .andExpect(jsonPath("$.quota.usedBytes").value(2 * ONE_MB))
+                .andExpect(jsonPath("$.quota.countLimit").value(10));
+    }
+
+    /**
+     * 물러난 원본은 목록에 <b>교체됨</b>으로 남고, 완료 요청은 {@code 410} 이다 (FR-027a).
+     *
+     * <p>같은 {@code EXPIRED} 인데 뜻이 둘이다. {@code replacedAt} 이 없으면 24시간 안에 완료로
+     * 되살아나고(FR-027), 있으면 되돌릴 자리가 없다 — 이 행에 "다시 올려 주세요" 를 띄우면 눌러도
+     * 아무 일도 일어나지 않는 버튼이 된다 (T-24 와 같은 모양).
+     */
+    @Test
+    void aRetiredOriginalShowsAsReplacedAndCannotBeCompleted() throws Exception {
+        Owner owner = agentOwner("퇴역원본");
+        String grant = grantJson(owner, body("v1.pdf", "application/pdf", ONE_MB, SHA_A));
+        storage.putObject(keyOf(grant), ONE_MB);
+        mockMvc.perform(complete(owner, idOf(grant))).andExpect(status().isOk());
+        retire(idOf(grant));
+
+        mockMvc.perform(documents(owner))
+                .andExpect(jsonPath("$.documents[0].status").value("EXPIRED"))
+                .andExpect(jsonPath("$.documents[0].replacedAt").isNotEmpty())
+                .andExpect(jsonPath("$.quota.usedCount").value(0));
+
+        mockMvc.perform(complete(owner, idOf(grant)))
+                .andExpect(status().isGone())
+                .andExpect(jsonPath("$.code").value("DOCUMENT_UPLOAD_GONE"));
+        // 원본이 아직 저장소에 있어도 결과는 같다 — 삭제는 스윕이 자기 주기로 한다 (FR-028).
+        assertTrue(storage.hasObject(keyOf(grant)));
+    }
+
+    /** 교체 대기 중인 만료 발급은 되살아나지 않는다 — {@code ux_ai_documents_active_replacement} 가 깨진다. */
+    @Test
+    void anExpiredReplacementCannotRecoverWhileAnotherIsPending() throws Exception {
+        Owner owner = agentOwner("교체대기복구");
+        long original = seedActive(owner, "READY", SHA_A, ONE_MB);
+        String stale = replacementJson(owner, original,
+                body("v2.pdf", "application/pdf", ONE_MB, SHA_B));
+        storage.putObject(keyOf(stale), ONE_MB);
+        expireDocument(idOf(stale), Duration.ofHours(1));
+        // 사용자가 그 사이에 다른 파일로 교체를 다시 걸었다.
+        replacementJson(owner, original, body("v3.pdf", "application/pdf", ONE_MB, shaOf(44)));
+
+        mockMvc.perform(complete(owner, idOf(stale)))
+                .andExpect(status().isGone())
+                .andExpect(jsonPath("$.code").value("DOCUMENT_UPLOAD_GONE"));
+    }
+
+    // ── 교체 권한 ───────────────────────────────────────────────────────────
+
+    @Test
+    void replacingAnUnknownDocumentIsNotFound() throws Exception {
+        Owner owner = agentOwner("교체없음");
+
+        mockMvc.perform(replacement(owner, 999_999_999L,
+                        body("v2.pdf", "application/pdf", ONE_MB, SHA_B)))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("DOCUMENT_NOT_FOUND"));
+    }
+
+    @Test
+    void replacingSomeoneElsesDocumentIsForbidden() throws Exception {
+        Owner owner = agentOwner("교체타인");
+        long original = seedActive(owner, "READY", SHA_A, ONE_MB);
+        Long stranger = createMemberWithWallet(users, wallets, "교체침입");
+
+        mockMvc.perform(put("/api/v1/documents/{id}/replacement", original)
+                        .header("Authorization", bearerFor(stranger))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body("v2.pdf", "application/pdf", ONE_MB, SHA_B)))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("BOOTH_EDITOR_FORBIDDEN"));
+    }
+
+    @Test
+    void guestsCannotReplaceDocuments() throws Exception {
+        Owner owner = agentOwner("교체게스트");
+        long original = seedActive(owner, "READY", SHA_A, ONE_MB);
+
+        mockMvc.perform(put("/api/v1/documents/{id}/replacement", original)
+                        .header("Authorization", "Bearer " + accessTokens.issueGuestToken().token())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body("v2.pdf", "application/pdf", ONE_MB, SHA_B)))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("MEMBER_ONLY"));
+    }
+
+    /** 임대가 끝나면 교체도 쓰기다 — 조회만 열려 있다 (FR-015). */
+    @Test
+    void anExpiredLeaseCannotReplace() throws Exception {
+        Owner owner = agentOwner("교체만료임대");
+        long original = seedActive(owner, "READY", SHA_A, ONE_MB);
+        expireLease(jdbc, owner.boothId());
+
+        mockMvc.perform(replacement(owner, original,
+                        body("v2.pdf", "application/pdf", ONE_MB, SHA_B)))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("BOOTH_LEASE_EXPIRED"));
+    }
+
     // ── 도우미 ──────────────────────────────────────────────────────────────
+
+    private RequestBuilder replacement(Owner owner, long documentId, String body) {
+        return put("/api/v1/documents/{id}/replacement", documentId)
+                .header("Authorization", bearerFor(owner.userId()))
+                .contentType(MediaType.APPLICATION_JSON).content(body);
+    }
+
+    private String replacementJson(Owner owner, long documentId, String request) throws Exception {
+        return mockMvc.perform(replacement(owner, documentId, request))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+    }
+
+    private Long replacesOf(long documentId) {
+        return jdbc.queryForObject("SELECT replaces_document_id FROM ai_documents WHERE id = ?",
+                Long.class, documentId);
+    }
+
+    /**
+     * {@code AiDocumentResultService.finalizeJob} 가 하는 퇴역을 SQL 로 대신한다.
+     *
+     * <p>여기서 워커 경로 전체를 돌리는 것은 이 파일이 보는 것(발급·완료·목록)이 아니다. 퇴역 자체는
+     * {@code AiDocumentResultApiIntegrationTest} 가 finalize 를 거쳐 검증한다.
+     */
+    private void retire(long documentId) {
+        jdbc.update("""
+                UPDATE ai_documents SET processing_status = 'EXPIRED', expired_at = now(),
+                       replaced_at = now(), updated_at = now() WHERE id = ?
+                """, documentId);
+    }
 
     private RequestBuilder uploadUrl(Owner owner, String body) {
         return post("/api/v1/agents/{id}/documents/upload-url", owner.agentId())
@@ -1005,7 +1444,13 @@ class AiDocumentUploadIntegrationTest {
                 + " WHERE document_id = ?", idOf(grant));
         sweeper.dispatchDueJobs();
 
-        DocumentProcessingClient.ProcessingRequest resent = processing.onlyRequest();
+        // 다른 테스트가 남긴 QUEUED Job 도 sweeper가 정상적으로 함께 보낼 수 있다. 이 시나리오는
+        // 이 문서가 같은 attempt로 재배차됐는지만 책임진다.
+        List<DocumentProcessingClient.ProcessingRequest> resentForThisDocument = processing.received().stream()
+                .filter(request -> request.documentId() == idOf(grant))
+                .toList();
+        assertEquals(1, resentForThisDocument.size(), "이 문서는 재배차를 정확히 한 번 받아야 한다");
+        DocumentProcessingClient.ProcessingRequest resent = resentForThisDocument.getFirst();
         assertEquals(0, resent.attemptNo(), "재배차는 attempt 를 올리지 않는다");
         assertEquals(idOf(grant), resent.documentId());
         assertEquals(0, jdbc.queryForObject(
@@ -1026,7 +1471,9 @@ class AiDocumentUploadIntegrationTest {
                 + " next_retry_at = now() - interval '1 minute' WHERE document_id = ?", idOf(grant));
         sweeper.dispatchDueJobs();
 
-        assertEquals(List.of(), processing.received(), "RUNNING 인 Job 을 다시 보내면 워커가 둘이 된다");
+        assertTrue(processing.received().stream()
+                        .noneMatch(request -> request.documentId() == idOf(grant)),
+                "RUNNING 인 이 Job 을 다시 보내면 워커가 둘이 된다");
     }
 
     private int countBy(String sql, Object... arguments) {

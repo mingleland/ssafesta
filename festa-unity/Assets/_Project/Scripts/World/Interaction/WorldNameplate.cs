@@ -36,8 +36,9 @@ namespace Festa.World
         [Tooltip("표시할 이름. 비어 있으면 그리지 않는다.")]
         [SerializeField] string _label;
 
-        [Tooltip("이 거리(월드 유닛) 안에서만 보인다.")]
-        [SerializeField] float _visibleDistance = 260f;
+        [Tooltip("이 거리(월드 유닛) 안에서만 보인다. 0 이하 = 거리 제한 없음. "
+               + "2026-09-16 사용자 결정: 어느 위치에서든 시야에 들어오면 표시한다 — 기본 0.")]
+        [SerializeField] float _visibleDistance = 0f;
 
 
         [Tooltip("머리 위 간격 — 이름표 자체 크기의 배수다. 월드 고정값이 아니라 비율이라야 "
@@ -47,7 +48,7 @@ namespace Festa.World
         [Tooltip("기준 거리에서의 글자 크기(월드 유닛).")]
         [SerializeField] float _baseCharacterHeight = 1.35f;
 
-        [Tooltip("이 거리에서 위 크기 그대로 보인다. 멀면 커지고 가까우면 작아진다(0.6~3배).")]
+        [Tooltip("이 거리에서 위 크기 그대로 보인다. 멀면 커지고 가까우면 작아진다(하한 0.6배, 상한 없음 — 화면상 크기 일정).")]
         [SerializeField] float _referenceDistance = 55f;
 
         [SerializeField] Color _color = new(1f, 0.99f, 0.95f, 1f);
@@ -64,6 +65,7 @@ namespace Festa.World
         TextMeshPro _text;
         MeshRenderer _renderer;
         Material _material;          // 인스턴스 — 색·외곽선을 이름표마다 따로 준다
+        bool _suppressed;
         float _topY;
         bool _measured;
 
@@ -84,7 +86,39 @@ namespace Festa.World
         }
 
         /// <summary>런타임에 붙이는 쪽(플레이어 등)이 표시 거리를 정할 수 있게 한다.</summary>
-        public void SetVisibleDistance(float distance) => _visibleDistance = Mathf.Max(1f, distance);
+        /// <summary>표시 거리(월드 유닛). 0 이하면 거리 제한 없음.</summary>
+        public void SetVisibleDistance(float distance) => _visibleDistance = Mathf.Max(0f, distance);
+
+        /// <summary>
+        /// 말풍선처럼 이름을 대신 표시하는 UI가 떠 있는 동안 이름표 렌더링만 잠시 멈춘다.
+        /// Label 값은 보존하므로 해제하는 즉시 최신 닉네임으로 돌아온다 (GitLab #242).
+        /// </summary>
+        public void SetSuppressed(bool suppressed)
+        {
+            _suppressed = suppressed;
+            if (_suppressed && _renderer != null) _renderer.enabled = false;
+        }
+
+        /// <summary>
+        /// 글자 크기와 외곽선 두께를 올려 <b>배경이 무엇이든 읽히게</b> 한다. NPC 안내 이름표용.
+        ///
+        /// <para><b>왜 필요한가.</b> NPC 를 구분하려고 쓴 노란색(휘도 0.70)이 안내데스크 뒤 밝은 회색 벽
+        /// (0.68)과 밝기가 거의 같아, 색만 다르고 명암이 없어 글자 모양이 안 잡혔다 (2026-09-14 사용자 지적).</para>
+        ///
+        /// <para><b>색으로는 못 푼다.</b> 밝은 벽과 밤하늘 양쪽에 동시에 대비가 나는 단일 색은 없다 —
+        /// 어둡게 내리면 벽에서 읽히는 대신 밤 배경에서 묻힌다. 그래서 <b>배경별로 다른 부분이 담당한다</b>:
+        /// 밝은 배경은 <b>검은 외곽선</b>이, 어두운 배경은 밝은 속면이 맡는다. 여기서 올리는 두 값이 그
+        /// 분담을 실제로 작동시킨다 — 외곽선을 두껍게, 그리고 그 외곽선이 화면에서 픽셀로 분해되도록 크게.</para>
+        ///
+        /// <para><b>그림자(underlay)는 여전히 쓰지 않는다</b> — <see cref="ApplyOutline"/> 참고. 한글에서
+        /// 획 사이를 뿌옇게 먹는다. 외곽선 상한이 0.25 인 것도 같은 이유라, 그 위는 받아도 깎는다.</para>
+        /// </summary>
+        public void SetLegibility(float characterHeight, float outlineWidth)
+        {
+            _baseCharacterHeight = Mathf.Max(0.1f, characterHeight);
+            _outlineWidth = Mathf.Clamp(outlineWidth, 0f, 0.25f);
+            if (_material != null) _material.SetFloat(ShaderUtilities.ID_OutlineWidth, _outlineWidth);
+        }
 
         /// <summary>
         /// 글자 색을 바꾼다. <b>본인과 남을 색으로 구분</b>하는 데 쓴다 — 이름을 읽지 않고도
@@ -145,6 +179,10 @@ namespace Festa.World
         void ApplyOutline()
         {
             _material = _text.fontMaterial;      // 인스턴스 생성
+
+            // 벽 위에 그린다(ZTest Always). 차폐 판정(IsOccluded)이 "대부분 가려짐" 을 걸러 주므로, 여기까지 온
+            // 글자는 일부가 벽 뒤여도 통째로 보이는 편이 반 토막보다 낫다 (S15P21A604-703 잔여, 2026-09-16).
+            WorldTextOcclusion.ApplyOverlayShader(_material, _label);
 
             // 프로젝트 폰트가 Light 한 벌뿐이라 그대로 쓰면 획이 가늘어 배경에 묻힌다.
             // SDF 는 거리장을 부풀려 굵기를 만들 수 있다 — 합성 볼드처럼 획이 뭉개지지 않고
@@ -213,8 +251,81 @@ namespace Festa.World
             _measured = true;
         }
 
+        /// <summary>
+        /// 머리 본을 따라가지 않고 <b>사람이 들어가 있는 구조물의 정점</b>에 고정할지.
+        /// 매표소처럼 건물 안에 NPC 가 서 있는 자리에 이름을 붙일 때 쓴다 — 그때 기준은
+        /// 사람 머리가 아니라 지붕이다 (2026-09-14 사용자 지정).
+        /// </summary>
+        bool _pinToStructureTop;
+
+        /// <summary>찾아낸 구조물 정점의 월드 Y. 아직 못 찾았으면 <see cref="float.MinValue"/>.</summary>
+        float _structureTopY = float.MinValue;
+
+        /// <summary>머리 위로 지붕을 찾아 올려다볼 거리(u). 이 씬의 사람 키가 22 남짓이다.</summary>
+        const float StructureSearchUp = 120f;
+        const int StructureSearchMaxTries = 20;
+        int _structureTries;
+        static readonly RaycastHit[] _structureHits = new RaycastHit[16];
+
+        /// <summary>구조물 정점에 고정한다(사람 머리를 따라가지 않는다).</summary>
+        public void PinToStructureTop()
+        {
+            _pinToStructureTop = true;
+            _headBone = null;
+            _structureTopY = float.MinValue;
+            _structureTries = 0;
+        }
+
+        /// <summary>
+        /// 머리 위로 레이를 쏴 <b>맨 먼저 만나는 지붕</b>을 찾고, 그 콜라이더의 정점을 이름표 높이로 삼는다.
+        ///
+        /// <para><b>왜 자식 렌더러를 재지 않나.</b> 매표소 NPC 가 달린 <c>@ManagementDesk</c> 는 시각물
+        /// 하나만 자식으로 가진 마커라, 자식을 재면 나오는 값이 <b>NPC 정수리</b>다 — 정확히 사용자가
+        /// 아니라고 한 그 자리다. 매표소 구조물은 씬에서 별개 오브젝트라 계층으로는 닿지 않는다.</para>
+        ///
+        /// <para><b>왜 위에서 아래로 쏘지 않나.</b> 축제장이 실내라 높은 데서 내려쏘면 건물 천장이 먼저
+        /// 잡힌다. 머리 위에서 올려쏘면 첫 히트가 그 사람을 덮고 있는 지붕이다 — 범위가 알아서 한정된다.</para>
+        ///
+        /// <para>가로 위치는 NPC 기준 그대로 둔다. 지붕 콜라이더의 중심을 쓰면 여러 부스를 덮는 큰 판일 때
+        /// 엉뚱한 데로 끌려간다 — 사람 바로 위, 지붕 높이면 "매표소 위" 로 읽힌다.</para>
+        ///
+        /// <para>못 찾으면 정수리 높이로 남되 <b>조용히 그러지 않는다</b>. 지붕에 콜라이더가 없다는 건
+        /// 여기서만 드러난다.</para>
+        /// </summary>
+        void MeasureStructureTop()
+        {
+            if (_structureTopY > float.MinValue || _structureTries >= StructureSearchMaxTries) return;
+            _structureTries++;
+
+            var origin = new Vector3(transform.position.x, _topY + 0.5f, transform.position.z);
+            int n = Physics.RaycastNonAlloc(origin, Vector3.up, _structureHits, StructureSearchUp, ~0, QueryTriggerInteraction.Ignore);
+
+            Collider nearest = null;
+            float best = float.MaxValue;
+            for (int i = 0; i < n; i++)
+            {
+                var c = _structureHits[i].collider;
+                if (c == null || c.transform.IsChildOf(transform)) continue;   // 자기 몸은 지붕이 아니다
+                if (_structureHits[i].distance < best) { best = _structureHits[i].distance; nearest = c; }
+            }
+
+            if (nearest == null)
+            {
+                if (_structureTries >= StructureSearchMaxTries)
+                    Debug.LogWarning($"[WorldNameplate] '{_label}' 머리 위 {StructureSearchUp}u 안에 지붕 콜라이더가 없다 — 정수리 높이로 둔다");
+                return;
+            }
+
+            _structureTopY = nearest.bounds.max.y;
+            Debug.Log($"[WorldNameplate] '{_label}' 구조물 정점 {_structureTopY:F1} (정수리 {_topY:F1}, 지붕 {nearest.name})");
+        }
+
         /// <summary>지금 자세의 정수리 높이. 머리 본이 있으면 자세를 따라간다.</summary>
-        float RawTopY() => _headBone != null ? _headBone.position.y + _headToTop : _topY;
+        float RawTopY()
+        {
+            if (_pinToStructureTop) return _structureTopY > _topY ? _structureTopY : _topY;
+            return _headBone != null ? _headBone.position.y + _headToTop : _topY;
+        }
 
         // 머리 본을 못 잡았으면 주기적으로 다시 시도한다. 첫 측정은 아바타 파츠가 조립되기 전에 돌 수
         // 있어 Animator 가 아직 없고, 그러면 이름표가 **고정 높이**로 굳어 앉기(SitGround)·마시기 이모트에
@@ -223,6 +334,7 @@ namespace Festa.World
         const int RebindEveryFrames = 30, RebindMaxAttempts = 200;   // 약 0.5초 간격, 최대 ~100초
         void TryRebindHead()
         {
+            if (_pinToStructureTop) return;   // 지붕에 고정된 이름표는 머리를 따라가지 않는다
             if (_headBone != null || _rebindAttempts >= RebindMaxAttempts) return;
             if (Time.frameCount % RebindEveryFrames != 0) return;
             _rebindAttempts++;
@@ -244,26 +356,37 @@ namespace Festa.World
         /// 앉기처럼 크게 한 번 바뀌는 변화는 0.3 초 안에 따라붙는다. 그래서 감쇠 계수를
         /// 프레임률과 무관하게 지수식으로 준다(가변 프레임률에서 흔들림 폭이 달라지지 않는다).</para>
         /// </summary>
+        /// <remarks>
+        /// <b>몸통 높이만 거른다 — 캐릭터가 통째로 오르내리는 것은 그대로 따라간다.</b>
+        /// 전에는 월드 Y 를 통으로 걸러서, 점프하면 이름표가 바닥 높이에 남아 캐릭터와 겹쳤다
+        /// (사용자 지적 2026-09-11). 점프는 루트가 움직이는 것이라 거를 대상이 아닌데도
+        /// 한 프레임 변화량이 <see cref="LargePoseChange"/> 를 못 넘어 즉시 붙기 분기에도 안 걸렸다.
+        ///
+        /// 걸러야 하는 것은 <b>루트 기준 머리 높이</b>다 — 걷기 반동·호흡은 여기서 흔들리고,
+        /// 점프·계단·경사는 루트에서 움직인다. 둘을 나눠 앞의 것만 거른다.
+        /// </remarks>
         float SmoothTopY()
         {
-            float raw = RawTopY();
-            if (!_smoothed) { _smoothTopY = raw; _smoothed = true; return raw; }
-            // 큰 변화(앉기 등)는 굳이 늦출 이유가 없다 — 바로 따라간다.
-            if (Mathf.Abs(raw - _smoothTopY) > LargePoseChange) { _smoothTopY = raw; return raw; }
-            _smoothTopY = Mathf.Lerp(_smoothTopY, raw, 1f - Mathf.Exp(-TopFollowRate * Time.deltaTime));
-            return _smoothTopY;
+            float rootY = transform.position.y;
+            float rawLocal = RawTopY() - rootY;   // 루트 위로 머리가 얼마나 있나
+            if (!_smoothed) { _smoothLocalTop = rawLocal; _smoothed = true; return rootY + rawLocal; }
+            // 큰 변화(앉기·눕기 등)는 굳이 늦출 이유가 없다 — 바로 따라간다.
+            if (Mathf.Abs(rawLocal - _smoothLocalTop) > LargePoseChange) _smoothLocalTop = rawLocal;
+            else _smoothLocalTop = Mathf.Lerp(_smoothLocalTop, rawLocal, 1f - Mathf.Exp(-TopFollowRate * Time.deltaTime));
+            return rootY + _smoothLocalTop;
         }
 
         /// <summary>이보다 크게 바뀌면 자세가 통째로 바뀐 것으로 보고 즉시 맞춘다 (월드 유닛).</summary>
         const float LargePoseChange = 4f;
         const float TopFollowRate = 7f;
-        float _smoothTopY;
+        float _smoothLocalTop;
         bool _smoothed;
 
         void LateUpdate()
         {
             if (_text == null) return;
             if (!_measured) MeasureTop();
+            if (_pinToStructureTop) MeasureStructureTop();
             TryRebindHead();
 
             var cam = Camera.main;
@@ -271,7 +394,9 @@ namespace Festa.World
 
             // 멀어져도 화면에서 비슷한 크기로 읽히게 한다.
             float camDist = Vector3.Distance(cam.transform.position, transform.position);
-            float scale = Mathf.Clamp(camDist / Mathf.Max(1f, _referenceDistance), 0.6f, 3f);
+            // 상한을 두지 않는다: 거리 제한이 없으므로 어디서 봐도 화면상 같은 크기로 읽혀야 한다.
+            // (3배 상한은 165u 에서 포화해 그 너머 글자가 줄었다 — 2026-09-16.)
+            float scale = Mathf.Max(0.6f, camDist / Mathf.Max(1f, _referenceDistance));
             float size = _baseCharacterHeight * scale;
             // 부모가 스케일된 NPC(부스 앵커 13.26배)에서는 그만큼 되돌린다 — 플레이어(lossy 1)는 종전과 같다.
             var ls = transform.lossyScale;
@@ -286,8 +411,17 @@ namespace Festa.World
             var toCam = cam.transform.position - _root.position;
             float dist = toCam.magnitude;
 
+            // 빌보드는 Y 축만 돌린다 — 기울기까지 따라가면 글자가 누워 읽기 어렵다.
+            // 차폐 판정보다 **먼저** 돌린다: 판정이 글자 사각형의 모서리를 재므로 이번 프레임의 회전이 기준이어야 한다.
+            var flat = cam.transform.position - _root.position;
+            flat.y = 0f;
+            if (flat.sqrMagnitude > 0.0001f)
+                _root.rotation = Quaternion.LookRotation(-flat.normalized, Vector3.up);
+
             bool inFront = Vector3.Dot(cam.transform.forward, -toCam) > 0f;
-            bool show = inFront && dist <= _visibleDistance && !string.IsNullOrEmpty(_label) && IsBodyVisible();
+            bool withinDistance = _visibleDistance <= 0f || dist <= _visibleDistance;
+            bool show = !_suppressed && inFront && withinDistance && !string.IsNullOrEmpty(_label)
+                        && IsBodyVisible() && !IsOccluded(cam);
             _renderer.enabled = show;
             if (!show) return;
 
@@ -296,13 +430,40 @@ namespace Festa.World
             // (S15P21A604-355 사용자 지적). 보이거나 안 보이거나 둘 중 하나로 둔다 —
             // 표시 거리(_visibleDistance)를 넘으면 그냥 끈다.
             _text.color = _color;
-
-            // 빌보드는 Y 축만 돌린다 — 기울기까지 따라가면 글자가 누워 읽기 어렵다.
-            var flat = cam.transform.position - _root.position;
-            flat.y = 0f;
-            if (flat.sqrMagnitude > 0.0001f)
-                _root.rotation = Quaternion.LookRotation(-flat.normalized, Vector3.up);
         }
+
+        /// <summary>
+        /// 카메라와 글자 사이에 **단단한 것**이 있는가. 있으면 이름표를 감춘다.
+        ///
+        /// <para><b>왜 <see cref="Renderer.isVisible"/> 로는 안 되나.</b> 그 값은
+        /// "어느 카메라에든 보이는가" 다 — 에디터에서는 **씬 뷰 카메라에만 보여도 true** 라
+        /// 게임 뷰에서 벽 뒤에 있어도 이름표가 뜬다. 빌드에서도 그 벽이 베이크된 오클루더가
+        /// 아니면 걸리지 않는다. 사용자가 반복해서 지적한 "벽 쪽으로 가면 닉네임만 뜬다" 가 이것이다.</para>
+        ///
+        /// <para>그래서 <b>카메라에서 글자 사각형(중심·네 모서리)까지 선분을 직접 쏘고 과반이 막히면 감춘다</b>
+        /// (<see cref="WorldTextOcclusion"/>). 바닥 중앙 한 점만 재던 때는 줄전구 하나가 중앙을 스쳐도 라벨이
+        /// 꺼졌고, 반대로 한쪽 끝만 벽에 박힌 경우는 못 걸러 글자가 잘린 채 남았다("ㅂ스 관리", 2026-09-16).
+        /// 잘림 자체는 Overlay 셰이더(<see cref="ApplyOutline"/>)가 없앤다. 자기 몸(자식 콜라이더)은
+        /// 건너뛰고, 트리거는 무시한다. 매 프레임 쏘면 사람 수만큼 늘어나므로 <c>OcclusionInterval</c> 프레임마다
+        /// 한 번만 재고 그 사이는 직전 값을 쓴다 — 이름표가 깜빡일 만큼 빠른 변화가 아니다.</para>
+        /// </summary>
+        bool IsOccluded(Camera cam)
+        {
+            if (!_hideWhenOccluded) return false;
+            if (Time.frameCount - _occlusionFrame < OcclusionInterval) return _occluded;
+            _occlusionFrame = Time.frameCount;
+
+            _occluded = WorldTextOcclusion.IsMostlyOccluded(cam, _text, transform);
+            return _occluded;
+        }
+
+        [Tooltip("몸이 가려지면 이름표도 감춘다. 끄면 벽 너머로 이름만 떠 보인다")]
+        [SerializeField] bool _hideWhenOccluded = true;
+
+        /// <summary>가림 판정 간격(프레임). 사람이 많을수록 레이 수가 늘어나므로 매 프레임 쏘지 않는다.</summary>
+        const int OcclusionInterval = 3;
+        int _occlusionFrame = -100;
+        bool _occluded;
 
         /// <summary>
         /// 몸 렌더러 중 하나라도 이번 프레임에 그려졌는가(<see cref="Renderer.isVisible"/> 는 프러스텀·오클루전 컬링 결과를 반영한다).
@@ -310,6 +471,10 @@ namespace Festa.World
         /// </summary>
         bool IsBodyVisible()
         {
+            // 지붕에 붙은 이름표의 주인은 건물이지 그 안의 사람이 아니다. NPC 는 부스 벽에 가려
+            // 컬링되기 쉬운데, 그걸로 지붕 위 글자를 끄면 밖에서는 이름이 아예 안 뜬다.
+            if (_pinToStructureTop) return true;
+
             if (_bodyRenderers == null || Time.frameCount - _bodyRefreshFrame > 120)
             {
                 var list = new System.Collections.Generic.List<Renderer>();

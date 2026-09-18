@@ -88,6 +88,32 @@ async def test_get_maps_optional_project_facts_without_breaking_legacy_shape() -
 
 
 @pytest.mark.asyncio
+async def test_get_maps_sparse_project_facts_before_extraction() -> None:
+    client = _client(
+        lambda _request: httpx.Response(
+            200,
+            json={
+                "found": True,
+                "role": "PROJECT_DOCENT",
+                "tone": "FRIENDLY",
+                "responseLength": "SHORT",
+                "systemPrompt": "안내한다.",
+                "forbiddenTopics": [],
+                "projectFacts": {"introduction": "소개만 있음"},
+            },
+        )
+    )
+
+    result = await client.get(booth_id=7, agent_id=3)
+
+    assert result.project_facts == ProjectFacts(
+        introduction="소개만 있음",
+        target_audience=None,
+        tech_stack=None,
+    )
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize("code", ["AGENT_NOT_IN_BOOTH", "AGENT_INACTIVE"])
 async def test_denial_is_an_explicit_domain_error(code: str) -> None:
     client = _client(
@@ -163,7 +189,7 @@ async def test_timeout_is_fail_closed_and_not_retried() -> None:
             "responseLength": "MEDIUM",
             "systemPrompt": "안내한다.",
             "forbiddenTopics": [],
-            "projectFacts": {"introduction": "소개만 있음"},
+            "projectFacts": {"unexpected": "field"},
         },
     ],
 )

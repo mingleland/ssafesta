@@ -29,6 +29,40 @@ namespace Festa.Network
             "웃음", "앉기", "건배", "감사"
         };
 
+        /// <summary>
+        /// 좌클릭 주먹질에 쓰는 원샷 셋 (사용자 지시 2026-09-15 — "세 개가 랜덤으로 나오게").
+        ///
+        /// <para><b>뽑는 것은 소유자다.</b> 뽑은 값이 <see cref="NetworkPlayer.EmoteId"/> 로 복제되므로
+        /// 모두가 같은 주먹을 본다. 값 하나로 두고 각자 클립을 고르면 화면마다 다른 동작이 나간다.</para>
+        /// </summary>
+        static readonly PlayerEmoteId[] Punches =
+        {
+            // **위빙이 섞인 클립은 뺐다** (사용자 지시 2026-09-16). Punch2 에 걸린 Punching 클립은
+            // 재생 구간이 1.28초라 주먹 사이에 상체를 좌우로 흘리는 동작이 들어간다 — 한 대 치는
+            // 것으로 읽히지 않는다. 남긴 둘은 0.33초로 잘라낸 잽이라 위빙이 들어갈 여지가 없다.
+            // 열거형과 애니메이터 상태는 건드리지 않는다 — 동결 네트워크 계약과 저장값을 지킨다.
+            PlayerEmoteId.Punch1, PlayerEmoteId.Punch3
+        };
+
+        /// <summary>
+        /// 주먹 한 대가 화면에 머무는 시간(초). 잘라낸 잽 길이(0.333·0.333·0.400)를 상태 speed 1.25 로 나눈 값이다.
+        ///
+        /// <para>애니메이터에서 읽지 않고 표로 두는 이유: 다음 한 대를 **언제 이어 칠지**를 클릭한 프레임에
+        /// 정해야 하는데, 상태 길이는 크로스페이드가 끝난 뒤에야 읽을 수 있다. 클립을 다시 자르면
+        /// 이 값도 같이 고친다.</para>
+        /// </summary>
+        static readonly float[] PunchSeconds = { 0.27f, 0.32f };
+
+        /// <summary>마지막 주먹이 끝난 뒤 이 시간 안에 다시 누르면 콤보가 이어진다.</summary>
+        const float ComboKeepAlive = 0.8f;
+
+        int _comboStep = -1;
+        float _comboExpireAt;
+        float _punchBusyUntil;
+        // 연타를 bool 하나로 기억하면 재생 중 두 번 이상 누른 입력이 하나로 합쳐진다.
+        // 최대 한 사이클까지 개수로 보관해 누른 만큼 순서대로 이어 친다.
+        int _queuedPunches;
+
         NetworkPlayer _player;
         bool _wheelOpen;
         Vector2 _center;
@@ -60,6 +94,10 @@ namespace Festa.Network
         public void PlayOneShot(PlayerEmoteId emote)
         {
             if (!IsOwner || emote == PlayerEmoteId.None || IsLooping(emote)) return;
+            // 주먹이 아닌 연출로 넘어가면 **예약된 주먹을 버린다.** 안 버리면 스윙 한가운데에서 큐가
+            // 풀려 EmoteId 를 주먹으로 덮어쓴다 — 망치를 치는 도중에 주먹이 끼어들어 동작이
+            // 뒤엉킨다(사용자 영상 2026-09-16).
+            if (System.Array.IndexOf(Punches, emote) < 0) CancelPendingPunches();
             _player.EmoteId.Value = emote;
             if (emote == PlayerEmoteId.Strike)
             {
@@ -68,6 +106,18 @@ namespace Festa.Network
                 _awaitingDuration = PlayerEmoteId.None;
                 return;
             }
+
+            int punch = System.Array.IndexOf(Punches, emote);
+            if (punch >= 0)
+            {
+                // 주먹은 상태 길이를 기다려 끊지 않는다. TrackOneShotDuration 은 크로스페이드가 끝난
+                // 뒤에야 길이를 읽고 최소 0.5초를 보장하는데, 잘라낸 잽은 0.27초라 그 바닥값이
+                // 다음 한 대를 늦춘다 — 콤보가 끊겨 보이는 자리다.
+                _oneShotStopAt = Time.unscaledTime + PunchSeconds[punch];
+                _awaitingDuration = PlayerEmoteId.None;
+                return;
+            }
+
             _oneShotStopAt = 0f;
             _awaitingDuration = emote;
         }
@@ -99,6 +149,18 @@ namespace Festa.Network
                     if (mouse.leftButton.wasReleasedThisFrame) CloseWheel(true);
                 }
             }
+            else if (!alt && mouse.leftButton.wasPressedThisFrame && CanPunch())
+            {
+                // 누른 것을 버리지 않는다. 치는 중이면 예약해 두고 끝나는 순간 이어 친다 —
+                // 무작위로 골라 매번 새로 시작하면 같은 동작이 겹쳐 움찔거리기만 한다(사용자 지적).
+                if (Time.time >= _punchBusyUntil) FirePunch();
+                else _queuedPunches = Mathf.Min(_queuedPunches + 1, Punches.Length);
+            }
+
+            if (_queuedPunches > 0 && Time.time >= _punchBusyUntil) FirePunch();
+
+            // 점프하면 남은 예약을 버린다 — 착지하는 순간 밀린 주먹이 몰아서 터지지 않게.
+            if (IsAirborne()) _queuedPunches = 0;
 
             TrackOneShotDuration();
 
@@ -118,6 +180,70 @@ namespace Festa.Network
             return new Vector2(
                 Mathf.Clamp(pointer.x, margin, Screen.width - margin),
                 Mathf.Clamp(pointer.y, margin, Screen.height - margin));
+        }
+
+        /// <summary>
+        /// 지금 좌클릭을 주먹질로 읽어도 되는가.
+        ///
+        /// <para>좌클릭은 부스 상호작용과 겹치지 않는다 — 그쪽 실행 입력은 F 하나이고 클릭은 조준·호버에만 쓴다
+        /// (<c>BoothInteractionInput.InteractKeyPressedThisFrame</c>). 남는 충돌원은 UI 클릭과, 이미 재생 중인
+        /// 연출이다. 루프 이모트(앉기·눕기)는 <see cref="PlayOneShot"/> 가 걸러 주지만 그건 "넣으려는 값" 기준이라
+        /// <b>지금 재생 중인 것</b>은 여기서 본다 — 눕거나 앉은 채로 주먹이 나가면 자세가 튄다.</para>
+        /// </summary>
+        bool CanPunch()
+        {
+            var es = UnityEngine.EventSystems.EventSystem.current;
+            if (es != null && es.IsPointerOverGameObject()) return false;
+            var current = _player.EmoteId.Value;
+            if (current != PlayerEmoteId.None && IsLooping(current)) return false;
+            // 망치 스윙은 원샷이라 IsLooping 에 걸리지 않는다. 그대로 두면 스윙 도중 좌클릭이
+            // 주먹으로 읽혀 두 연출이 겹친다 (사용자 영상 2026-09-16).
+            if (current == PlayerEmoteId.Strike) return false;
+            // 공중에서는 치지 않는다. 상체 레이어만 바뀌므로 다리는 점프 클립 그대로인데
+            // 상체만 복싱이라 자세가 어긋나 보인다 (사용자 지시 2026-09-16).
+            if (IsAirborne()) return false;
+            return true;
+        }
+
+        /// <summary>
+        /// 도약·체공 중인가. 착지 복귀(<see cref="PlayerAnimState.JumpLand"/>)는 이미 발이 땅에 있으므로
+        /// 포함하지 않는다 — 내려서자마자 칠 수 있어야 조작이 답답하지 않다.
+        /// </summary>
+        bool IsAirborne()
+        {
+            var state = _player.AnimState.Value;
+            return state == PlayerAnimState.Jump || state == PlayerAnimState.JumpLaunch;
+        }
+
+        /// <summary>예약과 콤보를 한꺼번에 버린다. 다른 연출이 끼어들 때 주먹의 잔여 일정이 살아남지 않게 한다.</summary>
+        void CancelPendingPunches()
+        {
+            _queuedPunches = 0;
+            _punchBusyUntil = 0f;
+            _comboStep = -1;
+            _comboExpireAt = 0f;
+        }
+
+        /// <summary>
+        /// 콤보 한 대를 친다. 이어서 누르면 1 → 2 → 1 로 돌고, 끊기면 다시 1 부터다.
+        ///
+        /// <para>무작위가 아니라 <b>순서</b>인 이유: 무작위는 같은 동작이 연달아 나올 수 있고, 그러면
+        /// 두 번 친 것이 한 번 친 것처럼 보인다. 순서로 돌리면 세 번이 서로 다른 동작이라 콤보로 읽힌다.
+        /// 고른 값은 <c>EmoteId</c> 로 복제되므로 남의 화면에서도 같은 순서로 나간다.</para>
+        /// </summary>
+        void FirePunch()
+        {
+            if (_queuedPunches > 0) _queuedPunches--;
+
+            bool continues = _comboStep >= 0 && Time.time <= _comboExpireAt;
+            _comboStep = continues ? (_comboStep + 1) % Punches.Length : 0;
+
+            float seconds = PunchSeconds[_comboStep];
+            _punchBusyUntil = Time.time + seconds;
+            _comboExpireAt = _punchBusyUntil + ComboKeepAlive;
+            // 피격 밀림은 걷어냈다 (사용자 지시 2026-09-16) — 주먹은 연출이고 남을 움직이지 않는다.
+
+            PlayOneShot(Punches[_comboStep]);
         }
 
         void UpdateSelection(Vector2 pointer)
@@ -145,7 +271,8 @@ namespace Festa.Network
         // 루프 이모트는 자동으로 끝나지 않는다 — 다시 선택하거나 이동하면 해제된다
         // (PlayerMovement 가 이동 시 EmoteId 를 None 으로 되돌린다).
         static bool IsLooping(PlayerEmoteId emote) =>
-            emote == PlayerEmoteId.SitGround || emote == PlayerEmoteId.Drink || Festa.World.LiePoseTable.IsLie(emote);
+            emote == PlayerEmoteId.SitGround || emote == PlayerEmoteId.Drink
+            || Festa.World.LiePoseTable.IsLie(emote) || Festa.World.SitPoseTable.IsSit(emote);
 
         // ── 원샷 이모트 종료 시점 ──────────────────────────────────
         // 클립 이름으로 길이를 찾을 수 없다. 애니메이터 상태 이름은 `Emote_{enum}` 규약이지만

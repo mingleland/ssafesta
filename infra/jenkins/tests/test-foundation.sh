@@ -16,6 +16,8 @@ integration_compose="${repo_root}/infra/deploy/compose/integration/compose.yaml"
 component_pipeline="${repo_root}/infra/jenkins/pipelines/component.groovy"
 develop_pipeline="${repo_root}/infra/jenkins/pipelines/develop.groovy"
 develop_job="${repo_root}/infra/jenkins/jobs/gitlab-develop-multibranch.groovy"
+unity_mr_job="${repo_root}/infra/jenkins/jobs/gitlab-unity-mr-validation.groovy"
+unity_mr_pipeline="${repo_root}/infra/jenkins/pipelines/unity-mr-validation.groovy"
 webgl_job="${repo_root}/infra/jenkins/jobs/gitlab-webgl-package-deploy.groovy"
 webgl_pipeline="${repo_root}/infra/jenkins/pipelines/webgl-package-deploy.groovy"
 webgl_deploy="${repo_root}/infra/jenkins/scripts/deploy-webgl-release.sh"
@@ -43,7 +45,7 @@ grep -Fq '${WEBGL_RELEASE_ROOT:-/srv/festa/webgl}:/srv/festa/webgl' "${agent_com
   || fail "deploy agent cannot mutate the host WebGL release root"
 grep -Fq '../jobs:/var/jenkins_home/job_dsl:ro' "${controller_compose}" \
   || fail "controller does not mount repository Job DSL definitions"
-for job_dsl in gitlab-develop-multibranch.groovy gitlab-webgl-package-deploy.groovy gitlab-demo-promotion.groovy; do
+for job_dsl in gitlab-develop-multibranch.groovy gitlab-unity-mr-validation.groovy gitlab-webgl-package-deploy.groovy gitlab-demo-promotion.groovy; do
   grep -Fq "/var/jenkins_home/job_dsl/${job_dsl}" "${jobs_casc}" \
     || fail "JCasC does not apply ${job_dsl}"
 done
@@ -87,6 +89,9 @@ jenkins = document["jenkins"]
 assert jenkins["numExecutors"] == 0
 assert jenkins["mode"] == "EXCLUSIVE"
 assert jenkins["slaveAgentPort"] == -1
+users = {item["id"]: item for item in jenkins["securityRealm"]["local"]["users"]}
+assert "webgl-publisher" in users
+assert users["webgl-publisher"]["password"] == "${JENKINS_WEBGL_PUBLISHER_PASSWORD}"
 nodes = {item["permanent"]["name"]: item["permanent"] for item in jenkins["nodes"]}
 assert set(nodes) == {"linux-docker", "deploy", "unity"}
 assert len({node["remoteFS"] for node in nodes.values()}) == 3
@@ -101,8 +106,10 @@ security=yaml.safe_load(pathlib.Path(sys.argv[1]).read_text(encoding='utf-8'))
 authorization=yaml.safe_load(pathlib.Path(sys.argv[2]).read_text(encoding='utf-8'))
 gitlab=yaml.safe_load(pathlib.Path(sys.argv[3]).read_text(encoding='utf-8'))
 assert 'credentials' not in security, 'JCasC must not overwrite UI-managed credentials'
-entries=authorization['jenkins']['authorizationStrategy']['globalMatrix']['entries']
+entries=authorization['jenkins']['authorizationStrategy']['projectMatrix']['entries']
 assert any('Credentials/ManageDomains' in item.get('group',{}).get('permissions',[]) for item in entries)
+publisher=next(item['user'] for item in entries if item.get('user',{}).get('name') == 'webgl-publisher')
+assert set(publisher['permissions']) == {'Overall/Read','Job/Discover','Job/Read','Job/Build'}
 server=gitlab['unclassified']['gitLabServers']['servers'][0]
 assert server['manageWebHooks'] is True and server['manageSystemHooks'] is False
 assert server['webhookSecretCredentialsId'] == '${GITLAB_WEBHOOK_SECRET_CREDENTIALS_ID}'
@@ -110,9 +117,14 @@ assert 'secretToken' not in server
 PY
 pass "JCasC credential persistence, GitLab migration and least-privilege matrix"
 
+grep -q 'JENKINS_WEBGL_PUBLISHER_PASSWORD: \${JENKINS_WEBGL_PUBLISHER_PASSWORD:?set in infra/.env}' "${controller_compose}" \
+  || fail "controller does not receive the WebGL publisher password"
+pass "WebGL publisher service account configuration"
+
 for name in GITLAB_PACKAGE_READ_CREDENTIAL_ID DEV_BACK_ENV_CREDENTIAL_ID DEV_AI_ENV_CREDENTIAL_ID DEV_INTERNAL_SPRING_TO_AI_TOKENS_CREDENTIAL_ID \
   DEV_INTERNAL_AI_TO_SPRING_TOKENS_CREDENTIAL_ID DEV_INTERNAL_INFRA_TO_SPRING_TOKENS_CREDENTIAL_ID DEMO_BACK_ENV_CREDENTIAL_ID DEMO_AI_ENV_CREDENTIAL_ID \
-  DEMO_INTERNAL_SPRING_TO_AI_TOKENS_CREDENTIAL_ID DEMO_INTERNAL_AI_TO_SPRING_TOKENS_CREDENTIAL_ID; do
+  DEMO_INTERNAL_SPRING_TO_AI_TOKENS_CREDENTIAL_ID DEMO_INTERNAL_AI_TO_SPRING_TOKENS_CREDENTIAL_ID \
+  DEMO_INTERNAL_INFRA_TO_SPRING_TOKENS_CREDENTIAL_ID; do
   grep -q "key: ${name}" "${repo_root}/infra/jenkins/casc/security.yaml" || fail "JCasC omits ${name}"
   grep -q "^[[:space:]]*${name}:.*\${${name}" "${controller_compose}" || fail "controller does not receive ${name}"
 done
@@ -142,6 +154,10 @@ grep -q 'with-credentials.sh CONNECTION_TOKEN_SECRET_FILE -- infra/deploy/script
   || fail "dev game pipeline does not require the connection token Secret file reference"
 grep -q 'detect-changed-components.sh' "${develop_pipeline}" \
   || fail "develop pipeline does not detect the pushed range"
+grep -q "script: 'git rev-parse HEAD'" "${develop_pipeline}" \
+  || fail "develop pipeline does not derive its head SHA from the checkout"
+! grep -q 'final String headSha = env.GIT_COMMIT' "${develop_pipeline}" \
+  || fail "develop pipeline relies on a restart-volatile GIT_COMMIT value"
 grep -q "mkdir -p artifacts/develop" "${develop_pipeline}" \
   || fail "develop pipeline does not create its selection artifact directory"
 ! grep -q 'deploy-release.sh' "${develop_pipeline}" \
@@ -164,7 +180,7 @@ grep -q "final List deployComponents = (selection.deployComponents as List).find
   || fail "dev batch must use the detector deployComponents contract and keep game Dedicated Server deployment outside it"
 grep -q 'withCredentials(credentialBindings)' "${develop_pipeline}" \
   || fail "dev batch does not bind selected component credentials"
-grep -q "credentialsId: env.DEV_INTERNAL_INFRA_TO_SPRING_TOKENS_CREDENTIAL_ID, variable: 'INTERNAL_INFRA_TO_SPRING_TOKENS'" "${develop_pipeline}" \
+grep -q "credentialsId: env.DEMO_INTERNAL_INFRA_TO_SPRING_TOKENS_CREDENTIAL_ID, variable: 'INTERNAL_INFRA_TO_SPRING_TOKENS'" "${develop_pipeline}" \
   || fail "dev backend does not bind the Infra-to-Spring token"
 grep -q 'gitUsernamePassword(credentialsId: checkoutCredentialId)' "${develop_pipeline}" \
   || fail "deploy freshness check does not bind the GitLab checkout credential"
@@ -186,8 +202,20 @@ grep -q "multibranchPipelineJob('festa-gitlab-develop')" "${develop_job}" \
   || fail "GitLab develop-only multibranch job is missing"
 grep -q 'serverName(gitlabServerName)' "${develop_job}" \
   || fail "GitLab develop Job DSL shadows the serverName method"
-grep -q 'credentialsId(gitlabCheckoutCredentialsId)' "${develop_job}" \
-  || fail "GitLab develop Job DSL shadows the credentialsId method"
+grep -q "String gitlabApiCredentialsId = System.getenv('GITLAB_API_CREDENTIALS_ID')" "${develop_job}" \
+  || fail "GitLab develop Job DSL must read the API credential"
+grep -q 'credentialsId(gitlabApiCredentialsId)' "${develop_job}" \
+  || fail "GitLab develop Job DSL must use the API credential for project discovery"
+grep -q 'projectOwner(gitlabProjectOwner)' "${develop_job}" \
+  || fail "GitLab develop Job DSL shadows the projectOwner method"
+grep -q 'String gitlabProjectFullPath = "${gitlabProjectOwner}/${gitlabProjectPath}"' "${develop_job}" \
+  || fail "GitLab develop Job DSL must compose the full GitLab project path"
+grep -q 'projectPath(gitlabProjectFullPath)' "${develop_job}" \
+  || fail "GitLab develop Job DSL must pass the full GitLab project path"
+! grep -q '^String projectOwner[[:space:]]*=' "${develop_job}" \
+  || fail "GitLab develop Job DSL declares a projectOwner variable that shadows the method"
+! grep -q '^String projectPath[[:space:]]*=' "${develop_job}" \
+  || fail "GitLab develop Job DSL declares a projectPath variable that shadows the method"
 grep -q "pipelineJob('festa-webgl-package-deploy')" "${webgl_job}" \
   || fail "GitLab WebGL package deployment job is missing"
 grep -q "scriptPath('infra/jenkins/pipelines/webgl-package-deploy.groovy')" "${webgl_job}" \
@@ -201,6 +229,22 @@ grep -q 'DEPLOY-TOKEN:' "${webgl_deploy}" || fail "Registry download does not us
 grep -q 'buildWithParameters' "${webgl_publish}" || fail "publisher does not trigger Jenkins after upload"
 ! grep -q 'unity-webgl-builder' "${webgl_job}" "${webgl_pipeline}" \
   || fail "obsolete Windows WebGL agent remains wired"
+grep -q "pipelineJob('festa-unity-mr-validation')" "${unity_mr_job}" \
+  || fail "Unity MR validation job is missing"
+grep -q "permission('hudson.model.Item.Build', 'unity-mr-validator')" "${unity_mr_job}" \
+  || fail "Unity MR validator cannot build its own job"
+grep -q "node('unity-6000.0.78f1')" "${unity_mr_pipeline}" \
+  || fail "Unity MR validation does not use Unity agent"
+grep -q "gitlabCommitStatus(name: 'unity-mr-validation')" "${unity_mr_pipeline}" \
+  || fail "Unity MR validation does not publish the required GitLab status context"
+grep -q 'with-credentials.sh -- bash ci/test' "${unity_mr_pipeline}" \
+  || fail "Unity MR validation does not use the credential-masking command wrapper"
+grep -q '^set +x$' "${repo_root}/infra/jenkins/scripts/with-credentials.sh" \
+  || fail "credential wrapper does not disable shell command echoing"
+for forbidden in 'ci/build' 'ci/package' 'docker compose' 'deploy-component.sh' 'deploy-dev-batch.sh' 'deploy-release.sh' 'promote-release.sh'; do
+  ! grep -Fq "${forbidden}" "${unity_mr_pipeline}" \
+    || fail "Unity MR validation contains forbidden ${forbidden}"
+done
 grep -q "pipelineJob('festa-demo-promotion')" "${demo_promotion_job}" \
   || fail "manual demo promotion job is missing"
 grep -q "scriptPath('infra/jenkins/pipelines/demo-promotion.groovy')" "${demo_promotion_job}" \
@@ -230,6 +274,8 @@ grep -q 'SPRING_PROFILES_ACTIVE: infra' "${integration_compose}" || fail "demo b
   || fail "shared Spring-to-AI token must reach exactly AI and backend"
 grep -q 'AI_INTERNAL_BASE_URL: http://ai:8000' "${integration_compose}" || fail "demo backend lacks AI service DNS"
 grep -q 'SPRING_INTERNAL_BASE_URL: http://back:8080' "${integration_compose}" || fail "demo AI lacks backend service DNS"
+grep -Fq '127.0.0.1:${AI_LOOPBACK_PORT:-18082}:8000' "${integration_compose}" \
+  || fail "demo AI lacks the loopback ingress the same-origin /ai/v1 route proxies to"
 pass "runtime credential binding and least-privilege Compose wiring"
 
 stage_summary_dir="$(mktemp -d)"
@@ -266,6 +312,9 @@ export NODE_RUNTIME_IMAGE="node:foundation-test"
 export PYTHON_JSONSCHEMA_VERSION="4.26.0"
 export JENKINS_ADMIN_ID="foundation-admin"
 export JENKINS_ADMIN_PASSWORD="foundation-only-value"
+export JENKINS_UNITY_MR_VALIDATOR_PASSWORD="foundation-unity-mr-validator-value"
+export JENKINS_UNITY_MR_PIPELINE_BRANCH=develop
+export JENKINS_WEBGL_PUBLISHER_PASSWORD="foundation-webgl-publisher-value"
 export JENKINS_PUBLIC_URL="https://ci.example.invalid/"
 export JENKINS_AGENT_SECRET_LINUX_DOCKER="foundation-linux-agent-value"
 export JENKINS_AGENT_SECRET_DEPLOY="foundation-deploy-agent-value"
@@ -280,6 +329,7 @@ export DEMO_BACK_ENV_CREDENTIAL_ID="foundation-demo-back-env"
 export DEMO_AI_ENV_CREDENTIAL_ID="foundation-demo-ai-env"
 export DEMO_INTERNAL_SPRING_TO_AI_TOKENS_CREDENTIAL_ID="foundation-demo-spring-to-ai"
 export DEMO_INTERNAL_AI_TO_SPRING_TOKENS_CREDENTIAL_ID="foundation-demo-ai-to-spring"
+export DEMO_INTERNAL_INFRA_TO_SPRING_TOKENS_CREDENTIAL_ID="foundation-demo-infra-to-spring"
 
 if command -v docker >/dev/null 2>&1; then
   runtime_env_dir="$(mktemp -d)"

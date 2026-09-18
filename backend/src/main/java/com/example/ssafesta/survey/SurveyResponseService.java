@@ -11,6 +11,7 @@ import com.example.ssafesta.wallet.CoinReason;
 import com.example.ssafesta.wallet.LedgerEntryType;
 import com.example.ssafesta.wallet.LedgerResult;
 import com.example.ssafesta.wallet.WalletService;
+import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -38,7 +39,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class SurveyResponseService {
 
-    private static final String REWARD_REFERENCE_TYPE = "SURVEY";
+    private static final String REWARD_REFERENCE_TYPE = CoinReason.SURVEY_REFERENCE_TYPE;
     private static final String GUEST_ONLY_MESSAGE =
             "보상이 있는 설문은 회원만 참여할 수 있습니다.";
     /** 같은 code 에 다른 이유다 — 보상이 아니라 추첨 때문이라 문장을 나눈다 (GitLab #173). */
@@ -383,6 +384,8 @@ public class SurveyResponseService {
 
     // ── 요청·응답 ───────────────────────────────────────────────────────────
 
+    // 미니게임 제출(TimerStopService.SubmitCommand)과 단순 이름이 같다 (S15P21A604-614).
+    @Schema(name = "SurveySubmitCommand")
     public record SubmitCommand(List<AnswerCommand> answers) {
 
         public SubmitCommand {
@@ -400,6 +403,7 @@ public class SurveyResponseService {
     }
 
     /** {@code rewardedCoin} is always present; {@code 0} means nothing was paid (계약 §1). */
+    @Schema(name = "SurveySubmitResult")
     public record SubmitResult(Long responseId, int rewardedCoin) {
     }
 

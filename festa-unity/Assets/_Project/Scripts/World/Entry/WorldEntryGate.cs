@@ -381,13 +381,44 @@ namespace Festa.World
 #endif
         }
 
+        /// <summary>
+        /// 게이트 연출의 기준이 되는 **칸(car) 자체**의 바운즈.
+        ///
+        /// <para><b>호출 버튼판(<c>elevator-switch</c>)은 뺀다.</b> 그것은 칸 안이 아니라 복도 벽에 붙어 있어
+        /// (실측 x 7.51~7.82, 칸 몸체는 15.45~40.83) 그대로 합치면 <c>min.x</c> 가 8 유닛 가까이 바깥으로
+        /// 끌려간다. 그러면 <c>min.x + 3.6</c> 으로 잡는 층수 표시기가 **문 위 벽(x≈18.5) 뒤에 파묻혀**
+        /// 화면에서 사라진다 — 화각 문제가 아니라 위치 문제였다(2026-09-12 실측: 표시기가 x 11.1 에
+        /// 생성됐고 벽면은 18.53 이라 12 유닛 앞에서 정면으로 봐도 보이지 않았다).
+        /// 원 주석의 "문 위 벽(실측 x≈18.5)" 이 맞는 값이고, 버튼판이 바운즈에 들어오면서 어긋났다.</para>
+        /// </summary>
         static Bounds CalculateBounds(Transform root)
         {
             var renderers = root.GetComponentsInChildren<Renderer>();
             if (renderers.Length == 0) return new Bounds(root.position, Vector3.one);
-            var b = renderers[0].bounds;
-            foreach (var r in renderers) b.Encapsulate(r.bounds);
+
+            bool started = false;
+            var b = new Bounds(root.position, Vector3.zero);
+            foreach (var r in renderers)
+            {
+                if (IsOutsideCar(r.transform)) continue;
+                if (!started) { b = r.bounds; started = true; }
+                else b.Encapsulate(r.bounds);
+            }
+            // 전부 걸러졌다면(이름 규약이 바뀐 경우) 예전처럼 전체를 쓴다 — 게이트가 아예 안 뜨는 것보다 낫다.
+            if (!started)
+            {
+                b = renderers[0].bounds;
+                foreach (var r in renderers) b.Encapsulate(r.bounds);
+            }
             return b;
+        }
+
+        /// <summary>칸 바깥에 붙은 부속인가. 지금은 복도 호출 버튼판 하나다.</summary>
+        static bool IsOutsideCar(Transform t)
+        {
+            for (var p = t; p != null; p = p.parent)
+                if (p.name.StartsWith("elevator-switch")) return true;
+            return false;
         }
     }
 }

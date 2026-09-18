@@ -9,7 +9,7 @@
 // 전에는 `openOverlay` 를 직접 불렀는데, 그러면 계약의 절반(events.ts 파싱 → dispatcher 라우팅)을
 // 건너뛰어 정작 Unity 를 붙였을 때 처음 실행되는 코드가 검증되지 않은 채로 남는다.
 // 이제 이 바를 누르는 것과 Unity 가 F 를 보내는 것이 같은 경로를 탄다.
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { initUnityBridge } from '../../../unity/bridge/events';
 import './mockInteractionBar.css';
 
@@ -26,6 +26,11 @@ const ENTRIES: { label: string; event: Record<string, unknown> }[] = [
   { label: '내 부스 관리', event: { type: 'WORLD_MANAGEMENT_INTERACT' } },
   { label: '이벤트 경품', event: { type: 'WORLD_EVENT_INTERACT', npcId: 'mock-event-npc' } },
   { label: '타이밍 스톱', event: { type: 'WORLD_MINIGAME_INTERACT', gameId: 'TIMER_STOP', machineId: 'mock-timer-stop' } },
+  { label: '안내데스크', event: { type: 'WORLD_GUIDE_INTERACT' } },
+  // 위치 알림 — 화면을 열지 않고 나가기 버튼의 노출 조건만 바꾼다 (S15P21A604-627, #174).
+  // 밖일 때 boothId 를 넣지 않는 것까지 Unity 송신부와 같다 — 0 을 실으면 "0번 부스" 로 읽힌다
+  { label: '부스 안', event: { type: 'WORLD_BOOTH_CONTEXT', insideBooth: true, boothId: MOCK_BOOTH_ID } },
+  { label: '부스 밖', event: { type: 'WORLD_BOOTH_CONTEXT', insideBooth: false } },
 ];
 
 export function MockInteractionBar() {
@@ -39,16 +44,29 @@ export function MockInteractionBar() {
     window.FestaUnity?.onBoothInteract?.(JSON.stringify(event));
   }
 
+  // 기본은 접힌 상태다 — 화면을 계속 가리지 않게 하고, 필요할 때만 펼친다.
+  const [open, setOpen] = useState(false);
+
   return (
-    <div className="mock-bar" role="group" aria-label="개발용 상호작용 트리거">
-      <span className="mock-bar-key">F</span>
-      <span className="mock-bar-label">DEV 상호작용</span>
-      <span className="mock-bar-sep" />
-      {ENTRIES.map((e) => (
-        <button key={e.label} type="button" className="mock-bar-btn" onClick={() => send(e.event)}>
-          {e.label}
-        </button>
-      ))}
+    <div className="mock-bar">
+      <button
+        type="button"
+        className="mock-bar-toggle"
+        aria-expanded={open}
+        aria-label="개발용 상호작용 트리거"
+        onClick={() => setOpen((v) => !v)}
+      >
+        DEV
+      </button>
+      {open && (
+        <div className="mock-bar-list" role="group" aria-label="개발용 상호작용 트리거">
+          {ENTRIES.map((e) => (
+            <button key={e.label} type="button" className="mock-bar-btn" onClick={() => send(e.event)}>
+              {e.label}
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

@@ -4,6 +4,7 @@
 // surveyId 가 서버가 주는 number 가 되면서 그 자리가 없어졌다 — 진입이 boothId 이므로 여기로 옮겼다.
 // 매직 값을 테스트가 다시 쓰지 않도록 상수로 내보낸다.
 import type { ApiError } from '../../shared/api/client';
+import { EVENT_SURVEY_KEY } from '../../shared/contracts/survey';
 import type { SurveyAnswerValue, SurveyDraftVM } from '../../shared/contracts/survey';
 import type {
   SurveyPort,
@@ -45,11 +46,11 @@ const surveyIdOf = (boothId: number): number => 1000 + boothId;
 /**
  * 평범한 이벤트 설문 — 아직 참여하지 않았다.
  *
- * **앱이 실제로 쓰는 key 와 같은 값이다**(`features/event/model/surveyEntry.ts`). mock 어댑터의
- * 존재 이유가 BE 도달 전에 화면을 돌려 보는 것이라, 다른 key 를 주면 mock 모드에서 설문이
- * 404 로만 보이고 아무것도 검증하지 못한다.
+ * **앱이 실제로 쓰는 key 그 자체다** — 계약 정본(`shared/contracts/survey`)에서 가져온다.
+ * mock 어댑터의 존재 이유가 BE 도달 전에 화면을 돌려 보는 것이라, 다른 key 를 주면 mock 모드에서
+ * 설문이 404 로만 보이고 아무것도 검증하지 못한다. 값을 여기 다시 적지 않는 이유가 그것이다.
  */
-export const MOCK_EVENT_SURVEY_KEY = 'SSAFESTA_2026';
+export const MOCK_EVENT_SURVEY_KEY = EVENT_SURVEY_KEY;
 /** 이미 참여한 이벤트 설문 */
 export const MOCK_EVENT_SURVEY_DONE = 'SSAFESTA_MOCK_DONE';
 /** 마감된 이벤트 설문 */
@@ -63,9 +64,12 @@ const EVENT_SURVEY_IDS: Record<string, number> = {
 
 const MOCK_REWARD_COIN = 5;
 
-function apiError(code: string, message: string): ApiError {
-  return { code, message, errors: [], warnings: [] };
+function apiError(code: string, message: string, errors: ApiError['errors'] = []): ApiError {
+  return { code, message, errors, warnings: [] };
 }
+
+/** 보상 상한 — 서버 `app.survey.*` 기본값 10 (GitLab #133). 기획 확정 시 값만 바뀐다 */
+export const MOCK_REWARD_COIN_MAX = 10;
 
 let submitted: Record<string, SurveyAnswerValue> | null = null;
 let submittedSurveyId: number | null = null;
@@ -153,6 +157,12 @@ export const surveyMockPort: SurveyPort = {
   // title 'FAIL' = 저장 실패 시나리오
   async saveDraft(boothId: number, draft: SurveyDraftVM): Promise<void> {
     if (draft.title === 'FAIL') throw apiError('UNKNOWN', '일시적인 오류입니다.');
+    // 상한 초과는 서버가 400 VALIDATION_FAILED + errors[0].field 로 거절한다 (docs/08 §1.3-1)
+    if (draft.rewardCoin > MOCK_REWARD_COIN_MAX) {
+      throw apiError('VALIDATION_FAILED', '입력값을 확인해 주세요.', [
+        { rule: 'FIELD_INVALID', field: 'rewardCoin', message: `보상 코인은 ${MOCK_REWARD_COIN_MAX} 이하여야 합니다.` },
+      ]);
+    }
     savedDraft = { boothId, draft: structuredClone(draft) };
   },
 };

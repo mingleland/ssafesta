@@ -40,8 +40,38 @@ namespace Festa.Content
             }
 
             // C-04(노트북 연출): 화면이 켜지는 3D 연출 대신 **초점 카메라 줌**으로 통일 — 노트북에 다가가 화면을 들여다보는 구도(-299).
-            Festa.World.InteractionFocusCamera.FocusOn(gameObject, 2.0f);
+            //
+            // 구도는 **화면 판 하나**에 맞춘다. 대상 전체로 잡으면 받침 테이블(0.80 m)이 화면(0.19 m)보다
+            // 네 배라 테이블에 맞춰지고, 그 경로의 거리 하한 8u 때문에 화면이 화면의 1/4 을 넘지 못했다.
+            // FE 가 그 위에 사이트를 띄우므로 화면이 화면을 꽉 채워야 "노트북으로 본다" 가 성립한다
+            // (사용자 지시 2026-09-18).
+            var screen = FindScreenRenderer();
+            if (screen != null) Festa.World.InteractionFocusCamera.FocusOnSurface(screen);
+            else Festa.World.InteractionFocusCamera.FocusOn(gameObject, 2.0f);
             BoothInteractBridge.SendLaptopInteract(_runtimeObject.BoothId, _runtimeObject.ObjectId);
+        }
+
+        /// <summary>
+        /// 노트북의 화면 판. 프리팹의 <c>screen</c> 메시다 — 이름으로 찾되, 못 찾으면 <b>가장 얇고 서 있는</b>
+        /// 렌더러를 고른다. 이름이 바뀌어도 구도가 통째로 어긋나지 않게 하는 예비 경로다.
+        /// </summary>
+        Renderer FindScreenRenderer()
+        {
+            Renderer best = null;
+            float bestScore = 0f;
+            foreach (var r in GetComponentsInChildren<Renderer>(true))
+            {
+                if (r == null || r.gameObject.name.StartsWith("__Festa")) continue;
+                if (r.gameObject.name.ToLowerInvariant().Contains("screen")) return r;
+                var s = r.bounds.size;
+                float thin = Mathf.Min(s.x, Mathf.Min(s.y, s.z));
+                float wide = Mathf.Max(s.x, Mathf.Max(s.y, s.z));
+                if (thin <= 0.0001f || wide <= 0.0001f) continue;
+                float score = s.y * (wide / thin);        // 서 있고 얇을수록 화면일 가능성이 크다
+                if (score <= bestScore) continue;
+                bestScore = score; best = r;
+            }
+            return best;
         }
     }
 }

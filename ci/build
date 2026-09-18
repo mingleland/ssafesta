@@ -4,9 +4,19 @@ build_project() {
   local component_dir
   component_dir="$(ci_component_dir)"
   case "${CI_COMPONENT}" in
-    ai) (cd "${component_dir}" && python -m compileall -q .) ;;
-    back) (cd "${component_dir}" && if [[ -x ./gradlew ]]; then ./gradlew clean build -x test; else ./mvnw package -DskipTests; fi) ;;
-    front) (cd "${component_dir}" && npm ci && npm run build) ;;
+    ai) (cd "${component_dir}" && python -m compileall -q -x '\.venv' .) ;;
+    back) (cd "${component_dir}" && if [[ -x ./gradlew ]]; then ./gradlew clean build -x test; else ./mvnw clean package -DskipTests; fi) ;;
+    front) (
+      cd "${component_dir}"
+      npm ci
+      npm run assets:verify
+      npm run build
+      # Jenkins 는 develop workspace 를 재사용하고 checkout 은 artifacts/ 를 지우지 않는다.
+      # 이전 run 의 front-dist 가 남아 있으면 그대로 비우고 이번 build 산출물로 채운다.
+      rm -rf -- "${CI_ARTIFACT_DIR}/front-dist"
+      mkdir -p "${CI_ARTIFACT_DIR}/front-dist"
+      cp -a dist/. "${CI_ARTIFACT_DIR}/front-dist/"
+    ) ;;
     game) bash festa-unity/ci/build --target linux-server ;;
   esac
 }

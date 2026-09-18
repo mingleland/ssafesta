@@ -70,7 +70,6 @@ namespace Festa.Content
 
         void OnDestroy()
         {
-            _ring.Dispose();
             if (_instance == this) _instance = null;
         }
 
@@ -86,7 +85,6 @@ namespace Festa.Content
             if (Festa.Integration.InputBridge.IsLocked)
             {
                 UpdateHover(null);
-                ShowHint(null);
                 // 안내 알약(_passive)도 내린다 — 이것만 남겨 두면 OnGUI 의 `else if (_passive != null)` 가 살아
                 // '영상 화면 · 준비 중' 이 미니게임 카드 위에 붙박이로 떴다(QA 2026-09-08 #55).
                 _passive = null;
@@ -98,7 +96,6 @@ namespace Festa.Content
             if (Festa.World.LiePoseTable.IsLocalPlayerLying())
             {
                 UpdateHover(null);
-                ShowHint(null);
                 _passive = null;
                 return;
             }
@@ -126,7 +123,6 @@ namespace Festa.Content
             targeted ??= NearestInteractableInRange(_hovered);
 
             UpdateHover(targeted);
-            ShowHint(targeted);
 
             // F 응답이 없는 부스 오브젝트(영상 화면·좋아요·상담 데스크 등)를 **조준**했을 때만 "준비 중" 을 알린다 (S15P21A604-455).
             // 근접 자동 조준은 쓰지 않는다 — 옆을 지나갈 때마다 뜨면 소음이다. 키캡이 없으니 -345 의 거짓 힌트 금지와도 맞는다.
@@ -160,7 +156,20 @@ namespace Festa.Content
         static bool TemporarilyBlocked(Festa.Booth.BoothInteractionTarget target)
         {
             var striker = target.GetComponentInParent<Festa.World.HighStrikerInteractable>();
-            return striker != null && striker.IsBusy;
+            if (striker != null && striker.IsBusy) return true;
+
+            // 이미 누가 앉아 있는 의자는 **대상에서 통째로 뺀다** — 프롬프트도 링도 뜨지 않는다.
+            // 눌러도 안 되는 버튼을 띄우면 고장으로 읽힌다 (사용자 지시 2026-09-18).
+            var chair = target.GetComponentInParent<Festa.World.BoothChairInteractable>();
+            if (chair != null)
+            {
+                var nm = Unity.Netcode.NetworkManager.Singleton;
+                var po = nm != null && nm.LocalClient != null ? nm.LocalClient.PlayerObject : null;
+                if (chair.IsOccupied(po, out _)) return true;
+                // 내가 앉아 있는 동안에도 뺀다 — 앉은 채 F 가 다시 먹으면 자세만 바뀌며 몸이 튄다.
+                if (Festa.World.SitPoseTable.IsLocalPlayerSitting()) return true;
+            }
+            return false;
         }
 
         /// <summary>사거리 안에서 가장 가까운 F 응답 대상. 없으면 null. 현재 대상이 사거리 안이면 히스테리시스를 둔다.</summary>
@@ -198,6 +207,12 @@ namespace Festa.Content
             if (origin == null) return true;   // 기준을 못 잡으면 막지 않는다 (조용히 잠그지 않는다)
             return target.DistanceFrom(origin.Value) <= target.MaxDistance;
         }
+
+        /// <summary>
+        /// 상호작용을 건 사람의 자리. 사거리 판정이 쓰는 기준과 <b>같은 것</b>을 내보낸다 —
+        /// NPC 가 "말 건 사람을 바라보게" 할 때 다른 기준을 쓰면 조준과 시선이 어긋난다.
+        /// </summary>
+        public static Vector3? InteractorPosition() => InteractionOrigin();
 
         static Vector3? InteractionOrigin()
         {
@@ -264,19 +279,15 @@ namespace Festa.Content
         }
 
         // ── 프롬프트 ─────────────────────────────────────────
-        // 포털(부스 입장)과 **같은 화면 언어**를 쓴다 — 키캡 패널 + 발밑 링.
+        // 포털(부스 입장)과 **같은 화면 언어**를 쓴다 — 키캡 패널. 그리기는 InteractPromptUI 한 곳에만 있다.
         // 전에는 여기만 화면 하단 uGUI 텍스트라, 같은 F 조작인데 다른 기능처럼 보였다
-        // (S15P21A604-355 사용자 보고). 그리기는 InteractPromptUI 한 곳에만 있다.
-        readonly Festa.World.InteractRing _ring = new Festa.World.InteractRing();
+        // (S15P21A604-355 사용자 보고).
+        //
+        // **발밑 링은 쓰지 않는다** (사용자 지시 2026-09-11). 포털은 부스 앞 빈 바닥에 깔려 "여기로 들어간다"
+        // 로 읽히지만, 오락기·슬롯머신은 기계가 바닥을 거의 덮고 서 있어 링이 기계 밑단과 겹쳐 잘린 빛줄기로
+        // 나왔다 — 바닥에 포털이 열린 것처럼 보인다는 지적. 기계는 프롬프트 알약만으로 충분히 읽힌다.
         string _toast;
         float _toastUntil;
-
-        void ShowHint(Festa.Booth.BoothInteractionTarget target)
-        {
-            if (target == null) { _ring.Hide(); return; }
-            var (pos, radius) = target.HighlightFootprint();
-            _ring.Show(pos, radius);
-        }
 
         /// <summary>대상별 행동 문구. 포털이 "3번 부스 입장" 을 쓰듯 여기도 무엇을 하는지 적는다.</summary>
         static string PromptFor(Festa.Booth.BoothInteractionTarget target)
@@ -293,6 +304,8 @@ namespace Festa.Content
                 return "타이밍 스톱 게임";
             if (target.GetComponentInParent<Festa.World.LoungeSofaInteractable>() != null)
                 return "소파에 눕기";
+            if (target.GetComponentInParent<Festa.World.BoothChairInteractable>() != null)
+                return "의자에 앉기";
             // 작동 중에는 여기까지 오지 않는다 — TemporarilyBlocked 가 대상에서 통째로 뺀다.
             if (target.GetComponentInParent<Festa.World.HighStrikerInteractable>() != null)
                 return "망치로 내리치기";
@@ -334,14 +347,25 @@ namespace Festa.Content
             // 이 토스트가 필요하고, FE 임베드면 개발 빌드에서도 불필요하다.
             if (Festa.World.UI.ControlsHintHud.HostProvidesUi) return;
 
-            _toast =
+            // **아는 상호작용만 알린다.** 전에는 모르는 종류가 "홈페이지 열기 요청" 으로 떨어졌는데,
+            // 이 채널에는 사람이 누른 것이 아닌 **상태 통지**도 흐른다 — 월드 진입 직후 1회 나가는
+            // WORLD_BOOTH_CONTEXT(#174) 가 그렇다. 그래서 접속하자마자 누른 적도 없는 안내가 떴다
+            // (사용자 지적 2026-09-11). 종류를 모르면 아무 말도 하지 않는 편이 맞다.
+            string text =
                 type == Bridge.AiAgentInteract    ? "AI 직원 호출을 보냈습니다 — 대화 창은 웹 화면이 엽니다" :
                 type == Bridge.ProjectInteract    ? "프로젝트 전시 요청을 보냈습니다 — 웹 화면에서 열립니다" :
                 type == Bridge.SurveyInteract     ? "설문 열기 요청을 보냈습니다 — 웹 화면에서 열립니다" :
                 type == Bridge.ManagementInteract ? "부스 관리 요청을 보냈습니다 — 웹 화면에서 열립니다" :
                 type == Bridge.ArcadeInteract     ? "게임 실행 요청을 보냈습니다 — 웹 화면에서 게임이 열립니다 (Esc 로 나가기)" :
                 type == Bridge.GameInteract       ? "게임 실행 요청을 보냈습니다 — 웹 화면에서 게임이 열립니다 (Esc 로 나가기)" :
-                                                    "홈페이지 열기 요청을 보냈습니다 — 웹 화면에서 열립니다";
+                type == Bridge.LaptopInteract     ? "홈페이지 열기 요청을 보냈습니다 — 웹 화면에서 열립니다" :
+                type == Bridge.MinigameInteract   ? "게임 실행 요청을 보냈습니다 — 웹 화면에서 게임이 열립니다 (Esc 로 나가기)" :
+                type == Bridge.EventInteract      ? "이벤트 열기 요청을 보냈습니다 — 웹 화면에서 열립니다" :
+                type == Bridge.GuideInteract      ? "이용 안내 요청을 보냈습니다 — 웹 화면에서 열립니다" :
+                                                    null;
+            if (text == null) return;
+
+            _toast = text;
             _toastUntil = Time.unscaledTime + 2.5f;
         }
 
@@ -354,10 +378,14 @@ namespace Festa.Content
             if (ro == null) return "전시물 · 준비 중";
             switch (ro.Type)
             {
-                case Festa.Booth.BoothObjectType.VideoScreen:      return "영상 화면 · 준비 중";
                 case Festa.Booth.BoothObjectType.LikeVote:         return "좋아요 투표 · 준비 중";
                 case Festa.Booth.BoothObjectType.ConsultationDesk: return "상담 데스크 · 준비 중";
                 case Festa.Booth.BoothObjectType.RecruitmentBoard: return "채용 게시판 · 준비 중";
+                // 영상 화면은 **장식으로 확정**됐다 (GitLab #194 ② — B안, 2026-09-17).
+                // 기능화(A)는 영상 호스팅 결정을 건너뛸 수 없다: projects.video_url 은 YouTube 링크가
+                // 들어오는 자리이고 Unity VideoPlayer 는 그것을 재생하지 못한다. 결정이 났으므로
+                // "준비 중" 을 계속 말하지 않는다 — 장식인데 준비 중이라고 하면 곧 될 것으로 읽힌다.
+                case Festa.Booth.BoothObjectType.VideoScreen:
                 case Festa.Booth.BoothObjectType.Furniture:
                 case Festa.Booth.BoothObjectType.Decoration:       return null;   // 가구·장식은 원래 아무 반응이 없어야 한다
                 default: return "전시물 · 준비 중";

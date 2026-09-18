@@ -132,6 +132,51 @@ class ProjectApiIntegrationTest {
     }
 
     /**
+     * 2026-09-14 보고 재현 — 프로젝트 관리 화면에서 소개 영상·서비스 주소만 채우고 저장했더니
+     * "저장하지 못했습니다. 잠시 후 다시 시도해 주세요." 만 뜨고, 부스 안 전시는 "준비 중" 이었다.
+     *
+     * <p>서버는 이유를 두 번 정확히 말한다 — 이름이 비었고, 서비스 주소에 scheme 이 없다. 그 봉투를
+     * FE 가 통째로 버린다({@code features/project/model/edit.ts} 의 {@code saveProject} catch) —
+     * 고정 문장 하나로 뭉개져 사용자에게는 일시적 장애로 읽힌다. T-24 와 같은 모양이다.
+     */
+    @Test
+    void theReportedScreenIsRefusedForItsOwnReasonsAndStoresNothing() throws Exception {
+        Owner owner = leasedOwner("재현");
+        String videoUrl = "https://youtube.com/shorts/ChO0Hc_Oq50?si=2ms465JlDf1oo-37";
+
+        // ① 화면 그대로 — 이름 칸이 비어 있다. POST 는 이름이 필수라 여기서 먼저 끊긴다.
+        mockMvc.perform(create(owner, """
+                        {"videoUrl": "%s", "deployUrl": "ssafy.com"}""".formatted(videoUrl)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"))
+                .andExpect(jsonPath("$.errors[0].field").value("name"))
+                .andExpect(jsonPath("$.errors[0].message").value("프로젝트 이름을 입력해 주세요."));
+
+        // ② 이름을 채워도 scheme 없는 "ssafy.com" 이 막는다.
+        mockMvc.perform(create(owner, """
+                        {"name": "SSAFY FESTA", "videoUrl": "%s", "deployUrl": "ssafy.com"}"""
+                        .formatted(videoUrl)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errors[0].rule").value("FIELD_INVALID"))
+                .andExpect(jsonPath("$.errors[0].field").value("deployUrl"))
+                .andExpect(jsonPath("$.errors[0].message")
+                        .value("배포 주소 형식이 올바르지 않습니다."));
+
+        // ③ 그래서 저장된 것이 없다 — 부스 전시가 "준비 중" 으로 보이는 이유다.
+        mockMvc.perform(list(owner))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.projects.length()").value(0));
+
+        // ④ 값 자체는 멀쩡하다 — https 를 붙이면 YouTube shorts 주소까지 그대로 통과한다.
+        mockMvc.perform(create(owner, """
+                        {"name": "SSAFY FESTA", "videoUrl": "%s", "deployUrl": "https://ssafy.com"}"""
+                        .formatted(videoUrl)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.videoUrl").value(videoUrl))
+                .andExpect(jsonPath("$.deployUrl").value("https://ssafy.com"));
+    }
+
+    /**
      * 편집자 가드는 <b>세 endpoint 전부</b>에 걸려 있다.
      *
      * <p>`PATCH` 만 검증하면 `POST`·`GET` 에서 가드를 빼먹어도 아무도 모른다 — 남의 부스에

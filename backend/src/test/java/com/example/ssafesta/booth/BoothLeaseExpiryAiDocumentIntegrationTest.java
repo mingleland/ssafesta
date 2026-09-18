@@ -7,7 +7,6 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import com.example.ssafesta.TestcontainersConfiguration;
 import com.example.ssafesta.ai.DocumentProcessingClient.CancelRequest;
 import com.example.ssafesta.ai.FakeDocumentProcessingClient;
-import com.example.ssafesta.ai.FakeDocumentProcessingClientConfiguration;
 import com.example.ssafesta.user.UserRepository;
 import com.example.ssafesta.wallet.WalletService;
 import java.time.Instant;
@@ -33,7 +32,7 @@ import org.springframework.transaction.support.TransactionTemplate;
  * And every path that expires a lease has to do this, not only the batch — the lazy re-lease path
  * goes through the same private method precisely so it cannot drift.
  */
-@Import({TestcontainersConfiguration.class, FakeDocumentProcessingClientConfiguration.class})
+@Import(TestcontainersConfiguration.class)
 @SpringBootTest
 class BoothLeaseExpiryAiDocumentIntegrationTest {
 
@@ -285,6 +284,11 @@ class BoothLeaseExpiryAiDocumentIntegrationTest {
                 String.class, jobId);
     }
 
+    private String errorMessage(long jobId) {
+        return jdbc.queryForObject("SELECT last_error FROM ai_document_jobs WHERE id = ?",
+                String.class, jobId);
+    }
+
     private String workerId(long jobId) {
         return jdbc.queryForObject("SELECT worker_id FROM ai_document_jobs WHERE id = ?",
                 String.class, jobId);
@@ -335,6 +339,47 @@ class BoothLeaseExpiryAiDocumentIntegrationTest {
     // ── 준비 ────────────────────────────────────────────────────────────────
 
     /** A booth on a slot whose lease has already run out — the fixture every case starts from. */
+    /**
+     * 임차인이 반납해도 같은 세 가지가 일어난다 (spec 004 D12·FR-020, spec 007 FR-015·FR-041).
+     *
+     * <p>반납과 만료는 한 메서드({@code BoothLeaseService.release})를 지나므로 여기서 다시 볼 것은
+     * <b>그 메서드가 반납 경로에서도 불린다는 사실</b>과 <b>기록이 사실대로 남는가</b> 둘이다.
+     *
+     * <p>Job 의 {@code last_error_code} 는 반납에서도 {@code BOOTH_LEASE_EXPIRED} 다 — 2026-09-14
+     * 에 그 값을 "유효한 임대가 없음" 의 포괄 코드로 재정의했다. AI 파트가 자기 임대 검사에서
+     * 돌려보내는 어휘와 같은 값이라(FR-041, GitLab #162) 새 값을 BE 단독으로 만들지 않는다.
+     * 사람이 읽는 {@code last_error} 문구만 반납용으로 갈린다.
+     */
+    @Test
+    void returningALeaseCancelsLiveJobsAndDisablesDocumentsJustLikeExpiryDoes() {
+        Long userId = createMemberWithWallet(users, wallets, "반납AI");
+        Long slotId = freeSlotId();
+        BoothLease lease = leaseService.lease(userId, slotId, 1).lease();
+        Leased booth = new Leased(lease.getBoothId(), slotId, lease.getId());
+        long agentId = seedAgent(booth.boothId());
+        long running = seedDocumentWithJob(booth, agentId, "PROCESSING", "RUNNING", 2);
+        long ready = seedDocument(booth.boothId(), agentId, "READY");
+        seedChunk(ready, booth.boothId(), agentId);
+        seedStaging(jobOf(running));
+
+        leaseService.cancel(userId, slotId);
+
+        assertEquals(LeaseStatus.CANCELLED, leases.findById(booth.leaseId()).orElseThrow().getStatus());
+        assertEquals("CANCELLED", jobStatus(jobOf(running)));
+        assertEquals(List.of("DISABLED", "DISABLED"),
+                List.of(documentStatus(running), documentStatus(ready)));
+        assertEquals(0, stagingCount(booth.boothId()));
+        assertEquals(0, chunkCount(booth.boothId()));
+
+        assertEquals("BOOTH_LEASE_EXPIRED", errorCode(jobOf(running)),
+                "반납도 AI 와 공유하는 '유효한 임대 없음' 코드를 쓴다 — 새 값을 만들지 않는다.");
+        assertEquals("임대를 반납해 처리를 취소했습니다.", errorMessage(jobOf(running)),
+                "사람이 읽는 문구는 사실대로 반납이라고 적혀야 합니다.");
+
+        // 살아 있던 Job 수만큼, 정확히 그만큼만 나간다.
+        assertEquals(List.of(new CancelRequest(jobOf(running), 2)), sortedCancels());
+    }
+
     private Leased leasedBooth(String prefix) {
         Long userId = createMemberWithWallet(users, wallets, prefix);
         Long slotId = freeSlotId();

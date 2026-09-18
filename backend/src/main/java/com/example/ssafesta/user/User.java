@@ -14,12 +14,26 @@ import java.time.Instant;
 @Table(name = "users")
 public class User {
 
+    static final String MEMBER = "MEMBER";
+    static final String ADMIN = "ADMIN";
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
     @Column(name = "account_type", nullable = false, length = 20)
-    private String accountType = "MEMBER";
+    private String accountType = MEMBER;
+
+    /**
+     * The one account nobody may act on (S15P21A604-743).
+     *
+     * <p>Deliberately <b>not</b> a third {@code accountType} value: {@link #promoteToAdmin()} and
+     * {@link #demoteToMember()} overwrite that column wholesale, so a master kept there would
+     * vanish on a single demotion. Here it sits in a column those two never touch, and there is no
+     * API that sets it — a migration is the only way in.
+     */
+    @Column(name = "is_master", nullable = false)
+    private boolean master;
 
     @Column(nullable = false, unique = true, length = 30)
     private String nickname;
@@ -54,6 +68,39 @@ public class User {
     public Long getId() { return id; }
     public String getNickname() { return nickname; }
     public AccountStatus getStatus() { return status; }
+    public String getAccountType() { return accountType; }
+    public Instant getCreatedAt() { return createdAt; }
+
+    /** Whether this account may use the admin API at all. A master is an admin too. */
+    public boolean isAdmin() { return ADMIN.equals(accountType); }
+
+    /** The protected account. Every admin action that names a target has to ask this first. */
+    public boolean isMaster() { return master; }
+
+    /**
+     * Grants admin rights. Leaves {@link #master} alone — that flag has no API.
+     *
+     * @return {@code false} when the account already had them, so the caller can answer the
+     *         duplicate request without a second audit row
+     */
+    public boolean promoteToAdmin() {
+        if (isAdmin()) {
+            return false;
+        }
+        this.accountType = ADMIN;
+        this.updatedAt = Instant.now();
+        return true;
+    }
+
+    /** @return {@code false} when the account was not an admin to begin with */
+    public boolean demoteToMember() {
+        if (!isAdmin()) {
+            return false;
+        }
+        this.accountType = MEMBER;
+        this.updatedAt = Instant.now();
+        return true;
+    }
 
     /** The stored appearance encoding, or {@code null} for a user who has never saved one. */
     public String getAvatarCode() { return avatarCode; }

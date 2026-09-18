@@ -1,8 +1,11 @@
 package com.example.ssafesta.wallet;
 
+import com.example.ssafesta.common.ApiException;
+import com.example.ssafesta.common.ErrorCode;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
+import java.util.Objects;
 import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -27,6 +30,16 @@ import org.springframework.transaction.annotation.Transactional;
  *
  * <p>This ordering assumes {@code READ COMMITTED} (PostgreSQL's default), where each statement
  * takes a fresh snapshot and therefore sees the committed entry after the lock is granted.
+ *
+ * <p><b>Why the idempotency lookup is global, and why an owner check follows it.</b> The key is
+ * {@code UNIQUE} across the whole ledger, so the lookup has to be global too — a per-wallet lookup
+ * would miss a colliding key and then hit the constraint. But a global hit can belong to
+ * <i>another</i> wallet, and answering {@code alreadyApplied} in that case hands the caller a
+ * success while nothing happened to their wallet. Every production key today carries the wallet
+ * owner or a per-owner reference ({@code userId}, {@code leaseId}, a session {@code nonce}), so a
+ * cross-wallet hit means a server-side key recipe collided. That is a defect, not a client error:
+ * it is thrown as {@code IllegalStateException} and surfaces as a 500 with the key and both wallet
+ * ids in the log (S15P21A604-695).
  */
 @Service
 public class WalletService {
@@ -40,11 +53,14 @@ public class WalletService {
     private final WalletRepository wallets;
     private final CoinLedgerEntryRepository ledger;
     private final WalletProperties properties;
+    private final CoinEventPublisher events;
 
-    public WalletService(WalletRepository wallets, CoinLedgerEntryRepository ledger, WalletProperties properties) {
+    public WalletService(WalletRepository wallets, CoinLedgerEntryRepository ledger, WalletProperties properties,
+                         CoinEventPublisher events) {
         this.wallets = wallets;
         this.ledger = ledger;
         this.properties = properties;
+        this.events = events;
     }
 
     /**
@@ -214,17 +230,73 @@ public class WalletService {
 
         Optional<CoinLedgerEntry> recorded = ledger.findByIdempotencyKey(idempotencyKey);
         if (recorded.isPresent()) {
-            return LedgerResult.alreadyApplied(recorded.get());
+            CoinLedgerEntry entry = recorded.get();
+            if (!entry.getWalletId().equals(wallet.getId())) {
+                // 키는 전역 UNIQUE 라 조회도 전역이 맞다 — 그래서 주인 검사가 그 다음이다. 여기 걸리면
+                // 서버가 만든 키가 지갑 사이에서 겹친 것이다. 조용히 alreadyApplied 로 답하면 호출자는
+                // 자기 지갑에 아무 일도 없이 "반영됐다" 를 받고, 새 항목을 만들면 UNIQUE 에 걸린다.
+                // 클라이언트 잘못이 아니라 서버 결함이라 409 로 위장하지 않고 크게 던진다 (T-24).
+                throw new IllegalStateException("멱등키가 다른 지갑의 원장 항목을 가리킵니다 — key=" + idempotencyKey
+                        + ", entryWalletId=" + entry.getWalletId() + ", walletId=" + wallet.getId()
+                        + " (S15P21A604-695)");
+            }
+            requireSameRequest(entry, entryType, signedAmount, reasonType, referenceType, referenceId);
+            return LedgerResult.alreadyApplied(entry);
         }
 
-        if (signedAmount < 0 && !wallet.canAfford(-signedAmount)) {
-            throw new InsufficientCoinException(-signedAmount, wallet.getBalance());
+        // long 으로 더한다. int 로 부호를 뒤집으면 Integer.MIN_VALUE 가 다시 음수로 넘쳐
+        // 이 관문을 그냥 통과하고, 마지막 방어선인 Wallet.apply 가 500 으로 터진다
+        // (S15P21A604-806). 증액 쪽도 같은 자리에서 터지던 것을 여기서 함께 받는다.
+        long next = (long) wallet.getBalance() + signedAmount;
+        if (next < 0) {
+            // 필요액은 메시지용 숫자라 표현 범위로 자른다 — 2^31 회수는 어차피 잔액을 넘는다.
+            throw new InsufficientCoinException(
+                    (int) Math.min(-(long) signedAmount, Integer.MAX_VALUE), wallet.getBalance());
+        }
+        if (next > Integer.MAX_VALUE) {
+            throw new ApiException(ErrorCode.COIN_BALANCE_OVERFLOW);
         }
 
         wallet.apply(signedAmount);
         CoinLedgerEntry entry = ledger.save(new CoinLedgerEntry(wallet.getId(), entryType, signedAmount,
                 wallet.getBalance(), reasonType, referenceType, referenceId, idempotencyKey));
+        if (signedAmount > 0) {
+            // 증액만, 그리고 새 항목일 때만 알린다 (S15P21A604-920). 위쪽 alreadyApplied 는 이미
+            // 돌아갔으니 여기 오는 것은 실제로 잔액이 움직인 경우뿐이다.
+            events.granted(userId, entry.getId(), signedAmount, wallet.getBalance(), reasonType,
+                    referenceType, referenceId);
+        }
         return LedgerResult.applied(entry);
+    }
+
+    /**
+     * The recorded entry has to be the same request, not just the same key.
+     *
+     * <p>Returning {@code alreadyApplied} on a key whose payload differs would answer "이미
+     * 반영됐다" to a caller whose request never happened, and hand back the earlier entry's
+     * {@code balanceAfter} as if it were theirs. Every caller that derives its key from the
+     * referenced row (lease, purchase, minigame) can never reach this — the guard exists for the
+     * paths where a client supplies the key, starting with administrator adjustment
+     * (S15P21A604-806).
+     *
+     * <p>A mismatched {@code walletId} is deliberately <b>not</b> routed here: that one means a
+     * server-made key collided across wallets, which is a defect rather than a client error, and
+     * the caller above keeps throwing loudly (T-24, S15P21A604-695).
+     */
+    private void requireSameRequest(CoinLedgerEntry entry, LedgerEntryType entryType, int signedAmount,
+                                    String reasonType, String referenceType, String referenceId) {
+        if (entry.getEntryType() == entryType
+                && entry.getAmount() == signedAmount
+                && Objects.equals(entry.getReasonType(), reasonType)
+                && Objects.equals(entry.getReferenceType(), referenceType)
+                && Objects.equals(entry.getReferenceId(), referenceId)) {
+            return;
+        }
+        log.warn("같은 멱등키에 다른 요청이 도착했습니다 — key={}, 저장={}/{}/{}/{}/{}, 도착={}/{}/{}/{}/{}",
+                entry.getIdempotencyKey(), entry.getEntryType(), entry.getAmount(), entry.getReasonType(),
+                entry.getReferenceType(), entry.getReferenceId(),
+                entryType, signedAmount, reasonType, referenceType, referenceId);
+        throw new ApiException(ErrorCode.IDEMPOTENCY_CONFLICT);
     }
 
     private void validateIdempotencyKey(String idempotencyKey) {

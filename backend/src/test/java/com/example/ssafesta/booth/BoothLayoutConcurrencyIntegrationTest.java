@@ -15,6 +15,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.RepeatedTest;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
 
@@ -26,6 +27,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
  */
 @Import(TestcontainersConfiguration.class)
 @SpringBootTest
+@AutoConfigureMockMvc
 class BoothLayoutConcurrencyIntegrationTest {
 
     private static final int WRITERS = 8;
@@ -71,7 +73,7 @@ class BoothLayoutConcurrencyIntegrationTest {
         editors[0] = ownerId;
         for (int index = 1; index < WRITERS; index++) {
             Long staffId = createMemberWithWallet(users, wallets, "직원" + index);
-            staffs.save(new BoothStaff(boothId, staffId, "EDITOR"));
+            staffs.save(new BoothStaff(boothId, staffId, "CONTENT_EDITOR"));
             editors[index] = staffId;
         }
         return editors;

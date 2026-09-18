@@ -76,12 +76,71 @@ namespace Festa.Integration
             if (echo.avatarCode != encodedAppearance)
             {
                 // 서버가 정규화·트림을 했다는 뜻 — 계약 위반이라 성공으로 처리하면 안 된다.
-                Debug.LogError("[HttpUserApi] 저장 echo 불일치 — 왕복 무손실 계약 위반. " +
-                               $"보낸 길이={encodedAppearance.Length} 받은 길이={echo.avatarCode?.Length ?? -1}");
+               Debug.LogError("[HttpUserApi] 저장 echo 불일치 — 왕복 무손실 계약 위반. " +
+                              $"보낸 길이={encodedAppearance.Length} 받은 길이={echo.avatarCode?.Length ?? -1}");
+               return false;
+           }
+
+           return true;
+       }
+
+        /// <summary>
+        /// GET /api/v1/users/me/avatar/presets — 저장된 칸만 온다 (GitLab#237).
+        ///
+        /// <para>실패는 <c>null</c> 이다. <b>빈 배열로 위장하지 않는다</b> — 빈 배열은 "세 칸 다 비었다"
+        /// 는 정상 응답으로 읽히는데, 그 상태로 화면을 그리면 저장해 둔 외형이 사라진 것처럼 보이고
+        /// 거기에 덮어쓰면 실제로 사라진다.</para>
+        /// </summary>
+        public async Task<AvatarPresetDto[]> GetAvatarPresetsAsync()
+        {
+            using var request = UnityWebRequest.Get($"{_baseUrl}/api/v1/users/me/avatar/presets");
+            var body = await SendAsync(request, "GET /users/me/avatar/presets");
+            if (body == null) return null;
+
+            // 최상위 배열을 JsonUtility 가 못 읽으므로 감싼다.
+            var envelope = ParseOrNull<AvatarPresetListEnvelope>("{\"items\":" + body + "}", "users/me/avatar/presets");
+            if (envelope?.items == null) return null;
+
+            // 서버가 범위를 지키는 것이 계약이지만, 화면이 세 칸 고정이라 벗어난 값은 버린다.
+            var kept = new System.Collections.Generic.List<AvatarPresetDto>(3);
+            foreach (var p in envelope.items)
+            {
+                if (p == null || p.slot < 1 || p.slot > 3 || string.IsNullOrEmpty(p.avatarCode))
+                {
+                    Debug.LogWarning($"[HttpUserApi] 프리셋 항목을 버린다 — slot={p?.slot} 길이={p?.avatarCode?.Length ?? -1}");
+                    continue;
+                }
+                kept.Add(p);
+            }
+            return kept.ToArray();
+        }
+
+        /// <summary>PUT /api/v1/users/me/avatar/presets/{slot} — 덮어쓰기도 같은 호출이다.</summary>
+        public async Task<bool> SaveAvatarPresetAsync(int slot, string encodedAppearance)
+        {
+            if (slot < 1 || slot > 3 || string.IsNullOrEmpty(encodedAppearance))
+            {
+                Debug.LogError($"[HttpUserApi] 프리셋 저장 거부 — slot={slot} 길이={encodedAppearance?.Length ?? -1}");
                 return false;
             }
 
-            return true;
+            var payload = JsonUtility.ToJson(new AvatarUpdateRequest { avatarCode = encodedAppearance });
+            using var request = new UnityWebRequest($"{_baseUrl}/api/v1/users/me/avatar/presets/{slot}", UnityWebRequest.kHttpVerbPUT)
+            {
+                uploadHandler = new UploadHandlerRaw(Encoding.UTF8.GetBytes(payload)),
+                downloadHandler = new DownloadHandlerBuffer(),
+            };
+            request.SetRequestHeader("Content-Type", "application/json");
+            return await SendAsync(request, $"PUT /users/me/avatar/presets/{slot}") != null;
+        }
+
+        /// <summary>DELETE /api/v1/users/me/avatar/presets/{slot} — 204 라 본문이 없다.</summary>
+        public async Task<bool> DeleteAvatarPresetAsync(int slot)
+        {
+            if (slot < 1 || slot > 3) return false;
+            using var request = UnityWebRequest.Delete($"{_baseUrl}/api/v1/users/me/avatar/presets/{slot}");
+            request.downloadHandler = new DownloadHandlerBuffer();
+            return await SendAsync(request, $"DELETE /users/me/avatar/presets/{slot}") != null;
         }
 
         /// <summary>
@@ -176,9 +235,9 @@ namespace Festa.Integration
             var session = ParseOrNull<WorldSessionDto>(body, "world-sessions");
             if (session == null) return null;
 
-            if (session.endpoint == null || string.IsNullOrEmpty(session.endpoint.host) || session.endpoint.port == 0)
+            if (!WorldSessionEndpoint.TryGetConnectionData(session, out _, out _, out _))
             {
-                Debug.LogError("[HttpUserApi] world-session 응답에 endpoint 가 없다 — 접속 불가");
+                Debug.LogError("[HttpUserApi] world-session 응답 endpoint 가 유효하지 않다 — 접속 불가");
                 return null;
             }
 
@@ -270,10 +329,20 @@ namespace Festa.Integration
             public string avatarCode;
         }
 
+       [Serializable]
+       class WorldSessionRequest
+       {
+           public string worldId;
+       }
+
+        /// <summary>
+        /// JsonUtility 는 최상위 배열을 못 읽는다 — 서버가 <c>[{...}]</c> 로 주므로
+        /// <c>{"items":[...]}</c> 로 감싸서 파싱한다. 이 우회를 빼면 조용히 빈 배열이 된다.
+        /// </summary>
         [Serializable]
-        class WorldSessionRequest
+        class AvatarPresetListEnvelope
         {
-            public string worldId;
+            public AvatarPresetDto[] items;
         }
     }
 }

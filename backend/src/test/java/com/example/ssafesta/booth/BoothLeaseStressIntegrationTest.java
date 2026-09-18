@@ -32,6 +32,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
 
@@ -48,6 +49,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 @Tag("stress")
 @Import(TestcontainersConfiguration.class)
 @SpringBootTest
+@AutoConfigureMockMvc
 class BoothLeaseStressIntegrationTest {
 
     private static final Logger log = LoggerFactory.getLogger(BoothLeaseStressIntegrationTest.class);
@@ -187,7 +189,7 @@ class BoothLeaseStressIntegrationTest {
             // Optional, so the second row would not just be untidy — it would throw and lock the
             // member out of leasing entirely (C-01, invariant I-5).
             assertEquals(1, boothCountOf(userId), "라운드 " + round + ": 회원의 부스는 하나여야 합니다 (C-01).");
-            booths.findByOwnerUserId(userId).orElseThrow(
+            booths.findByOwnerUserIdAndAdminOwnedFalse(userId).orElseThrow(
                     () -> new AssertionError("라운드 " + round + ": 소유 부스를 단건으로 읽을 수 있어야 합니다."));
         }
         log.info("시나리오2b - 슬롯 {}개 동시 광클 x {}라운드, 결과 분포 {}", rentable.size(), rounds, describe(outcomes));

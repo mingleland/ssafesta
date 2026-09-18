@@ -3,6 +3,7 @@ package com.example.ssafesta.auth;
 import com.example.ssafesta.common.ApiErrorWriter;
 import com.example.ssafesta.common.ErrorCode;
 import com.example.ssafesta.common.RequestIdFilter;
+import jakarta.servlet.DispatcherType;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
@@ -64,9 +65,23 @@ class SecurityConfiguration {
     SecurityFilterChain securityFilterChain(HttpSecurity http, OAuthLoginSuccessHandler successHandler,
                                             MemberSessionService sessions, ApiErrorWriter errors) throws Exception {
         return http.cors(Customizer.withDefaults())
-                .csrf(csrf -> csrf.ignoringRequestMatchers("/api/v1/**"))
+                .csrf(csrf -> csrf.ignoringRequestMatchers("/api/v1/**", "/ws/**"))
                 .authorizeHttpRequests(requests -> requests
+                        // The container's ERROR dispatch, not a route anyone calls. Refusing it
+                        // replaced every failure that lands there with a misleading 401, and let it
+                        // through only for a request that happened to carry a session — which is
+                        // how one unregistered OAuth provider read as Whitelabel HTML for a browser
+                        // and as UNAUTHORIZED for curl. ApiErrorController answers it in the
+                        // envelope and exposes nothing the original response did not already say.
+                        .dispatcherTypeMatchers(DispatcherType.ERROR).permitAll()
                         .requestMatchers("/actuator/health", "/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html", "/api/v1/auth/guest", "/api/v1/auth/refresh", "/api/v1/auth/oauth/**", "/oauth2/**", "/login/**").permitAll()
+                        // 상담 STOMP 핸드셰이크는 HTTP 인증을 타지 않는다 — 신원은 CONNECT 프레임의
+                        // WS Token 으로 확인하고(FR-019, StompAuthChannelInterceptor), 그 검증에
+                        // 실패한 연결은 거부된다. 여기서 막으면 핸드셰이크 단계에서 토큰을 URL 로
+                        // 넘겨야 하는데 그것이 바로 FR-019 가 금지하는 것이다.
+                        // /ws 는 범용 엔드포인트이고 /ws/consultation 은 이미 통보한 경로라 함께 연다.
+                        // 등록하지 않으면 STOMP CONNECT 검증 전에 핸드셰이크가 401 로 끊긴다.
+                        .requestMatchers("/ws", "/ws/**").permitAll()
                         // Slot browsing is open: a guest session exists to look around (헌법 12조).
                         // Leasing under /booth-slots/{id}/leases stays authenticated.
                         .requestMatchers(HttpMethod.GET, "/api/v1/booth-slots", "/api/v1/booths/*").permitAll()
@@ -101,6 +116,11 @@ class SecurityConfiguration {
                         // read at /booths/*/projects stays authenticated, and "*" spans one segment
                         // so it cannot reach it.
                         .requestMatchers(HttpMethod.GET, "/api/v1/booths/*/projects/published").permitAll()
+                        // 방문자의 <img> 가 들어오는 자리다 (GitLab #241). 게임 Asset 과 같은 구조로
+                        // 경로만 열고 판정은 서비스가 한다 — 게시된 프로젝트가 그 로고를 참조하고
+                        // 임대가 유효할 때만 누구나 볼 수 있고, 그 밖의 로고는 부스 편집자만이며
+                        // 나머지는 404 다. "*" 는 한 세그먼트라 다른 업로드 경로에 닿지 않는다.
+                        .requestMatchers(HttpMethod.GET, "/api/v1/booths/*/project-logos/*/content").permitAll()
                         .anyRequest().authenticated())
                 .oauth2Login(oauth -> oauth.successHandler(successHandler))
                 // The resource server installs its own entry point for bearer-token failures, so an
@@ -112,7 +132,7 @@ class SecurityConfiguration {
                         .accessDeniedHandler((request, response, exception) ->
                                 errors.write(response, ErrorCode.FORBIDDEN, null)))
                 .exceptionHandling(handling -> apiErrors(handling, errors))
-                .addFilterAfter(new SessionRevocationFilter(sessions), BearerTokenAuthenticationFilter.class)
+                .addFilterAfter(new SessionRevocationFilter(sessions, errors), BearerTokenAuthenticationFilter.class)
                 .build();
     }
 
@@ -121,7 +141,7 @@ class SecurityConfiguration {
         CorsConfiguration cors = new CorsConfiguration();
         cors.setAllowedOrigins(List.of(properties.frontendBaseUrl()));
         cors.setAllowedMethods(List.of("GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"));
-        cors.setAllowedHeaders(List.of("Authorization", "Content-Type"));
+        cors.setAllowedHeaders(List.of("Authorization", "Content-Type", "Idempotency-Key"));
         cors.setExposedHeaders(List.of("Set-Cookie", RequestIdFilter.HEADER));
         cors.setAllowCredentials(true);
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();

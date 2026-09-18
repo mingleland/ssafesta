@@ -51,6 +51,18 @@ namespace Festa.World
             // 누운 채 다시 F — BoothInteractionInput 이 먼저 막지만(프롬프트·링도 끔), 다른 경로로 와도 재텔레포트하지 않는다.
             if (LiePoseTable.IsLie(player.EmoteId.Value)) { Debug.Log("[LoungeSofa] 이미 누워 있다 — 무시(일어나기는 WASD)"); return; }
 
+            // **한 소파에 한 사람.** 없으면 뒤에 온 사람이 같은 자리로 텔레포트해 두 몸이 포개진다
+            // (사용자 지적 2026-09-11). 판정은 이미 복제되는 값만으로 한다 — 눕기 이모트(EmoteId)는
+            // NetworkVariable 이고 위치는 NetworkTransform 이라, 소파에 새 네트워크 상태를 달지 않아도
+            // 모든 화면에서 같은 답이 나온다. 누우려는 사람의 화면에서만 판정하면 충분하다.
+            if (TryFindOccupant(b, po, out var occupantName))
+            {
+                Debug.Log($"[LoungeSofa] {name} 은 {occupantName} 이 쓰는 중 — 무시");
+                _toast = "이 소파는 이미 누가 쓰고 있어요";
+                _toastUntil = Time.unscaledTime + 2f;
+                return;
+            }
+
             var right = _lieAxis.sqrMagnitude > 0.001f ? _lieAxis.normalized : Vector3.right;
 
             // 글자의 긴 축 길이가 짧으면(A·F·Y 14.5~16u) 곧게 누운 몸(22.5u)이 머리·발 3~4u 씩 넘어가 공중에 뜬다 →
@@ -94,6 +106,46 @@ namespace Festa.World
             float rootScale = po.transform.lossyScale.y;
             float s = rootScale > 0.0001f ? anim.transform.lossyScale.y / rootScale : anim.transform.lossyScale.y;
             return s > 0.01f ? s : fallback;
+        }
+
+        /// <summary>
+        /// 이 소파 위에 <b>다른 사람</b>이 누워 있는가. 눕기 이모트(<see cref="LiePoseTable.IsLie"/>)를 켠 채
+        /// 소파 윗면 위에 서 있으면 점유로 본다.
+        ///
+        /// <para>이모트와 위치 둘 다 봐야 한다 — 이모트만 보면 다른 소파에 누운 사람까지 잡히고, 위치만 보면
+        /// 소파 앞에 서 있는 사람이 자리를 막는다. 판정 상자는 소파 XZ 범위에 윗면 위로 한 사람 키만큼이다.</para>
+        /// </summary>
+        bool TryFindOccupant(Bounds seatBounds, NetworkObject self, out string occupantName)
+        {
+            occupantName = null;
+            var nm = NetworkManager.Singleton;
+            if (nm == null) return false;
+
+            var area = new Bounds(
+                new Vector3(seatBounds.center.x, seatBounds.max.y + OccupantHeight * 0.5f, seatBounds.center.z),
+                new Vector3(seatBounds.size.x, OccupantHeight, seatBounds.size.z));
+
+            foreach (var p in FindObjectsByType<NetworkPlayer>(FindObjectsInactive.Exclude, FindObjectsSortMode.None))
+            {
+                if (p == null || (self != null && p.gameObject == self.gameObject)) continue;
+                if (!LiePoseTable.IsLie(p.EmoteId.Value)) continue;
+                if (!area.Contains(p.transform.position)) continue;
+                var nick = p.Nickname.Value.ToString();
+                occupantName = string.IsNullOrWhiteSpace(nick) ? "다른 사용자" : nick;
+                return true;
+            }
+            return false;
+        }
+
+        /// <summary>점유 판정 상자의 높이(u). 누운 몸은 낮게 깔리므로 한 사람 키면 충분하다.</summary>
+        const float OccupantHeight = 22.5f;
+
+        string _toast;
+        float _toastUntil;
+
+        void OnGUI()
+        {
+            if (_toast != null && Time.unscaledTime <= _toastUntil) InteractPromptUI.DrawToast(_toast);
         }
     }
 }

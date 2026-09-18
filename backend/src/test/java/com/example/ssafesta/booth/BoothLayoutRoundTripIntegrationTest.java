@@ -14,6 +14,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Import;
 
 /**
@@ -24,6 +25,7 @@ import org.springframework.context.annotation.Import;
  */
 @Import(TestcontainersConfiguration.class)
 @SpringBootTest
+@AutoConfigureMockMvc
 class BoothLayoutRoundTripIntegrationTest {
 
     @Autowired private BoothLayoutService layouts;
@@ -153,17 +155,19 @@ class BoothLayoutRoundTripIntegrationTest {
     void theBoothEdgeIsInsideTheBooth() {
         Owner owner = newOwner("경계");
 
-        // 6m × 6m × 2.72m, origin at the floor centre. DECORATION의 실물이 벽 세 면에 정확히
-        // 닿는 배치: x 2.7+0.3=3.0, z −2.7−0.3=−3.0, y 1.11+1.61=2.72. 경계는 안이다 (#19 ③).
+        // 9.4m × 6m × 5.9m, origin at the floor centre (S15P21A604-698). DECORATION의 실물이 벽
+        // 세 면과 천장에 정확히 닿는 배치: x 4.4+0.3=4.7, z −2.7−0.3=−3.0, y 4.29+1.61=5.9.
+        // x와 z의 경계가 다르다 — 경계는 안이다 (#19 ③).
         layouts.saveDraft(owner.boothId(), owner.userId(), """
                 {"expectedRevision":0,"schemaVersion":1,"template":"PROJECT_EXHIBITION","objects":[
                   {"objectId":"corner","type":"DECORATION",
-                   "position":{"x":2.7,"y":1.11,"z":-2.7},"rotationY":0}]}
+                   "position":{"x":4.4,"y":4.29,"z":-2.7},"rotationY":0}]}
                 """);
 
         assertEquals(1, queries.findDraft(owner.boothId(), owner.userId()).orElseThrow().objects().size());
     }
 
+    /** x와 z를 따로 본다 — z는 3.0 그대로라, x가 넓어졌다고 z까지 열리면 안 된다. */
     @Test
     void justOutsideTheBoothIsRefused() {
         Owner owner = newOwner("경계밖");
@@ -172,7 +176,14 @@ class BoothLayoutRoundTripIntegrationTest {
                 () -> layouts.saveDraft(owner.boothId(), owner.userId(), """
                         {"expectedRevision":0,"schemaVersion":1,"template":"PROJECT_EXHIBITION","objects":[
                           {"objectId":"a","type":"DECORATION",
-                           "position":{"x":3.001,"y":0,"z":0},"rotationY":0}]}
+                           "position":{"x":4.701,"y":0,"z":0},"rotationY":0}]}
+                        """));
+
+        assertThrows(LayoutValidationFailedException.class,
+                () -> layouts.saveDraft(owner.boothId(), owner.userId(), """
+                        {"expectedRevision":0,"schemaVersion":1,"template":"PROJECT_EXHIBITION","objects":[
+                          {"objectId":"a","type":"DECORATION",
+                           "position":{"x":0,"y":0,"z":3.001},"rotationY":0}]}
                         """));
     }
 

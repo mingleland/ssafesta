@@ -1,6 +1,7 @@
 package com.example.ssafesta.world;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -8,9 +9,13 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.example.ssafesta.TestcontainersConfiguration;
 import com.example.ssafesta.auth.AccessTokenService;
 import com.example.ssafesta.auth.MemberSessionService;
+import com.example.ssafesta.common.RedisKeyspaceProperties;
 import com.example.ssafesta.user.User;
 import com.example.ssafesta.user.UserRepository;
+import com.example.ssafesta.wallet.WalletService;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
@@ -18,6 +23,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Import;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
@@ -42,9 +48,12 @@ class WorldSessionApiIntegrationTest {
 
     @Autowired private MockMvc mockMvc;
     @Autowired private UserRepository users;
+    @Autowired private WalletService wallets;
     @Autowired private MemberSessionService sessions;
     @Autowired private AccessTokenService accessTokens;
     @Autowired private JsonMapper json;
+    @Autowired private StringRedisTemplate redis;
+    @Autowired private RedisKeyspaceProperties redisKeyspace;
 
     // ------------------------------------------------------------- 회원
 
@@ -64,6 +73,17 @@ class WorldSessionApiIntegrationTest {
                 .andExpect(jsonPath("$.expiresAt").isNotEmpty());
     }
 
+    @Test
+    void aMemberWorldSessionRecordsOnlyTheWorldEnterMissionFact() throws Exception {
+        Long userId = newMember();
+
+        issueFor(memberBearer(userId));
+
+        String key = redisKeyspace.prefix() + "mission:world-enter:" + userId + ":"
+                + LocalDate.now(ZoneId.of("Asia/Seoul"));
+        assertTrue(Boolean.TRUE.equals(redis.hasKey(key)));
+    }
+
     /**
      * The stored nickname is derived on the server; the appearance is <b>not carried at all</b>.
      *
@@ -80,6 +100,7 @@ class WorldSessionApiIntegrationTest {
         User user = users.save(new User(newNickname()));
         user.changeAvatarCode(AVATAR);
         users.save(user);
+        wallets.openWallet(user.getId());
 
         Map<String, Object> claims = claimsOf(issueFor(memberBearer(user.getId())));
 
@@ -106,6 +127,7 @@ class WorldSessionApiIntegrationTest {
         // The suspension has to reach the world: an already-issued Access Token stays valid until it
         // expires, so without this check a suspended account would still walk in.
         User user = users.save(new User(newNickname()));
+        wallets.openWallet(user.getId());
         String bearer = memberBearer(user.getId());
         user.suspend("TEST");
         users.save(user);
@@ -166,7 +188,12 @@ class WorldSessionApiIntegrationTest {
     // ------------------------------------------------------------------ helpers
 
     private Long newMember() {
-        return users.save(new User(newNickname())).getId();
+        Long userId = users.save(new User(newNickname())).getId();
+        // Production member creation opens the wallet in the same transaction. These focused
+        // fixtures persist the account directly, so preserve that invariant before the daily-grant
+        // interceptor sees the request.
+        wallets.openWallet(userId);
+        return userId;
     }
 
     private static String newNickname() {

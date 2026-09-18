@@ -36,6 +36,11 @@ public class BoothController {
 
                     `homepageUrl` 은 **공개 여부와 무관하게 항상 저장값**이다 (spec 016). 미공개 상태에서도 스튜디오 폼을
                     프리필해야 하기 때문이며, 방문자용 `GET /api/v1/booths/{boothId}` 와 규칙이 다르다.
+
+                    **관리자 부스는 여기에 나오지 않는다** (spec 004 FR-022, `S15P21A604-905`). 관리자는 슬롯마다 부스를
+                    하나씩 들 수 있어 "내 부스 하나" 라는 이 응답 모양에 담기지 않는다. 관리자가 자기 부스를 찾을 때는
+                    `GET /api/v1/booth-slots` 의 `mine` 이 `true` 인 칸을 읽는다 — 그 응답이 슬롯마다 `boothId` 를 함께 준다.
+                    관리자가 일반 회원으로서 따로 임대한 부스가 있으면 그것은 여기에 그대로 나온다.
                     """)
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "내 부스와 임대 정보"),
@@ -63,8 +68,12 @@ public class BoothController {
                     "끝난 부스"를 구별할 수 없다.
 
                     `homepageUrl` 은 **공개된 배치가 있을 때만** 값이 온다 — 노트북은 공개 배치 안에만 있으므로
-                    방문자가 그 주소를 쓸 수 있는 순간과 일치시킨다. 미등록도 `null` 이라 FE 는 `null` 하나로
-                    "미등록/미공개" 안내를 끝낸다 (spec 016 FR-003).
+                    방문자가 그 주소를 쓸 수 있는 순간과 일치시킨다 (spec 016 FR-003).
+
+                    **등록값이 없으면 그 부스 프로젝트의 `deployUrl`(서비스 주소)이 대신 내려간다** (2026-09-14 결정).
+                    `booths.homepage_url` 은 등록 화면이 없어 실제로는 늘 비어 있었고, 소유자가 자기 서비스 주소를
+                    입력하는 칸은 프로젝트 관리의 "서비스 주소" 뿐이다. 등록값이 있으면 **등록값이 이긴다** —
+                    폴백은 빈 자리만 메운다. 둘 다 없으면 `null` 이라 FE 는 여전히 `null` 하나로 안내를 끝낸다.
 
                     ⚠️ 회차 필드 이름이 endpoint 마다 다르다 — 여기는 **`publishedLayoutVersion`**, 배치 Draft 조회와
                     Publish 결과는 **`publishedVersion`** 이다. 합치지 않기로 확정했다 (#97).

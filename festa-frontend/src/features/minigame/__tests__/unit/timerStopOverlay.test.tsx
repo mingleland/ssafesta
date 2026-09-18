@@ -102,6 +102,16 @@ describe('세션 발급과 진행', () => {
     await waitFor(() => expect(screen.getByText('보상 게임은 회원만 참여할 수 있어요')).toBeTruthy());
     expect(submit).not.toHaveBeenCalled();
   });
+
+  it('Space로 시작하고 다시 누르면 멈춘다', async () => {
+    renderOverlay();
+
+    fireEvent.keyDown(window, { code: 'Space' });
+    await waitFor(() => expect(screen.getByRole('button', { name: '멈추기' })).toBeTruthy());
+    fireEvent.keyDown(window, { code: 'Space' });
+
+    await waitFor(() => expect(submit).toHaveBeenCalledTimes(1));
+  });
 });
 
 describe('제출', () => {
@@ -197,5 +207,28 @@ describe('결과 variant — 서버 값을 그대로 쓴다', () => {
     await play({ message: 'Daily limit reached' });
     await screen.findByText('+5 코인');
     expect(screen.queryByText('Daily limit reached')).toBeNull();
+  });
+});
+
+// 목표 초 가시성 (S15P21A604-733). 부제에 있던 값을 플레이 영역으로 올렸다 — 달리는 중에 읽어야
+// 하는 값이 제목 옆 작은 글씨에 있으면 눈이 가지 않는다. 값·포맷은 그대로다.
+describe('목표 초 가시성 (-733)', () => {
+  it('달리는 중에는 목표 초가 플레이 영역의 독립 요소로 보인다', async () => {
+    const { container } = renderOverlay();
+    fireEvent.click(screen.getByRole('button', { name: '시작' }));
+    await waitFor(() => expect(container.querySelector('.ts-target')).not.toBeNull());
+    expect(container.querySelector('.ts-target-value')?.textContent).toBe('7.381');
+  });
+
+  it('부제는 목표 값을 담지 않는다 — 한 값이 두 곳에 있으면 한쪽이 낡는다', async () => {
+    const { container } = renderOverlay();
+    fireEvent.click(screen.getByRole('button', { name: '시작' }));
+    await waitFor(() => expect(container.querySelector('.ts-target')).not.toBeNull());
+    expect(container.querySelector('.festa-overlay-subtitle')?.textContent).toBe('목표 시간에 맞춰 멈추세요');
+  });
+
+  it('시작 전에는 목표 요소가 없다 — 아직 정해지지 않은 값이다', () => {
+    const { container } = renderOverlay();
+    expect(container.querySelector('.ts-target')).toBeNull();
   });
 });

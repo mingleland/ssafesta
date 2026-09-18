@@ -206,9 +206,9 @@ class MinigameTimerStopApiIntegrationTest {
     }
 
     @Test
-    void theStartRequestBodyUnityAlreadySendsIsIgnoredRatherThanRefused() throws Exception {
-        // HttpGameResultClient posts {gameId}. Refusing it would break a client that is already on
-        // develop, and there is nothing to identify anyway — spec 014 FR-009 allows one game.
+    void aStartRequestBodyIsIgnoredRatherThanRefused() throws Exception {
+        // There is nothing to identify — spec 014 FR-009 allows one game — so a body is accepted and
+        // dropped. The FE overlay sends none; this guards the leniency, not any particular caller.
         mockMvc.perform(post(SESSIONS)
                         .header("Authorization", bearerFor(member("미니바디")))
                         .contentType(MediaType.APPLICATION_JSON)
@@ -218,9 +218,9 @@ class MinigameTimerStopApiIntegrationTest {
     }
 
     @Test
-    void theExtraResultFieldsUnityAlreadySendsAreIgnoredRatherThanRefused() throws Exception {
-        // The shipped client sends {targetSeconds, stoppedSeconds, errorSeconds, timedOut}. Only
-        // stoppedSeconds is read; an errorSeconds of 0 must not buy the top band (C-06).
+    void extraResultFieldsAreIgnoredRatherThanRefused() throws Exception {
+        // Only stoppedSeconds is read; an errorSeconds of 0 must not buy the top band (C-06). The
+        // extra fields are tolerated so a caller that sends them still works.
         String bearer = bearerFor(member("미니추가"));
         String issued = issue(bearer);
         UUID sessionId = UUID.fromString(text(issued, "sessionId"));

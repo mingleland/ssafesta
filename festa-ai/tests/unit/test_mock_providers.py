@@ -1,11 +1,12 @@
 """Mock LLM·Embedding이 외부 호출 없이 결정적으로 동작하는지 검증한다."""
 
+import json
 import math
 
 import pytest
 
 from app.providers.embedding import EmbeddingProvider
-from app.providers.llm import LLMMessage, LLMProvider, LLMRequest
+from app.providers.llm import HANDOFF_SUMMARY_MARKER, LLMMessage, LLMProvider, LLMRequest
 from app.providers.mock import MockEmbeddingProvider, MockLLMProvider
 
 
@@ -95,3 +96,51 @@ async def test_mock_llm_returns_a_fixed_message_without_user_input() -> None:
     response = "".join([token.text async for token in provider.stream(request)])
 
     assert response == "[Mock 답변] 사용자 질문이 없습니다."
+
+
+@pytest.mark.asyncio
+async def test_mock_llm_returns_deterministic_json_for_handoff_summary_marker() -> None:
+    """S15P21A604-139 — 마커가 보이면 JSON 형태로 응답이 갈라져야 한다."""
+    request = LLMRequest(
+        messages=(
+            LLMMessage(role="system", content="요약 전용 지시"),
+            LLMMessage(
+                role="user",
+                content=f'<{HANDOFF_SUMMARY_MARKER} trust="untrusted" index="1" speaker="user">\n질문\n</{HANDOFF_SUMMARY_MARKER}>',
+            ),
+            LLMMessage(
+                role="assistant",
+                content=f'<{HANDOFF_SUMMARY_MARKER} trust="untrusted" index="1" speaker="assistant">\n답변\n</{HANDOFF_SUMMARY_MARKER}>',
+            ),
+        )
+    )
+    provider = MockLLMProvider()
+
+    response = "".join([token.text async for token in provider.stream(request)])
+
+    parsed = json.loads(response)
+    assert set(parsed.keys()) == {"summary", "topics", "lastUserIntent"}
+    assert isinstance(parsed["topics"], list)
+
+
+@pytest.mark.asyncio
+async def test_mock_llm_marker_response_still_arrives_chunked() -> None:
+    """마커 응답도 기존 chunking 경로(_LLM_TOKEN_CHUNK_SIZE)를 그대로 탄다 — concatenate-then-parse 경로 검증."""
+    request = LLMRequest(
+        messages=(
+            LLMMessage(
+                role="user",
+                content=f'<{HANDOFF_SUMMARY_MARKER} trust="untrusted" index="1" speaker="user">\n질문\n</{HANDOFF_SUMMARY_MARKER}>',
+            ),
+            LLMMessage(
+                role="assistant",
+                content=f'<{HANDOFF_SUMMARY_MARKER} trust="untrusted" index="1" speaker="assistant">\n답변\n</{HANDOFF_SUMMARY_MARKER}>',
+            ),
+        )
+    )
+    provider = MockLLMProvider()
+
+    tokens = [token.text async for token in provider.stream(request)]
+
+    assert len(tokens) > 1
+    assert json.loads("".join(tokens))["summary"]

@@ -40,7 +40,7 @@ public class GlobalExceptionHandler {
         log.debug("거부 — code={} message={}", code, exception.getMessage());
         return ResponseEntity.status(code.status()).body(ApiErrorResponse.of(
                 code, exception.getMessage(), RequestIdFilter.current(),
-                exception.errors(), exception.warnings()));
+                exception.errors(), exception.warnings(), exception.balance()));
     }
 
     /** A body that could not be parsed at all — malformed JSON, wrong type in a field. */
@@ -137,7 +137,7 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(Exception.class)
     ResponseEntity<ApiErrorResponse> handleUnexpected(Exception exception) {
         if (exception instanceof ErrorResponse rejection && rejection.getStatusCode().is4xxClientError()) {
-            ErrorCode code = codeFor(HttpStatus.resolve(rejection.getStatusCode().value()));
+            ErrorCode code = ErrorCode.of(HttpStatus.resolve(rejection.getStatusCode().value()));
             log.debug("프레임워크 거부 — status={} reason={}", rejection.getStatusCode(), exception.getMessage());
             // The code's status, never the exception's — the client branches on the code.
             return ResponseEntity.status(code.status())
@@ -153,20 +153,5 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(ErrorCode.VALIDATION_FAILED.status()).body(ApiErrorResponse.of(
                 ErrorCode.VALIDATION_FAILED, message == null ? ErrorCode.VALIDATION_FAILED.defaultMessage() : message,
                 RequestIdFilter.current()));
-    }
-
-    private ErrorCode codeFor(HttpStatus status) {
-        if (status == null) {
-            return ErrorCode.VALIDATION_FAILED;
-        }
-        return switch (status) {
-            case UNAUTHORIZED -> ErrorCode.UNAUTHORIZED;
-            case FORBIDDEN -> ErrorCode.FORBIDDEN;
-            case NOT_FOUND -> ErrorCode.NOT_FOUND;
-            case METHOD_NOT_ALLOWED -> ErrorCode.METHOD_NOT_ALLOWED;
-            case BAD_REQUEST -> ErrorCode.VALIDATION_FAILED;
-            case UNSUPPORTED_MEDIA_TYPE -> ErrorCode.UNSUPPORTED_MEDIA_TYPE;
-            default -> ErrorCode.VALIDATION_FAILED;
-        };
     }
 }

@@ -1,7 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 paths=()
-while [[ $# -gt 0 ]]; do case "$1" in --path) paths+=("$2"); shift 2;; *) echo "unknown argument: $1" >&2; exit 64;; esac; done
+tracked_only=false
+while [[ $# -gt 0 ]]; do case "$1" in
+  --path) paths+=("$2"); shift 2;;
+  --tracked) tracked_only=true; shift;;
+  *) echo "unknown argument: $1" >&2; exit 64;;
+esac; done
 [[ ${#paths[@]} -gt 0 ]] || paths=(.)
 python_bin="${PYTHON_BIN:-}"
 if [[ -z "${python_bin}" ]]; then
@@ -14,17 +19,23 @@ if [[ -z "${python_bin}" ]]; then
     exit 69
   fi
 fi
-python_paths=("${paths[@]}")
+if "${tracked_only}"; then
+  git rev-parse --is-inside-work-tree >/dev/null 2>&1 || { echo '--tracked requires a Git worktree.' >&2; exit 64; }
+  mapfile -d '' python_paths < <(git ls-files -z -- "${paths[@]}")
+else
+  python_paths=("${paths[@]}")
+fi
 if command -v cygpath >/dev/null 2>&1; then
-  python_paths=()
-  for path in "${paths[@]}"; do python_paths+=("$(cygpath -w "${path}")"); done
+  windows_paths=()
+  for path in "${python_paths[@]}"; do windows_paths+=("$(cygpath -w "${path}")"); done
+  python_paths=("${windows_paths[@]}")
 fi
 "${python_bin}" - "${SECRET_CANARY:-}" "${python_paths[@]}" <<'PY'
 import pathlib,re,sys
 canary=sys.argv[1]; roots=[pathlib.Path(p) for p in sys.argv[2:]]
 excluded={'.git','Library','Temp','Logs','obj','Builds','node_modules','.venv','venv','jenkins_home'}
 fixture_path='infra/tests/security/fixtures'
-explicit_fixture=any(fixture_path in root.as_posix() for root in roots)
+explicit_fixture=any(root.is_dir() and fixture_path in root.as_posix() for root in roots)
 safe_values={'[REDACTED]','[PLACEHOLDER]','[TEST-CANARY]','[TEST-ONLY]'}
 def safe_literal(value): return value in safe_values or value.startswith('$') or '...' in value
 sensitive_key=r'(?:[A-Za-z0-9_-]*(?:password|passwd|secret|api[_-]?key|access[_-]?token|refresh[_-]?token))'

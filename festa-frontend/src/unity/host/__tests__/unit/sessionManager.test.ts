@@ -54,6 +54,23 @@ describe('acquireUnitySession — single-flight (B-2)', () => {
     await expect(second).resolves.toBe(instance);
   });
 
+  it('생성 중 재acquire는 진행률을 최신 mount 콜백으로 넘긴다', async () => {
+    const { acquireUnitySession } = await freshSessionManager();
+    const gate = deferred<UnityInstance>();
+    loadUnityBuild.mockReturnValueOnce(gate.promise);
+    const firstProgress = vi.fn();
+    const latestProgress = vi.fn();
+
+    acquireUnitySession(canvas, firstProgress);
+    acquireUnitySession(canvas, latestProgress);
+    const loaderProgress = loadUnityBuild.mock.calls[0][1] as (progress: number) => void;
+    loaderProgress(0.5);
+
+    expect(firstProgress).not.toHaveBeenCalled();
+    expect(latestProgress).toHaveBeenLastCalledWith(0.5);
+    gate.resolve(fakeInstance(() => Promise.resolve()));
+  });
+
   it('StrictMode의 mount→cleanup→mount — release 예약 직후 다시 acquire하면 Quit이 불리지 않는다', async () => {
     const { acquireUnitySession, releaseUnitySession } = await freshSessionManager();
     const quit = vi.fn(() => Promise.resolve());

@@ -9,6 +9,7 @@ import com.example.ssafesta.auth.AccessTokenService;
 import com.example.ssafesta.auth.AuthProperties;
 import com.example.ssafesta.auth.InvalidRefreshTokenException;
 import com.example.ssafesta.auth.MemberSessionService;
+import com.example.ssafesta.consultation.ws.WsTokenService;
 import com.example.ssafesta.user.User;
 import com.example.ssafesta.user.UserRepository;
 import com.example.ssafesta.wallet.DailyCoinGrantService;
@@ -20,6 +21,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Import;
 import org.springframework.data.redis.core.StringRedisTemplate;
 
@@ -31,6 +33,7 @@ import org.springframework.data.redis.core.StringRedisTemplate;
  */
 @Import(TestcontainersConfiguration.class)
 @SpringBootTest
+@AutoConfigureMockMvc
 class RedisKeyspaceIsolationIntegrationTest {
 
     private static final RedisKeyspaceProperties ENV_A = new RedisKeyspaceProperties("keyspace-a");
@@ -96,11 +99,38 @@ class RedisKeyspaceIsolationIntegrationTest {
                 "같은 사용자·같은 날짜 키가 환경마다 따로 있어야 합니다");
     }
 
+    @Test
+    void aWsTokenIssuedInOneEnvironmentCannotOpenTheOther() {
+        WsTokenService envA = wsTokensIn(ENV_A);
+        WsTokenService envB = wsTokensIn(ENV_B);
+        Long userId = 994_351L;
+
+        String token = envA.issue(userId).token();
+
+        assertEquals(userId, envA.resolve(token).orElseThrow());
+        assertTrue(envB.resolve(token).isEmpty(),
+                "한 Redis 를 공유해도 한 환경의 WS Token 이 다른 환경의 연결을 열면 안 됩니다");
+    }
+
+    @Test
+    void theWsTokenKeyStartsWithTheEnvironmentNamespace() {
+        WsTokenService envA = wsTokensIn(ENV_A);
+
+        String token = envA.issue(994_352L).token();
+        String expected = ENV_A.prefix() + "consultation:ws:" + token;
+
+        assertEquals(Set.of(expected), redis.keys("*consultation:ws:" + token));
+    }
+
     private MemberSessionService sessionsIn(RedisKeyspaceProperties keyspace) {
         return new MemberSessionService(redis, accessTokens, authProperties, keyspace);
     }
 
     private DailyCoinGrantService dailyGrantsIn(RedisKeyspaceProperties keyspace) {
         return new DailyCoinGrantService(wallets, redis, walletProperties, keyspace);
+    }
+
+    private WsTokenService wsTokensIn(RedisKeyspaceProperties keyspace) {
+        return new WsTokenService(redis, keyspace);
     }
 }

@@ -25,7 +25,7 @@ afterEach(() => {
 
 describe('초기값', () => {
   it('신호가 오기 전에는 아무 모달도 없다', () => {
-    expect(getWorldUiState()).toEqual({ focus: false, minigame: false });
+    expect(getWorldUiState()).toEqual({ focus: false, minigame: false, avatar: false });
     expect(hasUnityModal()).toBe(false);
   });
 
@@ -41,10 +41,12 @@ describe('초기값', () => {
 // 바뀌면 이 테스트가 먼저 깨진다 — 다른 파트가 직렬화를 손봤을 때 브라우저까지 가서 알게 되지 않도록.
 describe('Unity 실제 payload (WorldUiBridge.cs 문자열 그대로)', () => {
   it.each([
-    ['{"focus":false,"minigame":false}', { focus: false, minigame: false }],
-    ['{"focus":true,"minigame":false}', { focus: true, minigame: false }],
-    ['{"focus":false,"minigame":true}', { focus: false, minigame: true }],
-    ['{"focus":true,"minigame":true}', { focus: true, minigame: true }],
+    ['{"focus":false,"minigame":false}', { focus: false, minigame: false, avatar: false }],
+    ['{"focus":true,"minigame":false}', { focus: true, minigame: false, avatar: false }],
+    ['{"focus":false,"minigame":true}', { focus: false, minigame: true, avatar: false }],
+    ['{"focus":true,"minigame":true}', { focus: true, minigame: true, avatar: false }],
+    // avatar 가 추가된 payload (S15P21A604-820, GitLab #197)
+    ['{"focus":false,"minigame":false,"avatar":true}', { focus: false, minigame: false, avatar: true }],
   ])('%s', (json, expected) => {
     // 초기값과 같은 조합도 실제로 반영됐는지 보려면 먼저 반대로 밀어 둔다.
     applyWorldUiStateJson('{"focus":true,"minigame":true}');
@@ -67,7 +69,7 @@ describe('Unity 실제 payload (WorldUiBridge.cs 문자열 그대로)', () => {
 describe('수신', () => {
   it('focus 를 받으면 Unity 모달이 있다고 판정한다', () => {
     applyWorldUiStateJson('{"focus":true,"minigame":false}');
-    expect(getWorldUiState()).toEqual({ focus: true, minigame: false });
+    expect(getWorldUiState()).toEqual({ focus: true, minigame: false, avatar: false });
     expect(hasUnityModal()).toBe(true);
   });
 
@@ -79,12 +81,12 @@ describe('수신', () => {
   it('빠진 필드는 직전 값을 유지한다 — 부분 갱신이 나머지를 지우지 않는다', () => {
     applyWorldUiStateJson('{"focus":true,"minigame":true}');
     applyWorldUiStateJson('{"focus":false}');
-    expect(getWorldUiState()).toEqual({ focus: false, minigame: true });
+    expect(getWorldUiState()).toEqual({ focus: false, minigame: true, avatar: false });
   });
 
   it('모르는 필드는 무시한다 — 필드 추가가 FE 배포를 강제하지 않는다', () => {
     applyWorldUiStateJson('{"focus":true,"dialogue":true}');
-    expect(getWorldUiState()).toEqual({ focus: true, minigame: false });
+    expect(getWorldUiState()).toEqual({ focus: true, minigame: false, avatar: false });
   });
 
   it('같은 상태를 다시 받으면 구독자를 깨우지 않는다', () => {
@@ -102,7 +104,7 @@ describe('계약 밖 payload', () => {
   it('JSON 이 아니면 상태를 바꾸지 않고 로그로 드러낸다', () => {
     const error = vi.spyOn(console, 'error').mockImplementation(() => {});
     applyWorldUiStateJson('focus=true');
-    expect(getWorldUiState()).toEqual({ focus: false, minigame: false });
+    expect(getWorldUiState()).toEqual({ focus: false, minigame: false, avatar: false });
     expect(error).toHaveBeenCalled();
   });
 
@@ -115,7 +117,7 @@ describe('계약 밖 payload', () => {
   it('boolean 이 아닌 필드는 그 필드만 버리고 나머지는 살린다', () => {
     const error = vi.spyOn(console, 'error').mockImplementation(() => {});
     applyWorldUiStateJson('{"focus":"yes","minigame":true}');
-    expect(getWorldUiState()).toEqual({ focus: false, minigame: true });
+    expect(getWorldUiState()).toEqual({ focus: false, minigame: true, avatar: false });
     expect(error).toHaveBeenCalled();
   });
 });
@@ -132,5 +134,54 @@ describe('reset', () => {
     subscribeWorldUiState(listener);
     resetWorldUiState();
     expect(listener).not.toHaveBeenCalled();
+  });
+});
+
+// 월드 안 아바타 커스터마이징 (S15P21A604-820, GitLab #197).
+//
+// 이 필드가 없으면 Unity 가 avatar:true 를 보내도 readFlag 가 조용히 버려서 hasUnityModal() 이
+// false 다 — ESC 가 아바타 화면 위에 GameMenu 를 연다. #132 가 focus·minigame 으로 고쳤던 결함이
+// 세 번째 화면에서 그대로 재발하는 자리다.
+describe('아바타 커스터마이징 (S15P21A604-820)', () => {
+  it('avatar 를 받으면 Unity 모달이 있다고 판정한다 — ESC 2단계가 선다', () => {
+    applyWorldUiStateJson('{"focus":false,"minigame":false,"avatar":true}');
+    expect(getWorldUiState()).toEqual({ focus: false, minigame: false, avatar: true });
+    expect(hasUnityModal()).toBe(true);
+  });
+
+  it('avatar 만 온 부분 갱신이 focus·minigame 을 지우지 않는다', () => {
+    applyWorldUiStateJson('{"focus":true,"minigame":true}');
+    applyWorldUiStateJson('{"avatar":true}');
+    expect(getWorldUiState()).toEqual({ focus: true, minigame: true, avatar: true });
+  });
+
+  it('avatar 가 boolean 이 아니면 그 필드만 버리고 로그로 드러낸다', () => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+    applyWorldUiStateJson('{"minigame":true,"avatar":"open"}');
+    expect(getWorldUiState()).toEqual({ focus: false, minigame: true, avatar: false });
+    expect(error).toHaveBeenCalled();
+  });
+
+  it('avatar 만 떠 있을 때 닫히면 모달이 없다고 판정한다', () => {
+    applyWorldUiStateJson('{"avatar":true}');
+    applyWorldUiStateJson('{"avatar":false}');
+    expect(hasUnityModal()).toBe(false);
+  });
+
+  it('인스턴스가 새로 서면 avatar 도 비운다', () => {
+    applyWorldUiStateJson('{"avatar":true}');
+    resetWorldUiState();
+    expect(getWorldUiState()).toEqual({ focus: false, minigame: false, avatar: false });
+  });
+
+  it('여는 명령의 오브젝트·메서드·인자가 계약과 같다 — 어긋나면 Unity 가 조용히 무시한다', async () => {
+    const { WORLD_UI_BRIDGE_OBJECT, requestAvatarCustomization } = await import('../../../host/worldUiBridge');
+    const SendMessage = vi.fn();
+
+    requestAvatarCustomization({ SendMessage } as never);
+
+    expect(WORLD_UI_BRIDGE_OBJECT).toBe('WorldUiBridge');
+    expect(SendMessage).toHaveBeenCalledTimes(1);
+    expect(SendMessage).toHaveBeenCalledWith('WorldUiBridge', 'RequestAvatarCustomization', 'esc-menu');
   });
 });

@@ -94,6 +94,50 @@ namespace Festa.World
             inst.BeginFocusWorld(target.transform, camPos, lookAt, lockInput);
         }
 
+        /// <summary>
+        /// <b>판 하나를 화면에 꽉 채운다.</b> 노트북 화면처럼 "그 면만 보고 싶은" 대상용이다.
+        ///
+        /// <para><see cref="FocusOn"/> 로는 안 된다. 그쪽은 대상 전체 경계로 거리를 정하는데 노트북 프리팹은
+        /// 받침 테이블(0.80 m)이 화면(0.19 m)보다 네 배 커서 구도가 테이블에 맞춰지고, 게다가 거리 하한이
+        /// 8u 라 작은 판은 아무리 가까이 가도 화면의 1/4 을 넘지 못한다 (사용자 지시 2026-09-18
+        /// "슬롯머신처럼 줌 쫙 땡겨서 노트북 화면만").</para>
+        ///
+        /// <para>거리는 <b>실제 화각에서 역산</b>한다 — 판의 가로·세로가 각각 화면의 <paramref name="fill"/>
+        /// 만큼 차지하는 거리를 구해 더 먼 쪽을 쓴다. 화면비가 달라도 판이 잘리지 않는다.</para>
+        /// </summary>
+        public static void FocusOnSurface(Renderer surface, float fill = 0.82f, bool lockInput = true)
+        {
+            if (surface == null) return;
+            var b = surface.bounds;
+            var cam = Camera.main;
+            float fov = cam != null ? cam.fieldOfView : 60f;
+            float aspect = cam != null && cam.aspect > 0.01f ? cam.aspect : 16f / 9f;
+
+            // 판의 두께 축을 뺀 나머지 둘이 보이는 크기다.
+            var size = b.size;
+            int thin = size.x <= size.y && size.x <= size.z ? 0 : size.y <= size.z ? 1 : 2;
+            float w = thin == 0 ? size.z : size.x;
+            float h = thin == 1 ? size.z : size.y;
+
+            fill = Mathf.Clamp(fill, 0.2f, 0.98f);
+            float halfV = Mathf.Tan(fov * 0.5f * Mathf.Deg2Rad);
+            float halfH = halfV * aspect;
+            float distance = Mathf.Max(h * 0.5f / (halfV * fill), w * 0.5f / (halfH * fill));
+            distance = Mathf.Max(distance, Mathf.Max(size[thin], 0.5f));   // 판 안으로 들어가지 않게
+
+            // 보는 방향은 플레이어 쪽이다 — 노트북은 앉거나 선 사람 쪽을 향해 열려 있다.
+            var local = FindLocalFollow();
+            Vector3 from = local != null ? local.transform.position
+                         : cam != null ? cam.transform.position
+                         : b.center + Vector3.back * 10f;
+            Vector3 dir = from - b.center; dir.y = 0f;
+            if (dir.sqrMagnitude < 0.01f) dir = -surface.transform.forward;
+            dir.Normalize();
+
+            var inst = Ensure();
+            inst.BeginFocusWorld(surface.transform, b.center + dir * distance, b.center, lockInput);
+        }
+
         /// <summary>초점 모드를 끝내고 추적 카메라·입력을 되돌린다. 초점 중이 아니면 아무 일도 없다.</summary>
         public static void Release()
         {
@@ -185,10 +229,17 @@ namespace Festa.World
         /// 초점 모드 나가기 어포던스 — 우상단 `[Esc] 나가기` 알약. Esc 하나만 있으면 ① 키보드 없는 기기, ② 캔버스가
         /// 포커스를 잃어 Esc 가 브라우저로 가는 경우(captureAllKeyboardInput=false), ③ FE 가 잠금을 안 풀어 주는 경우에
         /// 갇힌다(QA 2026-09-08 #54). 마우스·터치로도 눌린다. IMGUI 라 씬 배선이 없다.
+        ///
+        /// <para><b>FE 임베드에서는 그리지 않는다</b> (사용자 지시 2026-09-14). 임베드에서는 같은 자리에 React
+        /// HUD 의 상담 버튼이 있고 이 알약은 Unity 캔버스라 그 <b>뒤로 깔려</b>, 반쯤 가린 흰 판때기로만 보였다.
+        /// 기능도 겹친다 — 그쪽은 오버레이의 X·배경 클릭·ESC 가 <c>RequestExitWorldUi</c> 로 초점까지 함께 끝낸다(#132).
+        /// 게이트는 토스트(#141)와 같은 <b>FE 존재 여부</b>다. 단독 실행에는 그 대체 경로가 없으므로 그대로 남는다 —
+        /// 여기서 통째로 지우면 #54 가 그대로 돌아온다.</para>
         /// </summary>
         void OnGUI()
         {
             if (!_active) return;
+            if (Festa.World.UI.ControlsHintHud.HostProvidesUi) return;
             float ui = InteractPromptUI.UiScale();
             float h = Mathf.Round(44f * ui), cap = Mathf.Round(34f * ui), pad = Mathf.Round(14f * ui), gap = Mathf.Round(10f * ui);
             const string label = "나가기";

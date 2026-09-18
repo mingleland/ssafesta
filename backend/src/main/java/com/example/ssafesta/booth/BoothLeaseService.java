@@ -2,6 +2,8 @@ package com.example.ssafesta.booth;
 
 import com.example.ssafesta.ai.BoothDocumentDeactivationService;
 import com.example.ssafesta.common.ConstraintViolations;
+import com.example.ssafesta.user.AdminGuard;
+import com.example.ssafesta.wallet.CoinReason;
 import com.example.ssafesta.wallet.CoinSpendCommand;
 import com.example.ssafesta.wallet.LedgerResult;
 import com.example.ssafesta.wallet.WalletService;
@@ -23,17 +25,19 @@ import org.springframework.transaction.annotation.Transactional;
  * rolls back with it. "Coins gone, no booth" is not handled by a compensating refund here; it is
  * made unrepresentable (FR-003, SC-002).
  *
- * <p>It also owns the other direction — {@link #expireStaleLeases()} and the private {@code expire}
- * every path shares — because expiry is the same two rows in the same transaction (S15P21A604-152),
- * plus the booth's AI documents since S15P21A604-496.
+ * <p>It also owns the other direction — {@link #expireStaleLeases()}, {@link #cancel} and the
+ * private {@code release} every path shares — because ending a lease is the same two rows in the
+ * same transaction (S15P21A604-152), plus the booth's AI documents since S15P21A604-496.
+ * Expiry and the tenant's early return (D12) differ only in the word written into the row, so
+ * they go through one method rather than two that could drift apart.
  */
 @Service
 public class BoothLeaseService {
 
     private static final Logger log = LoggerFactory.getLogger(BoothLeaseService.class);
     private static final int ALLOWED_DURATION_DAYS = 1;
-    static final String LEASE_REASON = "LEASE_PAYMENT";
-    static final String LEASE_REFERENCE_TYPE = "BOOTH_LEASE";
+    static final String LEASE_REASON = CoinReason.LEASE_PAYMENT;
+    static final String LEASE_REFERENCE_TYPE = CoinReason.LEASE_REFERENCE_TYPE;
     /** V6, lower case: PostgreSQL reports index names folded. */
     private static final String ACTIVE_LESSEE_INDEX = "ux_booth_leases_active_lessee";
     /** How many leases one sweeper transaction takes — see {@link BoothLeaseRepository#findStaleActive}. */
@@ -44,16 +48,20 @@ public class BoothLeaseService {
     private final BoothLeaseRepository leases;
     private final WalletService wallets;
     private final BoothDocumentDeactivationService aiDocuments;
+    private final AdminGuard admins;
+    private final AdminBoothPurger purger;
     private final LeaseProperties properties;
 
     public BoothLeaseService(BoothSlotRepository slots, BoothRepository booths, BoothLeaseRepository leases,
                              WalletService wallets, BoothDocumentDeactivationService aiDocuments,
-                             LeaseProperties properties) {
+                             AdminGuard admins, AdminBoothPurger purger, LeaseProperties properties) {
         this.slots = slots;
         this.booths = booths;
         this.leases = leases;
         this.wallets = wallets;
         this.aiDocuments = aiDocuments;
+        this.admins = admins;
+        this.purger = purger;
         this.properties = properties;
     }
 
@@ -94,20 +102,32 @@ public class BoothLeaseService {
             throw new SlotAlreadyLeasedException(slotId);
         }
 
-        leases.findValidByLesseeUserId(userId, now).ifPresent(active -> {
-            throw new ActiveLeaseLimitException(active.getId());
-        });
+        // An administrator leases free and forever, and holds one booth per slot (S15P21A604-905).
+        // Read once: the three branches below must agree, and isAdmin() is a row read.
+        boolean admin = admins.isAdmin(userId);
+
+        if (!admin) {
+            leases.findValidByLesseeUserId(userId, now).ifPresent(active -> {
+                throw new ActiveLeaseLimitException(active.getId());
+            });
+        }
 
         releaseStaleLeases(slotId, now);
-        releaseStaleLeasesOfMember(userId, now);
+        if (!admin) {
+            // Nothing of an administrator's is ever stale — their leases end in 2099 — and the
+            // helper reads one Optional per member, which several permanent rows would break.
+            releaseStaleLeasesOfMember(userId, now);
+        }
 
-        Booth booth = ownBooth(userId);
+        Booth booth = admin ? newAdminBooth(userId, slot) : ownBooth(userId);
         booth.attachSlot(slotId);
 
         BoothLease lease;
         try {
-            lease = leases.saveAndFlush(new BoothLease(booth.getId(), slotId, userId, now,
-                    properties.duration(), properties.priceCoin()));
+            lease = leases.saveAndFlush(admin
+                    ? BoothLease.permanent(booth.getId(), slotId, userId, now, properties.adminEndsAt())
+                    : new BoothLease(booth.getId(), slotId, userId, now,
+                            properties.duration(), properties.priceCoin()));
         } catch (DataIntegrityViolationException exception) {
             // Lost a race on one of the partial unique indexes (or on booths.current_slot_id). The
             // transaction is doomed, which is exactly what this case needs: the losing request
@@ -115,10 +135,77 @@ public class BoothLeaseService {
             throw translateRace(exception, userId, slotId);
         }
 
+        if (admin) {
+            // No ledger row at all, not a zero-coin one: a 0 Coin LEASE_PAYMENT would show up in
+            // the administrator's own wallet history as a transaction that never happened.
+            log.info("관리자 부스 임대 — userId={}, slotId={}, leaseId={}, 무상·영구, endsAt={}",
+                    userId, slotId, lease.getId(), lease.getEndsAt());
+            return new LeaseOutcome(lease, wallets.balanceOf(userId), false);
+        }
+
         LedgerResult payment = charge(userId, lease);
         log.info("부스 임대 — userId={}, slotId={}, leaseId={}, coin={}, endsAt={}",
                 userId, slotId, lease.getId(), properties.priceCoin(), lease.getEndsAt());
         return new LeaseOutcome(lease, payment.balanceAfter(), false);
+    }
+
+
+    /**
+     * Hands the member's lease back before its time is up, freeing the slot at once (spec 004 D12,
+     * FR-020).
+     *
+     * <p><b>No refund.</b> The wallet is not touched here at all: D06 refuses a change-of-mind
+     * refund and FR-021 carries that into the early return, so a re-lease is a fresh charge. That is
+     * also what keeps this from being abusable — the slot is free, the coin is spent.
+     *
+     * <p>Everything else is the expiry path. The slot release, the booth detach and the AI document
+     * transitions all go through {@link #release}, so the only thing an early return changes is the
+     * word written into the row.
+     *
+     * <p><b>Two steps, not one, and the order matters.</b> The lease row is locked first with no
+     * time predicate, and only then is validity re-read. Binding an instant into the locking query
+     * could not work — that query is how the lock is taken, and a bound parameter would not refresh
+     * while the statement waits. So the lock comes first, {@code now} is read after it, and the
+     * expiry rule stays where {@link BoothLeaseRepository} promises it lives rather than being
+     * re-implemented here as a field comparison.
+     *
+     * <p>Against the sweeper both orderings are defined: whoever locks the row first decides it, and
+     * a return that arrives after an expiry has committed is refused rather than overwriting it.
+     *
+     * @param slotId the slot the caller believes they are returning, and since S15P21A604-905 the
+     *               key this method looks up. It was already required of members so a stale screen
+     *               naming the wrong slot would be refused rather than tearing down whichever booth
+     *               they happen to hold; an administrator holds several at once, so it is now the
+     *               only thing that says which one. A member's outcome is unchanged — the lessee is
+     *               checked right after, and naming someone else's slot is refused the same way.
+     */
+    @Transactional
+    public void cancel(Long userId, Long slotId) {
+        // Same serialization as lease(): without it a return and a re-lease can interleave so that
+        // the re-lease reads "no active lease" before the return commits, and the member ends up
+        // holding two.
+        wallets.lockOwner(userId);
+
+        if (leases.findActiveBySlotIdForUpdate(slotId).isEmpty()) {
+            log.info("반납할 임대가 없습니다 — userId={}, slotId={}", userId, slotId);
+            throw new ActiveLeaseNotFoundException();
+        }
+
+        BoothLease lease = leases.findValidBySlotId(slotId, Instant.now())
+                .orElseThrow(() -> {
+                    // Held the lock, but the row is logically expired by the time we read it. Leave
+                    // the transition to the sweeper: this path owns returns, not expiries.
+                    log.info("반납하려던 임대가 이미 만료 시각을 지났습니다 — userId={}, slotId={}", userId, slotId);
+                    return new ActiveLeaseNotFoundException();
+                });
+
+        if (!lease.getLesseeUserId().equals(userId)) {
+            log.info("반납 요청의 슬롯을 그 회원이 보유하고 있지 않습니다 — userId={}, 요청 slotId={}, 보유자={}",
+                    userId, slotId, lease.getLesseeUserId());
+            throw new ActiveLeaseNotFoundException();
+        }
+
+        release(lease, LeaseStatus.CANCELLED);
     }
 
     /**
@@ -143,7 +230,7 @@ public class BoothLeaseService {
      */
     private void releaseStaleLeases(Long slotId, Instant now) {
         for (BoothLease lease : leases.findStaleActiveBySlotId(slotId, now)) {
-            expire(lease);
+            release(lease, LeaseStatus.EXPIRED);
         }
         // A booth may still point at this slot even without a stale lease row (e.g. data repaired
         // by hand). Detach it too, or the UNIQUE column blocks the new booth.
@@ -173,7 +260,7 @@ public class BoothLeaseService {
     public int expireStaleLeases() {
         List<BoothLease> stale = leases.findStaleActive(Instant.now(), EXPIRY_BATCH);
         for (BoothLease lease : stale) {
-            expire(lease);
+            release(lease, LeaseStatus.EXPIRED);
         }
         return stale.size();
     }
@@ -193,17 +280,70 @@ public class BoothLeaseService {
      * lease. The lazy paths are unaffected by the guard: they run before {@code attachSlot}, so the
      * booth still points at the slot being released.
      */
-    private void expire(BoothLease lease) {
-        lease.expire();
-        booths.findById(lease.getBoothId())
-                .filter(booth -> lease.getSlotId().equals(booth.getCurrentSlotId()))
-                .ifPresent(Booth::detachSlot);
-        // The AI half of the same expiry (spec 007 FR-015·FR-041, S15P21A604-496). It is here rather
+    private void release(BoothLease lease, LeaseStatus to) {
+        Booth booth = booths.findById(lease.getBoothId()).orElse(null);
+        if (booth != null && booth.isAdminOwned()) {
+            releaseAdminBooth(lease, booth);
+            return;
+        }
+
+        boolean cancelled = to == LeaseStatus.CANCELLED;
+        if (cancelled) {
+            lease.cancel();
+        } else {
+            lease.expire();
+        }
+        if (booth != null && lease.getSlotId().equals(booth.getCurrentSlotId())) {
+            booth.detachSlot();
+        }
+        // The AI half of the same release (spec 007 FR-015·FR-041, S15P21A604-496). It is here rather
         // than in each caller because spec.md:71 wants it in this transaction, and because a second
-        // place to expire a lease is a second place to forget this.
-        aiDocuments.deactivate(lease.getBoothId());
-        log.info("만료 임대 정리 — leaseId={}, slotId={}, boothId={}",
+        // place to end a lease is a second place to forget this.
+        aiDocuments.deactivate(lease.getBoothId(), cancelled
+                ? BoothDocumentDeactivationService.Cause.CANCELLED
+                : BoothDocumentDeactivationService.Cause.EXPIRED);
+        // The expiry wording is asserted verbatim by BoothLeaseExpirySweeperIntegrationTest, which
+        // proves the lazy path and the sweeper pass share one method. Keep it exact.
+        log.info(cancelled
+                        ? "임대 반납 정리 — leaseId={}, slotId={}, boothId={}"
+                        : "만료 임대 정리 — leaseId={}, slotId={}, boothId={}",
                 lease.getId(), lease.getSlotId(), lease.getBoothId());
+    }
+
+    /**
+     * An administrator's booth does not survive its lease — it is deleted, content and all
+     * (S15P21A604-905).
+     *
+     * <p><b>Why the member path does not apply here.</b> That path preserves everything (FR-010) and
+     * detaches the slot, because a member keeps one booth across leases and re-leasing continues
+     * their own content. An administrator gets a <i>new</i> booth for every slot, so the returned one
+     * has no future: leaving it behind piles up dormant booths that no screen can reach and no member
+     * owns. Transitioning its status or deactivating its AI documents would be bookkeeping on rows
+     * that are about to be gone.
+     *
+     * <p><b>The order is forced.</b> Content first through {@link AdminBoothPurger} (plain JDBC,
+     * fifteen foreign keys deep), then the lease and the booth through JPA so the persistence
+     * context knows they are gone. The flush before the purge is what stops Hibernate from writing
+     * this transaction's pending changes onto rows the purge has already deleted.
+     *
+     * <p><b>This destroys visitor-generated rows</b> — survey responses, visit metrics and
+     * consultation transcripts left in that booth. It is inherent to the booth disappearing: none of
+     * those foreign keys cascade, so a delete that spared them could not run at all.
+     */
+    private void releaseAdminBooth(BoothLease lease, Booth booth) {
+        Long boothId = booth.getId();
+        booth.detachSlot();
+        leases.flush();
+        booths.flush();
+
+        purger.purge(boothId);
+        leases.delete(lease);
+        booths.delete(booth);
+        leases.flush();
+        booths.flush();
+
+        log.info("관리자 부스 반납 — leaseId={}, slotId={}, boothId={} (부스 삭제)",
+                lease.getId(), lease.getSlotId(), boothId);
     }
 
     /**
@@ -216,7 +356,7 @@ public class BoothLeaseService {
      */
     private void releaseStaleLeasesOfMember(Long userId, Instant now) {
         for (BoothLease lease : leases.findStaleActiveByLesseeUserId(userId, now)) {
-            expire(lease);
+            release(lease, LeaseStatus.EXPIRED);
         }
         leases.flush();
         booths.flush();
@@ -245,8 +385,24 @@ public class BoothLeaseService {
      * previous owner's layout, documents and survey answers (C-01, invariant I-5, SC-004).
      */
     private Booth ownBooth(Long userId) {
-        return booths.findByOwnerUserId(userId)
+        return booths.findByOwnerUserIdAndAdminOwnedFalse(userId)
                 .orElseGet(() -> booths.save(new Booth(userId, "내 부스")));
+    }
+
+    /**
+     * A fresh booth for each slot an administrator takes (S15P21A604-905).
+     *
+     * <p>Not {@link #ownBooth}: that one is the member rule — one booth carried across leases — and
+     * reusing it would make a second slot steal the first one's {@code current_slot_id}. The slot
+     * code goes into the name so the several booths are told apart in the slot list without anyone
+     * renaming them.
+     *
+     * <p>Nothing accumulates: a returned administrator booth is deleted outright, content and all
+     * (see {@link #releaseAdminBooth}), so there is never a dormant one to reuse or to choose
+     * between.
+     */
+    private Booth newAdminBooth(Long userId, BoothSlot slot) {
+        return booths.save(new Booth(userId, "관리자 부스 " + slot.getSlotCode(), true));
     }
 
     /** Result of a lease request. {@code alreadyHeld} marks the idempotent retry path (FR-018). */

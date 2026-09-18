@@ -18,6 +18,7 @@ import { useNavigate } from 'react-router-dom';
 import { isApiError } from '../../../shared/api/client';
 import { showToast } from '../../../shared/ui/toast/toastStore';
 import { IS_DEV_ENTRY, enterAsDeveloper } from '../model/devEntry';
+import { Tooltip } from '../../../shared/ui/tooltip/Tooltip';
 import './devEntry.css';
 
 /**
@@ -39,11 +40,11 @@ export function DevEntryButton() {
   if (!IS_DEV_ENTRY) return null;
 
   return (
+    <Tooltip content="개발자로 입장 — 회원 세션으로 바로 들어갑니다" placement="right">
     <button
       type="button"
       className="dev-entry-btn"
       aria-label="개발자로 입장"
-      title="개발자로 입장 — 회원 세션으로 바로 들어갑니다"
       onClick={() => {
         // 실패는 공통 Toast 로 낸다 — 이 화면(LoginPage)이 이미 쓰는 층이고,
         // `kind: 'error'` 는 자동 소멸이 없다("읽고 닫는 것", toastStore.ts).
@@ -60,5 +61,6 @@ export function DevEntryButton() {
         <path d="M18.5 2.5 21.5 5.5" />
       </svg>
     </button>
+    </Tooltip>
   );
 }

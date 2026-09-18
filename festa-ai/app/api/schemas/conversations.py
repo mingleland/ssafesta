@@ -21,3 +21,12 @@ class ConversationResponse(ApiModel):
 
 class MessageRequest(ApiModel):
     question: str = Field(min_length=1, max_length=2_000)
+
+
+class HandoffSummaryResponse(ApiModel):
+    """S15P21A604-139 응답. D11 — 대화 원문(question/answer)은 절대 담지 않는다."""
+
+    conversation_id: str
+    summary: str
+    topics: list[str]
+    last_user_intent: str

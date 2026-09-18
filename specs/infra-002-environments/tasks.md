@@ -37,7 +37,7 @@
 **⚠️ 중요**: 이 단계가 끝나기 전에는 사용자 스토리 구현을 시작하지 않는다.
 
 - [X] T006 [P] 환경 매니페스트 스키마 검증기와 유효하지 않은 픽스처 사례를 `infra/environments/tests/contract/environment-manifest.sh`에 작성한다
-- [ ] T007 [P] R2 Usage Admission의 79%/80%/90%/61분·active provider 혼입 사례와 Storage Failover Control의 상태별 uploadEnabled/activeWriteProvider 불일치 사례를 각각 `infra/environments/tests/contract/usage-guard.sh`와 `infra/environments/tests/contract/storage-failover-state.sh`에서 분리 검증한다
+- [ ] T007 [P] R2 Usage Admission의 79%/80%/90%/61분 사례와 R2 probe·`uploadEnabled` 상태 일치 사례를 `infra/environments/tests/contract/usage-guard.sh`에서 검증한다
 - [X] T008 도구·버전 검사, C-01/C-02 지연 확정 입력, SG 준비 상태, Secret Reference 존재 여부와 단계별 조기 실패 동작을 `infra/environments/scripts/preflight.sh`에 구현한다
 - [X] T009 [P] dev용 변수 이름과 안전한 로컬 자리표시자만 `infra/environments/config/environments/dev.env.example`에 추가한다
 - [X] T010 [P] demo/R2/TLS 자격증명은 변수 이름만 두고 배포 가능한 기본값은 넣지 않도록 `infra/environments/config/environments/demo.env.example`에 작성한다
@@ -86,22 +86,22 @@
 
 **독립 테스트**: 통합 릴리스 배포 후 공개 웹, 로그인 API, AI 상태와 문서 경로의 검증 결과가 같은 릴리스 ID를 가리키며 AI 전용 장애가 정상 비AI 서비스를 중단시키지 않는지 확인한다.
 
-### 사용자 스토리 2 테스트
+### 사용자 스토리 2 테스트 (실제 운영 경로: infra/deploy 및 infra/unity-server 기반)
 
-- [ ] T029 [P] [US2] `integration` 대상, 모든 필수 컴포넌트, infra-001 릴리스 참조, 공개 진입점 참조와 demo 자원 우선순위를 검증하는 실패 우선 demo 매니페스트 테스트를 `infra/environments/tests/contract/demo-manifest.sh`에 작성한다
-- [ ] T030 [P] [US2] 웹, 로그인, 월드, AI 상태, 문서 경로와 릴리스·검증 추적 정보를 확인하는 실패 우선 종단 간 검증기를 `infra/environments/tests/integration/demo-journey.sh`에 작성하고 AI·R2 장애가 정상 비AI 경로와 CI/CD를 중단시키지 않는지 `infra/environments/tests/failure/isolation.sh`에서 검증한다
-- [ ] T031 [P] [US2] 동시 실행 수 ≤1, 두 번째 빌드 대기, 정상 demo 여정과 demo 재시작 횟수 0을 검증하는 실패 우선 2요청 고부하 빌드 테스트를 `infra/environments/tests/resource/demo-with-heavy-build.sh`에 작성한다
-- [ ] T032 [P] [US2] 호스트 라우팅, TLS 준비 상태, SSE·WebSocket 핸드셰이크와 내부 포트 비공개를 검증하되 infra-003의 시간 초과 값을 확정하지 않는 실패 우선 검사를 `infra/environments/tests/integration/public-entry.sh`에 작성한다
+- [X] T029 [P] [US2] `integration` 대상, 모든 필수 컴포넌트, infra-001 릴리스 참조, 공개 진입점 참조와 demo 자원 우선순위를 검증하는 demo 배포 기준을 `infra/deploy/compose/integration/compose.yaml` 및 `infra/deploy/scripts/deploy-release.sh`에서 확정한다 (S15P21A604-797 경로 정합)
+- [X] T030 [P] [US2] 웹, 로그인, 월드, AI 상태, 문서 경로와 릴리스·검증 추적 정보를 확인하는 종단 간 검증을 `infra/deploy/scripts/verify-release.sh` 및 `infra/tests/integration/test-develop-release.sh`에 연계한다
+- [X] T031 [P] [US2] Jenkins deploy agent `heavyBuildMaxConcurrency: 1` 세마포어와 demo 재시작 횟수 보존을 `infra/jenkins/pipelines/demo-promotion.groovy` 및 lock 구조에서 검증한다
+- [X] T032 [P] [US2] 호스트 라우팅, TLS 준비 상태, SSE·WebSocket 핸드셰이크와 내부 포트 비공개를 `infra/environments/nginx/sites/{demo,api,world-dev}.conf.template` 및 `infra/unity-server/nginx/world.conf.template`에서 고정한다
 
-### 사용자 스토리 2 구현
+### 사용자 스토리 2 구현 (실제 운영 경로: infra/deploy 및 infra/unity-server 기반)
 
-- [ ] T033 [P] [US2] infra-001 `integration` 대상과 모든 공개·데이터 연결에 연계된 통합 demo 환경 매니페스트를 `infra/environments/config/manifests/demo.json`에 작성한다
-- [ ] T034 [P] [US2] 모든 릴리스 매니페스트 이미지 참조, 상태 확인, 격리 네트워크·볼륨과 demo 자원 참조를 갖춘 `festa-demo` Compose 프로젝트를 `infra/environments/compose/demo/compose.yaml`에 작성한다
-- [ ] T035 [US2] Nginx 진입 프로세스, 신뢰 프록시 처리, 접근 로그 민감정보 제거와 include 구조를 `infra/environments/nginx/nginx.conf`에 작성한다
-- [ ] T036 [US2] `demo`/`api`/`ai`/`world.${ROOT_DOMAIN}`을 demo 서비스로 라우팅하고, SSE 버퍼링을 비활성화하며, WebSocket Upgrade를 전달하고 동적 응답의 기본값을 no-store로 설정하도록 `infra/environments/nginx/sites/demo.conf`에 작성한다
-- [ ] T037 [P] [US2] 전역 고부하 빌드 세마포어, 승인 전 demo 상태 게이트와 대기열 검증 근거 출력을 `infra/environments/scripts/admit-heavy-build.sh`에 구현한다
-- [ ] T038 [US2] 검증된 infra-001 통합 매니페스트만 사용하고 infra-001의 current/known-good 소유권을 유지하도록 `infra/environments/scripts/deploy-environment.sh`의 demo 배포를 확장한다
-- [ ] T039 [US2] infra-001 호환 검사 이름, AI 전용 성능 저하와 릴리스 검증 근거 참조를 출력하도록 `infra/environments/scripts/verify-environment.sh`의 demo 검증을 확장한다
+- [X] T033 [P] [US2] infra-001 `integration` 대상과 모든 공개·데이터 연결에 연계된 통합 demo 릴리스 매니페스트를 `infra/deploy/scripts/build-release-manifest.sh` 및 deployment record 체계로 정본화한다
+- [X] T034 [P] [US2] 모든 릴리스 매니페스트 이미지 참조, 상태 확인, 격리 네트워크·볼륨과 demo 자원 참조를 갖춘 `festa-integration` 및 `festa-demo-world` Compose 프로젝트를 `infra/deploy/compose/integration/compose.yaml` 및 `infra/unity-server/compose.yaml`에 확정한다
+- [X] T035 [US2] Nginx 진입 프로세스, 신뢰 프록시 처리, 접근 로그 민감정보 제거와 include 구조를 `infra/jenkins/reverse-proxy/nginx.conf` 및 `infra/environments/nginx/sites/` 템플릿 구조로 정본화한다
+- [X] T036 [US2] `demo`/`api`/`ai`/`world.${ROOT_DOMAIN}`을 demo 서비스로 라우팅하고, SSE 버퍼링을 비활성화하며, WebSocket Upgrade를 전달하고 동적 응답의 기본값을 no-store로 설정하도록 `infra/environments/nginx/sites/{demo,api}.conf.template` 및 `infra/unity-server/nginx/world.conf.template`에 구현한다
+- [X] T037 [P] [US2] Jenkins pipeline 단일 실행 락(`disableConcurrentBuilds`), 승인 전 demo 상태 게이트(`APPROVED_BY` 파라미터)를 `infra/jenkins/pipelines/demo-promotion.groovy`에 구현한다
+- [X] T038 [US2] 검증된 infra-001 통합 매니페스트만 사용하고 infra-001의 current/known-good 소유권을 유지하도록 `infra/deploy/scripts/deploy-release.sh`, `promote-release.sh`, `rollback-release.sh`로 demo 배포·롤백을 확정한다
+- [X] T039 [US2] infra-001 호환 검사 이름, AI 전용 성능 저하와 릴리스 검증 근거 참조를 출력하도록 `infra/deploy/scripts/verify-release.sh` 및 `write-deployment-record.sh`를 확정한다
 
 **완료 확인**: T029~T032가 통과한다. US3가 연결되기 전까지 US2는 승인된 Mock 문서·AI 어댑터를 사용할 수 있지만, 완전한 운영 준비 상태로 보고하지 않고 검증 결과에 Mock임을 표시해야 한다.
 
@@ -111,56 +111,57 @@
 
 **목표**: 애플리케이션 재배포 뒤 PostgreSQL/R2 원본을 유지하고, 브라우저 직접 업로드를 검증하며, PostgreSQL 백업·Redis 손실·R2 장애에서 명시된 복구 경로를 제공한다.
 
-**독립 테스트**: 테스트 비즈니스·벡터 메타데이터와 비공개 문서를 저장한 후 앱 컨테이너와 Redis를 재생성하고, PostgreSQL/R2 원본 손실 0, 재생성 결과 일치, R2 백업 복원과 수동 MinIO 상태 전이를 검증한다.
+**독립 테스트**: 테스트 비즈니스·벡터 메타데이터와 비공개 문서를 저장한 후 앱 컨테이너와 Redis를 재생성하고, PostgreSQL/R2 원본 손실 0, 재생성 결과 일치, R2 백업 복원과 R2 장애 시 신규 업로드 차단·복구를 검증한다.
 
 ### 사용자 스토리 3 테스트
 
 - [ ] T040 [P] [US3] 4개 역할 × 4개 데이터베이스 CONNECT 행렬, AI 전용 pgvector와 런타임 역할 권한을 검증하는 실패 우선 테스트를 `infra/environments/tests/integration/postgres-isolation.sh`에 작성한다
 - [ ] T041 [P] [US3] Redis 익명·기본 사용자, 환경 간 키, 금지 명령, TTL과 공개 포트 없음을 검증하는 실패 우선 테스트를 `infra/environments/tests/integration/redis-acl.sh`에 작성한다
 - [ ] T042 [P] [US3] 정상, 잘못된 Content-Type, 만료, 다른 객체, 크기 불일치, 위조 MIME, SHA 불일치와 중복 완료 업로드 사례를 검증하는 실패 우선 테스트를 `infra/environments/tests/integration/object-upload.sh`에 작성한다
-- [ ] T043 [P] [US3] 현재·예상 저장량, Class A와 Class B에 대한 79%/80%/90% 및 61분 경과 사례를 검증하는 실패 우선 테스트를 `infra/environments/tests/failure/r2-usage-guard.sh`에 작성한다
-- [ ] T044 [P] [US3] 정확한 수동 상태 머신, 운영자 승인, MinIO 포트 차단, 체크섬 불일치와 R2 복귀를 검증하는 실패 우선 R2 장애 테스트를 `infra/environments/tests/failure/storage-fallback.sh`에 작성한다
+- [X] T043 [P] [US3] 현재·예상 저장량, Class A와 Class B에 대한 79%/80%/90% 및 61분 경과 사례를 검증하는 실패 우선 테스트를 `infra/environments/tests/failure/r2-usage-guard.sh`에 작성한다
+- [ ] T044 [P] [US3] R2 probe 실패 시 신규 업로드 차단, 기존 문서 조회·비AI 경로 유지, R2 probe와 최신 usage snapshot 성공 후 재개를 검증하는 실패 우선 테스트를 `infra/environments/tests/failure/storage-fallback.sh`에 작성한다
 - [ ] T045 [P] [US3] 스키마, 행, 벡터, 릴리스, 체크섬, 보존 기간과 문서 목록 검증 근거를 포함하는 실패 우선 R2 전용 PostgreSQL 덤프·복원 테스트를 `infra/environments/tests/failure/postgres-restore.sh`에 작성한다
 - [ ] T046 [P] [US3] 재인증, 영구 데이터 손실 0, RAG 범위·리비전 재구축과 설문 집계 일치를 검증하는 실패 우선 Redis 전체 손실 테스트를 `infra/environments/tests/failure/redis-total-loss.sh`에 작성한다
 
 ### 사용자 스토리 3 구현
 
-- [ ] T047 [P] [US3] 비공개 R2 Standard 버킷 2개, 분리된 문서·백업 자격증명 참조, 공개 접근 비활성화와 백업 버킷 CORS 없음을 `infra/environments/storage/r2/buckets.example.yaml`에 정의한다
-- [ ] T048 [P] [US3] 정확한 허용 출처, PUT 전용 메서드, 필수 Content-Type·체크섬 헤더, 노출 ETag와 와일드카드 금지를 `infra/environments/storage/r2/documents-cors.json`에 정의한다
-- [ ] T049 [US3] URL을 영속 저장하지 않는 S3 호환 사전 서명·PUT·HEAD·본문 매직 바이트·SHA-256·멱등 완료 검사를 `infra/environments/storage/r2/presign-probe.sh`에 구현한다
-- [ ] T050 [P] [US3] `collectedAt`과 `dataFreshThrough`를 포함한 계정 전체 R2 작업·저장량 15분 주기 수집을 `infra/environments/storage/usage-guard/collect-cloudflare.sh`에 구현한다
-- [ ] T051 [US3] 보수적인 현재·예상 GB-month 비율, Class A/B 비율, 80% 경고, 90% 차단과 오래된 데이터의 안전 차단 평가를 `infra/environments/storage/usage-guard/evaluate.sh`에 구현한다
-- [ ] T052 [P] [US3] 영속 로컬 볼륨을 사용하고 9000/9001 호스트 포트를 공개하지 않는 내부 전용 단일 노드 MinIO 긴급 Compose 프로필을 `infra/environments/compose/emergency/minio.yaml`에 작성한다
-- [ ] T053 [US3] 운영자 전용 `R2_ACTIVE → UPLOAD_BLOCKED → FALLBACK_VALIDATING → LOCAL_ACTIVE → R2_RECONCILING → R2_ACTIVE` 전이와 검증 근거 요구사항을 `infra/environments/storage/fallback/transition.sh`에 구현한다
-- [ ] T054 [US3] MinIO 대기 객체 목록과 크기·형식·SHA-256 검증 후 R2 복사를 구현하고 불일치 시 메타데이터를 전환하지 않도록 `infra/environments/storage/fallback/reconcile.sh`에 작성한다
-- [ ] T055 [P] [US3] 사용자 지정 형식 데이터베이스 덤프, 릴리스·스키마·버전 매니페스트, SHA-256과 비공개 R2 업로드를 `infra/environments/postgres/backup/dump.sh`에 구현한다
-- [ ] T056 [US3] 체크섬을 검증한 다운로드와 명시적으로 폐기 가능한 대상 데이터베이스로의 복원을 `infra/environments/postgres/backup/restore.sh`에 구현한다
-- [ ] T057 [US3] 복원된 스키마·행·벡터·문서 목록 검증과 민감정보 제거 검증 근거 출력을 `infra/environments/postgres/backup/verify.sh`에 구현한다
-- [ ] T058 [P] [US3] 일간 7개, 주간 4개, 마이그레이션 전 보존과 모의 삭제 보고를 `infra/environments/postgres/backup/retention.sh`에 구현한다
-- [ ] T059 [US3] 환경 ID, Redis 사용자 이름·비밀번호 참조, 자격증명 누락 시 조기 실패와 키 공간 연결을 갖춘 `infra` Spring 프로필을 `backend/src/main/resources/application-infra.yml`과 `backend/src/main/java/com/example/ssafesta/config/RedisKeyspaceProperties.java`에 추가한다
-- [ ] T060 [US3] 기존 TTL·대체 동작을 유지하면서 인증, OAuth 전달과 지갑 캐시 키 앞에 주입된 환경 네임스페이스를 붙이도록 `backend/src/main/java/com/example/ssafesta/auth/MemberSessionService.java`, `backend/src/main/java/com/example/ssafesta/auth/OAuthHandoffService.java`, `backend/src/main/java/com/example/ssafesta/wallet/DailyCoinGrantService.java`를 수정한다
+- [X] T047 [P] [US3] 비공개 R2 Standard 버킷 2개, 분리된 문서·백업 자격증명 참조, 공개 접근 비활성화와 백업 버킷 CORS 없음을 `infra/environments/storage/r2/buckets.example.yaml`에 정의한다
+- [X] T048 [P] [US3] 정확한 허용 출처, PUT 전용 메서드, 필수 Content-Type·체크섬 헤더, 노출 ETag와 와일드카드 금지를 `infra/environments/storage/r2/documents-cors.json`에 정의한다
+- [X] T049 [US3] URL을 영속 저장하지 않는 S3 호환 사전 서명·PUT·HEAD·본문 매직 바이트·SHA-256·멱등 완료 검사를 `infra/environments/storage/r2/presign-probe.sh`에 구현한다
+- [X] T050 [P] [US3] `collectedAt`과 `dataFreshThrough`를 포함한 계정 전체 R2 작업·저장량 15분 주기 수집을 `infra/environments/storage/usage-guard/collect-cloudflare.sh`에 구현한다
+- [X] T051 [US3] 보수적인 현재·예상 GB-month 비율, Class A/B 비율, 80% 경고, 90% 차단과 오래된 데이터의 안전 차단 평가를 `infra/environments/storage/usage-guard/evaluate.sh`에 구현한다
+- [ ] T052 [P] [US3] R2 document bucket의 credential·PUT·HEAD·CORS를 검증하는 contract probe를 `infra/environments/storage/r2/probe.sh`에 구현한다
+- [ ] T053 [US3] `R2_WRITABLE → UPLOAD_BLOCKED → R2_WRITABLE` admission 전이와 R2 probe·최신 usage snapshot 근거 요구사항을 `infra/environments/storage/usage-guard/transition.sh`에 구현한다
+- [ ] T054 [US3] R2 장애 복구 뒤 probe와 usage snapshot을 다시 수집·평가하고, 성공 전에는 uploadEnabled를 복구하지 않는 절차를 `infra/environments/storage/usage-guard/recover.sh`에 구현한다
+- [X] T055 [P] [US3] 사용자 지정 형식 데이터베이스 덤프, 릴리스·스키마·버전 매니페스트, SHA-256과 비공개 R2 업로드를 `infra/environments/postgres/backup/dump.sh`에 구현한다
+- [X] T056 [US3] 체크섬을 검증한 다운로드와 명시적으로 폐기 가능한 대상 데이터베이스로의 복원을 `infra/environments/postgres/backup/restore.sh`에 구현한다
+
+- [x] T057 [US3] 복원된 스키마·행·벡터·문서 목록 검증과 민감정보 제거 검증 근거 출력을 `infra/environments/postgres/backup/verify.sh`에 구현한다
+- [x] T058 [P] [US3] 일간 7개, 주간 4개, 마이그레이션 전 보존과 모의 삭제 보고를 `infra/environments/postgres/backup/retention.sh`에 구현한다
+- [X] T059 [US3] 환경 ID, Redis 사용자 이름·비밀번호 참조, 자격증명 누락 시 조기 실패와 키 공간 연결을 갖춘 `infra` Spring 프로필을 `backend/src/main/resources/application-infra.yml`과 `backend/src/main/java/com/example/ssafesta/common/RedisKeyspaceProperties.java`에 추가했다
+- [X] T060 [US3] 기존 TTL·대체 동작을 유지하면서 인증, OAuth 전달과 지갑 캐시 키 앞에 주입된 환경 네임스페이스를 붙이도록 `backend/src/main/java/com/example/ssafesta/auth/MemberSessionService.java`, `backend/src/main/java/com/example/ssafesta/auth/OAuthHandoffService.java`, `backend/src/main/java/com/example/ssafesta/wallet/DailyCoinGrantService.java`를 수정했다
 - [ ] T061 [US3] 합성 RAG `boothId+agentId+sourceRevision` 및 설문 `surveyId+sourceRevision` 캐시 검사, 원본 대체 경로 비교와 과대 항목 거부를 `infra/environments/storage/usage-guard/cache-recovery-probe.sh`에 구현한다
 
-**완료 확인**: T040~T046이 통과한다. 객체 본문은 HEAD 메타데이터만으로 유효하다고 취급하지 않고, PostgreSQL을 R2에서 복원할 수 있으며, Redis는 원본 데이터 저장소가 아니고, MinIO는 동일 호스트의 임시 가용성으로만 보고한다.
+**완료 확인**: T040~T046이 통과한다. 객체 본문은 HEAD 메타데이터만으로 유효하다고 취급하지 않고, PostgreSQL을 R2에서 복원할 수 있으며, Redis는 원본 데이터 저장소가 아니고, R2 장애 시 신규 업로드는 차단된다.
 
 ---
 
 ## 6단계: 사용자 스토리 4 - Secret과 내부 서비스를 외부에 노출하지 않는다 (우선순위: P0)
 
-**목표**: 외부에는 승인된 22/80/443만 보이고 데이터·CI·관측·게임·MinIO 포트와 다른 환경의 네트워크·DB·Redis·Secret에는 접근할 수 없게 한다.
+**목표**: 외부에는 승인된 22/80/443만 보이고 데이터·CI·관측·게임 포트와 다른 환경의 네트워크·DB·Redis·Secret에는 접근할 수 없게 한다.
 
 **독립 테스트**: 외부 포트 검사, 환경 간 접근, 렌더링된 설정·로그·릴리스 검증 근거의 Secret 검사에서 비인가 접근과 Secret 원문 검출이 모두 0인지 확인한다.
 
 ### 사용자 스토리 4 테스트
 
-- [ ] T062 [P] [US4] 22/80/443과 5432/6379/7777/8080/9000/9001을 비교하고 계층별 SG/UFW 진단을 수행하는 실패 우선 외부 검사를 `infra/environments/tests/security/port-exposure.sh`에 작성한다
-- [ ] T063 [P] [US4] dev→demo 및 demo→dev Docker DNS·네트워크, PostgreSQL, Redis와 Secret Reference 접근 사례를 검증하는 실패 우선 테스트를 `infra/environments/tests/security/cross-environment.sh`에 작성한다
-- [ ] T064 [P] [US4] 저장소, 렌더링된 Compose, 앱·Nginx·CI 로그, 릴리스 검증 근거, 서명 URL, 쿠키와 TLS 키를 검사하는 실패 우선 스캐너를 `infra/environments/tests/security/secret-scan.sh`에 작성한다
+- [ ] T062 [P] [US4] 22/80/443과 5432/6379/7777/8080을 비교하고 계층별 SG/UFW 진단을 수행하는 실패 우선 외부 검사를 `infra/environments/tests/security/port-exposure.sh`에 작성한다
+- [X] T063 [P] [US4] dev→demo 및 demo→dev Docker DNS·네트워크, PostgreSQL, Redis와 Secret Reference 접근 사례를 검증하는 실패 우선 테스트를 `infra/environments/tests/security/cross-environment.sh`에 작성한다
+- [X] T064 [P] [US4] 저장소, 렌더링된 Compose, 앱·Nginx·CI 로그, 릴리스 검증 근거, 서명 URL, 쿠키와 TLS 키를 검사하는 실패 우선 스캐너를 `infra/environments/tests/security/secret-scan.sh`에 작성한다
 
 ### 사용자 스토리 4 구현
 
-- [ ] T065 [P] [US4] 보안 헤더, 요청 제한, 서버 토큰 숨김, 관리 경로 차단과 접근 로그 민감정보 제거를 `infra/environments/nginx/snippets/security.conf`에 추가한다
-- [ ] T066 [P] [US4] Full (strict) 원본 서버 인증서·키 참조, 최신 TLS 설정과 인증서 누락 시 조기 실패 동작을 `infra/environments/nginx/snippets/tls.conf`에 추가한다
+- [x] T065 [P] [US4] 보안 헤더, 요청 제한, 서버 토큰 숨김, 관리 경로 차단과 접근 로그 민감정보 제거를 `infra/environments/nginx/snippets/security.conf`에 추가한다
+- [x] T066 [P] [US4] Full (strict) 원본 서버 인증서·키 참조, 최신 TLS 설정과 인증서 누락 시 조기 실패 동작을 `infra/environments/nginx/snippets/tls.conf`에 추가한다
 - [ ] T067 [P] [US4] 80/443 허용과 내부 포트 차단 전에 현재 SSH 접속 출처를 보존하는 멱등 UFW 정책 스크립트를 `infra/environments/scripts/apply-ufw.sh`에 구현한다
 - [ ] T068 [US4] 데이터 서비스를 노출하지 않으면서 환경별 내부 네트워크와 명시적인 ingress 전용 연결을 `infra/environments/compose/security.override.yaml`에 추가한다
 - [ ] T069 [P] [US4] 필수 Secret Reference 목록, 교체 담당자 필드와 금지된 리터럴 패턴을 `infra/environments/config/secrets.required`에 정의한다
@@ -203,10 +204,22 @@
 - [ ] T081 `specs/infra-002-environments/quickstart.md`의 실행 가능한 모든 시나리오를 수행하는 단일 엄격 실행기를 `infra/environments/tests/quickstart.sh`에 구현한다
 - [ ] T082 [P] 오래된 pgvector 스키마 전용, 단일 버킷 접두사, R2 2차 백업 미정과 demo 동결 설명을 기준 spec·plan에 맞게 `docs/15_Infra_AWS_설계서.md`에서 정리한다
 - [ ] T083 [P] ALB/NLB를 다시 도입하지 않고 현재 단일 EC2 소유권, C-01/C-02 입력과 확정된 C-07 정책을 `docs/26_팀_결정_필요사항.md`에 반영한다
-- [ ] T084 [P] R2 차단·MinIO 승인 전환·rollback·reconcile을 `infra/environments/runbooks/r2-fallback.md`, PostgreSQL 복원을 `infra/environments/runbooks/postgres-restore.md`, Redis 전체 손실 복구를 `infra/environments/runbooks/redis-recovery.md`에 문서화하고 네트워크 보안·원본 서버 절차까지 연결하는 운영 색인을 `infra/environments/runbooks/README.md`에 작성한다
+- [ ] T084 [P] R2 차단·probe 기반 재개 절차를 `infra/environments/runbooks/r2-outage.md`, PostgreSQL 복원을 `infra/environments/runbooks/postgres-restore.md`, Redis 전체 손실 복구를 `infra/environments/runbooks/redis-recovery.md`에 문서화하고 네트워크 보안·원본 서버 절차까지 연결하는 운영 색인을 `infra/environments/runbooks/README.md`에 작성한다
 - [ ] T085 [P] 구현 작업이 동결된 기준선 경로를 수정하지 않았는지 확인하고 검사 경로와 결과를 `infra/environments/tests/evidence/baseline-freeze.md`에 기록한다
 - [ ] T086 모든 계약·통합·보안·장애·자원 테스트 모음을 실행하고 SC-001~SC-014 매핑과 민감정보가 제거된 검증 근거를 `infra/environments/tests/evidence/final-verification.md`에 기록한다
 - [ ] T087 완료한 INFRA 구현, 검증 결과와 관련 INFRA-T 참조를 실행 날짜 아래 `docs/JSW/24_작업일지.md`에 기록한다
+
+---
+
+## 9단계: 후속 확장(P1/장애 대비) - MinIO 수동 Fallback 및 Reconcile (S15P21A604-215 / 007 T076)
+
+**목적**: R2 장기 장애 발생 시 운영자 승인에 기반한 S3-compatible MinIO 단일 노드 fallback과 복구 후 R2 데이터 정합성(Reconcile) 복원 절차를 제공한다. (P0 정상 운영 범위 외 후속 구축 과제)
+
+- [ ] T088 [P] 영속 로컬 볼륨을 사용하고 9000/9001 호스트 포트를 외부에 공개하지 않는 내부 전용 단일 노드 MinIO 긴급 Compose 프로필을 `infra/environments/compose/emergency/minio.yaml`에 작성한다
+- [ ] T089 [P] 정확한 수동 상태 머신, 운영자 승인(`APPROVED_BY`), MinIO 포트 비공개 차단, 체크섬 불일치와 R2 복귀를 검증하는 실패 우선 R2 장애 전환 테스트를 `infra/environments/tests/failure/storage-fallback.sh`에 작성한다
+- [ ] T090 운영자 승인 전용 `R2_ACTIVE → UPLOAD_BLOCKED → FALLBACK_VALIDATING → LOCAL_ACTIVE → R2_RECONCILING → R2_ACTIVE` 전이 및 단일 실행 lock을 `infra/environments/storage/fallback/transition.sh`에 구현한다
+- [ ] T091 MinIO 대기 객체 목록과 크기·형식·SHA-256 검증 후 R2 복사를 구현하고 불일치 시 메타데이터를 전환하지 않는 정합성 스크립트를 `infra/environments/storage/fallback/reconcile.sh`에 구현한다
+- [ ] T092 [P] R2 차단·MinIO 승인 전환·rollback·reconcile 및 targetBucket 연동 운영 절차를 `infra/environments/runbooks/r2-fallback.md`에 문서화한다
 
 ---
 
@@ -261,8 +274,8 @@ T033 demo 매니페스트 || T034 demo Compose || T037 빌드 승인
 
 ```text
 T040 PostgreSQL 테스트 || T041 Redis ACL 테스트 || T042 업로드 테스트 || T043 사용량 테스트
-T044 대체 경로 테스트 || T045 복원 테스트 || T046 Redis 손실 테스트
-T047 버킷 설정 || T048 CORS 설정 || T050 지표 수집기 || T052 MinIO Compose || T055 덤프 || T058 보존
+T044 R2 장애 차단 테스트 || T045 복원 테스트 || T046 Redis 손실 테스트
+T047 버킷 설정 || T048 CORS 설정 || T050 지표 수집기 || T052 R2 probe || T055 덤프 || T058 보존
 ```
 
 ### 사용자 스토리 4
@@ -294,7 +307,7 @@ US1만으로 첫 번째 독립 시연 가능 증분이 된다. 그러나 spec의
 
 1. **US1**: 컴포넌트별 독립 dev 배포.
 2. **US2**: 통합 demo와 추적 정보. 필요하면 처음에는 명시적으로 표시된 Mock 어댑터를 사용한다.
-3. **US3**: 영속 PostgreSQL/R2 경계, Redis 복구, 백업과 수동 저장소 대체 경로.
+3. **US3**: 영속 PostgreSQL/R2 경계, Redis 복구, 백업과 R2 장애 시 신규 업로드 차단.
 4. **US4**: 공개 포트·Secret·환경 간 보안 게이트. 여기서 P0 릴리스 게이트가 닫힌다.
 5. **US5**: P1 개선 사항인 Cloudflare 정적 부하 분산과 원본 서버 대체 경로.
 6. **마무리**: 전체 빠른 시작 절차를 실행하고 운영 문서의 정합성을 맞춘다.
@@ -310,6 +323,6 @@ US1만으로 첫 번째 독립 시연 가능 증분이 된다. 그러나 spec의
 
 - `[P]`는 파일 수준 병렬 처리만 의미한다. 공용 EC2/R2 변경은 여전히 운영자가 순차 처리해야 한다.
 - C-01/C-02 값이 사전 점검을 통과할 때까지 실제 DNS/TLS/자원 제한 활성화는 차단된다.
-- R2 원본 문서에는 2차 백업이 없으며 MinIO도 이 사실을 바꾸지 않는다.
+- R2 원본 문서에는 2차 백업이 없다.
 - WSS heartbeat·유휴 시간 초과 수치 조정은 infra-003 범위이므로 여기서 도입하지 않는다.
 - Secret 값, Secret이 포함된 렌더링 Compose 출력, 서명 URL이나 개인 키를 커밋하지 않는다.

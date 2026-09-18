@@ -18,7 +18,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * The timing-stop minigame — the one game spec 014 FR-009 allows (헌법 28조).
+ * The timing-stop minigame (spec 014). Since 2026-09-16 it is one of two — the plaza slot machine
+ * is the other ({@link SlotMachineService}, spec 021) — and the two share only the wallet.
  *
  * <p><b>The server owns the verdict.</b> It issues the target time, keeps its own start instant,
  * computes the error, picks the reward band, writes the ledger and applies the daily cap. The only
@@ -196,8 +197,10 @@ public class TimerStopService {
     }
 
     /**
-     * ASCII only, on purpose. Unity renders this string as-is and its WebGL IMGUI cannot draw
-     * Korean (T-22, spec 014 T013), so a Korean sentence here would reach the player as blanks.
+     * ASCII only, on purpose. No client renders this today — the FE overlay builds its own Korean
+     * copy from the verdict fields (S15P21A604-601), which is the right way round. This line stays
+     * for logs and for reading a raw response, so it keeps the ASCII constraint rather than
+     * growing a second, divergent source of player-facing wording.
      */
     private String message(int tier, boolean timedOut, int granted) {
         if (timedOut) {
@@ -267,6 +270,7 @@ public class TimerStopService {
      *                       client that also sends {@code targetSeconds}, {@code errorSeconds} or
      *                       {@code timedOut} has them ignored rather than refused
      */
+    @Schema(name = "TimerStopSubmitCommand")
     public record SubmitCommand(
             @Schema(description = "플레이어가 정지시킨 시각(초, 시작 기준 경과)", example = "7.41")
             BigDecimal stoppedSeconds) {
@@ -279,11 +283,13 @@ public class TimerStopService {
      * @param timedOut            the round ran past {@code failAfterSeconds}
      * @param rewardedCoins       what was actually granted, after the daily clip
      * @param dailyLimitReached   {@code dailyRemainingCoins == 0} — "더 받을 수 없다", not "이번 판이
-     *                            잘렸다". Kept alongside the number because Unity's ack DTO has this
-     *                            boolean and no remaining-coins field
+     *                            잘렸다". Kept alongside the number so a client can branch on the
+     *                            state without deriving it
      * @param dailyRemainingCoins what is left of today's cap after this grant
-     * @param message             short ASCII line the HUD can print as-is (WebGL IMGUI, T-22)
+     * @param message             short ASCII line describing the verdict; for logs, not for display
+     *                            (the FE overlay writes its own copy from the fields above)
      */
+    @Schema(name = "TimerStopSubmitResult")
     public record SubmitResult(boolean accepted, BigDecimal errorSeconds, int tier, boolean timedOut,
                                int rewardedCoins, boolean dailyLimitReached, int dailyRemainingCoins,
                                String message) {

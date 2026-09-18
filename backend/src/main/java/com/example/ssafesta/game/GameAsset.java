@@ -1,5 +1,6 @@
 package com.example.ssafesta.game;
 
+import com.example.ssafesta.storage.image.ImageBytesValidator;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -131,7 +132,7 @@ public class GameAsset {
      * and the upgrade path that would close the same-length hole. Checking it would mean hashing on
      * every read, and a play page pulls many assets, so that trade is not taken yet.
      */
-    void markReady(GameAssetImageValidator.VerifiedImage verified) {
+    void markReady(ImageBytesValidator.VerifiedImage verified) {
         this.contentType = verified.contentType();
         this.byteSize = verified.byteSize();
         this.width = verified.width();
@@ -154,6 +155,15 @@ public class GameAsset {
 
     boolean isDeleted() {
         return deletedAt != null;
+    }
+
+    /**
+     * Soft delete (contract §7). Only {@code deleted_at} moves — the object stays in storage, because
+     * a Published Version may still reference it and Published is immutable.
+     */
+    void markDeleted() {
+        this.deletedAt = Instant.now();
+        this.updatedAt = this.deletedAt;
     }
 
     boolean isGrantExpired(Instant now) {

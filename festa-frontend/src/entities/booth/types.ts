@@ -38,8 +38,12 @@ export interface BoothFacade {
   logoUrl: string | null; // https:// 최대 2048자, 업로드 아닌 URL 참조
 }
 
-// PUT /booths/{boothId}/facade 요청 본문 — 4필드 전부 nullable(§6)
-export type FacadePutRequest = BoothFacade;
+// PUT /booths/{boothId}/facade 요청 본문 (§6).
+//
+// facade 4필드는 전부 nullable 이고, `name` 은 S15P21A604-756 / !890 으로 더해진 **선택** 필드다.
+// 응답에는 없다 — 저장된 이름은 GET /booths/{boothId} 의 `name` 에서 읽는다.
+// **생략 = 현재 이름 유지**이지 "비우기" 가 아니다(`booths.name` 이 NOT NULL).
+export type FacadePutRequest = BoothFacade & { name?: string };
 
 // 1일 임대료. 서버가 실제 차감액의 권위이고(LeaseResponse.chargedCoin) 이 값은 **요청 전 안내용**이다 —
 // 확인 모달과 버튼 라벨이 같은 숫자를 말하게 하려고 한 곳에 둔다. 계약 예시도 100(lease-api.md §응답).
@@ -57,6 +61,13 @@ export interface BoothDetail {
   // 016 확장(C-01 #97 확정) — 노트북 오버레이 URL 의 정본. 이벤트 payload 의 url 이 아니라 이 값이다.
   // null = 미등록. 방문자에게는 published gate 뒤에서만 값이 온다(BoothQueryService).
   homepageUrl: string | null;
+  // 방문자 공개 여부의 서버 술어 Booth.isPublished() = 이 값 != null (BoothQueryService.OwnerBoothView).
+  // 화면에는 숫자를 내지 않는다 — null 이면 "준비 중", 있으면 "운영 중" 으로만 읽는다 (S15P21A604-898).
+  publishedLayoutVersion: number | null;
+  // AI 채팅 '사람 상담 요청' 버튼의 사전 차단 근거 (S15P21A604-910/914, GitLab #249).
+  // ai_agents.handoff_enabled 그대로 — AI 직원 미등록 부스는 false, published gate 없다.
+  // optional 인 이유: 값이 없으면(구버전 서버) 버튼을 유지하는 무해 degrade 가 계약이다.
+  handoffEnabled?: boolean;
 }
 
 // PUT /booths/{boothId}/homepage 응답 (spec 016 contracts/homepage-api.md §2, BoothHomepageService 구현 정본)

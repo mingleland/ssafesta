@@ -88,7 +88,8 @@
 
 - **Booth Layout**: 한 부스의 배치. 부스 식별자, 템플릿, 버전, 오브젝트 목록, 상태(작업본/공개본)
 - **Layout Object**: 배치된 오브젝트 하나. 식별자, 종류, 위치, 회전, 연결된 콘텐츠 식별자
-- **Object Type**: 배치 가능한 오브젝트 종류. 기능형(AI/영상/설문/상담데스크/프로젝트패널/노트북)과 장식형
+- **Object Type**: 배치 가능한 오브젝트 종류. 기능형(AI/설문/상담데스크/프로젝트패널/노트북/모집보드/좋아요)과
+  장식형(가구/장식/영상 스크린 — 영상은 2026-09-18 에 장식으로 내려갔다, GitLab #194 ②)
 
 ---
 
@@ -176,7 +177,7 @@ React 편집기는 **위에서 내려다보는 2D 평면**에서 오브젝트를
 | ~~C-03~~ | ~~오브젝트 크기 조절을 허용하는가?~~ | — | ✅ **확정: 고정 크기** (2026-08-18). `scale` 필드 없음 — Layout 계약 변경 없음 |
 | ~~C-04~~ | ~~콘텐츠 미연결 오브젝트의 공개를 막는가?~~ | — | ✅ **확정: 선택지 1(경고만, 공개 허용)** — 임대 슬롯 축제라 자리를 먼저 확보하고 콘텐츠는 나중에 채우는 흐름을 막지 않는다(리드 승인, [#45](https://github.com/kanghyunsoon/ssafesta/issues/45), 2026-08-21). BE 구현은 검증 결과를 `errors`(차단)/`warnings`(허용)로 나눠 응답하며(FR-016), 미연결은 `warnings`. `LayoutValidator.requiresConfig()` 게이트가 있어 `FURNITURE`·`DECORATION`은 경고 대상 아님. **전제 조건**: Unity `AiNpcInteractable`이 `configId` 미검사로 `agentId=0`(Unity `JsonUtility`가 null을 0으로 읽음) 호출하던 구멍을 가드로 막음(`9917d4d`) — FE는 서버 계약(`configId: null`)을 기준으로 하고 `0`을 유효 ID로 다루지 않는다 |
 | ~~C-05~~ | ~~Owner와 Staff의 동시 편집 정책은?~~ | — | ✅ **확정: `version` 낙관적 잠금 + 409.** BE 채택([Issue #5](https://github.com/kanghyunsoon/ssafesta/issues/5), 2026-08-20). 409 응답 body는 **`{code, message, requestId}`로 확정·구현 완료** (2026-08-20, `docs/08` §1.3 — 클라이언트는 `code`로만 분기). 요청 스키마는 body `expectedRevision` 필수로 확정·구현 완료, 코드 `LAYOUT_REVISION_CONFLICT` (2026-08-20) |
-| ~~C-06~~ | ~~템플릿은 몇 종이며 무엇이 다른가?~~ | — | ✅ **확정: 1종 `PROJECT_EXHIBITION`, `DEFAULT` 제거**(V11 마이그레이션이 기존 저장분 이관) — 셸 프리팹이 `BoothShell.prefab` 1종뿐이라 `template → 셸 1:1`(리드 승인, [#45](https://github.com/kanghyunsoon/ssafesta/issues/45), [#19](https://github.com/kanghyunsoon/ssafesta/issues/19), 2026-08-21). 템플릿이 담는 것 = 라벨 + 셸 외형 + `footprint`/`maxObjects` 메타 — 배경·테마는 `facade.themeCode`(#17) 소관이라 중복시키지 않는다. **미리 배치된 오브젝트 세트는 반대** — 12개 상한(헌법 22조)을 잠식하고 새 부스가 `CONFIG_NOT_LINKED` 경고를 안고 태어난다. 필요해지면 "시작 템플릿"(편집기 UX, 저장 계약 아님)으로 별도 처리. footprint·목록 조회는 `GET /booth-layout-templates` 신설(BE 구현, `contracts/layout-api.md` §9) |
+| ~~C-06~~ | ~~템플릿은 몇 종이며 무엇이 다른가?~~ | — | ✅ **확정: 1종 `PROJECT_EXHIBITION`, `DEFAULT` 제거**(V11 마이그레이션이 기존 저장분 이관) — 셸 프리팹이 `BoothShell.prefab` 1종뿐이라 `template → 셸 1:1`(리드 승인, [#45](https://github.com/kanghyunsoon/ssafesta/issues/45), [#19](https://github.com/kanghyunsoon/ssafesta/issues/19), 2026-08-21). 템플릿이 담는 것 = 라벨 + 셸 외형 + `footprint`/`maxObjects` 메타 — 배경·테마는 `facade.themeCode`(#17) 소관이라 중복시키지 않는다. **미리 배치된 오브젝트 세트는 반대** — 12개 상한(헌법 22조)을 잠식하고 새 부스가 `CONFIG_NOT_LINKED` 경고를 안고 태어난다. 필요해지면 "시작 템플릿"(편집기 UX, 저장 계약 아님)으로 별도 처리. footprint·목록 조회는 `GET /booth-layout-templates` 신설(BE 구현, `contracts/layout-api.md` §9). **치수는 `9.4 × 6 × 5.9`로 개정됐다** — `S15P21A604-698`, GitLab #181, 2026-09-15 3파트 합의 (x만 확장·z 유지, 높이는 셸 교체 후 실측) |
 | C-07 | 공개 이력(과거 버전)을 보관하고 되돌릴 수 있는가? | BE | ✅ **BE 답변(2026-08-20): 보관은 한다, 되돌리기 API는 MVP 제외.** `booth_layout_published_versions`가 이미 이력 구조라 보관 비용 0. 되돌리기는 UI·권한·"되돌린 것도 새 버전인가"를 함께 정해야 하므로 지금 열지 않는다 (재임대 미리보기와 연관) |
 
 ---
@@ -197,7 +198,7 @@ React 편집기는 **위에서 내려다보는 2D 평면**에서 오브젝트를
 | C-03 크기 조절 | **MVP 제외 의견.** `scale` 추가는 3파트 재합의를 부른다 — 기획 + Unity 결정 대기 |
 | C-04 미연결 공개 | **막지 않고 경고**([#45](https://github.com/kanghyunsoon/ssafesta/issues/45)로 채택). FR-007은 "알린다"이지 "막는다"가 아니다. 공개 시 미연결 목록 표시 후 진행, 방문자 쪽은 016 FR-009와 동일하게 오류가 아닌 안내 |
 | C-05 동시 편집 | **`version` 낙관적 잠금 + 409 제안.** 현재 `PUT /layouts/draft`에 충돌 감지 수단이 없어 마지막 저장이 앞 작업을 덮는다 — 요청 스키마 변경이라 BE 합의 필요 |
-| C-06 템플릿 종수 | FE 결정 불가 — 기획 사안. 편집기는 서버 제공 목록에서 고르는 구조로 만든다. 스냅 간격·영역 검증값의 선행 조건인 부스 크기는 6×6×2.72m([#19](https://github.com/kanghyunsoon/ssafesta/issues/19)), 종수는 1종([#45](https://github.com/kanghyunsoon/ssafesta/issues/45)) |
+| C-06 템플릿 종수 | FE 결정 불가 — 기획 사안. 편집기는 서버 제공 목록에서 고르는 구조로 만든다. 스냅 간격·영역 검증값의 선행 조건인 부스 크기는 6×6×2.72m([#19](https://github.com/kanghyunsoon/ssafesta/issues/19)) → **9.4×6×5.9m**(`S15P21A604-698`, GitLab #181), 종수는 1종([#45](https://github.com/kanghyunsoon/ssafesta/issues/45)) |
 | C-07 공개 이력 | **되돌리기 MVP 제외 의견.** 단 `version` 단조 증가는 유지해야 한다 (C-05가 의존) — BE 결정 대기 |
 
 **상정 결과**: C-01~C-07 전 항목 확정 — 현재 상태는 위 Clarifications 표가 정본이다.
@@ -246,7 +247,7 @@ FR-007이 "유효성 검사"를 요구하는데 **무엇을 검사하는지가 �
 | 오브젝트 12개 이하 (FR-010) | error |
 | `objectId`가 한 배치 안에서 유일 | error |
 | `type`이 canonical 문자열 화이트리스트에 있음 | error |
-| `position`·`rotationY`가 유한한 수, 부스 영역 내 (`0 ≤ y ≤ 2.72` — 셸 실측, #19 ②) | error |
+| `position`·`rotationY`가 유한한 수, 부스 영역 내 (`|x| ≤ 4.7`, `|z| ≤ 3`, `0 ≤ y ≤ 5.9` — 셸 실측, `S15P21A604-698`) | error |
 | **실물(회전 반영 AABB)이 부스 영역 안** — 앵커는 안인데 실물이 옆 슬롯에 걸치는 배치 차단 (#19 ③, contracts §10-2) | error `AREA_OUT_OF_BOUNDS` |
 | `template`이 화이트리스트에 있음 (`PROJECT_EXHIBITION` 단독 — #19 ④·#45) | error |
 | `configId`가 가리키는 콘텐츠가 **그 부스 소유**인지 (헌법 16·17조) | error |

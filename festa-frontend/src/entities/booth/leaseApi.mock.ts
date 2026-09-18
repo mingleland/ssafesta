@@ -241,3 +241,16 @@ export function __resetLeaseMockForTests(): void {
     // 무시
   }
 }
+
+// 조기 반납(S15P21A604-735) — 자리만 비우고 코인은 돌려주지 않는다. 그래서 wallet mock 을
+// 건드리지 않는다. hadBooth 는 남긴다: 반납 뒤에도 "한 번은 가졌던" 사실이 유지돼야
+// getMyBooth 가 null(204) 이 아니라 INACTIVE 를 돌려준다 — 만료와 같은 모양이다(FR-010).
+export async function cancelMyLease(slotId: number): Promise<void> {
+  const lease = activeLease();
+  // 세 경우를 서버와 같이 하나로 묶는다 — 활성 임대 없음 · 다른 자리 지목 · 이미 반납함
+  if (!lease || lease.slotId !== slotId) {
+    throw apiError('ACTIVE_LEASE_NOT_FOUND', '이 자리에 반납할 임대가 없습니다.');
+  }
+  myLease = null;
+  persistLease();
+}

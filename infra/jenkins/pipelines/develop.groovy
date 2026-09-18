@@ -1,5 +1,7 @@
 def call() {
-    final String headSha = env.GIT_COMMIT
+    // SCM environment variables may be absent after a Controller restart;
+    // the checked-out commit remains the authoritative build revision.
+    final String headSha = sh(returnStdout: true, script: 'git rev-parse HEAD').trim()
     if (!(headSha ==~ /^[0-9a-f]{40}$/)) { error('GIT_COMMIT must be a full lowercase SHA') }
 
     String range = "--branch develop --head '${headSha}'"
@@ -84,12 +86,13 @@ def call() {
         }
     }
 
-    if (deployComponents.isEmpty()) {
+    if (deployComponents.isEmpty() && !components.contains('game')) {
         echo 'NO_OP: game deployment remains on the Phase 3 WebGL path; Dedicated Server deployment is infra-003'
         return
     }
 
-    stage('Deploy Selected Components') {
+    if (!deployComponents.isEmpty()) {
+        stage('Deploy Selected Components') {
         node('deploy') {
             ws('/home/jenkins/agent/deploy/workspaces/develop-dev-batch') {
                 checkout scm
@@ -104,18 +107,18 @@ def call() {
                 }
                 credentialBindings << gitUsernamePassword(credentialsId: checkoutCredentialId)
                 if (deployComponents.contains('ai')) {
-                    credentialBindings << file(credentialsId: env.DEV_AI_ENV_CREDENTIAL_ID, variable: 'DEV_AI_ENV_FILE')
-                    credentialNames << 'DEV_AI_ENV_FILE'
+                    credentialBindings << file(credentialsId: env.DEMO_AI_ENV_CREDENTIAL_ID, variable: 'DEMO_AI_ENV_FILE')
+                    credentialNames << 'DEMO_AI_ENV_FILE'
                 }
                 if (deployComponents.contains('back')) {
-                    credentialBindings << file(credentialsId: env.DEV_BACK_ENV_CREDENTIAL_ID, variable: 'DEV_BACK_ENV_FILE')
-                    credentialBindings << string(credentialsId: env.DEV_INTERNAL_INFRA_TO_SPRING_TOKENS_CREDENTIAL_ID, variable: 'INTERNAL_INFRA_TO_SPRING_TOKENS')
-                    credentialNames << 'DEV_BACK_ENV_FILE'
+                    credentialBindings << file(credentialsId: env.DEMO_BACK_ENV_CREDENTIAL_ID, variable: 'DEMO_BACK_ENV_FILE')
+                    credentialBindings << string(credentialsId: env.DEMO_INTERNAL_INFRA_TO_SPRING_TOKENS_CREDENTIAL_ID, variable: 'INTERNAL_INFRA_TO_SPRING_TOKENS')
+                    credentialNames << 'DEMO_BACK_ENV_FILE'
                     credentialNames << 'INTERNAL_INFRA_TO_SPRING_TOKENS'
                 }
                 if (deployComponents.any { it in ['ai', 'back'] }) {
-                    credentialBindings << string(credentialsId: env.DEV_INTERNAL_SPRING_TO_AI_TOKENS_CREDENTIAL_ID, variable: 'INTERNAL_SPRING_TO_AI_TOKENS')
-                    credentialBindings << string(credentialsId: env.DEV_INTERNAL_AI_TO_SPRING_TOKENS_CREDENTIAL_ID, variable: 'INTERNAL_AI_TO_SPRING_TOKENS')
+                    credentialBindings << string(credentialsId: env.DEMO_INTERNAL_SPRING_TO_AI_TOKENS_CREDENTIAL_ID, variable: 'INTERNAL_SPRING_TO_AI_TOKENS')
+                    credentialBindings << string(credentialsId: env.DEMO_INTERNAL_AI_TO_SPRING_TOKENS_CREDENTIAL_ID, variable: 'INTERNAL_AI_TO_SPRING_TOKENS')
                     credentialNames.addAll(['INTERNAL_SPRING_TO_AI_TOKENS', 'INTERNAL_AI_TO_SPRING_TOKENS'])
                 }
 
@@ -140,9 +143,53 @@ def call() {
                     "CI_ARTIFACT_DIR=${artifactRoot}",
                     "FRESHNESS_EXPECTED_SHA=${headSha}",
                     'CI_BRANCH=develop',
-                    'PUBLIC_UNITY_BUILD_BASE=/unity/'
+                    'FESTA_DEPLOY_ENVIRONMENT=demo',
+                    'PUBLIC_UNITY_BUILD_BASE=/unity/',
+                    // 이 값이 비면 프론트는 멀쩡히 뜨는데 구글 로그인만 404 로 죽는다 (2026-09-17 실측).
+                    // agent 가 값을 주지 않으면 ROOT_DOMAIN 으로 만들어 준다 — 빈 값으로 조용히 배포되지 않게.
+                    "PUBLIC_API_BASE_URL=${env.PUBLIC_API_BASE_URL?.trim() ?: 'https://api.' + (env.ROOT_DOMAIN ?: '')}"
                 ]) {
                     if (credentialBindings.isEmpty()) { deployBatch() } else { withCredentials(credentialBindings) { deployBatch() } }
+                }
+            }
+        }
+    }
+    }
+
+    if ((selection.deployComponents as List).contains('game')) {
+        stage('Deploy Dedicated Server') {
+            node('deploy') {
+                ws('/home/jenkins/agent/deploy/workspaces/develop-game-deploy') {
+                    checkout scm
+                    sh "git checkout --detach '${headSha}'"
+                    unstash 'candidate-release-manifest'
+                    withEnv([
+                        "RELEASE_MANIFEST_PATH=${releaseManifest}",
+                        "GAME_ENV_FILE=${env.GAME_ENV_FILE ?: '/srv/festa/config/game.env'}",
+                        "CONNECTION_TOKEN_SECRET_FILE=${env.CONNECTION_TOKEN_SECRET_FILE ?: '/opt/festa/secrets/dev-game-connection-token-secret'}",
+                        "GAME_DEPLOY_STATE_DIR=${env.GAME_DEPLOY_STATE_DIR ?: '/var/lib/festa-environments/demo/game'}",
+                        "CI_ARTIFACT_DIR=${artifactRoot}"
+                    ]) {
+                        // deploy-game.sh 의 75 는 "배포된 WebGL 과 NGO 프리팹이 어긋나 교체하지 않았다" 는 뜻이다.
+                        // 실패가 아니라 건너뜀이다 — 돌고 있는 월드는 그대로이고, 무관한 커밋마다 빨간 빌드가 쌓이면
+                        // 사람이 검사를 꺼 버린다. deploy-dev-batch.sh 의 superseded 와 같은 관례를 쓴다.
+                        //
+                        // 각 스크립트를 개별 sh 스텝으로 부른다. 이전에는 한 덩어리 sh 문자열 안에 Groovy 의
+                        // error(...) 가 들어 있어 셸이 그것을 명령으로 실행했다 — 단계는 우연히 실패했지만
+                        // 의도한 메시지는 한 번도 나온 적이 없다.
+                        int deployStatus = sh(returnStatus: true, script: 'bash infra/unity-server/scripts/deploy-game.sh')
+                        if (deployStatus == 75) {
+                            currentBuild.result = 'NOT_BUILT'
+                            echo 'SKIPPED: deployed WebGL client and this game candidate disagree on the NGO prefab set; the running demo world was left untouched'
+                        } else if (deployStatus != 0) {
+                            error("Dedicated Server deployment failed with exit ${deployStatus}")
+                        } else if (sh(returnStatus: true, script: 'bash infra/unity-server/scripts/game-readiness.sh') == 0) {
+                            sh 'bash infra/unity-server/scripts/promote-game.sh'
+                        } else {
+                            sh 'bash infra/unity-server/scripts/rollback-game.sh'
+                            error('Dedicated Server deployment verification failed')
+                        }
+                    }
                 }
             }
         }

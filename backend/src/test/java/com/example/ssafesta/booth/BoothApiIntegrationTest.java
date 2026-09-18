@@ -2,6 +2,7 @@ package com.example.ssafesta.booth;
 
 import static com.example.ssafesta.booth.BoothTestSupport.createMemberWithWallet;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -304,11 +305,202 @@ class BoothApiIntegrationTest {
                 .andExpect(status().isConflict());
     }
 
+    /**
+     * AI 직원이 없는 부스는 사람 상담도 없다 (GitLab #249, S15P21A604-914).
+     *
+     * <p>방문자 FE 는 이 값으로 채팅의 '사람 상담 요청' 버튼을 누르기 전에 지운다. 행이 없을 때
+     * 오류가 아니라 {@code false} 여야 버튼이 조용히 사라진다.
+     */
+    @Test
+    void aBoothWithoutAnAgentOffersNoHandoff() throws Exception {
+        Long userId = createMemberWithWallet(users, wallets, "API핸드오프없음");
+        BoothLease lease = leaseService.lease(userId, freeSlotId(), 1).lease();
+
+        mockMvc.perform(get("/api/v1/booths/{id}", lease.getBoothId()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.handoffEnabled").value(false));
+    }
+
+    /** 등록된 AI 직원의 handoff 설정이 방문자에게 그대로 나간다 (S15P21A604-914). */
+    @Test
+    void anAgentsHandoffSettingReachesTheVisitor() throws Exception {
+        Long userId = createMemberWithWallet(users, wallets, "API핸드오프허용");
+        BoothLease lease = leaseService.lease(userId, freeSlotId(), 1).lease();
+        insertAgent(lease.getBoothId(), true);
+
+        mockMvc.perform(get("/api/v1/booths/{id}", lease.getBoothId()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.handoffEnabled").value(true));
+    }
+
+    /**
+     * 에이전트 행을 직접 심는다 — 이 테스트가 확인하는 것은 방문자 응답이지 등록 API 가 아니다.
+     * 소유자용 POST 를 태우면 AI 파트 계약(필수 필드·검증)이 바뀔 때마다 여기가 같이 깨진다.
+     */
+    private void insertAgent(Long boothId, boolean handoffEnabled) {
+        jdbc.update("INSERT INTO ai_agents (booth_id, name, role_code, tone_code, system_prompt, "
+                + "handoff_enabled) VALUES (?, ?, 'GUIDE', 'FRIENDLY', '안내합니다', ?)",
+                boothId, "핸드오프테스트", handoffEnabled);
+    }
+
+    // -- 슬롯 점유 한 질의 (S15P21A604-682) ------------------------------------
+
+    /**
+     * 임대가 실린 슬롯은 부스 정보도 <b>함께</b> 실린다.
+     *
+     * <p>이것이 이 기능의 불변식이다. 예전에는 임대 목록과 부스를 따로 읽어서, 두 질의 사이에
+     * 탈퇴가 커밋되면 {@code OCCUPIED} 인데 이름도 facade 도 없는 행이 나갔다 — 방문자에게는
+     * 들어갈 수 없는 간판이 보였다. 지금은 셋이 한 문장에서 온다.
+     *
+     * <p><b>문장 수를 세지 않는다.</b> 그 방식은 {@code SessionFactory} 전역 카운터를 읽어서
+     * 배경 스위퍼 하나만 늘어도 깨진다 (T-154). 여기서는 응답의 모양으로 고정한다.
+     */
+    @Test
+    void anOccupiedSlotCarriesItsBoothInTheSameRow() throws Exception {
+        Long userId = createMemberWithWallet(users, wallets, "점유조인");
+        String bearer = bearerFor(userId);
+        Long slotId = freeSlotId();
+        mockMvc.perform(leaseRequest(slotId, bearer)).andExpect(status().isCreated());
+
+        mockMvc.perform(get("/api/v1/booth-slots"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[?(@.slotId == " + slotId + ")].status").value("OCCUPIED"))
+                .andExpect(jsonPath("$[?(@.slotId == " + slotId + ")].boothId").isNotEmpty())
+                .andExpect(jsonPath("$[?(@.slotId == " + slotId + ")].boothName").isNotEmpty())
+                .andExpect(jsonPath("$[?(@.slotId == " + slotId + ")].facade").isNotEmpty())
+                .andExpect(jsonPath("$[?(@.slotId == " + slotId + ")].entryAvailable").value(true));
+    }
+
+    /** 빈 슬롯은 부스 자리가 전부 비어 있다 — 조인이 왼쪽 바깥이라는 확인이기도 하다. */
+    @Test
+    void aFreeSlotCarriesNoBooth() throws Exception {
+        Long slotId = freeSlotId();
+
+        mockMvc.perform(get("/api/v1/booth-slots"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[?(@.slotId == " + slotId + ")].status").value("AVAILABLE"))
+                .andExpect(jsonPath("$[?(@.slotId == " + slotId + ")].boothId").value(org.hamcrest.Matchers.contains(org.hamcrest.Matchers.nullValue())))
+                .andExpect(jsonPath("$[?(@.slotId == " + slotId + ")].entryAvailable").value(false));
+    }
+
+    /**
+     * 기한이 지난 임대는 행이 남아 있어도 빈 슬롯이다.
+     *
+     * <p>유효 판정이 조인 {@code on} 절로 들어갔으므로, 그 조건이 빠지면 만료된 임대가 다시
+     * {@code OCCUPIED} 로 올라온다. 스위퍼가 옮겨 주기 전에도 비어 보여야 한다 (SC-003).
+     */
+    @Test
+    void anExpiredLeaseLeavesTheSlotAvailable() throws Exception {
+        Long userId = createMemberWithWallet(users, wallets, "만료조인");
+        String bearer = bearerFor(userId);
+        Long slotId = freeSlotId();
+        mockMvc.perform(leaseRequest(slotId, bearer)).andExpect(status().isCreated());
+        jdbc.update("UPDATE booth_leases SET starts_at = now() - interval '25 hours', "
+                + "ends_at = now() - interval '1 hour' WHERE slot_id = ?", slotId);
+
+        mockMvc.perform(get("/api/v1/booth-slots"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[?(@.slotId == " + slotId + ")].status").value("AVAILABLE"))
+                .andExpect(jsonPath("$[?(@.slotId == " + slotId + ")].boothId").value(org.hamcrest.Matchers.contains(org.hamcrest.Matchers.nullValue())));
+    }
+
     private org.springframework.test.web.servlet.RequestBuilder leaseRequest(Long slotId, String bearer) {
         return post("/api/v1/booth-slots/{slotId}/leases", slotId)
                 .header("Authorization", bearer)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"durationDays\":1}");
+    }
+
+
+    /**
+     * 반납 한 바퀴 (spec 004 User Story 4, FR-020·FR-021).
+     *
+     * <p>단언이 여러 개인 이유가 있다. "반납한 사람이 다른 자리를 빌릴 수 있다" 만 보면
+     * {@code detachSlot} 을 빠뜨린 구현도 통과한다 — 다른 자리를 빌 때 {@code attachSlot} 이
+     * {@code current_slot_id} 를 덮어써 원래 자리가 덤으로 풀리기 때문이다. 해제를 실제로
+     * 증명하는 것은 <b>다른 회원이 그 자리를 빌리는</b> 줄이다.
+     */
+    @Test
+    void returningALeaseFreesTheSlotWithoutRefunding() throws Exception {
+        Long userId = createMemberWithWallet(users, wallets, "반납");
+        String bearer = bearerFor(userId);
+        // 일일 지급을 먼저 받아 둔다 — 인증 요청이면 무엇이든 발동하므로, 여기서 받지 않으면
+        // 아래 "잔액 불변" 단언이 지급분 때문에 흔들린다 (spec 003 FR-003).
+        mockMvc.perform(get("/api/v1/wallets/me").header("Authorization", bearer)).andExpect(status().isOk());
+
+        Long slotId = freeSlotId();
+        mockMvc.perform(leaseRequest(slotId, bearer)).andExpect(status().isCreated());
+        Long leaseId = leases.findValidByLesseeUserId(userId, Instant.now()).orElseThrow().getId();
+        Long boothId = booths.findByOwnerUserIdAndAdminOwnedFalse(userId).orElseThrow().getId();
+        int afterLease = wallets.balanceOf(userId);
+
+        mockMvc.perform(delete("/api/v1/booth-slots/{slotId}/leases/mine", slotId)
+                        .header("Authorization", bearer))
+                .andExpect(status().isNoContent());
+
+        // 만료가 아니라 반납으로 남는다 — 기록이 어느 쪽이었는지 말해야 한다.
+        assertEquals(LeaseStatus.CANCELLED, leases.findById(leaseId).orElseThrow().getStatus());
+
+        Booth booth = booths.findById(boothId).orElseThrow();
+        assertEquals(null, booth.getCurrentSlotId(), "반납했으면 부스가 자리를 놓아야 합니다.");
+        assertEquals(null, booth.getPublishedLayoutVersion(), "자리를 놓으면 공개본도 내려가야 합니다.");
+        assertEquals(BoothStatus.INACTIVE, booth.getStatus());
+
+        // 환불 없음 (FR-021). 잔액도 원장도 그대로다.
+        assertEquals(afterLease, wallets.balanceOf(userId), "반납은 코인을 돌려주지 않습니다.");
+        BoothTestSupport.assertBalanceMatchesLedger(wallets, userId);
+
+        mockMvc.perform(get("/api/v1/booth-slots"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[?(@.slotId == " + slotId + ")].status").value("AVAILABLE"));
+
+        // 해제를 진짜로 증명하는 줄: 남이 그 자리를 빌 수 있어야 한다.
+        mockMvc.perform(leaseRequest(slotId, bearerFor(createMemberWithWallet(users, wallets, "후임"))))
+                .andExpect(status().isCreated());
+
+        // 반납한 사람도 한도가 풀려 곧바로 다른 자리를 빌 수 있다 (D01).
+        mockMvc.perform(leaseRequest(freeSlotId(), bearer)).andExpect(status().isCreated());
+    }
+
+    /** 반납할 것이 없는 세 경우가 한 코드로 온다 — 클라이언트가 할 일이 셋 다 같기 때문이다. */
+    @Test
+    void returningWhatYouDoNotHoldIs404AndLeavesTheOtherLeaseAlone() throws Exception {
+        Long owner = createMemberWithWallet(users, wallets, "보유자");
+        Long slotId = freeSlotId();
+        mockMvc.perform(leaseRequest(slotId, bearerFor(owner))).andExpect(status().isCreated());
+
+        // 남의 자리를 반납하려는 사람
+        mockMvc.perform(delete("/api/v1/booth-slots/{slotId}/leases/mine", slotId)
+                        .header("Authorization", bearerFor(createMemberWithWallet(users, wallets, "남"))))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("ACTIVE_LEASE_NOT_FOUND"));
+
+        assertEquals(LeaseStatus.ACTIVE, leases.findValidByLesseeUserId(owner, Instant.now()).orElseThrow().getStatus(),
+                "남의 요청이 보유자의 임대를 건드리면 안 됩니다.");
+
+        // 두 번째 반납 — 이미 반납했으므로 같은 404 다. 오류가 아니라 새로고침 신호다.
+        String bearer = bearerFor(owner);
+        mockMvc.perform(delete("/api/v1/booth-slots/{slotId}/leases/mine", slotId).header("Authorization", bearer))
+                .andExpect(status().isNoContent());
+        mockMvc.perform(delete("/api/v1/booth-slots/{slotId}/leases/mine", slotId).header("Authorization", bearer))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("ACTIVE_LEASE_NOT_FOUND"));
+    }
+
+    @Test
+    void aGuestCannotReturnALease() throws Exception {
+        Long owner = createMemberWithWallet(users, wallets, "게스트반납");
+        Long slotId = freeSlotId();
+        mockMvc.perform(leaseRequest(slotId, bearerFor(owner))).andExpect(status().isCreated());
+
+        mockMvc.perform(delete("/api/v1/booth-slots/{slotId}/leases/mine", slotId)
+                        .header("Authorization", "Bearer " + accessTokens.issueGuestToken().token()))
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(delete("/api/v1/booth-slots/{slotId}/leases/mine", slotId))
+                .andExpect(status().isUnauthorized());
+
+        assertEquals(LeaseStatus.ACTIVE, leases.findValidByLesseeUserId(owner, Instant.now()).orElseThrow().getStatus());
     }
 
     private String bearerFor(Long userId) {

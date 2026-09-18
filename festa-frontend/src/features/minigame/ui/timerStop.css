@@ -5,9 +5,15 @@
   display: flex;
   flex-direction: column;
   align-items: center;
+  justify-content: center;
   gap: 10px;
-  padding: 18px 0 8px;
+  /* 대기·진행·결과가 저마다 다른 높이로 서면 창이 단계마다 위아래로 튄다. 오버레이의 상태 박스
+     (.festa-overlay-state — 세션 만료·오류 화면이 쓴다)와 같은 최소 높이를 써서 모든 단계가
+     같은 상자 안에서 가운데 선다. */
+  min-height: var(--ov-state-min-h);
+  padding: 12px 0;
   text-align: center;
+  outline: none;
 }
 
 .ts-guide {
@@ -27,8 +33,71 @@
   color: var(--ov-text);
 }
 
+/* 목표 초 (S15P21A604-733). 초시계 바로 위에 두고 강조색을 준다 — 부제에 있을 때는 제목 옆
+   작은 글씨라 달리는 중에 읽히지 않았다. 초시계보다 작게 두어 둘이 다투지 않게 한다. */
+.ts-target {
+  margin: 0;
+  font-size: 15px;
+  color: var(--ov-text-muted);
+}
+
+.ts-target-value {
+  font-variant-numeric: tabular-nums;
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--ov-accent, #ffc94d);
+}
+
 .ts-clock-idle { color: var(--ov-text-muted); }
 .ts-clock-done { font-size: 34px; }
+
+.ts-key-hint {
+  margin: 0;
+  color: var(--ov-text-muted);
+  font-size: 12px;
+}
+
+.ts-key-hint kbd {
+  display: inline-block;
+  min-width: 2.8em;
+  padding: 0.1em 0.35em;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  border-bottom-width: 2px;
+  border-radius: 0.3em;
+  background: rgba(0, 0, 0, 0.18);
+  color: inherit;
+  font: inherit;
+  font-size: 0.88em;
+}
+
+.ts-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+}
+
+/* 버튼 안의 키 표기는 본문 힌트의 키캡과 다르게 그린다.
+
+   본문 힌트는 inline-block 키캡이라 baseline 에 얹히고 아래 테두리가 1px 더 두꺼운데, 버튼 안에
+   그대로 쓰면 라벨 글자와 세로 중심이 어긋나 보인다(실측). 버튼 쪽은 높이를 정해 flex 로 가운데
+   맞추고, 위아래 테두리를 같게 둬 라벨과 같은 선에 서게 한다. */
+.ts-action kbd {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 1.6em;
+  padding: 0 0.5em;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 0.35em;
+  background: rgba(0, 0, 0, 0.2);
+  color: inherit;
+  font: inherit;
+  font-size: 0.8em;
+  line-height: 1;
+  letter-spacing: 0.01em;
+}
 
 .ts-headline {
   font-size: 17px;

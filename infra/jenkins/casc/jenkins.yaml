@@ -12,6 +12,10 @@ jenkins:
       users:
         - id: "${JENKINS_ADMIN_ID}"
           password: "${JENKINS_ADMIN_PASSWORD}"
+        - id: unity-mr-validator
+          password: "${JENKINS_UNITY_MR_VALIDATOR_PASSWORD}"
+        - id: webgl-publisher
+          password: "${JENKINS_WEBGL_PUBLISHER_PASSWORD}"
   nodes:
     - permanent:
         name: linux-docker

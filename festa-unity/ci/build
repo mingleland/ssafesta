@@ -5,7 +5,7 @@
 # infra/jenkins/pipelines/unity.groovy 와 루트 ci/build 가 이 파일을 호출하는데
 # 그동안 파일 자체가 없었다 — 게임 파트 CI 는 시작하자마자 실패했다.
 #
-# 사용: festa-unity/ci/build --target webgl|linux-server|all
+# 사용: festa-unity/ci/build --target webgl|linux-server|linux-smoke|all
 set -euo pipefail
 
 target="all"
@@ -19,8 +19,8 @@ while [[ $# -gt 0 ]]; do
 done
 
 case "${target}" in
-  webgl|linux-server|all) ;;
-  *) echo "잘못된 타깃: ${target} (webgl|linux-server|all)" >&2; exit 64 ;;
+  webgl|linux-server|linux-smoke|all) ;;
+  *) echo "잘못된 타깃: ${target} (webgl|linux-server|linux-smoke|all)" >&2; exit 64 ;;
 esac
 
 project_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"

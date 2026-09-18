@@ -3,9 +3,12 @@ package com.example.ssafesta.game;
 import com.example.ssafesta.common.ApiErrorDetail;
 import com.example.ssafesta.common.ApiException;
 import com.example.ssafesta.common.ErrorCode;
+import com.example.ssafesta.storage.ObjectDeleteQueue;
 import com.example.ssafesta.storage.ObjectStorage;
 import com.example.ssafesta.storage.StorageUnavailableException;
+import com.example.ssafesta.storage.image.ImageBytesValidator;
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.security.SecureRandom;
 import java.time.Duration;
 import java.time.Instant;
@@ -63,18 +66,20 @@ public class GameAssetService {
     private final GameAssetRepository assets;
     private final GameRepository games;
     private final GamePublishedVersionRepository publishedVersions;
+    private final GameDraftRepository drafts;
     private final GameAccessGuard guard;
-    private final GameAssetImageValidator imageValidator;
+    private final ImageBytesValidator imageValidator;
     private final ObjectStorage storage;
-    private final GameAssetDeleteQueue deleteQueue;
+    private final ObjectDeleteQueue deleteQueue;
 
     public GameAssetService(GameAssetRepository assets, GameRepository games,
-                            GamePublishedVersionRepository publishedVersions, GameAccessGuard guard,
-                            GameAssetImageValidator imageValidator, ObjectStorage storage,
-                            GameAssetDeleteQueue deleteQueue) {
+                            GamePublishedVersionRepository publishedVersions, GameDraftRepository drafts,
+                            GameAccessGuard guard, ImageBytesValidator imageValidator,
+                            ObjectStorage storage, ObjectDeleteQueue deleteQueue) {
         this.assets = assets;
         this.games = games;
         this.publishedVersions = publishedVersions;
+        this.drafts = drafts;
         this.guard = guard;
         this.imageValidator = imageValidator;
         this.storage = storage;
@@ -98,13 +103,13 @@ public class GameAssetService {
         games.findByIdForUpdate(gameId).orElseThrow(() -> new ApiException(ErrorCode.GAME_NOT_FOUND));
 
         if (declaredContentType == null
-                || !GameAssetImageValidator.ALLOWED_CONTENT_TYPES.contains(declaredContentType)) {
+                || !ImageBytesValidator.ALLOWED_CONTENT_TYPES.contains(declaredContentType)) {
             throw refuse(ErrorCode.GAME_ASSET_TYPE_UNSUPPORTED, "MIME_NOT_ALLOWED",
                     "PNG · JPEG · GIF · WebP 만 올릴 수 있습니다.");
         }
-        if (declaredByteSize <= 0 || declaredByteSize > GameAssetImageValidator.MAX_BYTES) {
+        if (declaredByteSize <= 0 || declaredByteSize > ImageBytesValidator.MAX_BYTES) {
             throw refuse(ErrorCode.GAME_ASSET_TOO_LARGE, "SIZE_EXCEEDED",
-                    "이미지는 " + (GameAssetImageValidator.MAX_BYTES / 1024 / 1024) + "MB 이하만 올릴 수 있습니다.");
+                    "이미지는 " + (ImageBytesValidator.MAX_BYTES / 1024 / 1024) + "MB 이하만 올릴 수 있습니다.");
         }
 
         Instant now = Instant.now();
@@ -132,7 +137,7 @@ public class GameAssetService {
                 // Signed for exactly the grant's lifetime — a longer signature would let bytes land
                 // after complete has already refused the row, leaving an object nothing points at.
                 String uploadUrl = storage.presignPut(target.provider(), target.bucket(), objectKey,
-                        declaredContentType, declaredByteSize, GRANT_TTL);
+                        declaredContentType, declaredByteSize, null, GRANT_TTL);
                 return new IssuedGrant(assetId, expiresAt, uploadUrl, declaredContentType);
             }
         }
@@ -171,12 +176,12 @@ public class GameAssetService {
         // 1 KiB and uploaded 4 GiB is exactly the case a declared bound would not catch. An object
         // over the limit arrives one byte too long and the validator refuses it below with
         // SIZE_EXCEEDED — the same rule a too-large declared size gets.
-        byte[] content = readObject(asset, GameAssetImageValidator.MAX_BYTES);
+        byte[] content = readObject(asset, ImageBytesValidator.MAX_BYTES);
         if (content == null || content.length == 0) {
             return fail(asset, "UPLOAD_MISSING");
         }
 
-        GameAssetImageValidator.VerifiedImage verified;
+        ImageBytesValidator.VerifiedImage verified;
         try {
             verified = imageValidator.verify(content, asset.getDeclaredByteSize());
         } catch (ApiException refusal) {
@@ -184,6 +189,61 @@ public class GameAssetService {
         }
         asset.markReady(verified);
         return AssetView.of(asset);
+    }
+
+    /**
+     * Soft-deletes an asset (contract §7).
+     *
+     * <p>Two safety nets, in order: a repeat call on an already-deleted row is refused rather than
+     * silently accepted — {@code GAME_ASSET_DELETED} tells the caller nothing changed, matching how
+     * every other {@code GAME_ASSET_*} state conflict in this file already reports "not what you
+     * expected" rather than "done" (contract §6, {@code complete()} above does the same for a
+     * non-{@code UPLOADING} row of a different kind). Then, unless the caller passes {@code force},
+     * a row still named anywhere in the saved Draft is refused with {@code GAME_ASSET_IN_USE} — the
+     * FE already blocks this locally by walking the Draft's actual scene graph
+     * ({@code removeAssetReference}, authoringCommands.ts), so reaching this check at all means that
+     * local guard was bypassed or raced, not that a normal click hit it.
+     *
+     * <p>The object itself is never touched here — no queue, no storage call. §7 requires the bytes to
+     * survive as long as a Published Version might still reference them, and only member withdrawal
+     * (a different, hard-delete path) is allowed to remove them.
+     */
+    @Transactional
+    public void delete(Long gameId, String assetId, Long userId, boolean force) {
+        guard.requireOwnedLive(gameId, userId);
+        GameAsset asset = assets.findForUpdate(gameId, assetId)
+                .orElseThrow(() -> new ApiException(ErrorCode.GAME_ASSET_NOT_FOUND));
+        if (asset.isDeleted()) {
+            throw new ApiException(ErrorCode.GAME_ASSET_DELETED);
+        }
+        if (!force && isReferencedByDraft(gameId, assetId)) {
+            throw new ApiException(ErrorCode.GAME_ASSET_IN_USE);
+        }
+        asset.markDeleted();
+    }
+
+    /**
+     * A cheap backstop, not the primary UX — see {@link #delete}. Every registered asset names itself
+     * twice in its own {@code assets[]} entry ({@code id} and inside {@code source}), so a plain
+     * substring search over the whole Draft would call every registered asset "in use" whether or not
+     * anything actually places it — the registry entry alone would always match. Dropping the
+     * {@code assets} array before searching is what leaves only real usage: a Scene background, a
+     * Sprite component, a Tile Layer's {@code tilesetAssetId}, an Item's {@code assetId}, a Dialogue
+     * portrait — every one of those shapes stores the bare id, never the full {@code asset://} source,
+     * so the id alone is still the right needle. Walking the schema to name which of those it is would
+     * duplicate the FE's own {@code find*UsageLocations} helpers for a path that is not the normal UX.
+     */
+    private boolean isReferencedByDraft(Long gameId, String assetId) {
+        return drafts.findById(gameId)
+                .map(GameDraft::getProjectJson)
+                .map(projectJson -> referencedOutsideRegistry(projectJson, assetId))
+                .orElse(false);
+    }
+
+    private boolean referencedOutsideRegistry(String projectJson, String assetId) {
+        ObjectNode project = (ObjectNode) GameProjectJson.parse(projectJson);
+        project.remove("assets");
+        return project.toString().contains(assetId);
     }
 
     /**

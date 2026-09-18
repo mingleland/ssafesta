@@ -110,6 +110,7 @@ export interface SurveyResultWire {
 
 // §4 PUT 본문. description·rewardCoin·closesAt 은 **키 존재 여부로 판정**되므로
 // FE 가 그 값을 편집하지 않는 한 키를 아예 싣지 않는다 — 실으면 기존 값이 지워진다.
+// rewardCoin 은 Builder 가 편집하므로 싣는다(S15P21A604-520). description·closesAt 은 여전히 없다.
 export interface SurveySaveQuestionWire {
   type: SurveyWireQuestionType;
   prompt: string;
@@ -122,6 +123,7 @@ export interface SurveySaveQuestionWire {
 
 export interface SurveySaveWire {
   title: string;
+  rewardCoin: number;
   questions: SurveySaveQuestionWire[];
 }
 

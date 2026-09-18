@@ -19,6 +19,7 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -34,16 +35,18 @@ public class MyAccountController {
     private final NicknamePolicy nicknamePolicy;
     private final AvatarCodePolicy avatarCodePolicy;
     private final InventoryService inventory;
+    private final AvatarPresetService avatarPresets;
 
     public MyAccountController(AccountLifecycleService lifecycle, UserRepository users, OAuthIdentityRepository identities,
                                NicknamePolicy nicknamePolicy, AvatarCodePolicy avatarCodePolicy,
-                               InventoryService inventory) {
+                               InventoryService inventory, AvatarPresetService avatarPresets) {
         this.lifecycle = lifecycle;
         this.users = users;
         this.identities = identities;
         this.nicknamePolicy = nicknamePolicy;
         this.avatarCodePolicy = avatarCodePolicy;
         this.inventory = inventory;
+        this.avatarPresets = avatarPresets;
     }
 
     @Operation(summary = "내 계정 조회",
@@ -131,6 +134,51 @@ public class MyAccountController {
         return new AvatarResponse(user.getAvatarCode());
     }
 
+    @Operation(summary = "내 아바타 프리셋 목록 조회",
+            description = """
+                    로그인한 회원이 저장한 아바타 프리셋만 슬롯 번호 오름차순으로 돌려준다. 비어 있는 슬롯은
+                    목록에 넣지 않는다. 게스트는 영속 외형을 가질 수 없어 `403 MEMBER_ONLY` 이다.
+                    """)
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "조회 성공. 빈 슬롯은 생략된다"),
+            @ApiResponse(responseCode = "403", description = "`MEMBER_ONLY` — 게스트 토큰이다")})
+    @GetMapping("/avatar/presets")
+    @Transactional(readOnly = true)
+    public List<AvatarPresetResponse> listAvatarPresets(@AuthenticationPrincipal Jwt jwt) {
+        User user = activeMember(jwt);
+        return avatarPresets.list(user.getId()).stream().map(AvatarPresetResponse::from).toList();
+    }
+
+    @Operation(summary = "내 아바타 프리셋 저장 또는 덮어쓰기",
+            description = """
+                    슬롯 1~3 중 하나에 완전한 아바타 코드를 저장한다. 현재 외형 저장과 같은 길이·문자셋·품목
+                    소유권 검사를 거치며, 문자열은 변형하지 않는다. 같은 슬롯에 다시 저장하면 그 슬롯만 교체한다.
+                    """)
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "저장 또는 덮어쓰기 성공"),
+            @ApiResponse(responseCode = "400", description = "`VALIDATION_FAILED` — 슬롯 또는 avatarCode가 유효하지 않다"),
+            @ApiResponse(responseCode = "403", description = "`MEMBER_ONLY` — 게스트 토큰이다"),
+            @ApiResponse(responseCode = "409", description = "`AVATAR_ITEM_NOT_OWNED` — 보유하지 않은 파츠를 포함한다")})
+    @PutMapping("/avatar/presets/{slot}")
+    public AvatarPresetResponse saveAvatarPreset(@AuthenticationPrincipal Jwt jwt, @PathVariable int slot,
+                                                  @RequestBody AvatarChangeRequest request) {
+        User user = activeMember(jwt);
+        return AvatarPresetResponse.from(avatarPresets.save(user.getId(), slot, request.avatarCode()));
+    }
+
+    @Operation(summary = "내 아바타 프리셋 삭제",
+            description = "슬롯 1~3 중 하나를 비운다. 이미 비어 있는 슬롯을 다시 삭제해도 성공하므로 재시도해도 안전하다.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "204", description = "삭제 성공 또는 이미 비어 있음"),
+            @ApiResponse(responseCode = "400", description = "`VALIDATION_FAILED` — 슬롯은 1~3이어야 한다"),
+            @ApiResponse(responseCode = "403", description = "`MEMBER_ONLY` — 게스트 토큰이다")})
+    @DeleteMapping("/avatar/presets/{slot}")
+    public ResponseEntity<Void> deleteAvatarPreset(@AuthenticationPrincipal Jwt jwt, @PathVariable int slot) {
+        User user = activeMember(jwt);
+        avatarPresets.delete(user.getId(), slot);
+        return ResponseEntity.noContent().build();
+    }
+
     /**
      * One place builds this response.
      *
@@ -142,7 +190,7 @@ public class MyAccountController {
         List<String> providers = identities.findAllByUser_Id(user.getId()).stream()
                 .map(identity -> identity.getProvider().name()).toList();
         return new MyAccountResponse(user.getId(), user.getNickname(), user.getStatus().name(), providers,
-                user.getAvatarCode());
+                user.getAvatarCode(), user.isAdmin(), user.isMaster());
     }
 
     @Operation(summary = "회원 탈퇴 — 즉시 삭제되고 되돌릴 수 없다",
@@ -202,6 +250,16 @@ public class MyAccountController {
             @Schema(description = "저장된 외형 인코딩", example = "fa|3=SK_Hair_Long_01|c=FF8800")
             String avatarCode) { }
 
+    @Schema(description = "저장된 아바타 프리셋. 비어 있는 슬롯은 목록 응답에서 생략된다")
+    public record AvatarPresetResponse(
+            @Schema(description = "프리셋 슬롯 번호", minimum = "1", maximum = "3", example = "1") int slot,
+            @Schema(description = "저장한 외형 인코딩", example = "fa|3=SK_Hair_Long_01|c=FF8800") String avatarCode,
+            @Schema(description = "마지막 저장 시각(UTC)", example = "2026-09-17T08:30:00Z") java.time.Instant updatedAt) {
+        static AvatarPresetResponse from(AvatarPreset preset) {
+            return new AvatarPresetResponse(preset.getSlot(), preset.getAvatarCode(), preset.getUpdatedAt());
+        }
+    }
+
     /**
      * @param avatarCode the stored appearance encoding, {@code null} for a user who has never saved
      *                   one. Null and not a preset: picking a default is the client's job (FR-010),
@@ -218,5 +276,10 @@ public class MyAccountController {
             List<String> providers,
             @Schema(description = "저장된 아바타 외형 인코딩. 한 번도 저장하지 않았으면 `null` 이다 — 키는 항상 있다",
                     nullable = true, example = "fa|3=SK_Hair_Long_01|c=FF8800")
-            String avatarCode) { }
+            String avatarCode,
+            @Schema(description = "관리자 권한 보유 여부. 토큰의 `role` 은 관리자도 `MEMBER` 라 클라이언트가 "
+                    + "관리자 메뉴 노출 여부를 판단할 근거가 이 칸뿐이다 — 실제 조치 권한은 매 요청 `AdminGuard` 가 따로 판정한다",
+                    example = "false") boolean admin,
+            @Schema(description = "보호된 마스터 계정 여부. `admin` 이 `false` 면 항상 `false` 다", example = "false")
+            boolean master) { }
 }

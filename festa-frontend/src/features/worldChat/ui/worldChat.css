@@ -1,0 +1,158 @@
+.world-chat {
+  position: absolute;
+  left: var(--festa-hud-margin-x);
+  bottom: var(--festa-hud-margin-y);
+  width: min(28rem, calc(100vw - 2 * var(--festa-hud-margin-x)));
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  pointer-events: auto;
+  z-index: var(--festa-z-world-hud);
+}
+
+/* Active — 읽고 쓰는 자리라 바탕을 준다. Passive 는 바탕 없이 월드 위에 글자만 얹는다 */
+.world-chat-open {
+  padding: 0.5rem 0.6rem;
+  border-radius: 0.6rem;
+  background: rgba(10, 14, 34, 0.55);
+}
+
+/* Passive 입력칸 — 늘 떠 있지만 월드를 가리지 않게 물러나 있다. 다만 여기가 채팅 자리라는
+   것은 읽혀야 해서 완전히 흐리게 두지 않는다. focus 하면 선명해진다. */
+.world-chat:not(.world-chat-open) .world-chat-input {
+  opacity: 0.72;
+  background: rgba(10, 14, 34, 0.62);
+}
+.world-chat-input:focus { opacity: 1; }
+.world-chat-input::placeholder { color: rgba(255, 255, 255, 0.62); }
+
+/* 게스트 — 쓸 수 없다는 것만 보이고 이유는 focus 했을 때 말한다 */
+.world-chat-input[readonly] { cursor: not-allowed; }
+
+.world-chat-log {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 12rem;
+  overflow-y: auto;
+  font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.85);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+}
+
+/* Passive — 스크롤 막대를 내보이지 않는다. 읽는 자리가 아니라 스쳐 보는 자리다 */
+.world-chat:not(.world-chat-open) .world-chat-log {
+  opacity: 0.6;
+  overflow: hidden;
+}
+
+/* Passive 에서는 지나간 말이 월드를 계속 가리지 않게 흐려진다. 데이터는 그대로 남아 있고
+   Active 로 들어가면 다시 선명해진다 (S15P21A604-791). */
+@keyframes world-chat-fade {
+  0%,
+  40% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+.world-chat:not(.world-chat-open) .world-chat-log li {
+  animation: world-chat-fade 14s ease-in forwards;
+}
+
+/* 말 본문과 섞지 않는다. 입장 알림은 사람이 한 말이 아니라 월드 상태 변화다. */
+.world-chat-join {
+  align-self: center;
+  width: fit-content;
+  margin: 0.2rem auto;
+  padding: 0.18rem 0.55rem;
+  border: 1px solid rgba(126, 224, 165, 0.42);
+  border-radius: 999px;
+  background: rgba(16, 50, 39, 0.56);
+  color: #a9eec2;
+  font-size: 0.76rem;
+  font-weight: 600;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .world-chat:not(.world-chat-open) .world-chat-log li {
+    animation: none;
+  }
+}
+
+/* 위쪽 로그를 읽는 중에 새 말이 왔을 때만 뜬다 */
+.world-chat-unread {
+  align-self: flex-start;
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  background: rgba(10, 14, 34, 0.8);
+  color: #fff;
+  font-size: 0.72rem;
+  cursor: pointer;
+}
+
+/* 보조기기 전용 — 새로 온 말 한 줄만 읽힌다 */
+.world-chat-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.world-chat-notice {
+  margin: 0;
+  font-size: 0.75rem;
+  color: #ffd9d9;
+}
+
+.world-chat-hint {
+  margin: 0;
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+/* 연결 상태 — 평상시엔 없다. 못 보내는 동안에만 작게 뜬다 (S15P21A604-790) */
+.world-chat-status {
+  margin: 0;
+  font-size: 0.72rem;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+/* 못 보내는 상태를 입력줄에도 드러낸다. 값은 그대로 둔다 — 연결이 돌아오면 그대로 보낸다 */
+.world-chat-input-row-offline {
+  opacity: 0.55;
+}
+
+.world-chat-input-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.world-chat-input {
+  flex: 1;
+  padding: 0.35rem 0.6rem;
+  border-radius: 0.4rem;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  background: rgba(10, 14, 34, 0.85);
+  color: #fff;
+}
+
+.world-chat-input-over {
+  border-color: #ff8a8a;
+}
+
+.world-chat-count {
+  font-size: 0.7rem;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+@media (max-height: 560px) {
+  .world-chat-log { max-height: min(8rem, 24dvh); }
+}

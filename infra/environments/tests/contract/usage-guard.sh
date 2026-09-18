@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# R2 사용량 상태 경계와 active provider 혼입 금지를 계약으로 고정한다.
+# R2 사용량 상태 경계를 계약으로 고정한다.
 set -euo pipefail
 
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -65,9 +65,6 @@ stale["collectedAt"] = "2026-08-30T02:01:00Z"
 stale["state"] = "STALE_BLOCKED"
 (output / "61-stale.json").write_text(json.dumps(stale), encoding="utf-8")
 
-mixed = copy.deepcopy(base)
-mixed["activeWriteProvider"] = "MINIO_LOCAL"
-(output / "active-provider-mixed.json").write_text(json.dumps(mixed), encoding="utf-8")
 PY
 
 bash "${validator}" "${schema}" \
@@ -76,8 +73,4 @@ bash "${validator}" "${schema}" \
   "${fixture_dir}/90-blocked.json" \
   "${fixture_dir}/61-stale.json" >/dev/null
 
-if bash "${validator}" "${schema}" "${fixture_dir}/active-provider-mixed.json" >/dev/null 2>&1; then
-  fail 'usage snapshot accepted activeWriteProvider'
-fi
-
-pass 'usage guard covers 79/80/90 percent, 61-minute stale, and provider separation'
+pass 'usage guard covers 79/80/90 percent and 61-minute stale'

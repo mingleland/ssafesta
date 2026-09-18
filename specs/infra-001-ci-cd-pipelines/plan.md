@@ -4,16 +4,20 @@
 
 ## Summary
 
-고정 파트 브랜치 CI/CD를 폐기한다. `feature/* → develop` MR의 Front·Back build·test merge gate는 GitLab CI/Runner가 `rules:changes`로 수행한다. Jenkins는 MR을 다시 빌드하지 않고, Squash Merge된 `develop`에서 변경 컴포넌트를 빌드·검증한 뒤 dev에만 자동 배포한다. 여러 컴포넌트 변경은 전부 Jenkins CI 성공 후 하나의 dev 배포 묶음으로 적용하고, 중간 실패면 이미 갱신한 묶음 구성원을 직전 known-good 상태로 복구한다. demo는 develop push와 분리된 수동 promotion job으로, dev 검증을 통과한 release만 배포한다.
+고정 파트 브랜치 CI/CD를 폐기한다. `feature/* → develop` MR의 Front·Back build·test merge gate는 GitLab CI/Runner가 `rules:changes`로 수행한다. Game 변경 MR은 Jenkins Unity agent가 MR head SHA에서 `ci/test`만 실행해 GitLab 필수 상태를 게시하며, `ci/test`의 Unity 스크립트 컴파일·EditMode 정적 검사를 통과해야 한다. 이 경로는 어떤 배포도 하지 않는다.
 
-기존 `.gitlab-ci.yml`, `ci/` build adapter, Jenkins controller/agent, release manifest, image provenance, Compose 기반 dev deploy/verify 도구를 재사용한다. WebGL은 Unity 담당자가 QA 완료 zip을 GitLab Generic Package Registry에 올린 뒤 업로드 도우미가 별도 Jenkins job을 호출한다. Jenkins deploy-agent가 package를 내려받아 검증하고 EC2 Nginx release pointer만 전환한다. Windows Jenkins Agent와 develop push WebGL 자동 빌드는 추가하지 않는다.
+실제 팀 운영 현실(demo 중심 검증)에 맞춰 별도의 `dev.ssafesta.world` 환경은 운영하지 않으며, `demo.ssafesta.world` 를 `develop` 기준 단일 활성 통합 환경(Staging)으로 확정한다. `develop` 에 머지된 변경은 Jenkins develop 파이프라인을 통해 컴포넌트별 필수 검증 후 `demo.ssafesta.world` 에 자동 배포된다. Demo 릴리스는 `candidate`(자동 검증 중) → `current`(자동 readiness 성공, 실제 demo 실행 중) → `known-good`(사람의 실제 서비스 검증 성공) 3단계로 엄격히 분리 관리한다.
+
+수동 승격(Production Promotion)은 가상의 dev→demo가 아니라 **`develop → main` 승격 정책**으로 전환하며, `main` 브랜치는 `https://ssafesta.world` 에서 서비스되는 실제 사용자 프로덕션(Production) 운영 환경을 나타낸다. 팀이 `demo.ssafesta.world` 에서 충분히 검증하여 known-good 으로 승인한 릴리스만 `main` 및 프로덕션으로 승격하며, **Architecture Invariant로 develop → main 승격 MR은 절대 Squash Merge를 금지(`squash=false` 강제, develop 계보 보존)**하고, demo에서 검증된 동일 아티팩트를 재빌드 없이 재사용한다(`Demo Artifact == Production Artifact`).
+
+기존 `.gitlab-ci.yml`, `ci/` build adapter, Jenkins controller/agent, release manifest, image provenance, Compose 기반 deploy/verify 도구를 재사용한다. WebGL은 Unity 담당자가 전달한 릴리스 zip 패키지 또는 Package Registry 업로드 산출물을 받아 배포하며, `deploy-game.sh` 의 프리팹 트리 대조 가드로 클라이언트-서버 정합성을 보장한다. Dedicated Server 배포는 스모크 러너 의존성을 제거하고 1~3단계(프로세스, 내부 포트, WSS 101) 통과로 current 승격을 확정한다. Redis는 40명 실측(1.27MB) 기반 `mem_limit: 256m` 상한 및 `appendonly yes` AOF 영속성을 적용한다.
 
 ## Technical Context
 
 **Language/Version**: Jenkins Declarative Pipeline/Groovy, Bash, YAML/JSON Schema; Unity `6000.0.78f1`
 **Primary Dependencies**: GitLab CI/Runner, Jenkins LTS + GitLab Branch Source, Docker Engine/Compose v2, existing Jenkins Lockable Resources and milestone steps
 **Storage**: Jenkins artifacts/fingerprints; GitLab Generic Package Registry; single EC2 local Docker image store; `/srv/festa/webgl/releases`와 current/previous symbolic links
-**Testing**: shell unit tests for path detector; Jenkins/Groovy static checks; dev single- and multi-component deploy rehearsal; forced failure rollback rehearsal; manual demo promotion rehearsal
+**Testing**: shell unit tests for path detector and Unity MR test-only pipeline; Jenkins/Groovy static checks; `ci/test` success·failure MR rehearsal with no deployment; dev single- and multi-component deploy rehearsal; forced failure rollback rehearsal; manual demo promotion rehearsal
 **Target Platform**: Ubuntu EC2, rootless build agent + rootful deploy agent, WebGL and Linux Dedicated Server
 **Project Type**: Infrastructure as Code and Jenkins orchestration
 **Performance Goals**: unrelated components never rebuild/deploy; stale run never overwrites newer dev state; one failed component never leaves a partial dev batch active
@@ -34,14 +38,14 @@
 
 ### 1. Change selection
 
-GitLab CI owns merge-before Front·Back selection with native `rules:changes`. Jenkins owns merge-after `develop` selection with one repository-owned detector that emits a machine-readable record instead of using branch names.
+GitLab CI owns merge-before Front·Back selection with native `rules:changes`. Jenkins Unity agent owns merge-before Game selection and test-only validation of the MR head SHA. Jenkins develop job owns merge-after `develop` selection with one repository-owned detector that emits a machine-readable record instead of using branch names.
 
 | Changed path | GitLab MR gate | Jenkins CI/dev CD after `develop` merge |
 |---|---|---|
 | `festa-ai/**`, dev AI compose config | none (initial scope) | `ai` |
 | `backend/**`, dev Back compose config | `back` | `back` |
 | `festa-frontend/**`, dev Front compose config | `front` | `front` |
-| `festa-unity/**`, dev Game compose config | none (initial scope) | `game` |
+| `festa-unity/**`, Game CI adapter, Unity project settings | Jenkins Unity test-only (`ci/test`) | `game` |
 | Front·Back shared contract/CI paths | `front` + `back` | all CI, no dev deploy |
 | Jenkins/deploy shared paths | no GitLab product gate | all CI, no dev deploy |
 | documentation/spec-only paths | none | none |
@@ -50,19 +54,22 @@ GitLab's `rules:changes` evaluates the MR diff. A Jenkins `develop` Squash merge
 
 ### 2. Delivery topology
 
-1. GitLab CI accepts same-project `feature/* → develop` only. It uses `rules:changes` to run required Front·Back build/test gates and GitLab blocks merge unless they pass. `jira-*` definitions remain disabled.
-2. Jenkins `develop` push job detects the Squash merge range, runs all selected CI first, then creates one candidate dev batch only if every selected CI succeeds.
-3. The dev batch transfers/verifies every candidate image before mutation. Under one batch lock it snapshots all affected component known-good state, deploys each selected component using existing service-scoped deploy/verify primitives, and promotes dev state only after all verify.
-4. If a reversible deploy/verify failure occurs, restore each component already changed by this batch from the snapshot and verify restoration. DB/schema, secret/config, irreversible, unknown, or restoration failure preserves evidence and requires manual action.
-5. Manual demo promotion selects an explicitly approved dev-verified full release manifest and reuses existing demo deploy → verify → promote/rollback logic. `develop` push never invokes it.
+1. GitLab CI accepts same-project `feature/* → develop` only. It uses `rules:changes` to run required Front·Back build/test gates; Game changes dispatch a Jenkins Unity test-only job for the MR head SHA. GitLab blocks merge unless every applicable status passes. `jira-*` definitions remain disabled.
+2. The Unity MR job calls only `ci/test`; it records the head SHA and test report, publishes success/failure to the matching GitLab MR commit, and has no deploy credential, Compose mutation, image package or promotion stage.
+3. Jenkins `develop` push job detects the merge range, runs all selected CI first, then creates one candidate batch for `demo.ssafesta.world` only if every selected CI succeeds.
+4. The demo batch transfers/verifies candidate images before mutation. Under batch lock it deploys selected components to `demo.ssafesta.world`, runs service-scoped readiness, and transitions the candidate to `current` only after all readiness checks pass.
+5. If an automated readiness failure occurs, candidate deployment is rolled back to previous state. After human verification of actual user journeys on `demo.ssafesta.world`, the release is explicitly approved as `known-good`.
+6. Production Promotion (`develop → main`) selects an explicitly human-approved `known-good` release, fast-forwards/merges to `main` without squash (`squash=false`), and promotes the identical verified artifacts to `ssafesta.world` without rebuilding.
 
 ### 3. Freshness and state invariants
 
-- A merge run rechecks that `develop` still points to its expected head before it obtains the dev batch lock. Superseded runs stop with no deploy.
-- A batch has one `batchId`, one source range, ordered selected components, a before-state snapshot and candidate content IDs.
-- The per-component dev current/known-good pointer changes only after its health verification; the batch promotion marker changes only after every selected component succeeds.
-- Rollback may use only the batch snapshot, not an arbitrary old manifest. This avoids weakening normal commit freshness checks.
+- A merge run rechecks that `develop` still points to its expected head before it obtains the batch lock. Superseded runs stop with no deploy.
+- Demo release lifecycle strictly adheres to 3 states: `candidate` (readiness in progress) → `current` (readiness passed, live on demo, `current ≠ known-good`) → `known-good` (human verified on demo).
+- Rollback uses the last human-verified `known-good` snapshot, never an unverified intermediate `current`.
+- **Architecture Invariant**: `develop → main` promotion MR MUST NOT squash (`squash=false` enforced, preserving develop ancestry).
+- **Artifact Invariant**: `Demo Artifact == Production Artifact` (no rebuild during production promotion).
 - Shared CI paths never deploy because no runtime component changed. Component runtime/deploy config counts as that component change.
+- Redis container enforces `mem_limit: 256m` based on 40-user peak empirical observation (1.27MB) and `appendonly yes` to safeguard login sessions across container restarts.
 
 ### 4. WebGL Package Registry delivery
 
@@ -70,13 +77,15 @@ GitLab's `rules:changes` evaluates the MR diff. A Jenkins `develop` Squash merge
 2. 도우미가 `festa-webgl/<release-id>/festa-webgl-release-<release-id>.zip`과 checksum을 업로드한다. 두 업로드 성공 뒤에만 Jenkins job을 호출한다.
 3. deploy-agent는 Jenkins의 GitLab Deploy Token으로 package를 내려받고 SHA-256·안전한 ZIP entry·manifest 참조를 검증한다.
 4. 검증된 산출물을 `/srv/festa/webgl/releases/<release-id>`에 설치하고 `current`를 원자적으로 전환한다.
-5. 공개 HTTP의 MIME·Brotli·Cache-Control 검증 실패 시 이전 `current`를 복원한다. 이 경로는 Dedicated Server를 조작하지 않는다.
+5. 공개 HTTP의 MIME·Brotli·Cache-Control 검증 실패 시 이전 `current`를 복원한다. known-good 기록까지 성공했을 때만 `current`·`previous`와 최신 `current.legacy.<UTC 14자리 timestamp>` 두 개를 남기고 오래된 legacy를 정리한다. 이 경로는 Dedicated Server를 조작하지 않는다.
 
 ### 5. Existing code to extend
 
 ```text
-.gitlab-ci.yml                                 Front·Back MR merge gate; jira-* definitions remain disabled
+.gitlab-ci.yml                                 Front·Back MR merge gate and Game-change Jenkins dispatch/status contract
 Jenkinsfile                                   develop dispatcher and detector entry
+infra/jenkins/jobs/gitlab-unity-mr-validation.groovy  Game MR test-only Jenkins job
+infra/jenkins/pipelines/unity-mr-validation.groovy    checkout SHA → validate → EditMode → status, no deploy
 infra/jenkins/pipelines/component.groovy      merge-after component CI stages, split from direct dev deploy
 infra/jenkins/pipelines/develop.groovy        replace all-component/demo flow with selected dev batch
 infra/jenkins/scripts/deploy-dev-component.sh existing one-component deploy primitive
@@ -107,11 +116,12 @@ specs/infra-001-ci-cd-pipelines/
 ## Delivery Order
 
 1. Add GitLab `rules:changes` Front·Back gate and runner/merge-setting rehearsal.
-2. Add Jenkins develop path detector and dispatch only supported develop pushes.
-3. Refactor merge-after component CI to accept `CI_COMPONENT` independently of source branch; keep it deploy-free.
-4. Build dev batch coordinator using existing component deploy/verify commands; add snapshot/promotion/rollback tests.
-5. Wire `develop` push to selected CI then dev batch; rehearse single component, shared-only, multi-component and rollback paths on dev.
-6. Separate demo into manual promotion; rehearse approved manifest deployment and reject non-dev-verified selection.
+2. Add Jenkins Unity MR test-only validation and required-status rehearsal before any develop deploy work.
+3. Add Jenkins develop path detector and dispatch only supported develop pushes.
+4. Refactor merge-after component CI to accept `CI_COMPONENT` independently of source branch; keep it deploy-free.
+5. Build dev batch coordinator using existing component deploy/verify commands; add snapshot/promotion/rollback tests.
+6. Wire `develop` push to selected CI then dev batch; rehearse single component, shared-only, multi-component and rollback paths on dev.
+7. Separate demo into manual promotion; rehearse approved manifest deployment and reject non-dev-verified selection.
 
 ## Post-Design Constitution Check
 

@@ -22,7 +22,7 @@ MAX_QUESTION_CHARACTERS = 2_000
 MAX_RECENT_TURNS = 6
 DEFAULT_CONTEXT_TOP_N = 5
 DEFAULT_TOKEN_BUDGET = 8_000
-MAX_PROJECT_FACT_CHARACTERS = 1_000
+MAX_PROJECT_FACT_CHARACTERS = 2_000
 
 PLATFORM_INSTRUCTION = """[플랫폼 필수 규칙]
 당신은 SSAFY FESTA의 부스 AI 직원이다.
@@ -33,6 +33,8 @@ PLATFORM_INSTRUCTION = """[플랫폼 필수 규칙]
 SAFETY_INSTRUCTION = """[안전 및 근거 규칙]
 retrieved_context에 제공된 내용만 근거로 한국어로 답한다.
 근거가 없으면 지어내지 말고 \"문서에서 확인할 수 없습니다.\"라고만 답한다.
+질문이 부스·전시·행사 운영과 무관한 잡담이나 개인 고민 상담(예: 식사 메뉴, 감정 상태)이면
+답하지 않고 \"부스 관련 질문에만 답변할 수 있습니다.\"라고만 답한다.
 답변 본문에 근거 원문을 인용하거나 '근거:' 같은 출처 문구를 넣지 않는다 — 어떤 문서를 썼는지는
 서버가 별도로 전달한다.
 개인정보를 요구하거나 제공하지 않는다.

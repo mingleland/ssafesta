@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
-# 선택된 dev component를 하나의 batch로 배포하고, 실패 시 이 batch의 known-good snapshot만 복구한다.
+# 선택된 component를 하나의 batch로 배포하고, 실패 시 이 batch의 known-good snapshot만 복구한다.
+# 기본 대상은 demo 다 — develop 머지가 demo.ssafesta.world 를 갱신한다 (spec §Session 2026-09-17).
+# 성공 시 CURRENT 만 자동 갱신하며, KNOWN_GOOD 승격은 사람이 approve-known-good.sh 로 별도 수행한다 (spec §Session 2026-09-17).
 set -euo pipefail
 
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -19,7 +21,11 @@ for candidate in "${PYTHON_BIN:-}" python3 python; do
 done
 [[ -n "${python_bin}" ]] || { echo 'Python 3 is required' >&2; exit 69; }
 
-state_root="${DEV_BATCH_STATE_DIR:-${ENVIRONMENT_STATE_DIR:-/tmp/festa-environments}/dev/batches}"
+# 기본값은 approve-known-good.sh · release-history.sh 와 같아야 한다. /tmp 로 두면 배포는 쓰고
+# 승인은 읽지 못해 known-good 이 영원히 비어 있다 (2026-09-18 실측).
+state_root="${DEV_BATCH_STATE_DIR:-${ENVIRONMENT_STATE_DIR:-/var/lib/festa-environments}/dev/batches}"
+target_environment="${FESTA_DEPLOY_ENVIRONMENT:-demo}"
+case "${target_environment}" in dev|demo) ;; *) echo 'FESTA_DEPLOY_ENVIRONMENT must be dev or demo' >&2; exit 64 ;; esac
 batch_dir="${state_root}/${DEV_BATCH_ID}"
 snapshot_dir="${batch_dir}/before"
 status_path="${CI_ARTIFACT_DIR}/dev-batch-result.json"
@@ -120,8 +126,8 @@ run_component() {
     return $?
   fi
   case "${component}" in
-    ai) component_env="${DEV_AI_ENV_FILE:-${COMPONENT_ENV_FILE:-}}" ;;
-    back) component_env="${DEV_BACK_ENV_FILE:-${COMPONENT_ENV_FILE:-}}" ;;
+    ai) component_env="${DEMO_AI_ENV_FILE:-${DEV_AI_ENV_FILE:-${COMPONENT_ENV_FILE:-}}}" ;;
+    back) component_env="${DEMO_BACK_ENV_FILE:-${DEV_BACK_ENV_FILE:-${COMPONENT_ENV_FILE:-}}}" ;;
   esac
   if [[ "${component}" =~ ^(ai|back)$ && -z "${component_env}" ]]; then
     echo "missing component environment file for ${component}" >&2
@@ -130,15 +136,15 @@ run_component() {
   case "${action}" in
     deploy)
       COMPONENT_ENV_FILE="${component_env}" CI_COMPONENT="${component}" RELEASE_MANIFEST_PATH="${manifest}" \
-        bash "${repo_root}/infra/environments/scripts/deploy-environment.sh" --environment dev --component "${component}" --release-manifest "${manifest}"
+        bash "${repo_root}/infra/environments/scripts/deploy-environment.sh" --environment "${target_environment}" --component "${component}" --release-manifest "${manifest}"
       ;;
     verify)
       COMPONENT_ENV_FILE="${component_env}" CI_COMPONENT="${component}" RELEASE_MANIFEST_PATH="${manifest}" \
-        bash "${repo_root}/infra/environments/scripts/verify-environment.sh" --environment dev --component "${component}"
+        bash "${repo_root}/infra/environments/scripts/verify-environment.sh" --environment "${target_environment}" --component "${component}"
       ;;
     rollback)
       COMPONENT_ENV_FILE="${component_env}" DEV_BATCH_ROLLBACK=1 DEV_BATCH_STATE_ROOT="${state_root}" CI_COMPONENT="${component}" RELEASE_MANIFEST_PATH="${manifest}" \
-        bash "${repo_root}/infra/environments/scripts/deploy-environment.sh" --environment dev --component "${component}" --release-manifest "${manifest}"
+        bash "${repo_root}/infra/environments/scripts/deploy-environment.sh" --environment "${target_environment}" --component "${component}" --release-manifest "${manifest}"
       ;;
   esac
 }
@@ -183,6 +189,11 @@ rollback() {
   component="${changed[index]}"; snapshot="${snapshot_dir}/${component}.json"
     if [[ ! -f "${snapshot}" ]] || ! run_component rollback "${component}" "${snapshot}" || ! run_component verify "${component}" "${snapshot}"; then
       manual=true
+    else
+      # 되돌렸으면 current 도 그 릴리스다 — 그러지 않으면 실행본과 기록이 갈린다
+      # (spec §Session 2026-09-18 규칙 6).
+      mkdir -p "${state_root}/current"
+      cp "${snapshot}" "${state_root}/current/${component}.json"
     fi
   done
   if [[ "${manual}" == true ]]; then
@@ -207,10 +218,16 @@ for component in "${components[@]}"; do
 done
 
 for component in "${components[@]}"; do
-  target="${state_root}/known-good/${component}.json"
+  # 자동 승격은 CURRENT 까지만. KNOWN_GOOD 은 사람이 approve-known-good.sh 로 승인해야 갱신된다.
+  mkdir -p "${state_root}/current"
+  target="${state_root}/current/${component}.json"
   temp="${target}.tmp"
   cp "${RELEASE_MANIFEST_PATH}" "${temp}"
   mv -f "${temp}" "${target}"
 done
+# current 가 된 릴리스만 이력에 남는다. candidate 에서 죽은 릴리스는 기록하지 않는다
+# (spec §Session 2026-09-18 규칙 1·7). 이력 적재 실패가 정상 배포를 되돌릴 이유는 없다.
+DEV_BATCH_STATE_DIR="${state_root}" bash "${repo_root}/infra/deploy/scripts/release-history.sh" record "${DEV_BATCH_ID}" \
+  || echo 'WARN: release history was not recorded' >&2
 write_status ACTIVE 'all selected component deployments and verifications passed'
 echo "${status_path}"

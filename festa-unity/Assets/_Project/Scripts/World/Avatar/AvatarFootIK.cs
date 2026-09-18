@@ -21,6 +21,12 @@ namespace Festa.World
         [SerializeField] float _maxPelvisDrop = 3f;
         [SerializeField] float _weightLerp = 10f;
 
+        /// <summary>
+        /// 이보다 작은 좌우 지면 차는 단차로 보지 않는다(u). 1 m = 13.26 u 이므로 0.15 u ≈ 1 cm —
+        /// 타일 이음매·메시 미세 단차에 골반이 떨리지 않게 한다.
+        /// </summary>
+        const float GroundDeadzone = 0.15f;
+
         Animator _anim;
         float _weight;          // 정지 1 → 이동 0.35
         float _pelvisOffset;    // 현재 골반 보정(음수)
@@ -43,8 +49,20 @@ namespace Festa.World
         void OnAnimatorIK(int layerIndex)
         {
             if (_anim == null || !_anim.isHuman) return;
-            // 이모트(앉기·눕기 등)·점프 상태에서는 끈다 — 앉은 자세에 발 IK 를 걸면 골반이 내려가 쭈그린다(2026-09-09 소파 실측), 공중에서는 발을 땅으로 당긴다.
             var state = _anim.GetCurrentAnimatorStateInfo(layerIndex);
+
+            // 의자 자세는 엉덩이를 좌면에 고정한 채 발만 바닥 위로 올린다. 일반 발 IK처럼 골반을
+            // 움직이면 좌면에서 다시 뜨므로, 발이 바닥 아래인 쪽에만 위치 IK를 건다.
+            if (IsChairSit(state))
+            {
+                _weight = 1f;
+                _pelvisOffset = 0f;
+                ClampChairFoot(AvatarIKGoal.LeftFoot);
+                ClampChairFoot(AvatarIKGoal.RightFoot);
+                return;
+            }
+
+            // 이모트(앉기·눕기 등)·점프 상태에서는 끈다 — 앉은 자세에 발 IK 를 걸면 골반이 내려가 쭈그린다(2026-09-09 소파 실측), 공중에서는 발을 땅으로 당긴다.
             if (state.IsTag("NoFootIK") || IsEmoteOrJump(state))
             {
                 _weight = 0f; _pelvisOffset = 0f;
@@ -59,10 +77,44 @@ namespace Festa.World
             _lHit = Probe(AvatarIKGoal.LeftFoot, out _lPos, out _lRot);
             _rHit = Probe(AvatarIKGoal.RightFoot, out _rPos, out _rRot);
 
-            // 골반: 두 발 중 더 낮은 쪽만큼 내린다(발이 공중에 뜨는 쪽을 땅에 닿게). 올리지는 않는다 — 올리면 캡슐 밖으로 뜬다.
-            float lDelta = _lHit ? _lPos.y - _anim.GetIKPosition(AvatarIKGoal.LeftFoot).y : 0f;
-            float rDelta = _rHit ? _rPos.y - _anim.GetIKPosition(AvatarIKGoal.RightFoot).y : 0f;
-            float drop = Mathf.Clamp(Mathf.Min(lDelta, rDelta, 0f), -_maxPelvisDrop, 0f) * _weight;
+            // 평지에서는 원본 걷기 애니메이션을 그대로 둔다. 골반 보정이 0이어도 발 목표를 지면에
+            // 강제로 고정하면 발목 높이 오차만큼 무릎이 살짝 접힌다. 양발 접촉면 차이가 미세하면
+            // 단차가 아니므로 발 위치·회전 IK까지 모두 끈다.
+            if (_lHit && _rHit)
+            {
+                float flatLeft = _lPos.y - _footHeight;
+                float flatRight = _rPos.y - _footHeight;
+                if (Mathf.Abs(flatLeft - flatRight) <= GroundDeadzone)
+                {
+                    _pelvisOffset = 0f;
+                    _anim.SetIKPositionWeight(AvatarIKGoal.LeftFoot, 0f);
+                    _anim.SetIKRotationWeight(AvatarIKGoal.LeftFoot, 0f);
+                    _anim.SetIKPositionWeight(AvatarIKGoal.RightFoot, 0f);
+                    _anim.SetIKRotationWeight(AvatarIKGoal.RightFoot, 0f);
+                    return;
+                }
+            }
+
+            // 골반: **두 발이 딛는 지면의 높이 차**만큼만 내린다. 올리지는 않는다 — 올리면 캡슐 밖으로 뜬다.
+            //
+            // 두 번 틀렸던 자리다.
+            // ① `지면높이 - 애니메이션 발높이` — 애니메이션이 들어 올린 발까지 "떠 있다" 로 읽어,
+            //    걷기 스윙마다 골반이 내려갔다 (2026-09-13).
+            // ② `지면높이 - transform.position.y` — 이 스크립트는 **Animator 노드**에 붙어 있고,
+            //    그 노드는 'AvatarVisual_Modular' 아래라 오프셋·배율이 끼어 있다. 바닥 높이가 아니다.
+            //    평지 실측(2026-09-14): 지면 0.084 · 노드 0.337 → 보정 **−0.253 이 상수로** 걸려
+            //    가만히 서 있어도 무릎이 굽었다 (사용자 지적, 2번 사진).
+            //
+            // 필요한 값은 애초에 절대 높이가 아니라 **한쪽 발이 다른 쪽보다 얼마나 낮은 데 있는가** 하나다.
+            // 그것만 쓰면 노드가 어디 있든·배율이 얼마든 평지에서는 정확히 0 이 된다.
+            float drop = 0f;
+            if (_lHit && _rHit)
+            {
+                float lGround = _lPos.y - _footHeight;
+                float rGround = _rPos.y - _footHeight;
+                float diff = Mathf.Min(lGround, rGround) - Mathf.Max(lGround, rGround);   // 항상 ≤ 0
+                if (diff < -GroundDeadzone) drop = Mathf.Clamp(diff, -_maxPelvisDrop, 0f) * _weight;
+            }
             _pelvisOffset = Mathf.Lerp(_pelvisOffset, drop, Time.deltaTime * _weightLerp);
             if (Mathf.Abs(_pelvisOffset) > 0.001f)
             {
@@ -84,6 +136,26 @@ namespace Festa.World
             return set;
         }
         static bool IsEmoteOrJump(AnimatorStateInfo state) => s_skipStates.Contains(state.shortNameHash);
+
+        static readonly int s_sitChair1 = Animator.StringToHash("Emote_SitChair1");
+        static readonly int s_sitChair2 = Animator.StringToHash("Emote_SitChair2");
+        static bool IsChairSit(AnimatorStateInfo state)
+            => state.shortNameHash == s_sitChair1 || state.shortNameHash == s_sitChair2;
+
+        void ClampChairFoot(AvatarIKGoal goal)
+        {
+            var original = _anim.GetIKPosition(goal);
+            if (!Probe(goal, out var grounded, out var rotation) || original.y >= grounded.y) {
+                _anim.SetIKPositionWeight(goal, 0f);
+                _anim.SetIKRotationWeight(goal, 0f);
+                return;
+            }
+
+            _anim.SetIKPositionWeight(goal, 1f);
+            _anim.SetIKRotationWeight(goal, 0.7f);
+            _anim.SetIKPosition(goal, grounded);
+            _anim.SetIKRotation(goal, rotation);
+        }
 
         bool Probe(AvatarIKGoal goal, out Vector3 pos, out Quaternion rot)
         {

@@ -77,7 +77,7 @@ class BoothHomepageApiIntegrationTest {
     void registeredStaffMayRegisterToo() throws Exception {
         Owner owner = leasedOwner("스태프등록");
         Long staff = createMemberWithWallet(users, wallets, "스태프");
-        staffs.save(new BoothStaff(owner.boothId(), staff, "STAFF"));
+        staffs.save(new BoothStaff(owner.boothId(), staff, "CONTENT_EDITOR"));
 
         mockMvc.perform(put("/api/v1/booths/{id}/homepage", owner.boothId())
                         .header("Authorization", bearerFor(staff))
@@ -306,6 +306,84 @@ class BoothHomepageApiIntegrationTest {
                 .andExpect(status().isOk()), "homepageUrl");
     }
 
+    // ── 프로젝트 서비스 주소 폴백 (2026-09-14 결정) ─────────────────────────
+
+    /**
+     * 노트북이 여는 주소의 실질 정본은 프로젝트 관리의 "서비스 주소" 다.
+     *
+     * <p>{@code booths.homepage_url} 은 endpoint 만 있고 화면이 없다 — FE 어디도
+     * {@code PUT /booths/{id}/homepage} 를 부르지 않아 실제 서비스에서는 늘 비어 있고, 그래서
+     * 노트북은 어느 부스에서도 "준비 안 됨" 이었다(2026-09-14 보고). 소유자가 자기 서비스 주소를
+     * 실제로 입력하는 칸은 {@code projects.deploy_url} 하나뿐이다.
+     */
+    @Test
+    void theProjectServiceUrlIsWhatTheLaptopOpensWhenNothingIsRegistered() throws Exception {
+        Owner owner = leasedOwner("폴백");
+        createProject(owner, "https://service.example.com");
+        publishLayout(owner);
+
+        mockMvc.perform(get("/api/v1/booths/{id}", owner.boothId()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.homepageUrl").value("https://service.example.com"));
+    }
+
+    /**
+     * 등록된 값이 파생된 값을 이긴다.
+     *
+     * <p>폴백은 빈 자리를 메우는 것이지 덮어쓰는 것이 아니다 — 등록 화면이 생기는 날 폴백은
+     * 스스로 사라진다(되돌릴 것이 없다).
+     */
+    @Test
+    void aRegisteredHomepageUrlStillWinsOverTheProjectServiceUrl() throws Exception {
+        Owner owner = leasedOwner("우선순위");
+        createProject(owner, "https://service.example.com");
+        mockMvc.perform(homepageRequest(owner, body("https://registered.example.com")))
+                .andExpect(status().isOk());
+        publishLayout(owner);
+
+        mockMvc.perform(get("/api/v1/booths/{id}", owner.boothId()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.homepageUrl").value("https://registered.example.com"));
+    }
+
+    /** 프로젝트는 있는데 서비스 주소 칸이 비었으면 열 것이 없다 — 폴백이 빈 값을 만들지 않는다. */
+    @Test
+    void aProjectWithoutAServiceUrlLeavesTheLaptopEmpty() throws Exception {
+        Owner owner = leasedOwner("주소없는프로젝트");
+        createProject(owner, null);
+        publishLayout(owner);
+
+        assertPresentAndNull(mockMvc.perform(get("/api/v1/booths/{id}", owner.boothId()))
+                .andExpect(status().isOk()), "homepageUrl");
+    }
+
+    /** 폴백도 게이트 뒤에 있다 — 미게시 부스에는 클릭할 노트북 자체가 없다. */
+    @Test
+    void theFallbackStaysBehindThePublishGate() throws Exception {
+        Owner owner = leasedOwner("폴백게이트");
+        createProject(owner, "https://service.example.com");
+
+        assertPresentAndNull(mockMvc.perform(get("/api/v1/booths/{id}", owner.boothId()))
+                .andExpect(status().isOk()), "homepageUrl");
+    }
+
+    /**
+     * 소유자 프리필은 <b>저장된 컬럼 그대로</b>다.
+     *
+     * <p>여기까지 폴백을 흘리면, 등록한 적 없는 값이 등록 폼에 채워져 소유자가 그것을 다시
+     * 저장하게 된다 — 한 주소가 두 컬럼에 복사되고 이후 한쪽만 고치면 갈린다.
+     */
+    @Test
+    void theOwnersPrefillDoesNotShowTheFallback() throws Exception {
+        Owner owner = leasedOwner("프리필폴백");
+        createProject(owner, "https://service.example.com");
+        publishLayout(owner);
+
+        assertPresentAndNull(mockMvc.perform(get("/api/v1/booths/mine")
+                .header("Authorization", bearerFor(owner.userId())))
+                .andExpect(status().isOk()), "homepageUrl");
+    }
+
     /** The owner's own surface ignores the gate — otherwise the studio form cannot prefill (R-06). */
     @Test
     void theOwnersPrefillIgnoresTheGate() throws Exception {
@@ -366,6 +444,16 @@ class BoothHomepageApiIntegrationTest {
                 .header("Authorization", bearerFor(owner.userId()))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(body);
+    }
+
+    /** @param deployUrl the "서비스 주소" 칸, or {@code null} for a project that left it empty */
+    private void createProject(Owner owner, String deployUrl) throws Exception {
+        String deploy = deployUrl == null ? "null" : "\"%s\"".formatted(deployUrl);
+        mockMvc.perform(post("/api/v1/booths/{id}/projects", owner.boothId())
+                        .header("Authorization", bearerFor(owner.userId()))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"전시\",\"deployUrl\":%s}".formatted(deploy)))
+                .andExpect(status().isCreated());
     }
 
     /** 009 방문자 조회가 같은 게이트를 읽어서 {@code BoothLayoutTestSupport} 로 옮겼다. */

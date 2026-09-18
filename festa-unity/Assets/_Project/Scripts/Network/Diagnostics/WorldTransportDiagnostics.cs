@@ -1,0 +1,272 @@
+using System;
+using System.Collections.Generic;
+using System.Globalization;
+using Unity.Netcode;
+using Unity.Netcode.Transports.UTP;
+using UnityEngine;
+
+namespace Festa.Network
+{
+    /// <summary>
+    /// World WebSocket이 Close reason 없이 끊겼을 때 서버·프록시 로그와 맞출 최소 transport 증거를 남긴다.
+    ///
+    /// <para><b>데디케이티드 서버 부하 계측도 여기서 한다</b> (GitLab #229). 40명 실측을 실제 사용자로 돌리는데
+    /// 서버 빌드에는 성능 계측이 하나도 없었다 — <see cref="Festa.Diagnostics.PerfHud"/> 가
+    /// <c>#if UNITY_EDITOR || !UNITY_SERVER</c> 라 서버 빌드에서 컴파일 자체가 빠진다. 로그를 떠도 접속·해제 줄만
+    /// 나와 "서버가 버텼는가" 를 판단할 수치가 없었다. 이 컴포넌트는 이미 서버·클라이언트 양쪽에서 살아 있고
+    /// transport 를 쥐고 있어 계측을 얹을 자리로 맞다.</para>
+    ///
+    /// <para><b>클라이언트 비용은 0 이다.</b> <see cref="Application.isBatchMode"/> 가드에서 즉시 빠지는데
+    /// WebGL 은 batchmode 로 뜨지 않는다. 다만 <c>#if UNITY_SERVER</c> 로 감싸지 <b>않았다</b> — 그러면
+    /// 서버 빌드에서만 깨져 뒤늦게 발견된다. 모든 플랫폼에서 컴파일되게 두어 에디터가 오류를 먼저 잡게 한다.</para>
+    /// </summary>
+    public sealed class WorldTransportDiagnostics : MonoBehaviour
+    {
+        const string ObjectName = "WorldTransportDiagnostics";
+
+        // ── 서버 부하 계측 (GitLab #229) ──
+        /// <summary>인프라가 <c>grep</c> 으로 구간을 떠 가는 표식. 바꾸면 #229 의 추출 명령이 깨진다.</summary>
+        const string MetricsTag = "[Festa/서버측정]";
+        const string IntervalArg = "-serverMetricsInterval";
+        const float DefaultIntervalSeconds = 10f;
+        const float MinIntervalSeconds = 1f;
+
+        /// <summary>한 창에 담을 프레임 표본 상한. 넘치면 버린다 — 측정 때문에 서버가 메모리를 먹으면 본말전도다.</summary>
+        const int MaxTickSamples = 8192;
+
+        bool _metricsEnabled;
+        bool _announced;
+        float _interval = DefaultIntervalSeconds;
+        float _windowStart = -1f;
+        readonly List<float> _tickMs = new();
+
+        // NGO 의 바이트 카운터는 **매 프레임 dispatch 뒤 리셋된다** — 한 번 읽어서는 초당 값을 못 만든다.
+        // 내부 API 라 리플렉션으로 잡는다 (PerfHud 가 쓰는 경로와 같다).
+        object _metrics;
+        System.Reflection.FieldInfo _sentField, _recvField;
+        System.Reflection.PropertyInfo _counterValue;
+        /// <summary>리플렉션 조회를 한 번만 한다 — 실패해도 매 프레임 다시 뒤지지 않는다.</summary>
+        bool _metricsProbed;
+        long _sentAccum, _recvAccum;
+
+        NetworkManager _manager;
+        NetworkTransport _transport;
+        UnityTransport _utp;
+        float _connectedAt = -1f;
+        float _lastDataAt = -1f;
+
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
+        static void AutoRegister()
+        {
+            if (GameObject.Find(ObjectName) != null) return;
+            var go = new GameObject(ObjectName);
+            go.AddComponent<WorldTransportDiagnostics>();
+            DontDestroyOnLoad(go);
+        }
+
+        void Awake()
+        {
+            // WebGL 클라이언트는 batchmode 가 아니다 — 여기서 걸러지면 아래 계측은 한 줄도 돌지 않는다.
+            _metricsEnabled = Application.isBatchMode;
+            if (_metricsEnabled) _interval = ReadIntervalArg();
+        }
+
+        void Update()
+        {
+            TrackManagerChange();
+            if (_metricsEnabled) SampleMetrics();
+        }
+
+        void TrackManagerChange()
+        {
+            var manager = NetworkManager.Singleton;
+            if (manager == _manager) return;
+
+            Unsubscribe();
+            _manager = manager;
+            if (_manager == null) return;
+
+            _transport = _manager.NetworkConfig?.NetworkTransport;
+            _utp = _transport as UnityTransport;
+            if (_transport != null) _transport.OnTransportEvent += OnTransportEvent;
+        }
+
+        void OnDestroy() => Unsubscribe();
+
+        void Unsubscribe()
+        {
+            if (_transport != null) _transport.OnTransportEvent -= OnTransportEvent;
+            _manager = null;
+            _transport = null;
+            _utp = null;
+            _connectedAt = -1f;
+            _lastDataAt = -1f;
+        }
+
+        void OnTransportEvent(NetworkEvent eventType, ulong clientId, ArraySegment<byte> payload, float receiveTime)
+        {
+            float now = Time.realtimeSinceStartup;
+            if (eventType == NetworkEvent.Data)
+            {
+                _lastDataAt = now;
+                return;
+            }
+
+            if (eventType == NetworkEvent.Connect)
+            {
+                _connectedAt = now;
+                _lastDataAt = now;
+                Debug.Log($"[WorldTransport] CONNECT {Context(clientId)}");
+                return;
+            }
+
+            if (eventType != NetworkEvent.Disconnect) return;
+
+            string connectedFor = _connectedAt >= 0f ? $"{now - _connectedAt:F1}s" : "unknown";
+            string idleFor = _lastDataAt >= 0f ? $"{now - _lastDataAt:F1}s" : "unknown";
+            string ngoReason = _manager != null ? _manager.DisconnectReason ?? "" : "";
+            Debug.LogWarning(
+                $"[WorldTransport] DISCONNECT utc={DateTime.UtcNow:O} connectedFor={connectedFor} " +
+                $"lastDataAgo={idleFor} ngoReason='{ngoReason}' {Context(clientId)}");
+        }
+
+        string Context(ulong clientId)
+        {
+            if (_manager == null) return "manager=null";
+
+            string endpoint = "unknown";
+            long rtt = -1;
+            if (_utp != null)
+            {
+                try { endpoint = _utp.GetEndpoint(clientId).ToString(); }
+                catch { /* 접속 종료 직후 endpoint가 먼저 제거될 수 있다. */ }
+                try { rtt = (long)_utp.GetCurrentRtt(clientId); }
+                catch { /* 같은 이유로 RTT 조회가 실패할 수 있다. */ }
+            }
+
+            string config = _utp == null
+                ? "transport=non-UTP"
+                : $"heartbeat={_utp.HeartbeatTimeoutMS}ms disconnect={_utp.DisconnectTimeoutMS}ms " +
+                  $"connect={_utp.ConnectTimeoutMS}ms attempts={_utp.MaxConnectAttempts}";
+
+            return $"role={(_manager.IsServer ? "server" : "client")} clientId={clientId} " +
+                   $"endpoint={endpoint} rtt={rtt}ms {config}";
+        }
+
+        // ────────────────────────────── 서버 부하 계측 (GitLab #229) ──────────────────────────────
+
+        /// <summary>
+        /// 프레임마다 표본을 모으고, 창이 차면 한 줄 남긴다.
+        ///
+        /// <para><b>접속자가 0 이면 남기지 않는다.</b> 하루치 빈 줄로 덮이면 인프라가 부하 구간을 못 찾는다.
+        /// 사람이 들어와 있는 동안만 줄이 생기므로 구간이 저절로 끊어진다.</para>
+        /// </summary>
+        void SampleMetrics()
+        {
+            var nm = _manager;
+            if (nm == null || !nm.IsServer) return;
+
+            if (!_announced)
+            {
+                _announced = true;
+                // 켜졌다는 사실은 접속자 0 이어도 한 번 남긴다 — 로그에 아무것도 없을 때
+                // "계측이 꺼진 것" 과 "아무도 안 들어온 것" 을 구분할 수 없으면 원인을 못 찾는다.
+                Debug.Log($"{MetricsTag} enabled interval={_interval:F0}s — 접속자가 1명 이상인 동안에만 기록한다.");
+            }
+
+            // 틱이 밀리기 시작하는 인원수를 찾는 유일한 지표다.
+            if (_tickMs.Count < MaxTickSamples) _tickMs.Add(Time.unscaledDeltaTime * 1000f);
+            SampleNetworkBytes(nm);
+
+            float now = Time.realtimeSinceStartup;
+            if (_windowStart < 0f) { _windowStart = now; return; }
+
+            float window = now - _windowStart;
+            if (window < _interval) return;
+            _windowStart = now;
+
+            int clients = nm.ConnectedClientsIds != null ? nm.ConnectedClientsIds.Count : 0;
+            if (clients <= 0 || _tickMs.Count == 0) { ResetWindow(); return; }
+
+            _tickMs.Sort();
+            float p50 = Percentile(0.50f);
+            float p95 = Percentile(0.95f);
+            float max = _tickMs[_tickMs.Count - 1];
+            int objects = nm.SpawnManager != null && nm.SpawnManager.SpawnedObjects != null
+                ? nm.SpawnManager.SpawnedObjects.Count
+                : -1;
+
+            Debug.Log(
+                $"{MetricsTag} utc={DateTime.UtcNow:yyyy-MM-ddTHH:mm:ss}Z clients={clients} " +
+                $"tick p50={p50:F1} p95={p95:F1} max={max:F1} ms | " +
+                $"net sent={_sentAccum / 1024f / window:F1} recv={_recvAccum / 1024f / window:F1} KB/s | " +
+                $"objects={objects} | heap={GC.GetTotalMemory(false) / 1048576}MB | window={window:F1}s");
+
+            ResetWindow();
+        }
+
+        void ResetWindow()
+        {
+            _tickMs.Clear();
+            _sentAccum = 0;
+            _recvAccum = 0;
+        }
+
+        /// <summary>정렬된 표본에서 백분위. 표본이 적어도 범위를 벗어나지 않게 자른다.</summary>
+        float Percentile(float q)
+        {
+            int i = Mathf.Clamp(Mathf.RoundToInt((_tickMs.Count - 1) * q), 0, _tickMs.Count - 1);
+            return _tickMs[i];
+        }
+
+        /// <summary>
+        /// NGO 의 transport 바이트 카운터를 프레임마다 누적한다. 카운터는 dispatch 뒤 리셋되므로
+        /// 한 번 읽어서는 초당 값을 만들 수 없다. 내부 API 라 리플렉션으로 잡는다.
+        ///
+        /// <para>못 잡으면 <b>조용히 0 을 쓰지 않는다</b> — 0 KB/s 가 찍히면 "대역폭 여유" 로 오독된다.
+        /// 한 번만 경고하고 이후에는 누적을 건너뛴다 (T-24).</para>
+        /// </summary>
+        void SampleNetworkBytes(NetworkManager nm)
+        {
+            if (_counterValue == null)
+            {
+                if (_metricsProbed) return;
+                _metricsProbed = true;
+                const System.Reflection.BindingFlags BF =
+                    System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic |
+                    System.Reflection.BindingFlags.Instance;
+                _metrics = nm.GetType().GetProperty("NetworkMetrics", BF)?.GetValue(nm);
+                _sentField = _metrics?.GetType().GetField("m_TransportBytesSent", BF);
+                _recvField = _metrics?.GetType().GetField("m_TransportBytesReceived", BF);
+                _counterValue = _sentField?.GetValue(_metrics)?.GetType()
+                    .GetProperty("Value", BF);
+                if (_counterValue == null || _recvField == null)
+                {
+                    Debug.LogWarning($"{MetricsTag} NGO 바이트 카운터를 찾지 못했다 — " +
+                                     "net sent/recv 는 0 으로 남는다. NGO 판올림으로 내부 필드명이 바뀌었는지 확인해야 한다.");
+                    return;
+                }
+            }
+            if (_counterValue == null) return;
+
+            _sentAccum += (long)_counterValue.GetValue(_sentField.GetValue(_metrics));
+            _recvAccum += (long)_counterValue.GetValue(_recvField.GetValue(_metrics));
+        }
+
+        /// <summary>실행 인자 <c>-serverMetricsInterval &lt;초&gt;</c>. 없거나 못 읽으면 기본값.</summary>
+        static float ReadIntervalArg()
+        {
+            var args = Environment.GetCommandLineArgs();
+            for (int i = 0; i < args.Length - 1; i++)
+            {
+                if (!string.Equals(args[i], IntervalArg, StringComparison.OrdinalIgnoreCase)) continue;
+                if (float.TryParse(args[i + 1], NumberStyles.Float, CultureInfo.InvariantCulture, out float v)
+                    && v >= MinIntervalSeconds) return v;
+                Debug.LogWarning($"{MetricsTag} {IntervalArg} 값을 읽지 못했다 ('{args[i + 1]}') — " +
+                                 $"기본 {DefaultIntervalSeconds:F0}초를 쓴다.");
+                return DefaultIntervalSeconds;
+            }
+            return DefaultIntervalSeconds;
+        }
+    }
+}

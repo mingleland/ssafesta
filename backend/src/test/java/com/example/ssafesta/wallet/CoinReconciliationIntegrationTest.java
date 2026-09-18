@@ -8,15 +8,22 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.example.ssafesta.TestcontainersConfiguration;
 import com.example.ssafesta.user.UserRepository;
+import java.time.Duration;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.scheduling.config.FixedDelayTask;
+import org.springframework.scheduling.config.ScheduledTaskHolder;
 
 /** Reconciliation and administrator adjustment (spec 003 FR-013, FR-014). */
 @Import(TestcontainersConfiguration.class)
 @SpringBootTest
+@AutoConfigureMockMvc
 class CoinReconciliationIntegrationTest {
 
     @Autowired private WalletService wallets;
@@ -25,6 +32,9 @@ class CoinReconciliationIntegrationTest {
     @Autowired private CoinLedgerEntryRepository ledger;
     @Autowired private UserRepository users;
     @Autowired private JdbcTemplate jdbc;
+    @Autowired private CoinReconciliationSweeper sweeper;
+    @Autowired private List<ScheduledTaskHolder> scheduledTaskHolders;
+    @Value("${app.wallet.reconciliation-scan-interval}") private Duration configuredScanInterval;
 
     @Test
     void aHealthyLedgerReportsNoMismatch() {
@@ -74,6 +84,41 @@ class CoinReconciliationIntegrationTest {
 
         assertEquals(before + 1, runs.count());
         assertNotNull(runs.findFirstByOrderByStartedAtDescIdDesc().orElseThrow().getFinishedAt());
+    }
+
+    // ── 배치 (S15P21A604-693) ────────────────────────────────────────────────
+    //
+    // run() 은 오랫동안 테스트만 불렀다. 직접 호출 테스트는 @Scheduled 를 지워도 초록이라, 등록
+    // 자체를 따로 본다 — 둘 중 하나만 있으면 "돈다" 를 증명하지 못한다.
+
+    @Test
+    void theSweeperRunsOneReconciliation() {
+        long before = runs.count();
+
+        sweeper.reconcile();
+
+        assertEquals(before + 1, runs.count());
+        assertEquals(CoinReconciliationRun.Status.COMPLETED,
+                runs.findFirstByOrderByStartedAtDescIdDesc().orElseThrow().getStatus());
+    }
+
+    /** {@code @Scheduled} 가 실제로 등록돼 있고, 주기가 설정값을 따른다. 어노테이션을 지우면 여기서 떨어진다. */
+    @Test
+    void theSweeperIsRegisteredAsAFixedDelayTaskWithTheConfiguredInterval() {
+        List<FixedDelayTask> registered = scheduledTaskHolders.stream()
+                .flatMap(holder -> holder.getScheduledTasks().stream())
+                .map(task -> task.getTask())
+                .filter(FixedDelayTask.class::isInstance)
+                .map(FixedDelayTask.class::cast)
+                // Spring 7 은 runnable 을 Task$OutcomeTrackingRunnable(비공개)로 감싸므로 instanceof 로는
+                // 못 본다. 감싼 쪽의 toString 이 ScheduledMethodRunnable 의 "클래스.메서드" 를 그대로 돌려준다.
+                .filter(task -> (CoinReconciliationSweeper.class.getName() + ".reconcile")
+                        .equals(String.valueOf(task.getRunnable())))
+                .toList();
+
+        assertEquals(1, registered.size(), "정합성 점검 스위퍼는 정확히 하나의 fixedDelay 작업으로 등록돼야 한다.");
+        assertEquals(configuredScanInterval, registered.getFirst().getIntervalDuration(),
+                "주기는 app.wallet.reconciliation-scan-interval 을 따라야 한다 — 상수로 박혀 있으면 설정이 장식이다.");
     }
 
     @Test

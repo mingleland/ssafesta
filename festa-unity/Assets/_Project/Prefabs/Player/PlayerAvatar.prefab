@@ -25,6 +25,11 @@ GameObject:
   - component: {fileID: 3077078690858850745}
   - component: {fileID: 6804392290677801411}
   - component: {fileID: 1582079450886445712}
+  - component: {fileID: 5813659176010968827}
+  - component: {fileID: 403387360215051380}
+  - component: {fileID: 9114138493320667276}
+  - component: {fileID: 7991853783431578192}
+  - component: {fileID: 5057290560676765375}
   m_Layer: 8
   m_Name: PlayerAvatar
   m_TagString: Untagged
@@ -235,8 +240,8 @@ MonoBehaviour:
   _maxPitch: 65
   _collisionReturnLerp: 5
   _collisionPullLerp: 8
-  _lookHeight: 14.4
-  _lookHeightNear: 17.5
+  _lookHeight: 16.8
+  _lookHeightNear: 18.9
   _selfHideDistance: 7.5
   _selfShowDistance: 10
   _occlusionGuardRadius: 12
@@ -306,13 +311,13 @@ CharacterController:
   m_ProvidesContacts: 0
   m_Enabled: 1
   serializedVersion: 3
-  m_Height: 16.875
-  m_Radius: 2.75
+  m_Height: 22.4
+  m_Radius: 2.85
   m_SlopeLimit: 45
   m_StepOffset: 3.75
   m_SkinWidth: 0.22
   m_MinMoveDistance: 0
-  m_Center: {x: 0, y: 8.4375, z: 0}
+  m_Center: {x: 0, y: 11.2, z: 0}
 --- !u!114 &8037092520390793218
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -368,7 +373,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   ShowTopMostFoldoutHeaderGroup: 1
-  _visibleDistance: 190
+  _visibleDistance: 0
   _ownColor: {r: 0.66, g: 0.82, b: 0.28, a: 1}
   _otherColor: {r: 1, g: 0.99, b: 0.95, a: 1}
 --- !u!114 &6804392290677801411
@@ -401,3 +406,80 @@ MonoBehaviour:
   _headOffset: 0.56
   _headLength: 0.19
   _headRadius: 0.052
+--- !u!136 &5813659176010968827
+CapsuleCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8589622438861398775}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 0
+  serializedVersion: 2
+  m_Radius: 2.85
+  m_Height: 22.4
+  m_Direction: 1
+  m_Center: {x: 0, y: 11.2, z: 0}
+--- !u!114 &403387360215051380
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8589622438861398775}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8067da3c589eb1549912bfe0cf377864, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  _settleFrames: 3
+  _sampleFrames: 12
+  _refitFrames: 60
+--- !u!114 &9114138493320667276
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8589622438861398775}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2d97f5aa8267d8a48ad0fd0043bf2d4f, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  ShowTopMostFoldoutHeaderGroup: 1
+--- !u!114 &7991853783431578192
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8589622438861398775}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: bb394cb60ab53b848917769c91a4b590, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  ShowTopMostFoldoutHeaderGroup: 1
+--- !u!114 &5057290560676765375
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8589622438861398775}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1274315bcd9f17f4187c63198b6c8b8d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  ShowTopMostFoldoutHeaderGroup: 1

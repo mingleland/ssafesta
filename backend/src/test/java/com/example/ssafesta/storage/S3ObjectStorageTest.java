@@ -72,11 +72,13 @@ class S3ObjectStorageTest {
     void aPresignedPutCarriesTheBucketKeyAndTtl() {
         try (S3ObjectStorage storage = new S3ObjectStorage(properties(Duration.ofMinutes(15)))) {
             String url = storage.presignPut("R2", "test-ai-documents", KEY,
-                    "application/pdf", 1024, Duration.ofMinutes(15));
+                    "application/pdf", 1024, "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+                    Duration.ofMinutes(15));
 
             assertTrue(url.contains("/test-ai-documents/" + KEY), "bucket·key 가 경로에 없다: " + url);
             assertTrue(url.contains("X-Amz-Expires=900"), "TTL 이 실리지 않았다: " + url);
             assertTrue(url.contains("X-Amz-Signature="), "서명이 없다: " + url);
+            assertTrue(url.toLowerCase().contains("x-amz-checksum-sha256"), "SHA-256 header가 서명되지 않았다: " + url);
         }
     }
 

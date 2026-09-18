@@ -17,6 +17,10 @@ import java.time.Instant;
  * <p>{@code endsAt} is computed here from the payment instant and the configured duration, never
  * taken from the request (D02, invariant I-4, 헌법 16조).
  *
+ * <p>A lease only ever leaves {@code ACTIVE}: by running out of time ({@link #expire()}) or by the
+ * tenant handing it back ({@link #cancel()}, D12). Neither is reversible and a re-lease creates a
+ * new row.
+ *
  * <p>Slot exclusivity is enforced by a partial unique index created in V1:
  * {@code CREATE UNIQUE INDEX ux_booth_leases_active_slot ON booth_leases(slot_id) WHERE status = 'ACTIVE'}.
  * That index does not look at {@code endsAt}, which is why an expired lease must still be
@@ -49,8 +53,23 @@ public class BoothLease {
     @Column(name = "ends_at", nullable = false, updatable = false)
     private Instant endsAt;
 
+    /** When the D07 one-hour warning was claimed. Null means it has not been sent yet. */
+    @Column(name = "expiry_warning_sent_at")
+    private Instant expiryWarningSentAt;
+
     @Column(name = "charged_coin", nullable = false, updatable = false)
     private int chargedCoin;
+
+    /**
+     * An administrator's lease: free, and with an {@code endsAt} far enough away that no expiry path
+     * ever reaches it (S15P21A604-905).
+     *
+     * <p>It exists so {@code ux_booth_leases_active_lessee} can skip these rows — an administrator
+     * holds one lease per slot, while the one-active-lease rule still binds every ordinary member
+     * (V6, T-110). Nothing reads it to decide expiry: that stays {@code ends_at > now} everywhere.
+     */
+    @Column(nullable = false, updatable = false)
+    private boolean permanent;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt = Instant.now();
@@ -60,12 +79,23 @@ public class BoothLease {
 
     public BoothLease(Long boothId, Long slotId, Long lesseeUserId, Instant startsAt, Duration duration,
                       int chargedCoin) {
+        this(boothId, slotId, lesseeUserId, startsAt, startsAt.plus(duration), chargedCoin, false);
+    }
+
+    /** An administrator's free, non-expiring lease (S15P21A604-905). */
+    static BoothLease permanent(Long boothId, Long slotId, Long adminUserId, Instant startsAt, Instant endsAt) {
+        return new BoothLease(boothId, slotId, adminUserId, startsAt, endsAt, 0, true);
+    }
+
+    private BoothLease(Long boothId, Long slotId, Long lesseeUserId, Instant startsAt, Instant endsAt,
+                       int chargedCoin, boolean permanent) {
         this.boothId = boothId;
         this.slotId = slotId;
         this.lesseeUserId = lesseeUserId;
         this.startsAt = startsAt;
-        this.endsAt = startsAt.plus(duration);
+        this.endsAt = endsAt;
         this.chargedCoin = chargedCoin;
+        this.permanent = permanent;
     }
 
     public Long getId() { return id; }
@@ -75,11 +105,28 @@ public class BoothLease {
     public LeaseStatus getStatus() { return status; }
     public Instant getStartsAt() { return startsAt; }
     public Instant getEndsAt() { return endsAt; }
+    public Instant getExpiryWarningSentAt() { return expiryWarningSentAt; }
     public int getChargedCoin() { return chargedCoin; }
+    public boolean isPermanent() { return permanent; }
+
+    /** Claims the one-time expiry warning before its WebSocket event is published after commit. */
+    void markExpiryWarningSent(Instant sentAt) {
+        this.expiryWarningSentAt = sentAt;
+    }
 
     /** Marks a lease whose time has passed as expired, freeing the slot for re-lease (FR-017). */
     void expire() {
         this.status = LeaseStatus.EXPIRED;
+    }
+
+    /**
+     * Marks a lease the tenant handed back early, freeing the slot right away (D12, FR-020).
+     *
+     * <p>A different word from {@link #expire()} so the history says which one happened; everything
+     * else about the release is identical, including <b>not</b> refunding the coin (FR-021).
+     */
+    void cancel() {
+        this.status = LeaseStatus.CANCELLED;
     }
 
     /** Seconds left, or 0 once expired (spec 004 FR-007, SC-005). */

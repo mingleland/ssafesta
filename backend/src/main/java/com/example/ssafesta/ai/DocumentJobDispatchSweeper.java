@@ -1,6 +1,7 @@
 package com.example.ssafesta.ai;
 
 import com.example.ssafesta.ai.DocumentProcessingClient.ProcessingRequest;
+import com.example.ssafesta.storage.ObjectDeleteQueue;
 import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -69,7 +70,7 @@ public class DocumentJobDispatchSweeper {
      *
      * <p><b>Deliberately not {@code @Transactional}.</b> The claim commits on its own before any
      * HTTP call is made, which is what stops a slow FastAPI from holding row locks for the length of
-     * its timeout. {@code GameAssetDeleteQueue.sweep} makes the same choice for the same reason, and
+     * its timeout. {@code ObjectDeleteQueue.sweep} makes the same choice for the same reason, and
      * an annotation here would also be inert since {@link #claim} is called through {@code this}.
      */
     @Scheduled(fixedDelayString = "PT30S")

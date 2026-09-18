@@ -7,17 +7,20 @@
 // 갈아끼우므로 Esc·배경 클릭·X·외부 closeOverlay()·다른 오버레이 전환이 전부 여기로 수렴한다.
 import { useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { facadeApi } from '../../../entities/booth/facadeApi.select';
 import { closeOverlay } from '../../../shared/types/overlay';
 import { closeConversation, createConversation, isAiHttpError, streamMessage } from '../../../entities/conversation/api';
 import { describeHttpError, shouldResetConversation } from '../../../entities/conversation/errorMessages';
 import { consumeSseStream } from '../../../entities/conversation/stream.consumer';
 import type { SseConsumptionStatus } from '../../../entities/conversation/stream.consumer';
 import { OverlayFrame } from '../../overlay/ui/OverlayFrame';
+import { Tooltip } from '../../../shared/ui/tooltip/Tooltip';
 import { useSession } from '../../auth/model/session';
 import { saveReturnTo } from '../../auth/model/returnTo';
 import { aiHandoffContext } from '../../consultation/model/startContext';
 import { requestConsultation, useVisitorConsultation } from '../../consultation/model/visitor';
 import './aiChatOverlay.css';
+import { renderMarkdown } from './renderMarkdown';
 import { openVisitorOverlay } from '../../world/model/worldScreen';
 
 interface Props {
@@ -44,7 +47,7 @@ const IcAgent = (
   </svg>
 );
 
-const SUGGESTIONS = ['어떤 프로젝트를 전시하나요?', '팀을 소개해 주세요', '기술 스택이 궁금해요'];
+const SUGGESTIONS = ['어떤 프로젝트인가요?', '누구를 대상으로 한 서비스인가요?', '기술 스택이 궁금해요'];
 
 export function AiChatOverlay({ payload }: Props) {
   const { kind } = useSession();
@@ -52,6 +55,10 @@ export function AiChatOverlay({ payload }: Props) {
   const location = useLocation();
   const navigate = useNavigate();
   const consultation = useVisitorConsultation();
+  // 제목에는 사람이 읽는 부스 이름을 쓴다 — payload.boothId 는 DB PK 라 그대로 노출하면
+  // 슬롯 번호처럼 읽힌다(S15P21A604-823). 방문자도 부를 수 있는 GET /booths/{id} 로 이름을 얻는다.
+  // 실패하면 조용히 이름 없이 '부스'로만 둔다(제목 장식이라 대화 흐름을 막지 않는다).
+  const [boothName, setBoothName] = useState<string | null>(null);
   const [turns, setTurns] = useState<Turn[]>([]);
   const [draft, setDraft] = useState('');
   const [busy, setBusy] = useState(false);
@@ -82,6 +89,19 @@ export function AiChatOverlay({ payload }: Props) {
   useEffect(() => {
     bodyRef.current?.scrollTo({ top: bodyRef.current.scrollHeight });
   }, [turns]);
+
+  useEffect(() => {
+    let alive = true;
+    void facadeApi
+      .getBooth(payload.boothId)
+      .then((booth) => {
+        if (alive) setBoothName(booth.name);
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, [payload.boothId]);
 
   // 게스트·비로그인은 Conversation 생성 진입점 자체를 보이지 않는다(spec 008 FR-027·SC-011).
   function goLogin() {
@@ -200,7 +220,7 @@ export function AiChatOverlay({ payload }: Props) {
   return (
     <OverlayFrame
       title="AI 직원"
-      subtitle={'부스 #' + payload.boothId}
+      subtitle={boothName ?? '부스'}
       size="l"
       icon={IcAgent}
       onClose={closeOverlay}
@@ -214,15 +234,16 @@ export function AiChatOverlay({ payload }: Props) {
       footer={
         isMember ? (
           <>
-            <button
-              type="button"
-              className="ov-btn ai-escalate"
-              disabled={consultationInProgress}
-              title={consultationInProgress ? '이미 진행 중인 상담이 있습니다' : undefined}
-              onClick={escalateToHuman}
-            >
-              사람 상담 요청
-            </button>
+            <Tooltip content={consultationInProgress ? '이미 진행 중인 상담이 있습니다' : null}>
+              <button
+                type="button"
+                className="ov-btn ai-escalate"
+                disabled={consultationInProgress}
+                onClick={escalateToHuman}
+              >
+                사람 상담 요청
+              </button>
+            </Tooltip>
             <form
               className="ai-composer"
               onSubmit={(e) => {
@@ -273,17 +294,8 @@ export function AiChatOverlay({ payload }: Props) {
             <div key={i} className={'ai-turn ai-turn-' + t.role}>
               {t.role === 'agent' && <span className="ai-avatar">AI</span>}
               <div className="ai-bubble">
-                {t.text}
+                {t.role === 'agent' ? renderMarkdown(t.text) : t.text}
                 {t.streaming && <span className="ai-caret" />}
-                {t.sources !== undefined && t.sources.length > 0 && !t.streaming && (
-                  <span className="ai-sources">
-                    {t.sources.map((s) => (
-                      <span key={s} className="ov-chip">
-                        {s}
-                      </span>
-                    ))}
-                  </span>
-                )}
                 {(t.status === 'error' || t.status === 'truncated') && (
                   <span className="ai-stream-error" role="alert">
                     {t.errorMessage}

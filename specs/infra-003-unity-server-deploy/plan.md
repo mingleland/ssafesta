@@ -4,7 +4,7 @@
 
 ## Summary
 
-x86_64 단일 EC2의 demo 환경에 `11F-01` Unity Dedicated Server 하나를 배포하고 `Cloudflare → Nginx:443 → demo-game:7777` 외부 WSS 경로를 검증한다. Backend는 120초 HS256 월드 입장 JWT를 전용 Secret으로 발급하고 Unity 서버는 이를 자체 검증한다. 사용된 토큰은 game 전용 영속 볼륨에 만료까지 기록해 컨테이너 교체 뒤에도 재사용을 차단한다. OCI Ampere A1 ARM64에서 계획했던 Unity 검증은 WebGL 정적 배포를 포함해 취소한다.
+x86_64 단일 EC2의 demo 환경에 `11F-01` Unity Dedicated Server 하나를 배포하고 `Cloudflare → Nginx:443 → demo-game:7777` 외부 WSS 경로를 검증한다. 배포는 4개 파트 통합 매니페스트뿐 아니라 `DEPLOY_COMPONENTS=game` 단독 릴리스 매니페스트로도 지원한다. smoke runner 자동 검증은 3시간 빌드 비용 부담으로 공식 제외(보류)하고, 1~3단계(프로세스 실행, 내부 7777 수신, 외부 WSS 101 핸드셰이크) 통과로 candidate → current 전환을 확정하며, 실제 플레이어 입장 및 상호작용 검증은 배포된 WebGL 브라우저 실접속 수동 검증 후 known-good 으로 승격한다. WebGL 클라이언트와 서버 후보의 프리팹 트리 해시 대조 가드를 통해 어긋난 교체는 자동으로 건너뛰어(SKIP, exit 75) 운영 월드를 보호한다. Backend는 120초 HS256 월드 입장 JWT를 전용 Secret으로 발급하고 Unity 서버는 이를 자체 검증한다. 사용된 토큰은 game 전용 영속 볼륨에 만료까지 기록해 컨테이너 교체 뒤에도 재사용을 차단한다. OCI Ampere A1 ARM64에서 계획했던 Unity 검증은 WebGL 정적 배포를 포함해 취소한다.
 
 ## Technical Context
 
@@ -58,7 +58,8 @@ Phase 1 설계 후에도 위 판정은 변하지 않는다.
 - game 서비스는 비관리자 container, 내부 `7777`, `maxPlayers=40`, 전용 replay volume과 Secret Reference를 가진다.
 - 배포 전 host와 game image가 모두 x86_64인지 확인하고 아키텍처 불일치나 에뮬레이션 경로는 실패 처리한다.
 - Nginx `world` host는 WebSocket Upgrade, cache/buffering off와 초기 read/send timeout 180초를 사용한다.
-- 배포는 `--no-deps`로 game만 갱신하고 외부 승인 접속 실패 시 known-good으로 복구한다.
+- 배포는 `DEPLOY_COMPONENTS=game` 단독 매니페스트 및 4개 통합 매니페스트를 모두 수용하고 `--no-deps`로 game만 갱신하며, 비대상 서비스(AI/Back/Front) restart delta 0을 보존한다.
+- 서버 준비성 검증은 3단계 검증 체계(프로세스 실행, 내부 7777 수신, 외부 WSS 101 핸드셰이크)를 적용한다: 스모크 러너 및 자동 4단계(approvedAdmission) 검증은 3시간 빌드 비용 부담으로 운영 범위에서 공식 제외(보류)하고, 1~3단계 통과로 candidate → current 전환을 확정한다. 실제 플레이어 입장 및 상호작용은 배포된 WebGL 브라우저 실접속 수동 검증 후 known-good 으로 승격한다. WebGL과 서버 후보의 프리팹 트리 해시 대조 가드를 통해 어긋난 교체는 자동으로 건너뛰어(SKIP, exit 75) 운영 중인 월드 서버를 보호한다.
 
 ## Project Structure
 
