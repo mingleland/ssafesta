@@ -4,22 +4,8 @@
     {
       "name": "festa-frontend",
       "runtimeExecutable": "npm",
-      "runtimeArgs": [
-        "run",
-        "dev",
-        "--prefix",
-        "festa-frontend"
-      ],
+      "runtimeArgs": ["run", "dev", "--prefix", "festa-frontend"],
       "port": 5173
-    },
-    {
-      "name": "festa-backend",
-      "runtimeExecutable": "cmd",
-      "runtimeArgs": [
-        "/c",
-        "cd backend && mvnw.cmd spring-boot:run -Dspring-boot.run.profiles=local -Dspring-boot.run.arguments=--server.port=18080"
-      ],
-      "port": 18080
     }
   ]
 }
