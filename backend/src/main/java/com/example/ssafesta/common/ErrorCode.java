@@ -170,6 +170,13 @@ public enum ErrorCode {
      */
     DOCUMENT_NOT_REPLACEABLE(HttpStatus.CONFLICT, "이 문서는 교체할 수 없습니다."),
     /**
+     * 처리 중인 문서는 삭제할 수 없다 (FR-012, S15P21A604-831). 업로드가 끝난 {@code QUEUED}와
+     * {@code PROCESSING}은 살아 있는 {@code ai_document_jobs} 행을 가질 수 있어, 지금 지우면 CASCADE가
+     * 그 Job 행을 워커 밑에서 걷어 간다. 업로드 전 {@code QUEUED(uploaded_at IS NULL)}는 아직 Job이
+     * 없으므로 삭제할 수 있다. 완료(READY)나 이미 끝난 상태(FAILED·EXPIRED·DISABLED)도 안전하다.
+     */
+    DOCUMENT_NOT_DELETABLE(HttpStatus.CONFLICT, "처리 중인 문서는 삭제할 수 없습니다. 완료된 뒤 다시 시도해 주세요."),
+    /**
      * 늦게 도착한 이전 attempt 의 결과다 (GitLab #119 §3, S15P21A604-400).
      *
      * <p>lease 가 만료돼 Job 을 회수하고 {@code attempt_no} 를 올린 뒤, 죽은 줄 알았던 이전 워커가
