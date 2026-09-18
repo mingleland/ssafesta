@@ -590,7 +590,8 @@ namespace Festa.Network
             }
 
             var before = transform.position;
-            var velocity = horizontalVelocity + NoStandSlide() + ExternalPush() + SoftSeparation() + Vector3.up * _verticalSpeed;
+            var noStandSlide = ResolveNoStandSlide(ref horizontalVelocity);
+            var velocity = horizontalVelocity + noStandSlide + ExternalPush() + SoftSeparation() + Vector3.up * _verticalSpeed;
             _controller.Move(velocity * Time.deltaTime);
             PreventPlayerPushThroughWall(before);
         }
@@ -763,17 +764,27 @@ namespace Festa.Network
         // 오브젝트 중심 반대 방향으로 밀려 가장자리에서 떨어진다. 입력으로 버텨도 밀림이 이긴다.
         //
         // 라운지 글자 소파는 예외다 — F 로 올라가 눕는 자리다(사용자 확인).
-        // 달리기(_runSpeed 65)보다 빨라야 한다. 입력에 **더해지는** 값이라 달리기보다 느리면
-        // 중심 쪽으로 달려서 계속 올라서 있을 수 있다 — 그러면 막은 것이 아니다.
-        const float NoStandSlideSpeed = 90f;
-        const float NoStandHold = 0.2f;        // 접촉이 끊겨도 이만큼은 밀어 가장자리를 넘긴다
+        //
+        // 예전에는 달리기(65u/s)를 이기려고 90u/s를 입력에 더했다. 그래서 작은 의자에 발끝만 닿아도
+        // 옆으로 던져지는 것처럼 보였다. 이제 중심으로 향하는 입력 성분만 제거하고, 바깥 방향으로는
+        // 걷기보다 낮은 속도로 미끄러뜨린다. 안쪽 입력이 사라졌으므로 높은 밀기 속도가 필요 없다.
+        const float NoStandSlideSpeed = 14f;
+        const float NoStandHold = 0.12f;       // 접촉이 끊긴 직후 가장자리에서 자연스럽게 내려오게 한다
         Vector3 _noStandPush;
         float _noStandPushUntil;
         int _noStandCachedId;
         bool _noStandCachedResult;
 
-        Vector3 NoStandSlide()
-            => Time.time < _noStandPushUntil ? _noStandPush * NoStandSlideSpeed : Vector3.zero;
+        Vector3 ResolveNoStandSlide(ref Vector3 horizontalVelocity)
+        {
+            if (Time.time >= _noStandPushUntil) return Vector3.zero;
+
+            // _noStandPush 는 오브젝트 중심에서 바깥쪽이다. 음수 성분만 중심으로 파고드는 입력이므로
+            // 지우고, 접선·바깥 방향 입력은 그대로 둔다. 조작권을 뺏지 않으면서 재진입만 막는다.
+            float inward = Vector3.Dot(horizontalVelocity, _noStandPush);
+            if (inward < 0f) horizontalVelocity -= _noStandPush * inward;
+            return _noStandPush * NoStandSlideSpeed;
+        }
 
         /// <summary>상체 레이어에서만 재생돼 이동과 함께 나갈 수 있는 이모트인가 (주먹질).</summary>
         static bool IsUpperBodyOnly(PlayerEmoteId emote) =>
