@@ -142,14 +142,14 @@
 
 - [ ] T050 [P] [US4] client disconnect에서 player와 SessionDataStore가 제거되고 이전 grant를 다시 쓰지 않는 Unity 테스트를 `festa-unity/Assets/_Project/Tests/EditMode/DisconnectCleanupTests.cs`에 작성한다
 - [ ] T051 [P] [US4] 자동 재접속 없이 종료 안내→사용자 선택→새 session 발급→새 연결 상태 전이를 검증하는 테스트를 `festa-unity/Assets/_Project/Tests/EditMode/ManualReconnectFlowTests.cs`에 작성한다
-- [ ] T052 [P] [US4] Nginx 180초 초기 timeout, Upgrade 유지와 cache/buffering off를 검사하는 테스트를 `infra/unity-server/tests/integration/idle-timeout.sh`에 작성한다
+- [x] T052 [P] [US4] Nginx 180초 초기 timeout, Upgrade 유지와 cache/buffering off를 검사하는 테스트를 `infra/unity-server/tests/integration/idle-timeout.sh`에 작성한다
 - [ ] T053 [P] [US4] 회원·게스트 브라우저 2개의 10분 무입력·종료·30초 재접속 결과 필드를 검사하는 증거 테스트를 `infra/unity-server/tests/evidence/p0-evidence.sh`에 작성한다
 
 ### Implementation for User Story 4
 
 - [ ] T054 [US4] 연결 종료 reason을 표시하고 사용자가 누를 때만 새 world-session을 요청하도록 `festa-unity/Assets/_Project/Scripts/Network/Connection/ConnectionStatusHud.cs`를 구현한다
 - [ ] T055 [US4] disconnect callback에서 session/player를 한 번만 정리하고 수동 재접속 시 이전 payload를 폐기하도록 `festa-unity/Assets/_Project/Scripts/Network/Connection/ConnectionManager.cs`를 보강한다
-- [ ] T056 [P] [US4] `proxy_read_timeout`·`proxy_send_timeout` 초기값 180초와 장시간 Upgrade 설정을 `infra/unity-server/nginx/world.conf.template`에 반영한다
+- [x] T056 [P] [US4] `proxy_read_timeout`·`proxy_send_timeout` 초기값 180초와 장시간 Upgrade 설정을 `infra/unity-server/nginx/world.conf.template`에 반영한다
 - [ ] T057 [US4] 회원·게스트 두 브라우저의 상호 이동·10분 무입력·종료 정리·새 grant 재접속을 안내하고 시간 측정하는 `infra/unity-server/scripts/verify-p0-browser.sh`를 구현한다
 - [ ] T058 [P] [US4] Cloudflare/Nginx/Unity 중 종료 계층과 관찰 시각을 분리해 기록하는 `infra/unity-server/scripts/collect-idle-evidence.sh`를 구현한다
 - [ ] T059 [US4] 10분 동안 예상 밖 종료 0이면 180초를 확정하고 실패 시 계층 진단·조정·동일 시험 반복을 요구하는 `infra/unity-server/runbooks/idle-and-reconnect.md`를 작성한다

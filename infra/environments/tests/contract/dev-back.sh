@@ -26,6 +26,11 @@ assert_contains "${data_compose}" 'name: festa-data-private' 'data project must 
 assert_contains "${repo_root}/infra/environments/redis/users.acl.example" 'user dev_back .*~dev:\*' 'dev backend ACL must cover its namespaced Redis keys'
 assert_contains "${repo_root}/infra/environments/redis/users.acl.example" 'user dev_back .*\+@connection .*\+info' 'backend ACL must permit Spring Redis health checks'
 assert_contains "${repo_root}/infra/environments/redis/users.acl.example" 'user demo_back .*\+@connection .*\+info' 'demo backend ACL must permit Spring Redis health checks'
+# 채팅 rate limit 과 세션 refresh 가 Lua 로 원자 처리된다. @scripting 이 빠지면 EVALSHA 가
+# 거절되어 채팅이 막히고 월드 입장 직후 연결이 끊긴다 (2026-09-18 실측).
+for redis_user in dev_back dev_ai demo_back demo_ai; do
+  assert_contains "${repo_root}/infra/environments/redis/users.acl.example" "user ${redis_user} .*\\+@scripting" "${redis_user} ACL must permit EVALSHA"
+done
 assert_not_contains "${overlay}" '^\s*POSTGRES_PASSWORD:' 'backend password must not be committed'
 assert_not_contains "${overlay}" '^\s*REDIS_PASSWORD:' 'Redis password must not be committed'
 pass 'dev backend uses scoped data credentials and loopback-only ingress'

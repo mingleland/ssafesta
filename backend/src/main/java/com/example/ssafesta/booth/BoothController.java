@@ -36,6 +36,11 @@ public class BoothController {
 
                     `homepageUrl` 은 **공개 여부와 무관하게 항상 저장값**이다 (spec 016). 미공개 상태에서도 스튜디오 폼을
                     프리필해야 하기 때문이며, 방문자용 `GET /api/v1/booths/{boothId}` 와 규칙이 다르다.
+
+                    **관리자 부스는 여기에 나오지 않는다** (spec 004 FR-022, `S15P21A604-905`). 관리자는 슬롯마다 부스를
+                    하나씩 들 수 있어 "내 부스 하나" 라는 이 응답 모양에 담기지 않는다. 관리자가 자기 부스를 찾을 때는
+                    `GET /api/v1/booth-slots` 의 `mine` 이 `true` 인 칸을 읽는다 — 그 응답이 슬롯마다 `boothId` 를 함께 준다.
+                    관리자가 일반 회원으로서 따로 임대한 부스가 있으면 그것은 여기에 그대로 나온다.
                     """)
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "내 부스와 임대 정보"),

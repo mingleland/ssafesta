@@ -121,6 +121,14 @@ festa-frontend/src/
 - 응답 도중 Lease가 만료되면 시작된 1건만 기존 60초 한도 내 완료하며 다음 질문부터 `BOOTH_LEASE_EXPIRED`다.
 - 로그·metric은 `requestId`, 지연, event 수, error code, 기대/실제 식별자만 기록하고 질문·답변·Chunk 원문은 기록하지 않는다.
 
+### 7. 정형 프로젝트 정보 단축 응답 (S15P21A604-396)
+
+- 문서 Embedding 결과 Chunk에서 대상 사용자·사용 기술 후보 구간을 고르고 공유 LLM adapter를 한 번 호출해 strict JSON으로 추출한다. 문서에 명시되지 않은 값은 `null`이다.
+- 추출 결과는 별도 API를 늘리지 않고 기존 document finalize의 선택 `projectFacts`에 실어 attempt 멱등성·stale 방어를 재사용한다. 추출 실패는 원문 없는 경고만 남기고 `projectFacts` 없이 finalize한다.
+- Spring Agent 설정의 선택 `projectFacts`는 프로젝트 소개·대상 사용자·사용 기술을 제공한다. FastAPI client는 기존 응답과 신규 응답을 모두 허용한다.
+- Agent 설정 확인 뒤 정확한 화이트리스트 문자열만 단축 응답한다. 값 누락·복합 질문·미등록 표현은 기존 질의 Embedding→검색→RAG 경로를 그대로 탄다.
+- 단축 응답은 기존 SSE `start→token→done`과 완료 turn 저장을 재사용하며 `source`를 만들지 않는다.
+
 ## Complexity Tracking
 
 Constitution 위반 없음.

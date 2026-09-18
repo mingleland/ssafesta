@@ -49,6 +49,7 @@ def create_app() -> FastAPI:
         settings=settings,
         spring_http_client=spring_http_client,
         embedding_provider=embedding_provider,
+        llm_provider=llm_provider,
     )
     document_task_supervisor = DocumentTaskSupervisor(
         processor=document_orchestrator.run,
