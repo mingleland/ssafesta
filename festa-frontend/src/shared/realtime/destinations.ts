@@ -9,8 +9,14 @@ export const WORLD_CHAT_SEND = '/app/world/chat';
 
 export const WORLD_CHAT_TOPIC = '/topic/world/chat';
 export const WORLD_CHAT_ERRORS = '/user/queue/world/chat/errors';
+/** D07 — the tenant only; Spring resolves this through the authenticated STOMP principal. */
+export const BOOTH_LEASE_EXPIRY_QUEUE = '/user/queue/booth-lease-expiry';
 
 export const ALLOWED_SEND_DESTINATIONS: readonly string[] = [WORLD_CHAT_SEND];
 
 // 상담 real 어댑터가 도착하면 `/user/queue/consultation` 과 부스 토픽이 여기 붙는다.
-export const ALLOWED_SUBSCRIBE_DESTINATIONS: readonly string[] = [WORLD_CHAT_TOPIC, WORLD_CHAT_ERRORS];
+export const ALLOWED_SUBSCRIBE_DESTINATIONS: readonly string[] = [
+  WORLD_CHAT_TOPIC,
+  WORLD_CHAT_ERRORS,
+  BOOTH_LEASE_EXPIRY_QUEUE,
+];

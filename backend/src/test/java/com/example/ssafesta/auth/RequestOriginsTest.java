@@ -100,6 +100,7 @@ class RequestOriginsTest {
 
     private AuthProperties props(String frontendBaseUrl) {
         return new AuthProperties("secret", Duration.ofMinutes(30), Duration.ofDays(14), Duration.ofMinutes(5),
-                Duration.ofSeconds(60), Duration.ofSeconds(30), "/api/v1/auth/refresh", frontendBaseUrl, false);
+                Duration.ofSeconds(60), Duration.ofSeconds(30), Duration.ofSeconds(30),
+                "/api/v1/auth/refresh", frontendBaseUrl, false);
     }
 }

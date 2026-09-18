@@ -57,10 +57,17 @@ public class EventShopService {
      *                      quantity
      */
     @Transactional
-    public PurchaseView purchase(Long userId, Long prizeId, int quantity, String operationId) {
+    public PurchaseView purchase(Long userId, Long prizeId, int quantity, PurchaseRecipient recipient,
+                                 String operationId) {
         if (quantity < 1) {
             throw ApiException.fieldInvalid("quantity", "1 이상이어야 합니다.");
         }
+        // Every prize in the event shop is a gift certificate, so no purchase may be recorded
+        // without a recipient. The check sits here rather than in the controller because this is
+        // the one method every purchase path goes through (GitLab #239).
+        PurchaseRecipient validRecipient = recipient == null
+                ? new PurchaseRecipient(null, null, null).validated()
+                : recipient.validated();
         String idempotencyKey = purchaseKey(userId, operationId);
 
         // Wallet lock first, matching InventoryService.purchase — every coin-spending purchase in
@@ -77,7 +84,8 @@ public class EventShopService {
         if (replay.isPresent()) {
             EventPurchase existing = replay.get();
             if (!existing.getBuyerUserId().equals(userId) || !existing.getPrizeId().equals(prizeId)
-                    || existing.getQuantity() != quantity) {
+                    || existing.getQuantity() != quantity
+                    || !sameRecipient(existing, validRecipient)) {
                 throw new ApiException(ErrorCode.IDEMPOTENCY_CONFLICT);
             }
             return viewOf(existing, prizeNameOf(existing.getPrizeId()));
@@ -98,12 +106,25 @@ public class EventShopService {
 
         Instant now = Instant.now();
         EventPurchase saved = purchases.save(new EventPurchase(prizeId, userId, quantity, coinSpent,
-                result.entryId(), idempotencyKey, now));
+                validRecipient, result.entryId(), idempotencyKey, now));
 
         String buyerNickname = users.findById(userId).map(User::getNickname).orElse(null);
         events.purchased(saved.getId(), prizeId, prize.getName(), buyerNickname, quantity, coinSpent, now);
 
         return viewOf(saved, prize.getName());
+    }
+
+    /**
+     * A replay has to name the same recipient, or it is a different order wearing the same key.
+     *
+     * <p>Rows bought before GitLab #239 carry no recipient at all, and a retry of one of those
+     * would now arrive with one. Those are compared as equal rather than conflicting: the stored
+     * row is the authoritative first result either way, and answering {@code 409} there would turn
+     * a legitimate retry into a dead end the client cannot escape.
+     */
+    private static boolean sameRecipient(EventPurchase existing, PurchaseRecipient requested) {
+        PurchaseRecipient stored = existing.getRecipient();
+        return stored.isAbsent() || stored.equals(requested);
     }
 
     private String prizeNameOf(Long prizeId) {

@@ -87,6 +87,13 @@ app:
     # 두 탭이 함께 로그아웃된다 (S15P21A604-764, GitLab #198). 이 창 밖의 재사용은 그대로
     # 계보째 끊는다 — spec 001 시나리오 7 은 변하지 않는다.
     refresh-reuse-grace: PT30S
+    # 갱신으로 밀려난 sid 가 이 시간 동안은 아직 통과한다. React 와 Unity 가 Access Token 하나를
+    # 나눠 쓰므로, 유예가 없으면 한쪽의 정상 갱신이 다른 쪽이 들고 있는 토큰을 즉사시킨다 —
+    # 월드가 12슬롯 게시본·world-sessions 를 한꺼번에 401 로 잃는 경로가 이것이다 (GitLab #216).
+    # 위 refresh-reuse-grace 와 수치는 같지만 뜻이 다르다: 그쪽은 "같은 Refresh Token 을 두 번 쓴
+    # 것을 도난으로 볼지", 이쪽은 "두 Access Token 이 겹쳐 사는 시간" 이다. 새 로그인·로그아웃·
+    # 계보 폐기는 이 유예를 즉시 끝낸다 — 다른 기기 로그인이 밀어내는 규칙은 그대로다.
+    session-rotation-grace: PT30S
     refresh-cookie-path: /api/v1/auth/refresh
     # 기본값 없음 — localhost 로 조용히 뜨면 OAuth 마지막 리디렉트와 CORS 허용 오리진이
     # 배포에서 동시에 깨지고, 화면에는 로그인 실패로만 보인다.
@@ -119,8 +126,12 @@ app:
     timer-stop:
       # FR-001a — 목표 시간을 이 범위에서 무작위로 뽑는다. 밀리초 단위까지만 쓸 수 있다
       # (target_value 가 NUMERIC(8,3)).
-      target-min-seconds: 5.0
-      target-max-seconds: 10.0
+      #
+      # 2026-09-18 에 5~10초에서 2~4초로 당겼다 (GitLab #214, S15P21A604-888) — 실플레이에서 한 판
+      # 대기가 지루하다는 FE 요청이다. 하한 2초는 준비 시간 보장이다: 목표는 세션 응답이 온 뒤에야
+      # 화면에 뜨고 그 순간 이미 초시계가 돈다. 실패 임계도 아래 margin 을 타고 5~7초로 함께 짧아진다.
+      target-min-seconds: 2.0
+      target-max-seconds: 4.0
       # failAfterSeconds = 목표 + 이 값 (FR-001d). 리드 확정 대기 중이고, 게임 파트는 GitLab #134
       # 에서 목표+3초에 이견 없음을 회신했다 — docs/26 "미니게임 실패 임계" 행 참조.
       fail-margin-seconds: 3.0
@@ -153,19 +164,20 @@ app:
         - plaza-slot-01
         - plaza-slot-02
       # 배수 오름차순. tier = 인덱스 + 1 이고 0 은 낙첨이다 — 낙첨에는 행이 없고 남는 가중치가
-      # 그대로 낙첨 확률이다(0.78). 합 1.00, RTP = 0.15×2 + 0.05×3 + 0.02×5 = 0.55 이라
-      # 10코인 한 판 기대 손실 4.5코인, 즉 이 기계는 코인 소각처다.
+      # 그대로 낙첨 확률이다(0.781). 합 1.00, 기본 RTP = 0.20×2 + 0.01×3 + 0.009×10 = 0.52 이라
+      # 10코인 한 판 기대 손실 4.8코인, 즉 이 기계는 코인 소각처다. 지급 없는 10연속 베팅 뒤
+      # 다음 1회는 service가 ×2(tier 1)로 보장한다. 보장 상태는 별도 저장하지 않고 원장에서 계산한다.
       #
       # ⚠️ 4번째 tier 를 붙이지 마라. Unity 가 tier 를 0..3 으로 자르고(HttpSlotMachineClient)
       # 릴 당첨 프리셋도 3개뿐이라, 코인은 나가는데 화면은 다른 등급을 보여 준다. 설정 검증이
       # 기동 시 거부하므로 여기서 조용히 어긋나지는 않는다.
       tiers:
         - multiplier: 2
-          weight: 0.15
+          weight: 0.20
         - multiplier: 3
-          weight: 0.05
-        - multiplier: 5
-          weight: 0.02
+          weight: 0.01
+        - multiplier: 10
+          weight: 0.009
 
   # Unity 월드 접속 정보 (spec 002 FR-010). 배포 값(wss / world.<domain> / 443)은
   # application-infra.yml 이 소유하고 이 세 기본값을 덮는다.
@@ -178,7 +190,7 @@ app:
     connection-token-secret: ${CONNECTION_TOKEN_SECRET}
 
   lease:
-    price-coin: 100
+    price-coin: 50
     duration: PT24H
     # 만료 배치의 "주기"다 (S15P21A604-152). 24시간 임대 기간 자체는 위 duration 이고, 만료
     # 판정의 권위는 여전히 조회 시점이다 (spec 004 C-02) — 이 값을 늘려도 만료 부스 입장은

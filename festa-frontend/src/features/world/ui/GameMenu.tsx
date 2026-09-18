@@ -15,6 +15,8 @@ import { walletApi } from '../../../entities/wallet/api.select';
 import { leaseApi } from '../../../entities/booth/leaseApi.select';
 import { openManagement } from '../model/worldScreen';
 import { useAdminCapability } from '../../admin/model/capability';
+import { getReadyUnityInstance } from '../../../unity/host/sessionManager';
+import { requestAvatarCustomization } from '../../../unity/host/worldUiBridge';
 import type { MenuPanel } from '../model/gameClientUi';
 import './gameMenu.css';
 
@@ -99,6 +101,17 @@ export function GameMenu({ onClose, onOpenPanel }: Props) {
     navigate('/login', { replace: true });
   }
 
+  // 월드를 떠나지 않고 Unity 가 아바타 화면을 연다 (S15P21A604-852, GitLab #197 게임 파트 계약).
+  // 메뉴를 먼저 닫는다 — 안 닫으면 아바타 화면 위에 이 패널이 그대로 덮인다. 닫는 명령은 따로 없고,
+  // Unity 가 밀어 주는 `avatar:true` 를 `hasUnityModal()` 이 받아 ESC 중재 2단계가 처리한다.
+  function openAvatarCustomization() {
+    const instance = getReadyUnityInstance();
+    // mock 월드·boot 전에는 보낼 곳이 없다. 조용히 넘긴다 — BoothExitButton 과 같은 판단이다.
+    if (instance === null) return;
+    requestAvatarCustomization(instance);
+    onClose();
+  }
+
   const account = state.account;
   // 실패를 '불러오는 중...' 으로 위장하지 않는다 — 영원히 로딩처럼 보이던 자리다(T-24 정신).
   const memberNickname = state.status === 'error' ? '이름을 불러오지 못했습니다' : '불러오는 중...';
@@ -133,6 +146,15 @@ export function GameMenu({ onClose, onOpenPanel }: Props) {
             {IcChevron}
           </button>
 
+          {/* 게스트에게는 감춘다 — 보상 수령이 `403 MEMBER_ONLY` 이고(GitLab #233), 헌법 12조상
+              게스트는 비영속이라 코인을 줄 자리가 없다. 눌리는 버튼을 두면 열어 놓고 전부 막는 화면이 된다. */}
+          {isMember && (
+            <button type="button" className="gm-item" onClick={() => onOpenPanel('missions')}>
+              미션
+              {IcChevron}
+            </button>
+          )}
+
           {myBoothQuery.data && (
             <button type="button" className="gm-item" onClick={openManagement}>
               부스 관리
@@ -147,10 +169,14 @@ export function GameMenu({ onClose, onOpenPanel }: Props) {
             </button>
           )}
 
-          <button type="button" className="gm-item" disabled title="준비 중입니다">
-            아바타 변경
-            <span className="gm-badge">준비 중</span>
-          </button>
+          {/* 게스트에게는 감춘다. Unity 가 거부하고 로그만 남기므로(S15P21A604-437) 눌리는 버튼을
+              두면 아무 일도 안 일어난 것처럼 보인다 — 게임 파트가 #197 회신에서 요청한 처리다. */}
+          {isMember && (
+            <button type="button" className="gm-item" onClick={openAvatarCustomization}>
+              아바타 변경
+              {IcChevron}
+            </button>
+          )}
 
           {/* 설정에 있는 것은 음악뿐이다 — 없는 항목을 만들지 않는다(S15P21A604-618) */}
           <button type="button" className="gm-item" onClick={() => onOpenPanel('settings')}>

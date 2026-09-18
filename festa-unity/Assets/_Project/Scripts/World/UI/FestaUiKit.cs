@@ -96,9 +96,16 @@ namespace Festa.World.UI
             return canvas;
         }
 
+        /// <summary>
+        /// 전체 화면을 덮는 배경의 오브젝트 이름. <b>상수로 두는 이유</b> — 캐릭터 로비가
+        /// 미리보기 드래그 판정에서 이 배경만 골라 통과시킨다
+        /// (<c>CharacterLobbyController.IsPointerInPreviewArea</c>). 이름을 바꾸면 그쪽이 조용히 깨진다.
+        /// </summary>
+        public const string BackdropName = "Backdrop";
+
         public static Image Backdrop(Transform parent)
         {
-            var go = new GameObject("Backdrop", typeof(RectTransform), typeof(Image));
+            var go = new GameObject(BackdropName, typeof(RectTransform), typeof(Image));
             go.transform.SetParent(parent, false);
             var img = go.GetComponent<Image>();
             img.color = Dim;

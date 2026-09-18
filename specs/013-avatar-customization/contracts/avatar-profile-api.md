@@ -1,7 +1,7 @@
 # Contract: 아바타 프로필 저장 API
 
 **Spec**: 013 | **당사자**: Unity ↔ Spring
-**상태**: ✅ **구현 완료** (BE, 2026-08-24 — spec 013a `BE/tasks.md` T001~T019, 회귀 232/232). 2026-09-01 `S15P21A604-378`에서 spec 012 카탈로그·구매와 `i=` 8슬롯 소유권 검증을 추가했다. Unity는 Mock을 실제 호출로 교체할 수 있다.
+**상태**: ✅ **구현 완료** (BE, 2026-08-24 — spec 013a `BE/tasks.md` T001~T019, 회귀 232/232). 2026-09-01 `S15P21A604-378`에서 spec 012 카탈로그·구매와 `i=` 8슬롯 소유권 검증을 추가했다. 2026-09-17 `S15P21A604-858`에서 회원별 프리셋 3슬롯 API를 추가했다. Unity는 Mock을 실제 호출로 교체할 수 있다.
 
 ---
 
@@ -76,6 +76,30 @@ PUT /api/v1/users/me/avatar
 
 구 계약을 그대로 믿고 `VARCHAR(32)`로 만들면, 항목이 늘어난 시점에 저장이 잘리거나 실패한다.
 **과거에 정확히 이 형태의 사고가 있었다** (T-24 — 길이 초과가 조용히 잘려 무반응).
+
+## 프리셋 3슬롯
+
+회원은 현재 외형과 별개로 완전한 외형 인코딩을 슬롯 1~3에 보관할 수 있다. 게스트는 세 경로 모두
+`403 MEMBER_ONLY`다. 슬롯의 `avatarCode`는 현재 외형 저장과 동일한 3,800자·인쇄 가능 ASCII·품목
+소유권 검사를 통과해야 하며, 서버는 값을 변형하지 않는다.
+
+```http
+GET /api/v1/users/me/avatar/presets
+→ 200 [{ "slot": 1, "avatarCode": "sk_01", "updatedAt": "2026-09-17T08:30:00Z" }]
+
+PUT /api/v1/users/me/avatar/presets/{slot}
+{ "avatarCode": "sk_01" }
+→ 200 { "slot": 1, "avatarCode": "sk_01", "updatedAt": "2026-09-17T08:30:00Z" }
+
+DELETE /api/v1/users/me/avatar/presets/{slot}
+→ 204
+```
+
+- `slot`은 1~3이다. 범위를 벗어나면 `400 VALIDATION_FAILED`, `errors[0].field: "slot"`이다.
+- 목록은 슬롯 오름차순이며 **비어 있는 슬롯은 생략**한다.
+- 같은 슬롯의 `PUT`은 해당 슬롯만 덮어쓴다.
+- `DELETE`는 비어 있는 슬롯을 다시 호출해도 `204`다. 재시도 가능한 UI 동작이기 때문이다.
+- 저장소는 `avatar_presets(user_id, slot, avatar_code TEXT, updated_at)`이고 `(user_id, slot)`이 기본 키다.
 
 ## 인증
 

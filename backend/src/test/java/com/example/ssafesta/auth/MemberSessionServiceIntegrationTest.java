@@ -2,7 +2,9 @@ package com.example.ssafesta.auth;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -332,6 +334,93 @@ class MemberSessionServiceIntegrationTest {
         MemberSessionService.MemberSession revived = sessions.issue(userId);
         assertNotNull(revived.accessToken());
         assertEquals(MemberSessionService.SessionCheck.SID_MISMATCH, sessions.check(userId, null));
+    }
+
+    /**
+     * 갱신으로 밀려난 {@code sid} 가 짧은 유예 동안은 통과한다 (S15P21A604-887, GitLab #216).
+     *
+     * <p>React 와 Unity 가 Access Token 하나를 나눠 쓰는데 갱신마다 {@code sid} 가 새로 서므로,
+     * 유예가 없으면 한쪽의 정상 갱신이 <b>다른 쪽이 들고 있는 토큰을 즉사</b>시킨다. 유예 밖이면
+     * 그대로 밀려난 토큰이다.
+     */
+    @Test
+    void aSidRotatedByARefreshStillPassesInsideTheGraceWindow() {
+        long userId = 991_290L;
+        MemberSessionService.MemberSession first = sessions.issue(userId);
+        String rotatedSid = redis.opsForValue().get(key("auth:session:" + userId));
+
+        sessions.refresh(first.refreshToken());
+
+        String currentSid = redis.opsForValue().get(key("auth:session:" + userId));
+        assertNotEquals(rotatedSid, currentSid, "갱신은 sid 를 회전시킨다 — 이 전제가 깨지면 유예는 의미가 없다");
+        assertEquals(MemberSessionService.SessionCheck.ACTIVE, sessions.check(userId, currentSid));
+        assertEquals(MemberSessionService.SessionCheck.ACTIVE, sessions.check(userId, rotatedSid),
+                "유예 안의 옛 sid 는 통과해야 한다");
+
+        // 유예가 끝난 자리 — 기다리지 않고 유예 키를 지워 만료를 대신한다.
+        redis.delete(key("auth:session:prev:" + userId));
+        assertEquals(MemberSessionService.SessionCheck.SID_MISMATCH, sessions.check(userId, rotatedSid));
+    }
+
+    /**
+     * 새 로그인은 유예를 주지 않고, 남아 있던 유예까지 끝낸다 (S15P21A604-887, GitLab #216).
+     *
+     * <p>유예 키가 살아 있는 동안 새 로그인을 통과시키면 <b>다른 기기 로그인이 즉시 밀어낸다</b>는
+     * spec 001 시나리오 4 가 그 시간만큼 깨진다. 유예는 같은 사람의 갱신에만 있는 장치다.
+     */
+    @Test
+    void aNewLoginEndsTheGraceInsteadOfInheritingIt() {
+        long userId = 991_291L;
+        MemberSessionService.MemberSession first = sessions.issue(userId);
+        String rotatedSid = redis.opsForValue().get(key("auth:session:" + userId));
+        sessions.refresh(first.refreshToken());
+        assertEquals(MemberSessionService.SessionCheck.ACTIVE, sessions.check(userId, rotatedSid));
+        String refreshedSid = redis.opsForValue().get(key("auth:session:" + userId));
+
+        sessions.issue(userId);
+
+        assertEquals(MemberSessionService.SessionCheck.SID_MISMATCH, sessions.check(userId, rotatedSid),
+                "새 로그인은 남아 있던 유예를 끝낸다");
+        assertEquals(MemberSessionService.SessionCheck.SID_MISMATCH, sessions.check(userId, refreshedSid),
+                "직전 세션의 sid 도 새 로그인에는 유예를 받지 않는다");
+        assertNull(redis.opsForValue().get(key("auth:session:prev:" + userId)));
+    }
+
+    /** 로그아웃은 유예까지 지운다 — 남기면 폐기가 폐기가 아니게 된다 (GitLab #216). */
+    @Test
+    void revokingASessionAlsoEndsTheGrace() {
+        long userId = 991_292L;
+        MemberSessionService.MemberSession first = sessions.issue(userId);
+        String rotatedSid = redis.opsForValue().get(key("auth:session:" + userId));
+        sessions.refresh(first.refreshToken());
+
+        sessions.revoke(userId);
+
+        assertEquals(MemberSessionService.SessionCheck.NO_SESSION, sessions.check(userId, rotatedSid));
+        assertNull(redis.opsForValue().get(key("auth:session:prev:" + userId)));
+    }
+
+    /**
+     * 계보 폐기도 유예를 끝낸다 (GitLab #216).
+     *
+     * <p>유예 밖의 재사용은 계보째 끊는데(spec 001 시나리오 7), 그때 유예 키를 남기면 방금 끊은
+     * 세션의 옛 Access Token 이 남은 유예 동안 계속 통과한다.
+     */
+    @Test
+    void revokingAFamilyAlsoEndsTheGrace() {
+        long userId = 991_293L;
+        MemberSessionService.MemberSession first = sessions.issue(userId);
+        MemberSessionService.MemberSession second = sessions.refresh(first.refreshToken());
+        String graceSid = redis.opsForValue().get(key("auth:session:prev:" + userId));
+        assertNotNull(graceSid, "갱신은 유예 키를 남긴다");
+
+        // 유예 밖의 재사용 — 계보가 끊긴다.
+        ageRotationMarker(first.refreshToken(), Duration.ofMinutes(5));
+        assertThrows(ApiException.class, () -> sessions.refresh(first.refreshToken()));
+
+        assertNull(redis.opsForValue().get(key("auth:session:prev:" + userId)));
+        assertEquals(MemberSessionService.SessionCheck.NO_SESSION, sessions.check(userId, graceSid));
+        assertNotNull(second.accessToken());
     }
 
     /**

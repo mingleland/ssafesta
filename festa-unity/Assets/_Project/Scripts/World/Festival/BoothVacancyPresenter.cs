@@ -32,6 +32,9 @@ namespace Festa.World
         /// <summary>게시본 조회가 끝난 뒤에도 방마다 늦게 채워질 수 있어 주기적으로 다시 본다.</summary>
         const float SweepSeconds = 5f;
 
+        /// <summary><c>GET /booth-slots</c> 의 <c>status</c> 계약값. 이 값일 때만 임대 중으로 본다 (GitLab #238).</summary>
+        const string OccupiedStatus = "OCCUPIED";
+
         static BoothVacancyPresenter s_instance;
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
@@ -118,6 +121,10 @@ namespace Festa.World
             // 게시된 부스까지 꺼 버린다.
             if (!Enabled || !WorldBoothPublishedBootstrap.Completed) return;
 
+            // 임대 상태 목록이 아직 없으면 이번 sweep 에 받아 둔다 (GitLab #238). 실패해도 아래는
+            // 옛 근거(게시본)로 판정하므로 월드가 비지 않는다. 다음 sweep(5초)에 다시 시도한다.
+            if (!Festa.Booth.BoothSlotDirectory.TryGet(1, out _)) _ = Festa.Booth.BoothSlotDirectory.GetAsync();
+
             for (var slot = 1; slot <= SlotCount; slot++)
             {
                 var r = Refs(slot);
@@ -141,8 +148,16 @@ namespace Festa.World
         }
 
         /// <summary>
-        /// 이 슬롯을 누가 임차해 게시했는가. 포털의 입장 판정(<see cref="PortalInteractor.IsEnterable"/>)과
-        /// 같은 근거를 쓴다 — 두 곳이 갈리면 "들어가지는데 직원이 없는" 부스가 생긴다.
+        /// 이 슬롯이 <b>임대되어 있는가</b> (GitLab #238).
+        ///
+        /// <para><b>게시본 유무가 아니라 임대 상태를 본다.</b> 2026-09-10 에 "임대되지 않은 부스는 비워 둔다" 를
+        /// 구현하면서 임대 여부를 게시본 유무(<c>BoothRuntime.IsLoaded</c>)로 대신 읽었다. 임대하면 곧 게시한다는
+        /// 가정이었는데, 실제로는 임대 뒤 한참 뒤에 게시하거나 아예 안 하는 사용자가 있다. 그 사이 부스 선택 맵은
+        /// "사용 중" 이라 하고 월드의 그 방은 직원·조명·포털이 꺼진 빈 칸이 된다 — 두 화면이 서로 다른 것을 읽었다.</para>
+        ///
+        /// <para>근거는 <c>GET /booth-slots</c> 의 <c>status</c> 다. 간판(<see cref="BoothSignPresenter"/>)이 이미
+        /// 같은 목록에서 <c>boothName</c>·<c>facade</c> 를 읽고 있어 데이터 소스가 늘지 않는다.
+        /// <b>내부 배치만</b> 게시본으로 그린다 — 게시본 404 는 "빈 칸" 이 아니라 "내부가 비어 있다" 로만 읽는다.</para>
         /// </summary>
         public static bool IsRented(int slot)
         {
@@ -153,6 +168,11 @@ namespace Festa.World
             var portal = Refs(slot).Portal;
             if (portal != null && portal.eventBooth) return true;
 
+            if (Festa.Booth.BoothSlotDirectory.TryGet(slot, out var dto))
+                return string.Equals(dto.status, OccupiedStatus, System.StringComparison.OrdinalIgnoreCase);
+
+            // 슬롯 목록을 아직 못 받았으면 **조용히 끄지 않는다.** 조회 한 번 실패로 월드가 통째로
+            // 빈 칸이 되면 서버 장애가 "아무도 임대 안 함" 처럼 보인다. 옛 근거(게시본)로 버틴다.
             var runtime = Refs(slot).Runtime;
             // 판단 근거가 없으면(방·런타임 미생성) 조용히 끄지 않는다.
             return runtime == null || runtime.IsLoaded;

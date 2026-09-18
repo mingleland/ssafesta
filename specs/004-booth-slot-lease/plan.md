@@ -30,7 +30,7 @@
 
 **Constraints**: 코인만 차감되는 상태 0건, 한 슬롯 두 명 임대 0건, 게스트 임대 불가
 
-**Scale/Scope**: 방 12개(임대 가능 11개) / 사용자당 활성 임대 1개 / 임대 1일 100코인
+**Scale/Scope**: 방 12개(임대 가능 11개) / 사용자당 활성 임대 1개 / 임대 1일 50코인
 
 ## Constitution Check
 
@@ -77,7 +77,7 @@ backend/src/main/java/com/example/ssafesta/booth/
 ├── BoothLease.java                   # 임대
 ├── BoothLeaseRepository.java         # 만료 판정 술어를 여기 모은다
 ├── LeaseStatus.java                  # ACTIVE / EXPIRED
-├── LeaseProperties.java              # 가격 100 / 기간 24h
+├── LeaseProperties.java              # 가격 50 / 기간 24h
 ├── BoothLeaseService.java            # 임대 생성 — 차감과 한 트랜잭션
 ├── BoothQueryService.java            # 슬롯 목록 · 내 부스 · 부스 상세
 ├── BoothSlotController.java          # GET /booth-slots, POST /booth-slots/{id}/leases

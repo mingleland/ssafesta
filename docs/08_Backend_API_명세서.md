@@ -143,6 +143,13 @@ Access Token 갱신. `refresh_token` 쿠키(HttpOnly)로 인증한다. Refresh �
 
 유예는 `app.auth.refresh-reuse-grace`(기본 `PT30S`)다. 그 창 밖의 재사용은 그대로 계보째 끊는다(spec 001 시나리오 7).
 
+**갱신은 직전 Access Token 을 즉시 죽이지 않는다** (`S15P21A604-887`, GitLab #216). 갱신마다 Access Token 의
+`sid` 클레임이 새로 서지만, **밀려난 `sid` 도 `app.auth.session-rotation-grace`(기본 `PT30S`) 동안은 통과한다.**
+React 와 Unity 가 같은 Access Token 을 나눠 쓰기 때문이다 — 유예가 없으면 한쪽의 정상 갱신이 다른 쪽이 들고
+있는 토큰을 즉사시키고, 월드가 12슬롯 게시본·`world-sessions`·`catalog` 를 한꺼번에 401 로 잃는다. 그래도
+**새 로그인·로그아웃·계보 폐기는 이 유예를 즉시 끝낸다** — 다른 기기에서 로그인하면 옛 토큰은 그 자리에서
+무효다(spec 001 시나리오 4). 유예는 "같은 사람의 갱신" 에만 열린다.
+
 - 쿠키가 없는 것은 **정상 상태**다. FE 는 페이지 로드마다 이 endpoint 를 1회 호출하는데, RT 는 HttpOnly 라
   FE 가 존재 여부를 읽을 수 없고 그게 설계 의도다(헌법 13조). 따라서 비로그인·게스트 방문자는 매번 이 401 을
   받으며, 이것을 서버 오류로 취급하면 안 된다.
@@ -196,6 +203,29 @@ Access Token 갱신. `refresh_token` 쿠키(HttpOnly)로 인증한다. Refresh �
 | 게스트 | `403 MEMBER_ONLY` (헌법 12조 — 외형을 영속 저장하지 않는다) |
 
 상한 3800은 Unity `AvatarAppearance.MaxEncodedLength`가 소유한 값이다. **낮추지 않는다** — 모듈러 인코딩(`fa|…`)은 파츠 이름이 그대로 들어가 길다.
+
+### GET `/users/me/avatar/presets`
+
+회원의 저장 프리셋 목록을 슬롯 오름차순으로 조회한다. 비어 있는 슬롯은 응답에서 생략된다.
+
+```json
+[
+  { "slot": 1, "avatarCode": "sk_01", "updatedAt": "2026-09-17T08:30:00Z" }
+]
+```
+
+### PUT `/users/me/avatar/presets/{slot}`
+
+회원 프리셋 슬롯 1~3 중 하나를 전체 외형 코드로 저장하거나 덮어쓴다. 요청 본문과 검증은
+`PUT /users/me/avatar`와 같다. 성공 시 `200`과 `{ slot, avatarCode, updatedAt }`를 돌려준다.
+
+### DELETE `/users/me/avatar/presets/{slot}`
+
+회원 프리셋 슬롯을 비운다. 이미 비어 있는 슬롯도 `204`로 성공하므로 재시도해도 안전하다.
+
+세 프리셋 경로는 게스트에게 `403 MEMBER_ONLY`, 슬롯 범위 밖에 `400 VALIDATION_FAILED`와
+`errors[0].field: "slot"`을 반환한다. 저장 테이블은 `avatar_presets.avatar_code TEXT`이며
+`users.avatar_code`와 같은 길이 제한 정책을 따른다.
 
 정본 계약: `specs/013-avatar-customization/contracts/avatar-profile-api.md`
 
@@ -479,6 +509,7 @@ Unity가 부스 방(앵커)에서 호출하는 경로. **인증 불필요.** 응
 - **Publish 검증 연동**: `LAPTOP` 오브젝트가 있는데 이 URL이 미등록이면 Publish 응답에 warning `CONFIG_NOT_LINKED`("홈페이지 주소가 등록되지 않았습니다.")가 실린다. `LAPTOP`은 `configId`를 갖지 않으므로 판정 근거가 `configId` 부재가 아니라 **URL 미등록**이다 — 코드·봉투는 기존 그대로. FE는 `LAPTOP`에 `configId`를 보내지 않는다(보내면 `CONFIG_UNVERIFIED`가 붙는다).
 - **`SURVEY_KIOSK`도 같은 모양이다** (`S15P21A604-699`, GitLab #181): 설문 바인딩이 부스 기준이라(spec 010 C-06) 부스당 설문이 1개고 `GET /booths/{boothId}/survey/run`이 부스로 찾는다. 그래서 판정 근거가 `configId` 부재가 아니라 **그 부스에 설문이 없음**이고, warning `CONFIG_NOT_LINKED`("이 부스에 설문이 없습니다.")로 나간다. **게시는 막지 않는다**(C-04) — 키오스크를 먼저 놓고 설문을 나중에 만드는 순서가 정상이다. `configId`를 실어 보내도 서버가 읽지 않으며 `CONFIG_UNVERIFIED`도 붙지 않는다.
 - **`PROJECT_PANEL`도 같은 모양이다** (`S15P21A604-765`, GitLab #194): 프로젝트가 부스당 1개고(`ux_projects_booth`) `GET /booths/{boothId}/projects/published`가 부스로 찾는다. 방문자 계약(`BOOTH_PROJECT_INTERACT`)에도 `configId`가 없다. 판정 근거는 **그 부스에 프로젝트가 없음**이고 warning `CONFIG_NOT_LINKED`("이 부스에 프로젝트가 없습니다.")로 나간다. **게시는 막지 않는다**(C-04). `configId`를 실어 보내도 서버가 읽지 않으며 `CONFIG_UNVERIFIED`도 붙지 않는다.
+- **`VIDEO_SCREEN` 은 네 번째지만 이유가 다르다** (`S15P21A604-889`, GitLab #194 ②, 2026-09-18): 부스 단위 술어로 옮긴 것이 아니라 **장식으로 내려갔다**. 영상 기능화를 이번 축제에서 하지 않기로 확정했으므로 가리킬 콘텐츠가 없다. `configId` 를 실어 보내도 저장만 하고 무시하며 `CONFIG_NOT_LINKED`·`CONFIG_UNVERIFIED` 둘 다 붙지 않는다. 관람 정면(`FRONT_BLOCKED`) 검사에서도 빠진다.
 
 ---
 
@@ -607,6 +638,70 @@ Unity가 부스 방(앵커)에서 호출하는 경로. **인증 불필요.** 응
 성공 `200` + 변경 후 공통 표현. 실패: `400 VALIDATION_FAILED` · `401` · `403 MEMBER_ONLY` ·
 `403 BOOTH_EDITOR_FORBIDDEN`(**타 부스 프로젝트 수정 차단**) · **`404 PROJECT_NOT_FOUND`** ·
 `409 BOOTH_LEASE_EXPIRED`.
+
+### POST `/booths/{boothId}/project-logos` · POST `.../{logoId}/complete` · GET `.../{logoId}/content`
+
+대표 이미지를 **파일로 올린다** (2026-09-18 개정 — spec 009 C-03, GitLab #241, `S15P21A604-895`).
+개정 전에는 "업로드 미지원, URL 참조"였다. 외부 `http(s)` URL은 **계속 받는다** — 선택지가 늘었을
+뿐이고 기존 값은 무효가 되지 않는다.
+
+**세 단계다. 가운데는 서버를 지나지 않는다.**
+
+```text
+POST /booths/{boothId}/project-logos      { contentType, byteSize }
+  → { logoId, uploadUrl, requiredContentType, expiresAt }
+PUT  uploadUrl (브라우저 → 객체 저장소)     Content-Type = requiredContentType
+POST /booths/{boothId}/project-logos/{logoId}/complete
+  → { logoId, status, url, contentType, byteSize, width, height, failureRule }
+PATCH /projects/{projectId}               { "thumbnailUrl": url }
+```
+
+`PUT`의 `Content-Type`은 **`requiredContentType`과 같아야 한다** — 서명에 박혀 있어 다른 값이면
+저장소가 403을 낸다. `uploadUrl`은 10분을 산다.
+
+**선언한 `contentType`·`byteSize`는 거절에만 쓴다.** 통과는 `complete`가 실제 바이트를 읽어
+정한다 — 위장한 MIME은 시작에서 통과해도 완료에서 `FAILED`가 된다. 허용은 PNG · JPEG · GIF ·
+WebP · 5MB · 한 변 4096px이고 애니메이션 WebP는 거부다(게임 Asset과 **같은 검증기**를 쓴다).
+
+**`complete`의 검증 실패도 `200`이다.** `status`가 `FAILED`이고 `failureRule`이 사유다
+(`MIME_NOT_ALLOWED` · `SIZE_EXCEEDED` · `DIMENSION_EXCEEDED` · `DECODE_FAILED` ·
+`UPLOAD_MISSING` · `GRANT_EXPIRED`). 던지지 않는 이유는 게임 Asset과 같다 — 예외는 실패 기록을
+되돌려 행을 영원히 재시도 상태로 남긴다. 실패한 자리는 되살아나지 않고 재시도는 새 업로드다.
+같은 `logoId`로 다시 불러도 안전하다(멱등).
+
+**저장 계약은 신설하지 않았다.** `complete`가 준 `url`을 기존 `PATCH /projects/{projectId}`의
+`thumbnailUrl`에 그대로 넣는다. 그 값은 **절대 URL이 아니라 경로**
+(`/api/v1/booths/{boothId}/project-logos/{logoId}/content`)다 — 절대 URL로 만들려면 "이 배포의
+공개 API origin"이라는 새 설정이 필요하고, 그것이 환경마다 틀리면 DB에 남은 URL이 다른 환경에서
+깨진다. 그래서 `thumbnailUrl`의 `http(s)` 규칙에 **이 형식 하나만 예외**이고 다른 상대 경로는
+계속 거부된다.
+
+**grant는 `projectId`가 아니라 `boothId` 기준이다** — 프로젝트를 만들기 전에 로고를 올리는 흐름이
+요구사항이고(#241 ①), 부스 편집 권한은 `BoothAccessGuard` 하나가 답한다.
+
+**`GET .../content`는 인증 없이 열린 경로이고 판정은 서버가 한다** (게임 Asset의 `/content`와 같은
+구조). 세 갈래다.
+
+| 조건 | 결과 |
+|---|---|
+| 게시된 프로젝트가 이 로고를 참조 + 임대 유효 | 누구나 — 방문자의 `<img>`가 이 경로로 들어온다 |
+| 그 밖의 `READY` 로고 | **그 부스 편집자만** — `complete`와 저장 사이, 저장 실패 후 재확인 경로 |
+| 그 밖 | `404 PROJECT_LOGO_NOT_FOUND` |
+
+두 번째 갈래가 없으면 업로드 직후 새로고침한 작성자가 자기 이미지를 못 본다. 없는 것과 볼 권한이
+없는 것에 **같은 404**를 주는 이유: 있는지 여부가 남의 부스 편집 상태를 알려 주는 신호가 되면
+안 된다. `Content-Type`은 **검증으로 확정한 값**이고 선언값을 되돌려주지 않는다 —
+`X-Content-Type-Options: nosniff`가 함께 나간다.
+
+**올려 두고 저장하지 않은 이미지는 남지 않는다.** 참조가 끊긴 로고는 표식만 남기고 유예 뒤에
+지우며, **삭제 직전에 참조를 다시 확인한다** — A → B → 다시 A로 되돌린 사용자의 살아 있는 이미지를
+지우지 않는다. 완료 후 24시간 동안 아무도 참조하지 않은 로고도 정리되고, 부스당 미참조 `READY`
+로고 수에는 상한이 있다(`409 PROJECT_LOGO_QUOTA_EXCEEDED`).
+
+실패: `403 MEMBER_ONLY`·`403 BOOTH_EDITOR_FORBIDDEN` · `404 BOOTH_NOT_FOUND`·`404
+PROJECT_LOGO_NOT_FOUND` · `409 BOOTH_LEASE_EXPIRED`·`409 PROJECT_LOGO_QUOTA_EXCEEDED` ·
+`413 PROJECT_LOGO_TOO_LARGE` · `415 PROJECT_LOGO_TYPE_UNSUPPORTED` · `503 STORAGE_UNAVAILABLE`
+(저장소가 답하지 않는다 — 다시 부르면 된다. 이 경우 행은 `PENDING`으로 남는다).
 
 ### PUT `/projects/{projectId}/like` · DELETE `/projects/{projectId}/like`
 
@@ -1249,6 +1344,7 @@ STOMP 연결용 **5분짜리** 토큰(FR-019·FR-020, C-14). → `201 { token, e
 ```text
 엔드포인트  wss://<host>/ws/consultation     native WebSocket + STOMP, SockJS 없음 (C-05)
 구독        /user/queue/consultation              방문자 — 내 요청의 상태 변화
+/user/queue/booth-lease-expiry                    부스 운영자 — 임대 만료 1시간 전 알림
             /topic/booths/{boothId}/consultation  직원 — 그 부스 대기열 변화
 SEND        없다 — P1 은 서버에서 클라이언트로 가는 단방향 알림이고 행동은 전부 REST 다 (C-12)
 봉투        { type, requestId, occurredAt, … }
@@ -1346,7 +1442,7 @@ SEND        없다 — P1 은 서버에서 클라이언트로 가는 단방향 �
   "failAfterSeconds": 10.381, "serverStartedAt": "2026-09-10T02:11:04.117Z" }
 ```
 
-목표 시간은 **서버가 5~10초에서 무작위로 발급**한다 (FR-001a). 일일 한도에 도달한 회원에게도
+목표 시간은 **서버가 2~4초에서 무작위로 발급**한다 (FR-001a, 2026-09-18 개정 — GitLab #214). 일일 한도에 도달한 회원에게도
 세션은 발급된다 — 게임은 할 수 있고 보상만 없다 (Acceptance Scenario 4).
 
 ### POST `/minigames/timer-stop/sessions/{sessionId}/result` → `200`

@@ -5,6 +5,7 @@ import com.example.ssafesta.common.ErrorCode;
 import com.example.ssafesta.wallet.CoinCreditCommand;
 import com.example.ssafesta.wallet.CoinReason;
 import com.example.ssafesta.wallet.CoinSpendCommand;
+import com.example.ssafesta.wallet.CoinLedgerEntryRepository;
 import com.example.ssafesta.wallet.LedgerEntryType;
 import com.example.ssafesta.wallet.LedgerResult;
 import com.example.ssafesta.wallet.WalletService;
@@ -50,11 +51,17 @@ public class SlotMachineService {
     /** {@code coin_ledger_entries.reference_type} for both entries of one spin. */
     static final String SPIN_REFERENCE_TYPE = "SLOT_SPIN";
 
+    /** Ten settled losses earn exactly the next spin a tier-one payout (GitLab #235). */
+    static final int PITY_LOSS_STREAK = 10;
+
     private final WalletService wallets;
+    private final CoinLedgerEntryRepository ledger;
     private final SlotMachineProperties properties;
 
-    public SlotMachineService(WalletService wallets, SlotMachineProperties properties) {
+    public SlotMachineService(WalletService wallets, CoinLedgerEntryRepository ledger,
+                              SlotMachineProperties properties) {
         this.wallets = wallets;
+        this.ledger = ledger;
         this.properties = properties;
     }
 
@@ -67,11 +74,17 @@ public class SlotMachineService {
         }
         int bet = requiredBet(command);
 
+        // The historical read is part of coin settlement. Take the same lock every wallet mutation
+        // uses before reading it: without this, two requests can both see the same ten losses and
+        // both consume one guarantee. Decide before recording this spin's bet so the current,
+        // as-yet-unsettled row cannot count as an eleventh loss.
+        wallets.lockOwner(userId);
+        int tier = mustForceTierOne(consecutiveLosses(userId)) ? 1 : properties.rollTier();
+
         UUID spinId = UUID.randomUUID();
         LedgerResult charged = wallets.spend(new CoinSpendCommand(userId, bet, CoinReason.SLOT_BET,
                 SPIN_REFERENCE_TYPE, spinId.toString(), betKey(spinId)));
 
-        int tier = properties.rollTier();
         int payout = bet * properties.multiplierOfTier(tier);
         // 낙첨 writes no second entry. A zero-amount row would be a ledger line that moves nothing,
         // and every reader of the history would have to learn to skip it.
@@ -82,6 +95,22 @@ public class SlotMachineService {
                 : charged.balanceAfter();
 
         return new SlotSpinResult(spinId.toString(), bet, payout, tier, balanceAfter);
+    }
+
+    static boolean mustForceTierOne(int consecutiveLosses) {
+        return consecutiveLosses >= PITY_LOSS_STREAK;
+    }
+
+    private int consecutiveLosses(Long userId) {
+        int losses = 0;
+        for (Boolean won : ledger.findRecentSlotWinFlags(userId, CoinReason.SLOT_BET,
+                CoinReason.SLOT_PAYOUT, SPIN_REFERENCE_TYPE, PITY_LOSS_STREAK)) {
+            if (Boolean.TRUE.equals(won)) {
+                break;
+            }
+            losses++;
+        }
+        return losses;
     }
 
     /**

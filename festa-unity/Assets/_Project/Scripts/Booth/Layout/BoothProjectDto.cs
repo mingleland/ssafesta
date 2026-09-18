@@ -20,6 +20,13 @@ namespace Festa.Booth
         public int projectId;
         public string name;
         public string thumbnailUrl;   // https 만. null 가능 (spec 009 C-03 — 업로드 미지원·URL 참조)
+
+        /// <summary>
+        /// 소개 영상 주소. 서버는 예전부터 실어 보내고 있었는데(<c>VisitorProjectView.videoUrl</c>)
+        /// Unity 가 받지 않고 버리고 있었다 — 부스 스크린이 쓰려고 이제 받는다 (2026-09-18).
+        /// 지금 들어오는 값은 대부분 YouTube 링크다. null 가능.
+        /// </summary>
+        public string videoUrl;
     }
 
     [Serializable]

@@ -1,0 +1,89 @@
+{
+  "schemaVersion": "1.0.0",
+  "environmentId": "demo",
+  "kind": "integrated-demo",
+  "composeProject": "festa-demo",
+  "deploymentTargetIds": {
+    "integration": "integration"
+  },
+  "releaseManifestRef": "infra/deploy/state/runtime/demo/releases/${RELEASE_ID}/release-manifest.json",
+  "runtimeServices": [
+    {
+      "serviceId": "demo-ai",
+      "component": "ai",
+      "imageRef": "release-manifest://ai",
+      "networkRefs": ["festa-demo-ai-back-private", "festa-data-private"],
+      "internalEndpoint": "http://ai:8000",
+      "healthCheckRef": "ai-readiness",
+      "cpuLimitRef": "DEMO_AI_CPU_LIMIT",
+      "memoryLimitRef": "DEMO_AI_MEMORY_LIMIT",
+      "persistentVolumeRefs": ["festa-demo-ai-data"],
+      "releaseId": "${RELEASE_ID}"
+    },
+    {
+      "serviceId": "demo-back",
+      "component": "back",
+      "imageRef": "release-manifest://back",
+      "networkRefs": ["festa-demo-ai-back-private", "festa-data-private"],
+      "internalEndpoint": "http://back:8080",
+      "healthCheckRef": "back-readiness",
+      "cpuLimitRef": "DEMO_BACK_CPU_LIMIT",
+      "memoryLimitRef": "DEMO_BACK_MEMORY_LIMIT",
+      "persistentVolumeRefs": [],
+      "releaseId": "${RELEASE_ID}"
+    },
+    {
+      "serviceId": "demo-front",
+      "component": "front",
+      "imageRef": "release-manifest://front",
+      "networkRefs": ["festa-demo-front-private"],
+      "internalEndpoint": "http://front:80",
+      "healthCheckRef": "front-readiness",
+      "cpuLimitRef": "DEMO_FRONT_CPU_LIMIT",
+      "memoryLimitRef": "DEMO_FRONT_MEMORY_LIMIT",
+      "persistentVolumeRefs": [],
+      "releaseId": "${RELEASE_ID}"
+    }
+  ],
+  "publicEntryRefs": ["demo-front", "demo-api", "demo-ai", "demo-world"],
+  "dataBindings": [
+    {
+      "bindingId": "demo-business",
+      "type": "postgres-business",
+      "environmentId": "demo",
+      "databaseName": "festa_demo_business",
+      "serviceRole": "festa_demo_back_app",
+      "credentialRef": "POSTGRES_DEMO_BACK_CREDENTIAL_REF"
+    },
+    {
+      "bindingId": "demo-ai-vector",
+      "type": "postgres-ai",
+      "environmentId": "demo",
+      "databaseName": "festa_demo_ai",
+      "serviceRole": "festa_demo_ai_app",
+      "credentialRef": "POSTGRES_DEMO_AI_CREDENTIAL_REF"
+    },
+    {
+      "bindingId": "demo-redis",
+      "type": "redis",
+      "environmentId": "demo",
+      "keyPatterns": ["demo:*"],
+      "credentialRef": "REDIS_DEMO_CREDENTIAL_REF"
+    }
+  ],
+  "secretRefs": [
+    "POSTGRES_DEMO_BACK_CREDENTIAL_REF",
+    "POSTGRES_DEMO_AI_CREDENTIAL_REF",
+    "REDIS_DEMO_CREDENTIAL_REF",
+    "DEMO_CONNECTION_TOKEN_SECRET_REF"
+  ],
+  "mockAdapters": [],
+  "resourcePolicy": {
+    "heavyBuildMaxConcurrency": 1,
+    "demoPriority": true,
+    "ec2CapacityRefs": ["EC2_VCPU", "EC2_RAM_MB", "EC2_DISK_GB", "EC2_OS"],
+    "demoServiceLimitRefs": { "cpu": "DEMO_CPU_LIMIT" },
+    "buildAgentLimitRefs": { "cpu": "BUILD_AGENT_CPU_LIMIT" },
+    "admissionHealthRefs": ["DEMO_WEB_HEALTH_URL"]
+  }
+}

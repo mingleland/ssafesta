@@ -75,7 +75,9 @@ export async function api<T>(path: string, init: ApiInit = {}): Promise<T> {
   const { skipAuthRetry, baseUrl, ...rest } = init;
   const headers = new Headers(rest.headers);
   if (accessToken) headers.set('Authorization', `Bearer ${accessToken}`);
-  if (rest.body && !headers.has('Content-Type')) headers.set('Content-Type', 'application/json');
+  if (rest.body && !(rest.body instanceof FormData) && !headers.has('Content-Type')) {
+    headers.set('Content-Type', 'application/json');
+  }
 
   const response = await fetch(`${baseUrl ?? apiBaseUrl()}${path}`, {
     ...rest,

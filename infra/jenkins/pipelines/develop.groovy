@@ -107,18 +107,18 @@ def call() {
                 }
                 credentialBindings << gitUsernamePassword(credentialsId: checkoutCredentialId)
                 if (deployComponents.contains('ai')) {
-                    credentialBindings << file(credentialsId: env.DEV_AI_ENV_CREDENTIAL_ID, variable: 'DEV_AI_ENV_FILE')
-                    credentialNames << 'DEV_AI_ENV_FILE'
+                    credentialBindings << file(credentialsId: env.DEMO_AI_ENV_CREDENTIAL_ID, variable: 'DEMO_AI_ENV_FILE')
+                    credentialNames << 'DEMO_AI_ENV_FILE'
                 }
                 if (deployComponents.contains('back')) {
-                    credentialBindings << file(credentialsId: env.DEV_BACK_ENV_CREDENTIAL_ID, variable: 'DEV_BACK_ENV_FILE')
-                    credentialBindings << string(credentialsId: env.DEV_INTERNAL_INFRA_TO_SPRING_TOKENS_CREDENTIAL_ID, variable: 'INTERNAL_INFRA_TO_SPRING_TOKENS')
-                    credentialNames << 'DEV_BACK_ENV_FILE'
+                    credentialBindings << file(credentialsId: env.DEMO_BACK_ENV_CREDENTIAL_ID, variable: 'DEMO_BACK_ENV_FILE')
+                    credentialBindings << string(credentialsId: env.DEMO_INTERNAL_INFRA_TO_SPRING_TOKENS_CREDENTIAL_ID, variable: 'INTERNAL_INFRA_TO_SPRING_TOKENS')
+                    credentialNames << 'DEMO_BACK_ENV_FILE'
                     credentialNames << 'INTERNAL_INFRA_TO_SPRING_TOKENS'
                 }
                 if (deployComponents.any { it in ['ai', 'back'] }) {
-                    credentialBindings << string(credentialsId: env.DEV_INTERNAL_SPRING_TO_AI_TOKENS_CREDENTIAL_ID, variable: 'INTERNAL_SPRING_TO_AI_TOKENS')
-                    credentialBindings << string(credentialsId: env.DEV_INTERNAL_AI_TO_SPRING_TOKENS_CREDENTIAL_ID, variable: 'INTERNAL_AI_TO_SPRING_TOKENS')
+                    credentialBindings << string(credentialsId: env.DEMO_INTERNAL_SPRING_TO_AI_TOKENS_CREDENTIAL_ID, variable: 'INTERNAL_SPRING_TO_AI_TOKENS')
+                    credentialBindings << string(credentialsId: env.DEMO_INTERNAL_AI_TO_SPRING_TOKENS_CREDENTIAL_ID, variable: 'INTERNAL_AI_TO_SPRING_TOKENS')
                     credentialNames.addAll(['INTERNAL_SPRING_TO_AI_TOKENS', 'INTERNAL_AI_TO_SPRING_TOKENS'])
                 }
 
@@ -143,7 +143,11 @@ def call() {
                     "CI_ARTIFACT_DIR=${artifactRoot}",
                     "FRESHNESS_EXPECTED_SHA=${headSha}",
                     'CI_BRANCH=develop',
-                    'PUBLIC_UNITY_BUILD_BASE=/unity/'
+                    'FESTA_DEPLOY_ENVIRONMENT=demo',
+                    'PUBLIC_UNITY_BUILD_BASE=/unity/',
+                    // 이 값이 비면 프론트는 멀쩡히 뜨는데 구글 로그인만 404 로 죽는다 (2026-09-17 실측).
+                    // agent 가 값을 주지 않으면 ROOT_DOMAIN 으로 만들어 준다 — 빈 값으로 조용히 배포되지 않게.
+                    "PUBLIC_API_BASE_URL=${env.PUBLIC_API_BASE_URL?.trim() ?: 'https://api.' + (env.ROOT_DOMAIN ?: '')}"
                 ]) {
                     if (credentialBindings.isEmpty()) { deployBatch() } else { withCredentials(credentialBindings) { deployBatch() } }
                 }

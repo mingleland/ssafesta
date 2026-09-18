@@ -28,6 +28,8 @@ services:
     image: redis:7.2.10-alpine
     restart: unless-stopped
     command: ["redis-server", "/usr/local/etc/redis/redis.conf"]
+    # 40명 피크 실측(1.27MiB) 기반 상한. infra-001 plan.md 결정 (S15P21A604-185).
+    mem_limit: 256m
     environment:
       REDIS_HEALTH_USER: ${REDIS_HEALTH_USER:-health}
     secrets:
