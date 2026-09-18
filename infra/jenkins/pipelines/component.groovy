@@ -36,6 +36,10 @@ def call(Map config = [:]) {
         }
     }
 
+    // 실패 알림이 어느 파트에서 멈췄는지 알 수 있게 표식을 남긴다. game 은 자기 워크스페이스에서
+    // 빌드되므로 post 블록이 읽는 최상위 워크스페이스에 남겨야 game 실패도 game 으로 잡힌다.
+    sh "mkdir -p artifacts/develop && printf '%s' '${component}' >artifacts/develop/current-component"
+
     if (component == 'game') {
         node('unity-6000.0.78f1') {
             ws('/home/jenkins/agent/unity/workspaces/develop-game') {

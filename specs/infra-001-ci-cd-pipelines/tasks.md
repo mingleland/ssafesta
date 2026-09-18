@@ -46,6 +46,7 @@
 - [X] T012 `infra/jenkins/jobs/gitlab-develop-multibranch.groovy`를 추가해 develop push 전용 Jenkins job을 정의한다
 - [X] T012A `infra/jenkins/pipelines/develop.groovy`에서 `game` 빌드를 앱 컴포넌트 뒤로 옮기고 release manifest 를 배포 단위(`app` / `game`)별로 분리해, Unity 실행기 대기가 `ai`·`back`·`front` 배포를 막지 않게 한다 (2026-09-18 #468 실측: unity 대기 50분 뒤 전체 ABORT 로 완성된 back·front 이미지가 배포되지 못했다)
 - [ ] T012B 서로 다른 MR 이 한 푸시 범위로 묶이지 않도록 배포 트리거를 MR 단위로 분리한다 — 머지 커밋별 빌드 또는 GitLab MR 머지 웹훅 기반 트리거. 현재는 `GIT_BEFORE_SHA..GIT_COMMIT` 범위 판정이라 3초 차로 머지된 백엔드·게임 MR 이 한 빌드가 된다
+- [X] T012C develop 빌드가 실패하면 그 원인이 된 파트에게 Mattermost 로 알린다 — `infra/jenkins/scripts/notify-build-failure.sh` 가 `artifacts/develop/current-component` 표식으로 파트를 판정하고 `NOTIFY_OWNERS` 매핑으로 멘션한다. GitLab 은 외부 커밋 상태를 알리지 않아 지금까지 인프라 담당 한 사람만 실패를 봤다
 
 **Checkpoint**: Jenkins develop job은 MR test-only job과 분리되어 develop push의 selection 결과만 dev 배포 후보로 만든다.
 

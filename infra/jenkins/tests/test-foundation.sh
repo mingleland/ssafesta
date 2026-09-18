@@ -198,6 +198,15 @@ grep -q "branch != 'develop'" "${jenkinsfile}" \
   || fail "Jenkinsfile accepts non-develop branches"
 ! grep -q 'componentBranches' "${jenkinsfile}" \
   || fail "Jenkinsfile retains legacy component branch dispatch"
+grep -q 'notify-build-failure.sh' "${jenkinsfile}" \
+  || fail "Jenkinsfile does not notify the responsible part when a build fails"
+grep -q "printf '%s' infra >artifacts/develop/current-component" "${develop_pipeline}" \
+  || fail "infra-owned stages do not reclaim the failure-notice marker from the last part"
+# game 은 자기 워크스페이스에서 빌드된다. 표식을 그 안에서 쓰면 post 블록이 못 읽어 직전 파트를 지목한다.
+notice_marker_line="$(grep -n 'current-component' "${component_pipeline}" | head -1 | cut -d: -f1)"
+unity_node_line="$(grep -n "node('unity-" "${component_pipeline}" | head -1 | cut -d: -f1)"
+[[ -n "${notice_marker_line}" && -n "${unity_node_line}" && "${notice_marker_line}" -lt "${unity_node_line}" ]] \
+  || fail "failure-notice marker is written inside the Unity workspace, so game failures cannot be attributed"
 grep -q "multibranchPipelineJob('festa-gitlab-develop')" "${develop_job}" \
   || fail "GitLab develop-only multibranch job is missing"
 grep -q 'serverName(gitlabServerName)' "${develop_job}" \

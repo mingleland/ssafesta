@@ -23,6 +23,8 @@ jenkins:
             value: "${DEPLOY_CREDENTIALS_ID}"
           - key: MATTERMOST_CREDENTIALS_ID
             value: "${MATTERMOST_CREDENTIALS_ID}"
+          - key: NOTIFY_OWNERS
+            value: "${NOTIFY_OWNERS}"
           - key: DEV_BACK_ENV_CREDENTIAL_ID
             value: "${DEV_BACK_ENV_CREDENTIAL_ID}"
           - key: DEV_AI_ENV_CREDENTIAL_ID

@@ -31,6 +31,8 @@ def call() {
     final List deployComponents = (selection.deployComponents as List).findAll { it in ['ai', 'back', 'front'] }
     final String deployComponentList = deployComponents.join(',')
 
+    // 실패 알림이 이 빌드가 무엇을 다뤘는지 함께 싣도록 환경에 남긴다. post 블록의 sh 까지 내려간다.
+    env.SELECTED_COMPONENTS = components.join(', ')
     echo "SELECTED_COMPONENTS: ${components.join(', ')}; dev batch targets: ${deployComponentList ?: 'none'}"
 
     // game 은 Unity 실행기 하나를 독점하고 빌드가 45분을 넘는다. 그 빌드를 ai·back·front 배포보다
@@ -66,6 +68,8 @@ def call() {
     }
 
     def candidateManifest = { String label, String comps, String metadataDir, String manifestPath, String bundle, String stashName ->
+        // 여기부터는 파트 CI 가 아니라 인프라 구간이다. 실패 알림이 직전 파트를 잘못 지목하지 않게 표식을 되돌린다.
+        sh "mkdir -p artifacts/develop && printf '%s' infra >artifacts/develop/current-component"
         stage("Candidate Manifest (${label})") {
             sh """
                 mkdir -p '${metadataDir}'

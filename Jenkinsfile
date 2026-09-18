@@ -32,5 +32,23 @@ pipeline {
             sh 'infra/jenkins/scripts/secret-scan.sh --path artifacts'
             archiveArtifacts artifacts: 'artifacts/**/*', allowEmptyArchive: true, fingerprint: true
         }
+        // 실패가 Jenkins 안에만 남으면 인프라 담당 한 사람만 본다. 파트 CI 실패도 여기서 터진다.
+        unsuccessful {
+            script {
+                final Closure notify = {
+                    withEnv(["BUILD_RESULT=${currentBuild.currentResult}"]) {
+                        sh 'infra/jenkins/scripts/notify-build-failure.sh'
+                    }
+                }
+                final String hookCredential = (env.MATTERMOST_CREDENTIALS_ID ?: '').trim()
+                try {
+                    if (hookCredential.isEmpty()) { notify() }
+                    else { withCredentials([string(credentialsId: hookCredential, variable: 'MATTERMOST_WEBHOOK_URL')]) { notify() } }
+                } catch (ignored) {
+                    // credential 미등록이 아직 기본 상태다. 알림이 이미 실패한 빌드를 한 번 더 죽이면 안 된다.
+                    try { notify() } catch (ignoredAgain) { echo 'NOTIFY_UNSENT: 실패 알림을 실행하지 못했다' }
+                }
+            }
+        }
     }
 }
