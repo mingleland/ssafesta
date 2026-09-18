@@ -483,9 +483,20 @@ namespace Festa.Avatar
             }
         }
 
-        static bool IsUsableAppearance(AvatarConfig config)
-            => config.headId != 0 && config.hairId != 0 && config.shoesId != 0
-               && (config.outfitId != 0 || (config.topId != 0 && config.bottomId != 0));
+        /// <summary>
+        /// 읽어 온 외형을 쓸 수 있는가. <b>얼굴만 본다.</b>
+        ///
+        /// <para>예전에는 헤어·신발과 상·하의까지 요구했다. 그런데 항목 그리드는 얼굴을 뺀 모든
+        /// 카테고리에 "없음" 버튼을 준다 — UI 가 허용해 저장까지 된 외형을 불러오기에서만 거부하는
+        /// 상태였다(GitLab #248). 이 게이트는 프리셋 칸뿐 아니라 저장 외형 복원·씬 핸드오프 복원·현재
+        /// 외형 승계도 함께 쓰므로, 같은 외형이 그 경로들에서도 조용히 버려졌다.</para>
+        ///
+        /// <para>얼굴에는 "없음" 이 없다. 그래서 <c>headId == 0</c> 은 사용자의 선택이 아니라 모듈러
+        /// 코드를 못 읽었다는 뜻이고, 그것만 거부하면 된다. 속옷 노출은 조립 단계의
+        /// <see cref="AvatarCatalog.EnsureRequiredClothing"/> 이 한벌옷이 없을 때 상·하의를 기본값으로
+        /// 채워 이미 막고 있다.</para>
+        /// </summary>
+        static bool IsUsableAppearance(AvatarConfig config) => config.headId != 0;
 
         /// <summary>
         /// 외형을 세 칸에 담아 두고 꺼내 쓴다 (QA 요청 2026-09-17, GitLab #237).

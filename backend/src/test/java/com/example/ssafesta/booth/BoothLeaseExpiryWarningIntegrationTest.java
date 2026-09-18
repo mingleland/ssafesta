@@ -65,7 +65,8 @@ class BoothLeaseExpiryWarningIntegrationTest {
 
         clearInvocations(messaging);
         assertEquals(0, warnings.notifyExpiringLeases(), "이미 보낸 임대는 다음 스캔에서 다시 잡으면 안 됩니다.");
-        verify(messaging, never()).convertAndSendToUser(anyString(), anyString(), any());
+        verify(messaging, never()).convertAndSendToUser(anyString(),
+                eq(BoothLeaseExpiryWarningPublisher.DESTINATION), any());
     }
 
     @Test
@@ -80,7 +81,11 @@ class BoothLeaseExpiryWarningIntegrationTest {
                 + "ends_at = now() - interval '1 minute' WHERE id = ?", expired.getId());
 
         assertEquals(0, warnings.notifyExpiringLeases());
-        verify(messaging, never()).convertAndSendToUser(anyString(), anyString(), any());
+        // destination 을 한정해 본다 — 여기서 확인할 것은 "만료 알림이 가지 않는다" 이지 "어떤
+        // 개인 알림도 없다" 가 아니다. 셋업의 지갑 생성이 코인 지급 알림을 내므로(S15P21A604-920)
+        // 전체 금지는 이 테스트와 무관한 이유로 깨진다.
+        verify(messaging, never()).convertAndSendToUser(anyString(),
+                eq(BoothLeaseExpiryWarningPublisher.DESTINATION), any());
         assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM booth_leases "
                         + "WHERE id IN (?, ?) AND expiry_warning_sent_at IS NOT NULL",
                 Integer.class, later.getId(), expired.getId()));

@@ -334,7 +334,6 @@ describe('구역 구분 없이 즉시구매·응모권이 한 격자에 3/3으�
     const list = container.querySelector('[aria-label="이벤트 상점 상품 목록"]') as HTMLElement;
     expect(list.style.gridTemplateColumns).toBe('repeat(3, 1fr)');
   });
-
   it('API 반환 순서와 무관하게 구매 5종 뒤에 치킨을 배치한다', async () => {
     listPrizes.mockResolvedValue([
       { prizeId: 5, name: '교보문고 10000원권', priceCoin: 1000, stock: 3, active: true },

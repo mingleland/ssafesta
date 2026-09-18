@@ -1,5 +1,7 @@
 package com.example.ssafesta.booth;
 
+import com.example.ssafesta.ai.AiAgent;
+import com.example.ssafesta.ai.AiAgentRepository;
 import com.example.ssafesta.project.Project;
 import com.example.ssafesta.project.ProjectRepository;
 import java.time.Instant;
@@ -34,15 +36,17 @@ public class BoothQueryService {
     private final BoothLeaseRepository leases;
     private final BoothAccessGuard accessGuard;
     private final ProjectRepository projects;
+    private final AiAgentRepository agents;
 
     public BoothQueryService(BoothSlotRepository slots, BoothRepository booths,
                              BoothLeaseRepository leases, BoothAccessGuard accessGuard,
-                             ProjectRepository projects) {
+                             ProjectRepository projects, AiAgentRepository agents) {
         this.slots = slots;
         this.booths = booths;
         this.leases = leases;
         this.accessGuard = accessGuard;
         this.projects = projects;
+        this.agents = agents;
     }
 
     /**
@@ -78,7 +82,7 @@ public class BoothQueryService {
     @Transactional(readOnly = true)
     public Optional<MyBoothView> findMyBooth(Long userId) {
         Instant now = Instant.now();
-        return booths.findByOwnerUserId(userId).map(booth -> {
+        return booths.findByOwnerUserIdAndAdminOwnedFalse(userId).map(booth -> {
             BoothLease lease = leases.findValidByBoothId(booth.getId(), now).orElse(null);
             BoothSlot slot = lease == null ? null : slots.findById(lease.getSlotId()).orElse(null);
             return MyBoothView.of(booth, lease, slot, now);
@@ -98,7 +102,22 @@ public class BoothQueryService {
         return new PublicBoothView(booth.getId(), lease.getSlotId(), booth.getName(),
                 lease.getStatus().name(), true, lease.getEndsAt(),
                 BoothFacadeService.FacadeView.of(booth), booth.getPublishedLayoutVersion(),
-                visibleHomepageUrl(booth));
+                visibleHomepageUrl(booth), handoffEnabled(booth.getId()));
+    }
+
+    /**
+     * Whether this booth takes a human handoff, read by the visitor's chat overlay to hide the
+     * '사람 상담 요청' button before it can be pressed (GitLab #249, S15P21A604-914).
+     *
+     * <p>No agent means no one to hand off to, so the absent row reads {@code false} rather than
+     * an error — the button is simply not offered. There is no {@code published} gate here, unlike
+     * {@link #visibleHomepageUrl}: a visitor cannot reach an unpublished booth at all, and this is
+     * a boolean about the booth rather than an address pointing out of it. {@code AiAgent.status}
+     * is not consulted either, so this answer is the same value the owner's
+     * {@code GET /booths/{id}/agents} reports — two screens, one number.
+     */
+    private boolean handoffEnabled(Long boothId) {
+        return agents.findByBoothId(boothId).map(AiAgent::isHandoffEnabled).orElse(false);
     }
 
     /**
@@ -208,6 +227,6 @@ public class BoothQueryService {
     public record PublicBoothView(Long boothId, Long slotId, String name, String leaseStatus,
                                   boolean entryAvailable, Instant endsAt,
                                   BoothFacadeService.FacadeView facade, Integer publishedLayoutVersion,
-                                  String homepageUrl) {
+                                  String homepageUrl, boolean handoffEnabled) {
     }
 }

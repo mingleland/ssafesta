@@ -64,8 +64,18 @@ public class WorldChatRateLimiter {
     /** Redis 가 판정을 못 줄 때 내려보내는 대기 시간. 기존 거절 동작을 그대로 두는 값이다. */
     static final long UNAVAILABLE_RETRY_AFTER_MS = 5_000L;
 
+    /**
+     * 같은 사람의 입장 알림을 다시 방송하기까지의 간격 (S15P21A604-915 / GitLab #223 §5-5).
+     *
+     * <p>입장 알림은 대화가 아니라 사실 통지라, 채팅과 같은 창·벌칙 구조를 둘 이유가 없다. 막아야
+     * 하는 것은 <b>연결을 끊고 다시 붙기를 반복해 토픽을 밀어 올리는 것</b> 하나다. 그래서 간격
+     * 하나로 끝낸다.
+     */
+    static final long JOIN_NOTICE_INTERVAL_MS = 60_000L;
+
     private static final String SENDS_PREFIX = "world:chat:sends:";
     private static final String STATE_PREFIX = "world:chat:rate:";
+    private static final String JOIN_PREFIX = "world:chat:join:";
 
     /**
      * 허용 여부와 남은 대기를 한 번에 판정한다.
@@ -124,6 +134,24 @@ public class WorldChatRateLimiter {
             return {1, 0}
             """, List.class);
 
+    /**
+     * 지금 이 사람의 입장을 알려도 되는가.
+     *
+     * <p>마지막 방송 시각을 {@code KEYS[1]} 에 두고 간격만 본다. {@code SET NX PX} 한 줄로도
+     * 되지만 그러면 판정이 <b>Redis 의 TTL 시계</b>에 묶여, 주입한 시각으로 검증할 수 없다.
+     * 값에 시각을 적어 두면 판정은 주입한 시각을 따르고 TTL 은 청소만 맡는다.
+     */
+    private static final RedisScript<Long> JOIN = new DefaultRedisScript<>("""
+            local now = tonumber(ARGV[1])
+            local interval = tonumber(ARGV[2])
+            local last = tonumber(redis.call('GET', KEYS[1]) or '0')
+            if last > 0 and now - last < interval then
+              return 0
+            end
+            redis.call('SET', KEYS[1], now, 'PX', interval)
+            return 1
+            """, Long.class);
+
     private final StringRedisTemplate redis;
     private final String keyspace;
     private final Clock clock;
@@ -167,6 +195,29 @@ public class WorldChatRateLimiter {
         }
         boolean allowed = ((Number) verdict.get(0)).intValue() == 1;
         return new Decision(allowed, ((Number) verdict.get(1)).longValue());
+    }
+
+    /**
+     * 이 회원의 입장 알림을 지금 방송해도 되는가 (S15P21A604-915).
+     *
+     * <p>여기서 거절은 "연결이 잘못됐다" 가 아니라 "방금 알렸다" 다. 부르는 쪽은 방송만 건너뛰고
+     * 연결은 그대로 둔다 — 입장 알림에는 클라이언트로 거절을 돌려줄 응답 경로가 없다.
+     *
+     * @throws WorldChatUnavailableException Redis 가 답하지 않아 판정할 수 없을 때
+     */
+    public boolean tryAnnounceJoin(Long userId) {
+        Long verdict;
+        try {
+            verdict = redis.execute(JOIN, List.of(keyspace + JOIN_PREFIX + userId),
+                    String.valueOf(clock.millis()), String.valueOf(JOIN_NOTICE_INTERVAL_MS));
+        } catch (RuntimeException unreachable) {
+            throw new WorldChatUnavailableException(unreachable);
+        }
+        if (verdict == null) {
+            // 파이프라인·트랜잭션 모드에서만 null 이다. 그 상태로는 판정이 성립하지 않는다.
+            throw new WorldChatUnavailableException(null);
+        }
+        return verdict == 1L;
     }
 
     /**
