@@ -1766,6 +1766,20 @@ Draft와 공개 회차 이력은 삭제하지 않는다. 방문자·Unity 공개
 
 오류: `400 VALIDATION_FAILED`(사유 누락·길이 초과) · `403 FORBIDDEN`(관리자 아님) · `403 MASTER_PROTECTED`(마스터 소유 부스) · `404 BOOTH_NOT_FOUND`.
 
+### POST `/admin/booth-slots/{slotId}/lease/release`
+
+임차인의 동의 없이 그 자리의 임대를 끝낸다 (`S15P21A604-927`). 본문은 `{ "reason": "사유" }`이며 사유는 1~500자로 필수다. → `204 No Content`.
+
+**`unpublish`와 무엇이 다른가** — 비공개는 공개 포인터만 해제하므로 임대가 살아 있고 `GET /booth-slots`는 그 슬롯을 계속 `OCCUPIED`로 보고한다. 자리를 비우는 것은 이 API다. 처리 직후 슬롯이 `AVAILABLE`이 되어 다른 회원이 임대할 수 있고, 임차인의 활성 임대 한도(D01)도 함께 풀린다.
+
+**부스 콘텐츠는 보존된다.** 임차인이 직접 반납한 것과 같은 경로이므로 부스·Layout·프로젝트·설문·AI 문서가 그대로 남고(spec 004 FR-010), 다시 임대하면 Draft부터 이어진다(D08). 임대 행은 `CANCELLED`로 남고 AI 문서는 같은 트랜잭션에서 비활성화된다. **관리자 자신이 임차한 부스만 예외다** — 그 부스는 원래 반납과 함께 삭제되는 구조다(`S15P21A604-905`).
+
+**코인은 환불되지 않는다** — spec 004 D06을 이 경로까지 적용한다. 임차인의 잔액은 변하지 않는다.
+
+성공만 `admin_actions`에 `BOOTH_LEASE_RELEASE`·`BOOTH`·사유를 남긴다.
+
+오류: `400 VALIDATION_FAILED`(사유 누락·길이 초과) · `403 FORBIDDEN`(관리자 아님) · `403 MASTER_PROTECTED`(마스터 소유 부스) · `404 BOOTH_SLOT_NOT_FOUND` · `404 ACTIVE_LEASE_NOT_FOUND`(회수할 활성 임대가 없다 — 이미 만료·반납됐다).
+
 ### GET `/admin/event-surveys/{surveyKey}/entrants?page=0&size=20`
 
 이벤트 설문 참여 회원만 최신 제출순으로 페이지 조회한다 (`S15P21A604-742` #59). 전역 Admin 전용이고, 응답은 `{ content: [{ responseId, userId, nickname, submittedAt }], page, size, totalElements, totalPages }`다. 이벤트 설문은 회원 전용이라 게스트 식별자가 섞이지 않는다.

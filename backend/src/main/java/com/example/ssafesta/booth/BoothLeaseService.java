@@ -2,6 +2,7 @@ package com.example.ssafesta.booth;
 
 import com.example.ssafesta.ai.BoothDocumentDeactivationService;
 import com.example.ssafesta.common.ConstraintViolations;
+import com.example.ssafesta.user.AdminActionRecorder;
 import com.example.ssafesta.user.AdminGuard;
 import com.example.ssafesta.wallet.CoinReason;
 import com.example.ssafesta.wallet.CoinSpendCommand;
@@ -50,11 +51,13 @@ public class BoothLeaseService {
     private final BoothDocumentDeactivationService aiDocuments;
     private final AdminGuard admins;
     private final AdminBoothPurger purger;
+    private final AdminActionRecorder adminActions;
     private final LeaseProperties properties;
 
     public BoothLeaseService(BoothSlotRepository slots, BoothRepository booths, BoothLeaseRepository leases,
                              WalletService wallets, BoothDocumentDeactivationService aiDocuments,
-                             AdminGuard admins, AdminBoothPurger purger, LeaseProperties properties) {
+                             AdminGuard admins, AdminBoothPurger purger,
+                             AdminActionRecorder adminActions, LeaseProperties properties) {
         this.slots = slots;
         this.booths = booths;
         this.leases = leases;
@@ -62,6 +65,7 @@ public class BoothLeaseService {
         this.aiDocuments = aiDocuments;
         this.admins = admins;
         this.purger = purger;
+        this.adminActions = adminActions;
         this.properties = properties;
     }
 
@@ -186,18 +190,7 @@ public class BoothLeaseService {
         // holding two.
         wallets.lockOwner(userId);
 
-        if (leases.findActiveBySlotIdForUpdate(slotId).isEmpty()) {
-            log.info("반납할 임대가 없습니다 — userId={}, slotId={}", userId, slotId);
-            throw new ActiveLeaseNotFoundException();
-        }
-
-        BoothLease lease = leases.findValidBySlotId(slotId, Instant.now())
-                .orElseThrow(() -> {
-                    // Held the lock, but the row is logically expired by the time we read it. Leave
-                    // the transition to the sweeper: this path owns returns, not expiries.
-                    log.info("반납하려던 임대가 이미 만료 시각을 지났습니다 — userId={}, slotId={}", userId, slotId);
-                    return new ActiveLeaseNotFoundException();
-                });
+        BoothLease lease = lockValidLease(slotId);
 
         if (!lease.getLesseeUserId().equals(userId)) {
             log.info("반납 요청의 슬롯을 그 회원이 보유하고 있지 않습니다 — userId={}, 요청 slotId={}, 보유자={}",
@@ -205,6 +198,95 @@ public class BoothLeaseService {
             throw new ActiveLeaseNotFoundException();
         }
 
+        release(lease, LeaseStatus.CANCELLED);
+    }
+
+    /**
+     * Takes the slot's active lease under lock, or refuses (S15P21A604-927).
+     *
+     * <p><b>Two steps, and the order matters</b> — the reasoning is {@link #cancel}'s, which is why
+     * both ending paths reach it here rather than each writing it out. The row is locked with no
+     * time predicate first, and validity is re-read only after the lock is held: binding an instant
+     * into the locking query could not work, because that query <i>is</i> how the lock is taken and
+     * a bound parameter would not refresh while the statement waits.
+     *
+     * <p>A row that is logically expired by the time we read it is left to the sweeper. These paths
+     * own returns, not expiries.
+     */
+    private BoothLease lockValidLease(Long slotId) {
+        if (leases.findActiveBySlotIdForUpdate(slotId).isEmpty()) {
+            log.info("반납할 임대가 없습니다 — slotId={}", slotId);
+            throw new ActiveLeaseNotFoundException();
+        }
+        return leases.findValidBySlotId(slotId, Instant.now())
+                .orElseThrow(() -> {
+                    log.info("반납하려던 임대가 이미 만료 시각을 지났습니다 — slotId={}", slotId);
+                    return new ActiveLeaseNotFoundException();
+                });
+    }
+
+    /**
+     * An administrator takes a slot back from whoever holds it (S15P21A604-927).
+     *
+     * <p><b>It is the tenant's return, performed by someone else.</b> Nothing about the ending
+     * differs: {@link #release} writes {@code CANCELLED}, detaches the slot and deactivates the AI
+     * documents in this transaction, and the member's booth and all its content are preserved
+     * exactly as spec 004 FR-010 requires. What the administrator takes away is the seat, not the
+     * work — re-leasing continues from the same content, Draft-first (D08). An administrator's own
+     * booth still goes through {@link #releaseAdminBooth}, because that is what its own return does.
+     *
+     * <p>So the only thing this adds to {@link #cancel} is who may ask: the lessee check is replaced
+     * by an administrator check, and an audit row records who took the seat and why.
+     *
+     * <p><b>No refund</b> (spec 004 D06 extended to this path). The wallet is not touched.
+     *
+     * <p>Locking is {@link #cancel}'s, one indirection further out: the lessee is the person whose
+     * concurrent requests have to queue, and they are only known once the lease is read. So the
+     * lease is peeked at first, the lessee's row is locked, and only then is the lease taken under
+     * lock — same order as everywhere else (wallet, then lease), which is what keeps the two paths
+     * from deadlocking against each other.
+     *
+     * @param actorUserId the administrator, recorded as the actor
+     * @param slotId      the slot to take back
+     * @param reason      why, in their words — the audit column that makes the row readable later
+     */
+    @Transactional
+    public void releaseByAdmin(Long actorUserId, Long slotId, String reason) {
+        admins.requireAdmin(actorUserId);
+        if (slots.findById(slotId).isEmpty()) {
+            throw new SlotNotFoundException(slotId);
+        }
+
+        Long lessee = leases.findValidBySlotId(slotId, Instant.now())
+                .map(BoothLease::getLesseeUserId)
+                .orElseThrow(() -> {
+                    log.info("강제 반납할 임대가 없습니다 — actorUserId={}, slotId={}", actorUserId, slotId);
+                    return new ActiveLeaseNotFoundException();
+                });
+        wallets.lockOwner(lessee);
+
+        BoothLease lease = lockValidLease(slotId);
+        if (!lease.getLesseeUserId().equals(lessee)) {
+            // 잠금을 잡는 사이에 임대가 갈렸다 — 훑어본 임대가 끝나고 다른 회원이 같은 자리를 빌렸다.
+            // 잠근 지갑이 그 사람의 것이 아니므로 여기서 회수하면 직렬화가 성립하지 않는다. 화면이
+            // 낡았다는 뜻이고, 다시 읽고 다시 요청하면 된다.
+            log.info("강제 반납 대상 임대가 잠금 사이에 바뀌었습니다 — slotId={}, 훑어본 임차인={}, 현재 임차인={}",
+                    slotId, lessee, lease.getLesseeUserId());
+            throw new ActiveLeaseNotFoundException();
+        }
+        Booth booth = booths.findById(lease.getBoothId())
+                .orElseThrow(() -> new BoothNotFoundException(lease.getBoothId()));
+        // 마스터의 부스를 관리자가 빼앗는 것은 막는다 — AdminGuard 의 보호가 자원을 통해서도
+        // 성립해야 한다는 같은 이유다.
+        admins.requireOwnerNotMaster(booth.getOwnerUserId());
+
+        // 감사 행이 먼저다. 같은 트랜잭션(Propagation.MANDATORY)이라 함께 커밋되거나 함께 사라지고,
+        // 관리자 부스는 이 다음 줄에서 삭제되므로 그 뒤에 쓰면 target 으로 남길 부스가 이미 없다.
+        adminActions.record(actorUserId, AdminActionRecorder.BOOTH_LEASE_RELEASE,
+                AdminActionRecorder.TARGET_BOOTH, booth.getId(), reason);
+
+        log.info("관리자 강제 반납 — actorUserId={}, slotId={}, boothId={}, 임차인={}, 사유={}",
+                actorUserId, slotId, booth.getId(), lessee, reason);
         release(lease, LeaseStatus.CANCELLED);
     }
 
