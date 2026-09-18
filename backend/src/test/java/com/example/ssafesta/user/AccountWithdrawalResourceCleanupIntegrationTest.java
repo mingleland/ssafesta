@@ -11,8 +11,9 @@ import com.example.ssafesta.auth.MemberSessionService;
 import com.example.ssafesta.booth.Booth;
 import com.example.ssafesta.booth.BoothRepository;
 import com.example.ssafesta.common.RedisKeyspaceProperties;
-import com.example.ssafesta.game.GameAssetDeleteQueue;
 import com.example.ssafesta.storage.FakeObjectStorage;
+import com.example.ssafesta.storage.ObjectDeleteQueue;
+import com.example.ssafesta.storage.ObjectDeleteQueue;
 import com.example.ssafesta.wallet.WalletService;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -46,7 +47,7 @@ class AccountWithdrawalResourceCleanupIntegrationTest {
     @Autowired private BoothRepository booths;
     @Autowired private StringRedisTemplate redis;
     @Autowired private RedisKeyspaceProperties keyspace;
-    @Autowired private GameAssetDeleteQueue deleteQueue;
+    @Autowired private ObjectDeleteQueue deleteQueue;
     @Autowired private FakeObjectStorage storage;
     @Autowired private JdbcTemplate jdbc;
 

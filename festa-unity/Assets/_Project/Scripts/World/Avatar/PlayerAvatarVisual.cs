@@ -259,12 +259,42 @@ namespace Festa.World
         /// <summary>예약된 접지 재측정 한 번. 정착 후 값이 선 자세의 진짜 기준이 된다.</summary>
         void RunScheduledReground()
         {
+            // **아직 떨어지는 중이면 재지 않는다.** 바닥 판독은 "루트보다 위 2u 아래에 있는 가장 높은 면" 인데,
+            // 공중에 있으면 그 조건에 **지나가는 면**이 걸린다 — 라운지 단상 위를 지나며 재면 글자 윗면(7.87)을
+            // 바닥으로 잡고, 실제로는 단상(3.08)에 내려서므로 외형이 4.8u 아래로 눌려 몸이 단상에 파묻힌다.
+            // 재접속·로그인에서 특히 잦은 이유가 이것이다 — 그때만 스폰 낙하가 있다 (T-268 미해결분).
+            // 못 믿을 순간이면 값을 굳히지 말고 뒤로 미룬다.
+            if (!GroundReadingSettled())
+            {
+                _regroundAt = Time.time + RegroundSettle;
+                _spawnRegroundAt = Time.time + RegroundSettle;
+                return;
+            }
             if (!GroundToCurrentPose() || !_baseNeedsRefresh) return;
             _baseNeedsRefresh = false;
             if (ChangesGroundContact(_player.EmoteId.Value)) return;
             _baseVisualLocalY = _currentVisual.transform.localPosition.y;
             _calibratedVisualLocalY = _baseVisualLocalY;
         }
+
+        /// <summary>
+        /// 지금 잰 바닥면을 믿어도 되는가 — <b>몸이 실제로 그 면에 올라서 있는가</b>.
+        ///
+        /// <para>소유자는 <see cref="CharacterController.isGrounded"/> 가 그대로 답이다. 원격 아바타는
+        /// 컨트롤러가 없으므로 루트와 바닥면의 거리로 본다 — 서 있으면 0 에 가깝고, 떨어지는 중이면 벌어진다.</para>
+        ///
+        /// <para>바닥을 아예 못 찾으면 <c>true</c> 다. 그 경우 <see cref="FootContactY"/> 가 캡슐 바닥으로
+        /// 떨어지는 폴백 경로를 타므로, 여기서 막으면 영원히 재측정이 미뤄진다.</para>
+        /// </summary>
+        bool GroundReadingSettled()
+        {
+            if (_controller != null && _controller.enabled) return _controller.isGrounded;
+            if (!TryFindGroundBelowFeet(out var groundY)) return true;
+            return Mathf.Abs(transform.position.y - groundY) <= MaxSettledGroundGap;
+        }
+
+        /// <summary>원격 아바타가 "바닥에 서 있다" 로 볼 최대 간격(u). 선 자세의 루트-바닥 오차는 0.10~0.22 다.</summary>
+        const float MaxSettledGroundGap = 2f;
 
         // 크로스페이드(0.2초)가 끝나 포즈가 자리잡은 뒤에 재야 한다. 섞이는 중에 재면
         // 선 자세와 앉은 자세의 **중간값**이 나온다.
@@ -284,7 +314,10 @@ namespace Festa.World
         // 0.04 m 까지 내려간다. 접지 보정을 그대로 돌리면 그 프레임을 "바닥에 박힌 것" 으로 읽고 몸을
         // 끌어내려 파묻힌다(사용자 지적 2026-09-10). 원샷이라 끝나면 RestoreBaseGrounding 이 되돌린다.
         static bool ChangesGroundContact(PlayerEmoteId emote) =>
-            emote == PlayerEmoteId.SitGround || emote == PlayerEmoteId.Strike || LiePoseTable.IsLie(emote);
+            emote == PlayerEmoteId.SitGround || emote == PlayerEmoteId.Strike
+            || LiePoseTable.IsLie(emote);
+        // 의자 착석(SitChair*)은 여기 넣지 않는다 — 바닥이 아니라 **좌면**에 몸을 올려야 해서
+        // 기준면이 다르다. 좌석이 직접 재서 맞춘다 (BoothChairInteractable → SetSeatLift).
 
         /// <summary>
         /// **현재 포즈**의 최하단을 바닥에 맞춘다. 스킨 메시는 BakeMesh 로 굽으므로
@@ -303,6 +336,91 @@ namespace Festa.World
             _rootHeightAtGrounding = RootHeightAboveGround();
             return true;
         }
+
+        /// <summary>
+        /// 좌석이 잰 만큼 외형을 세로로 옮긴다 — <b>루트가 아니라 외형이다.</b>
+        ///
+        /// <para>왜 루트가 아닌가. 의자에 앉히려고 루트를 좌면 기준으로 내렸더니 중력이 캡슐을 바닥까지
+        /// 끌어내려 계산이 통째로 무의미했다 — 실측하면 의도한 −1.45 가 아니라 바닥인 0.22 에 있었고,
+        /// 그래서 엉덩이가 좌면 위 19 cm 에 떠 있었다 (2026-09-18). 루트는 바닥에 두고 보이는 몸만 올린다.</para>
+        ///
+        /// <para>착석이 끝나면 좌석이 <see cref="ClearSeatOffsetImmediate"/> 로 되돌린다. 외형
+        /// 기준값(<see cref="_baseVisualLocalY"/>)은 건드리지 않는다 — 일어설 때 원래 접지로 정확히
+        /// 복귀해야 한다.</para>
+        ///
+        /// <para><b>목표만 정하고 즉시 옮기지 않는다.</b> 처음에는 좌석이 잰 값을 그 프레임에 통째로
+        /// 대입했는데, 착석 0.4 초 뒤 몸이 1.6u 내려가고 1.8u 앞으로 가는 것이 한 프레임에 일어나
+        /// 순간이동처럼 끊겨 보였다 (사용자 지적 2026-09-18). 값은 <see cref="TickSeatOffset"/> 가
+        /// 매 프레임 지수 감쇠로 따라간다.</para>
+        /// </summary>
+        public void SetSeatOffset(Vector3 worldDelta)
+        {
+            if (_currentVisual == null) return;
+            var t = _currentVisual.transform;
+            var parent = t.parent;
+            _seatOffsetTarget = parent != null ? parent.InverseTransformVector(worldDelta) : worldDelta;
+        }
+
+        /// <summary>
+        /// 좌석 보정을 <b>즉시</b> 0 으로 되돌린다. 일어서는 순간은 루트가 좌석 밖으로 이동하고
+        /// 자세도 선 자세로 바뀌므로, 여기서 감쇠로 천천히 풀면 걸어 나가는 동안 몸이 솟아오른다.
+        /// </summary>
+        public void ClearSeatOffsetImmediate()
+        {
+            _seatOffsetTarget = Vector3.zero;
+            if (_currentVisual == null || _seatOffsetLocal == Vector3.zero) { _seatOffsetLocal = Vector3.zero; return; }
+            var t = _currentVisual.transform;
+            t.localPosition -= _seatOffsetLocal;
+            _seatOffsetLocal = Vector3.zero;
+        }
+
+        /// <summary>기존 세로 보정 호출과의 호환용. 새 좌석 코드는 수평까지 포함한 <see cref="SetSeatOffset"/> 을 쓴다.</summary>
+        public void SetSeatLift(float worldDeltaY) => SetSeatOffset(Vector3.up * worldDeltaY);
+
+        /// <summary>
+        /// 좌석 보정을 목표까지 부드럽게 따라가게 한다. 다른 보정(접지 유지 등)과 같은
+        /// <c>localPosition</c> 을 쓰므로 <b>증분만</b> 더한다 — 절대 대입하면 서로를 지운다.
+        /// </summary>
+        void TickSeatOffset()
+        {
+            if (_currentVisual == null) return;
+            var remaining = _seatOffsetTarget - _seatOffsetLocal;
+            if (remaining.sqrMagnitude < 1e-8f)
+            {
+                if (_seatOffsetLocal != _seatOffsetTarget) _seatOffsetLocal = _seatOffsetTarget;
+                return;
+            }
+
+            // 0.18 초쯤에 눈에 띄지 않게 수렴한다. 남은 양이 아주 작으면 남기지 않고 붙인다 —
+            // 지수 감쇠는 영원히 도달하지 않아 매 프레임 미세 이동이 남는다.
+            float k = 1f - Mathf.Exp(-SeatOffsetResponse * Time.deltaTime);
+            var step = remaining.sqrMagnitude < 0.0004f ? remaining : remaining * k;
+            _currentVisual.transform.localPosition += step;
+            _seatOffsetLocal += step;
+        }
+
+        /// <summary>좌석 보정 추종 속도(1/초). 18 이면 0.18 초에 약 96% 도달한다.</summary>
+        const float SeatOffsetResponse = 12f;
+
+        /// <summary>
+        /// 지금 <b>실제로 적용돼 있는</b> 좌석 보정(월드 벡터). 좌석이 앉은 자세를 다시 잴 때 이 값을
+        /// 빼야 한다 — 재는 대상이 이미 보정된 몸이라, 빼지 않으면 보정이 자기 자신을 지운다.
+        /// </summary>
+        public Vector3 SeatOffsetWorld
+        {
+            get
+            {
+                if (_currentVisual == null) return Vector3.zero;
+                var parent = _currentVisual.transform.parent;
+                return parent != null ? parent.TransformVector(_seatOffsetLocal) : _seatOffsetLocal;
+            }
+        }
+
+        /// <summary>지금 적용 중인 좌석 보정(외형 부모의 로컬 단위). 되돌릴 때 이 값을 뺀다.</summary>
+        Vector3 _seatOffsetLocal;
+
+        /// <summary>좌석이 요청한 보정 목표(외형 부모의 로컬 단위).</summary>
+        Vector3 _seatOffsetTarget;
 
         /// <summary>조립 뒤 실제 포즈로 키를 다시 맞췄는가. 조립 한 번에 한 번만 한다.</summary>
         bool _heightCalibrated;
@@ -756,6 +874,7 @@ namespace Festa.World
                 RunScheduledReground();
             }
 
+            TickSeatOffset();
             HoldFeetOnGround();
             if (_groundShadow == null || _groundShadowRenderer == null) return;
 

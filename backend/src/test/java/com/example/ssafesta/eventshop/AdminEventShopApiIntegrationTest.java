@@ -2,6 +2,7 @@ package com.example.ssafesta.eventshop;
 
 import static com.example.ssafesta.booth.BoothTestSupport.createMemberWithWallet;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
@@ -154,12 +155,35 @@ class AdminEventShopApiIntegrationTest {
                 Integer.class, purchaseId));
     }
 
+    @Test
+    void theListCarriesTheRecipientAndStillRendersPurchasesMadeBeforeItExisted() throws Exception {
+        Long admin = admin("수령자운영자");
+        Long buyer = member("수령자구매자");
+        EventPrize prize = prizes.saveAndFlush(new EventPrize("수령자품목", 20, null));
+        Long withRecipient = buy(buyer, prize.getId());
+        // GitLab #239 앞의 구매 행은 세 컬럼이 NULL 이다 — V41 이 nullable 로 더한 그 상태를 그대로 만든다.
+        jdbc.update("UPDATE event_purchases SET campus=NULL, team_name=NULL, recipient_name=NULL WHERE id=?",
+                withRecipient);
+        Long legacy = withRecipient;
+        Long fresh = buy(buyer, prizes.saveAndFlush(new EventPrize("수령자품목2", 20, null)).getId());
+
+        mockMvc.perform(get("/api/v1/admin/event-shop/purchases").header("Authorization", bearer(admin)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[?(@.purchaseId == " + fresh + " && @.campus == '구미' "
+                        + "&& @.teamName == 'A604' && @.recipientName == '황덕')]").exists())
+                .andExpect(jsonPath("$.content[?(@.purchaseId == " + legacy + ")]").exists());
+
+        assertTrue(purchases.findById(legacy).orElseThrow().getRecipient().isAbsent(),
+                "옛 구매 행은 세 필드가 함께 비어 있어야 합니다.");
+    }
+
     private Long buy(Long buyerUserId, Long prizeId) throws Exception {
         mockMvc.perform(post("/api/v1/event-shop/purchases")
                         .header("Authorization", bearer(buyerUserId))
                         .header("Idempotency-Key", UUID.randomUUID().toString())
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"prizeId\":" + prizeId + ",\"quantity\":1}"))
+                        .content("{\"prizeId\":" + prizeId + ",\"quantity\":1,\"campus\":\"구미\","
+                                + "\"teamName\":\"A604\",\"recipientName\":\"황덕\"}"))
                 .andExpect(status().isCreated());
         return purchases.findAll().stream()
                 .filter(p -> p.getPrizeId().equals(prizeId) && p.getBuyerUserId().equals(buyerUserId))

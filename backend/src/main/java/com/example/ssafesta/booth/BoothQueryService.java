@@ -78,7 +78,7 @@ public class BoothQueryService {
     @Transactional(readOnly = true)
     public Optional<MyBoothView> findMyBooth(Long userId) {
         Instant now = Instant.now();
-        return booths.findByOwnerUserId(userId).map(booth -> {
+        return booths.findByOwnerUserIdAndAdminOwnedFalse(userId).map(booth -> {
             BoothLease lease = leases.findValidByBoothId(booth.getId(), now).orElse(null);
             BoothSlot slot = lease == null ? null : slots.findById(lease.getSlotId()).orElse(null);
             return MyBoothView.of(booth, lease, slot, now);

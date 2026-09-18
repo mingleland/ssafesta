@@ -1,5 +1,6 @@
 package com.example.ssafesta.game;
 
+import com.example.ssafesta.storage.image.ImageBytesValidator;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -131,7 +132,7 @@ public class GameAsset {
      * and the upgrade path that would close the same-length hole. Checking it would mean hashing on
      * every read, and a play page pulls many assets, so that trade is not taken yet.
      */
-    void markReady(GameAssetImageValidator.VerifiedImage verified) {
+    void markReady(ImageBytesValidator.VerifiedImage verified) {
         this.contentType = verified.contentType();
         this.byteSize = verified.byteSize();
         this.width = verified.width();

@@ -99,7 +99,7 @@ class BoothLeaseConcurrencyIntegrationTest {
         assertTrue(seenBySweeper.stream().noneMatch(l -> l.getId().equals(leaseId)),
                 "반납이 잠근 행은 배치가 건너뛰어야 합니다.");
         assertEquals(LeaseStatus.CANCELLED, leases.findById(leaseId).orElseThrow().getStatus());
-        assertEquals(null, booths.findByOwnerUserId(userId).orElseThrow().getCurrentSlotId());
+        assertEquals(null, booths.findByOwnerUserIdAndAdminOwnedFalse(userId).orElseThrow().getCurrentSlotId());
     }
 
     /**
@@ -158,7 +158,7 @@ class BoothLeaseConcurrencyIntegrationTest {
                 "배치가 이긴 뒤의 반납은 ACTIVE_LEASE_NOT_FOUND 여야 합니다 — 실제: " + refusal.get());
         assertEquals(LeaseStatus.EXPIRED, leases.findById(leaseId).orElseThrow().getStatus(),
                 "진 쪽이 최종 상태를 덮어쓰면 안 됩니다.");
-        assertEquals(null, booths.findByOwnerUserId(userId).orElseThrow().getCurrentSlotId());
+        assertEquals(null, booths.findByOwnerUserIdAndAdminOwnedFalse(userId).orElseThrow().getCurrentSlotId());
     }
 
     /** 래치 대기 중 인터럽트가 나면 테스트를 멈춘다 — 조용히 지나가면 경합이 성립하지 않은 채 통과한다. */

@@ -2,6 +2,7 @@ package com.example.ssafesta.world.chat;
 
 import com.example.ssafesta.common.ApiException;
 import com.example.ssafesta.common.ErrorCode;
+import com.fasterxml.jackson.annotation.JsonInclude;
 import java.security.Principal;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -48,6 +49,16 @@ public class WorldChatController {
     @MessageExceptionHandler
     @SendToUser(destinations = ERROR_QUEUE, broadcast = false)
     public WorldChatError onFailure(Exception failure) {
+        if (failure instanceof WorldChatTooFastException tooFast) {
+            return new WorldChatError(tooFast.errorCode().name(), tooFast.getMessage(),
+                    tooFast.retryAfterMs());
+        }
+        if (failure instanceof WorldChatUnavailableException unavailable) {
+            // 판정을 못 했을 뿐 "영구히 막혔다" 는 뜻이 아니다. 클라이언트가 다시 보낼 시점이
+            // 필요하므로 고정값을 준다 — 기존 거절 동작을 그대로 두는 값이다 (GitLab #223).
+            return new WorldChatError(unavailable.errorCode().name(), unavailable.getMessage(),
+                    WorldChatRateLimiter.UNAVAILABLE_RETRY_AFTER_MS);
+        }
         if (failure instanceof ApiException api) {
             return new WorldChatError(api.errorCode().name(), api.getMessage());
         }
@@ -58,5 +69,19 @@ public class WorldChatController {
                 ErrorCode.CHAT_UNAVAILABLE.defaultMessage());
     }
 
-    public record WorldChatError(String code, String message) { }
+    /**
+     * 거절 봉투.
+     *
+     * <p>{@code retryAfterMs} 는 <b>밀리초 정수</b>다 (GitLab #223). {@code Duration} 을 그대로
+     * 직렬화하면 {@code "PT5S"} 가 나가고, 그 문자열을 파싱하는 일이 클라이언트마다 반복된다.
+     * 대기가 없는 거절(내용 검증 실패 등)에는 필드를 내리지 않는다 — 기다리면 통과하는 것처럼
+     * 읽히면 클라이언트가 같은 줄을 다시 보낸다.
+     */
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    public record WorldChatError(String code, String message, Long retryAfterMs) {
+
+        WorldChatError(String code, String message) {
+            this(code, message, null);
+        }
+    }
 }

@@ -5,6 +5,7 @@ import com.example.ssafesta.common.ErrorCode;
 import com.example.ssafesta.user.AdminActionRecorder;
 import com.example.ssafesta.user.User;
 import com.example.ssafesta.user.UserRepository;
+import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.List;
@@ -134,10 +135,12 @@ public class AdminEventShopService {
     }
 
     private static AdminPurchaseView viewOf(EventPurchase purchase, String prizeName, String buyerNickname) {
+        PurchaseRecipient recipient = purchase.getRecipient();
         return new AdminPurchaseView(purchase.getId(), purchase.getPrizeId(), prizeName,
                 purchase.getBuyerUserId(), buyerNickname, purchase.getQuantity(), purchase.getCoinSpent(),
                 purchase.getLedgerEntryId(), purchase.getPurchasedAt(), purchase.getFulfillment().name(),
-                purchase.getNote(), purchase.getUpdatedAt());
+                purchase.getNote(), purchase.getUpdatedAt(), recipient.campus(), recipient.teamName(),
+                recipient.recipientName());
     }
 
     public record AdminPrizeView(Long prizeId, String name, int priceCoin, Integer stock, boolean active,
@@ -148,8 +151,16 @@ public class AdminEventShopService {
         }
     }
 
+    /**
+     * {@code campus}·{@code teamName}·{@code recipientName} are the hand-off details (GitLab #239)
+     * and are {@code null} together on purchases made before that field existed — the screen has to
+     * render that row rather than assume every purchase names a recipient.
+     */
     public record AdminPurchaseView(Long purchaseId, Long prizeId, String prizeName, Long buyerUserId,
                                     String buyerNickname, int quantity, int coinSpent, Long ledgerEntryId,
-                                    Instant purchasedAt, String fulfillment, String note, Instant updatedAt) {
+                                    Instant purchasedAt, String fulfillment, String note, Instant updatedAt,
+                                    @Schema(nullable = true) String campus,
+                                    @Schema(nullable = true) String teamName,
+                                    @Schema(nullable = true) String recipientName) {
     }
 }
