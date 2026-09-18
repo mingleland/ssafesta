@@ -22,7 +22,7 @@ import {
   subscribeWorldLoadStart,
 } from '../bridge/events';
 import type { WorldConnectionState } from '../bridge/events';
-import { hasUnityModal, resetWorldUiState } from '../bridge/worldUiState';
+import { getWorldUiState, hasUnityModal, resetWorldUiState } from '../bridge/worldUiState';
 import { resetWorldContext } from '../../features/world/model/worldContext';
 import { discardPendingVisit } from '../../features/world/model/boothVisitTracker';
 import { acquireUnitySession, releaseUnitySession, restartUnitySession } from './sessionManager';
@@ -245,6 +245,10 @@ export function UnityHost() {
     if (screen === 'visitor' || screen === 'management') return;
     // 줌 없이 열린 레이어였다(이벤트 NPC·상담 Quick Access·월드 안내) — 보낼 것이 없다
     if (!hasUnityModal()) return;
+    // 아바타 화면은 여기서 닫지 않는다. 메뉴에서 여는 동작과 같은 동기 경로에서 avatar:true 가
+    // 먼저 적용되므로, 그대로 두면 연 직후 overlay-closed 로 닫아 버린다. 닫기는 ESC 중재 2단계가
+    // 전담한다 — 닫기 전 비동기 로드가 끝나면 IsOpen=false 인 채로 화면만 늦게 올라온다(좀비 UI).
+    if (getWorldUiState().avatar) return;
     requestExitWorldUi(instance, 'overlay-closed');
   }, [instanceReady, screen]);
 

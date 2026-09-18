@@ -27,6 +27,7 @@ import { projectApi } from '../../../entities/project/api.select';
 import { getAiAgent } from '../../../entities/aiAgent/api';
 import { formatRemaining, remainingMs } from '../../../entities/booth/remaining';
 import { OverlayEmpty, OverlayError, OverlayFrame, OverlayLoading } from '../../overlay/ui/OverlayFrame';
+import { ManagedLogoImage } from '../../../shared/ui/ManagedLogoImage';
 import { useSession } from '../../auth/model/session';
 import { openManagementDetail } from '../../world/model/worldScreen';
 import type { ManagementPanel, ManagementPanelKind } from '../../world/model/managementPanel';
@@ -72,6 +73,25 @@ const IcReturn = (
     <path d="M9 14L4 9l5-5M4 9h11a5 5 0 0 1 0 10h-3" />
   </svg>
 );
+
+/**
+ * 부스 카드 썸네일 — URL 없음·조회 실패·깨진 응답 전부 같은 빈 자리로 떨어진다.
+ * ManagedLogoImage 는 실패 시 null 을 돌려주므로, 여기서 broken 을 받아 빈 자리를 그린다 —
+ * 로고 칸이 통째로 사라지지 않게. 빈 자리에 파비콘을 채우지 않는다 — "SSAFESTA 라는 프로젝트가
+ * 등록된 것" 처럼 읽힌다 (S15P21A604-855).
+ */
+function BoothThumb({ url }: { url: string | null }) {
+  const [broken, setBroken] = useState(false);
+  useEffect(() => setBroken(false), [url]);
+  if (url === null || broken) {
+    return (
+      <span className="bm-thumb bm-thumb-empty" aria-hidden="true">
+        {IcImage}
+      </span>
+    );
+  }
+  return <ManagedLogoImage className="bm-thumb" src={url} alt="" onError={() => setBroken(true)} />;
+}
 
 // 운영 관리 4카드의 아이콘 타일 — 색은 사진 레퍼런스(docs/LJH/ui-design/00_context/sources/booth-management.png)
 const OPS_ICONS: Record<'project' | 'survey' | 'consultation' | 'ai-agent', ReactNode> = {
@@ -153,6 +173,21 @@ export function BoothManagementOverlay({ onClose }: Props) {
     const id = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(id);
   }, []);
+  // 게이트 팝업(div, role=dialog)은 네이티브 <dialog>가 아니라 ESC를 스스로 닫지 못하고,
+  // WorldPage의 ESC 중재자도 모르는 지역 상태라 한 번에 관리 오버레이까지 닫혔다.
+  // 게이트가 열려 있으면 여기서 한 겹만 닫고 중재자에게 전파하지 않는다.
+  useEffect(() => {
+    if (!showAgentGate && !showProjectGate) return;
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key !== 'Escape') return;
+      if (document.querySelector('dialog[open]') !== null) return; // LeaseCancelDialog가 먼저
+      e.stopPropagation(); // 중재자(closeTopScreen)가 오버레이까지 닫지 않게
+      if (showAgentGate) setShowAgentGate(false);
+      else setShowProjectGate(false);
+    }
+    window.addEventListener('keydown', onKeyDown, true); // capture: 중재자(bubble)보다 먼저
+    return () => window.removeEventListener('keydown', onKeyDown, true);
+  }, [showAgentGate, showProjectGate]);
   const myBoothQuery = useQuery({
     queryKey: ['my-booth'],
     queryFn: leaseApi.getMyBooth,
@@ -250,7 +285,7 @@ export function BoothManagementOverlay({ onClose }: Props) {
     // 부스 없음 — GET /booths/mine 이 204 를 주는 상태. 임대 흐름으로 보낸다(새 계약 없음)
     if (myBooth === null || myBooth.lease === null) {
       return (
-        <div className="bm-empty">
+        <div className="bm-empty bm-width">
           <span className="bm-empty-icon" aria-hidden="true">
             {IcBooth}
           </span>
@@ -288,15 +323,8 @@ export function BoothManagementOverlay({ onClose }: Props) {
         <div className="bm-side">
           <section className="bm-identity">
             <div className="bm-identity-head">
-              {project?.thumbnailUrl ? (
-                <img className="bm-thumb" src={project.thumbnailUrl} alt="" />
-              ) : (
-                // 등록된 프로젝트가 없으면 빈 자리로 둔다. 파비콘을 채워 넣으면 "SSAFESTA 라는 프로젝트가
-                // 등록된 것" 처럼 읽힌다 (S15P21A604-855).
-                <span className="bm-thumb bm-thumb-empty" aria-hidden="true">
-                  {IcImage}
-                </span>
-              )}
+              {/* URL 없음·조회 실패·깨진 응답 전부 빈 자리로 — 로고 칸이 통째로 사라지지 않게 */}
+              <BoothThumb url={project?.thumbnailUrl ?? null} />
               <div className="bm-identity-text">
                 <h3 className="bm-name">{project?.name ?? '프로젝트 미등록'}</h3>
                 <span className="bm-slot">부스 번호 {lease.slotCode ?? '미연결'}</span>

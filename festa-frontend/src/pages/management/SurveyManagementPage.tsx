@@ -263,7 +263,7 @@ function BuilderSaveAction() {
   );
 }
 
-function ResultTab({ boothId }: { boothId: number }) {
+function ResultTab({ boothId, onGoBuilder }: { boothId: number; onGoBuilder: () => void }) {
   const state = useSurveyResult();
 
   useEffect(() => {
@@ -273,6 +273,20 @@ function ResultTab({ boothId }: { boothId: number }) {
   if (state.status === 'idle' || state.status === 'loading') return <ScreenLoading label="결과를 불러오는 중..." />;
   if (state.status === 'error') {
     return <ScreenError title="결과를 불러오지 못했습니다" message="잠시 후 다시 시도해 주세요." onRetry={() => void loadSurveyResult(boothId)} />;
+  }
+  if (state.status === 'noSurvey') {
+    // 404 SURVEY_NOT_FOUND 는 오류가 아니라 "아직 설문이 없다" 다(BE 계약) — 오류 화면으로
+    // 렌더하면 편집 탭이 멀쩡한데 결과만 실패처럼 보인다(2026-09-18 실측)
+    return (
+      <>
+        <ScreenEmpty title="저장된 설문이 없습니다" hint="설문 편집에서 설문을 만들어 저장하면 결과가 여기에 쌓입니다." />
+        <div className="mg-empty-action">
+          <button type="button" className="sc-btn sc-btn-primary" onClick={onGoBuilder}>
+            설문 편집으로 가기
+          </button>
+        </div>
+      </>
+    );
   }
   if (state.status === 'empty') return <ScreenEmpty title="아직 응답이 없습니다" hint="방문자가 설문에 답하면 여기에 집계가 쌓입니다." />;
 
@@ -402,7 +416,7 @@ export function SurveyManagementPage() {
           응답 결과
         </button>
       </div>
-      {tab === 'builder' ? <BuilderTab boothId={boothId} /> : <ResultTab boothId={boothId} />}
+      {tab === 'builder' ? <BuilderTab boothId={boothId} /> : <ResultTab boothId={boothId} onGoBuilder={() => setTab('builder')} />}
     </ManagementScreen>
   );
 }

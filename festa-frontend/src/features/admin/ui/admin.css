@@ -89,7 +89,28 @@
 .ad-dialog-target { margin: 0 0 10px; padding: 8px 10px; border-radius: 8px; background: rgba(255,255,255,0.06); font-weight: 600; }
 .ad-dialog-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; }
 
-.ad-bar { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.ad-bar {
+  /* 라벨 폭을 고정해 트랙 시작·끝이 모든 행에서 같아진다 — flex + minWidth 는 라벨이
+     긴 행에서 트랙을 밀어 게이지 길이가 제각각이 됐다(2026-09-18 스크린샷). 긴 라벨은
+     말줄임으로 감수한다 */
+  display: grid;
+  grid-template-columns: minmax(0, 230px) minmax(0, 1fr) 36px;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+}
+.ad-bar-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: rgba(234, 238, 251, 0.85); }
 .ad-bar i { display: block; height: 8px; border-radius: 4px; background: rgba(77, 141, 255, 0.6); min-width: 2px; }
 .ad-bar-track { flex: 1; background: rgba(255,255,255,0.06); border-radius: 4px; }
-.ad-badge-fe { font-size: 11px; color: var(--sc-gold); border: 1px solid rgba(255,206,77,0.4); border-radius: 6px; padding: 1px 6px; margin-left: 6px; vertical-align: middle; }
+.ad-bar .num { text-align: right; font-variant-numeric: tabular-nums; color: var(--sc-text-muted); }
+
+/* 개별 응답의 답변 목록 — dt 가 질문 문장(긴 텍스트)이라 ad-kv 의 max-content 열을 쓰면
+   dd 가 한두 글자 폭으로 짜부러져 답변이 세로로 흘렀다(2026-09-18 스크린샷). 질문 위,
+   답변 아래로 쌓는 전용 배치다 */
+.ad-answers { display: flex; flex-direction: column; gap: 12px; margin: 0; font-size: 13.5px; }
+.ad-answers > div {
+  display: flex; flex-direction: column; gap: 4px;
+  padding-bottom: 10px; border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+.ad-answers dt { color: var(--sc-text-muted); line-height: 1.5; }
+.ad-answers dd { margin: 0; line-height: 1.55; overflow-wrap: anywhere; }

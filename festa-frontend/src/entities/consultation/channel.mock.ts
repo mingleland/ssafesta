@@ -1,4 +1,4 @@
-// Consultation mock 시뮬레이터 — Port 의 유일한 구현 (real 은 BE -137 구현 후).
+// Consultation mock 시뮬레이터 — 테스트·VITE_USE_MOCK 용. 정본은 channel.real.ts 다.
 // 테스트·개발에서 수락/만료/종료를 트리거할 수 있게 시뮬레이션 함수를 노출한다.
 import type {
   ConsultationActiveSession,
@@ -40,7 +40,7 @@ export const consultationVisitorMock: ConsultationChannelPort = {
 };
 
 export const consultationStaffMock: ConsultationStaffPort = {
-  async getQueue() {
+  async getQueue(_boothId: number) {
     return [...queue];
   },
   async accept(requestId: string) {

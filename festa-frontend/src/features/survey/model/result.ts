@@ -1,11 +1,17 @@
 // Survey 집계 결과 상태 기계 (S15P21A604-133) + 주관식 페이지네이션 (S15P21A604-194).
 // UI 는 useSurveyResult() 와 loadNextTextPage 만 소비한다. 집계 화면 자체는 UI Track 후속.
 import { useSyncExternalStore } from 'react';
+import { isApiError } from '../../../shared/api/client';
 import { surveyApi } from '../../../entities/survey/api.select';
 import type { SurveyQuestionAggregateVM } from '../../../shared/contracts/survey';
 
 export interface SurveyResultState {
-  status: 'idle' | 'loading' | 'ready' | 'empty' | 'error';
+  /**
+   * noSurvey — 부스에 설문이 아직 없다. BE 는 `404 SURVEY_NOT_FOUND` 로 이 정상 상태를 알리는
+   * 데(SurveyController — "오류 상태가 아니라 설문을 만들지 않았다는 뜻") 그것을 error 로
+   * 렌더하면 설문 편집 탭이 멀쩡한데 결과만 실패처럼 보인다(2026-09-18 실측)
+   */
+  status: 'idle' | 'loading' | 'ready' | 'empty' | 'noSurvey' | 'error';
   /** 조회 기준. 늦은 응답 가드도 이 값으로 본다 */
   boothId: number | null;
   /** 결과 응답이 알려준 서버 id — 주관식 다음 페이지 조회에 쓴다 */
@@ -79,8 +85,14 @@ export async function loadSurveyResult(boothId: number): Promise<void> {
       perQuestion: result.perQuestion,
       textAnswers: { ...result.textAnswers, loadingNext: false },
     });
-  } catch {
+  } catch (error) {
     if (state.boothId !== boothId) return;
+    // 1단계(부스 설문 조회)의 404 SURVEY_NOT_FOUND 는 정상 상태다 — 결과 경로가 2단계라
+    // (boothId → surveyId → results) 그 404가 여기까지 올라온다(#133 별칭 확정 전까지)
+    if (isApiError(error) && error.code === 'SURVEY_NOT_FOUND') {
+      setState({ status: 'noSurvey' });
+      return;
+    }
     setState({ status: 'error' });
   }
 }

@@ -57,9 +57,10 @@ describe('OverlayHost — GAME 배선', () => {
     openOverlay('GAME', { boothId: BOOTH_ID, objectId: 'portal-1', configId: CONFIG_ID });
     render(<OverlayHost />);
 
+    // lazy GameOverlay import 가 CI 환경에서 1초를 넘길 수 있어 넉넉한 타임아웃을 둔다.
     await waitFor(() => {
       expect(calls.filter((url) => url.includes(PORTAL_PATH))).toHaveLength(1);
-    });
+    }, { timeout: 5000 });
   });
 
   it('GAME 요청에 임시 "준비 중" 화면을 더 이상 보여주지 않는다', async () => {
@@ -69,7 +70,7 @@ describe('OverlayHost — GAME 배선', () => {
     // 서버가 준 사유가 그대로 화면에 나온다 = GameOverlay 까지 도달했다는 뜻이다.
     await waitFor(() => {
       expect(screen.getByText('아직 게시되지 않은 게임입니다.')).toBeTruthy();
-    });
+    }, { timeout: 5000 });
     expect(screen.queryByText(NOT_READY_TEXT)).toBeNull();
   });
 
