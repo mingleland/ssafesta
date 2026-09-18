@@ -49,8 +49,20 @@ namespace Festa.World
         void OnAnimatorIK(int layerIndex)
         {
             if (_anim == null || !_anim.isHuman) return;
-            // 이모트(앉기·눕기 등)·점프 상태에서는 끈다 — 앉은 자세에 발 IK 를 걸면 골반이 내려가 쭈그린다(2026-09-09 소파 실측), 공중에서는 발을 땅으로 당긴다.
             var state = _anim.GetCurrentAnimatorStateInfo(layerIndex);
+
+            // 의자 자세는 엉덩이를 좌면에 고정한 채 발만 바닥 위로 올린다. 일반 발 IK처럼 골반을
+            // 움직이면 좌면에서 다시 뜨므로, 발이 바닥 아래인 쪽에만 위치 IK를 건다.
+            if (IsChairSit(state))
+            {
+                _weight = 1f;
+                _pelvisOffset = 0f;
+                ClampChairFoot(AvatarIKGoal.LeftFoot);
+                ClampChairFoot(AvatarIKGoal.RightFoot);
+                return;
+            }
+
+            // 이모트(앉기·눕기 등)·점프 상태에서는 끈다 — 앉은 자세에 발 IK 를 걸면 골반이 내려가 쭈그린다(2026-09-09 소파 실측), 공중에서는 발을 땅으로 당긴다.
             if (state.IsTag("NoFootIK") || IsEmoteOrJump(state))
             {
                 _weight = 0f; _pelvisOffset = 0f;
@@ -124,6 +136,26 @@ namespace Festa.World
             return set;
         }
         static bool IsEmoteOrJump(AnimatorStateInfo state) => s_skipStates.Contains(state.shortNameHash);
+
+        static readonly int s_sitChair1 = Animator.StringToHash("Emote_SitChair1");
+        static readonly int s_sitChair2 = Animator.StringToHash("Emote_SitChair2");
+        static bool IsChairSit(AnimatorStateInfo state)
+            => state.shortNameHash == s_sitChair1 || state.shortNameHash == s_sitChair2;
+
+        void ClampChairFoot(AvatarIKGoal goal)
+        {
+            var original = _anim.GetIKPosition(goal);
+            if (!Probe(goal, out var grounded, out var rotation) || original.y >= grounded.y) {
+                _anim.SetIKPositionWeight(goal, 0f);
+                _anim.SetIKRotationWeight(goal, 0f);
+                return;
+            }
+
+            _anim.SetIKPositionWeight(goal, 1f);
+            _anim.SetIKRotationWeight(goal, 0.7f);
+            _anim.SetIKPosition(goal, grounded);
+            _anim.SetIKRotation(goal, rotation);
+        }
 
         bool Probe(AvatarIKGoal goal, out Vector3 pos, out Quaternion rot)
         {
