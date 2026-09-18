@@ -110,9 +110,11 @@ describe('내 부스 관리창 개편 (-817)', () => {
     expect((document.querySelector('.bm-thumb') as HTMLImageElement).src).toBe('https://x/t.png');
   });
 
-  it('프로젝트 0건이면 프로젝트 미등록', async () => {
+  it('프로젝트 0건이면 프로젝트 미등록 — 파비콘 대신 빈 자리를 둔다', async () => {
     await renderOverlay();
     expect(await screen.findByText('프로젝트 미등록')).toBeTruthy();
+    expect(document.querySelector('img.bm-thumb')).toBeNull();
+    expect(document.querySelector('.bm-thumb.bm-thumb-empty')).not.toBeNull();
   });
 
   describe('부스 이름 편집', () => {
@@ -167,9 +169,9 @@ describe('내 부스 관리창 개편 (-817)', () => {
     it('slot → default → 문구, 셋으로 끝난다', async () => {
       await renderOverlay();
       const img = () => document.querySelector('.bm-preview-img') as HTMLImageElement | null;
-      await waitFor(() => expect(img()?.getAttribute('src')).toBe('/booth-preview/F11-R06.png'));
+      await waitFor(() => expect(img()?.getAttribute('src')).toBe('/booth-preview/F11-R06.webp'));
       fireEvent.error(img()!);
-      expect(img()?.getAttribute('src')).toBe('/booth-preview/default.png');
+      expect(img()?.getAttribute('src')).toBe('/booth-preview/default.webp');
       fireEvent.error(img()!);
       expect(img()).toBeNull();
       expect(screen.getByText('부스 미리보기를 불러올 수 없습니다.')).toBeTruthy();
@@ -180,7 +182,7 @@ describe('내 부스 관리창 개편 (-817)', () => {
       getMyBooth.mockResolvedValue({ ...myBooth, lease: { ...myBooth.lease, slotCode: null } });
       await renderOverlay();
       await waitFor(() =>
-        expect(document.querySelector('.bm-preview-img')?.getAttribute('src')).toBe('/booth-preview/default.png'),
+        expect(document.querySelector('.bm-preview-img')?.getAttribute('src')).toBe('/booth-preview/default.webp'),
       );
     });
   });

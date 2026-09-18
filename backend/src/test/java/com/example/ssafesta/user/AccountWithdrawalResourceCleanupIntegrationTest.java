@@ -11,8 +11,9 @@ import com.example.ssafesta.auth.MemberSessionService;
 import com.example.ssafesta.booth.Booth;
 import com.example.ssafesta.booth.BoothRepository;
 import com.example.ssafesta.common.RedisKeyspaceProperties;
-import com.example.ssafesta.game.GameAssetDeleteQueue;
 import com.example.ssafesta.storage.FakeObjectStorage;
+import com.example.ssafesta.storage.ObjectDeleteQueue;
+import com.example.ssafesta.storage.ObjectDeleteQueue;
 import com.example.ssafesta.wallet.WalletService;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -46,7 +47,7 @@ class AccountWithdrawalResourceCleanupIntegrationTest {
     @Autowired private BoothRepository booths;
     @Autowired private StringRedisTemplate redis;
     @Autowired private RedisKeyspaceProperties keyspace;
-    @Autowired private GameAssetDeleteQueue deleteQueue;
+    @Autowired private ObjectDeleteQueue deleteQueue;
     @Autowired private FakeObjectStorage storage;
     @Autowired private JdbcTemplate jdbc;
 
@@ -146,6 +147,18 @@ class AccountWithdrawalResourceCleanupIntegrationTest {
         lifecycle.withdraw(userId);
 
         assertEquals(0, count("SELECT count(*) FROM oauth_identities WHERE user_id = ?", userId));
+    }
+
+    /** Presets are member-owned durable state too, so their FK must not make withdrawal fail. */
+    @Test
+    void withdrawingCascadesToAvatarPresets() {
+        Long userId = member("프리셋탈퇴");
+        jdbc.update("INSERT INTO avatar_presets(user_id, slot, avatar_code, updated_at) VALUES (?, 1, 'sk_01', now())", userId);
+
+        lifecycle.withdraw(userId);
+
+        assertEquals(0, count("SELECT count(*) FROM avatar_presets WHERE user_id = ?", userId));
+        assertEquals(0, count("SELECT count(*) FROM users WHERE id = ?", userId));
     }
 
     // ── 도우미 ──────────────────────────────────────────────────────────────

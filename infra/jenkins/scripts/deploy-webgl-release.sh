@@ -386,10 +386,12 @@ verify_release() {
   done
 }
 
-record_known_good() {
+# 자동으로 기록하는 것은 CURRENT 까지다.
+# KNOWN_GOOD 승격은 사람이 실제 서비스 검증을 마친 뒤 approve-known-good.sh 로 수행한다 (spec §Session 2026-09-17).
+record_current() {
   local state_root target temp
   state_root="${WEBGL_STATE_DIR:-${ENVIRONMENT_STATE_DIR:-/var/lib/festa-environments}/dev/batches}"
-  target="${state_root}/known-good/webgl.json"
+  target="${state_root}/current/webgl.json"
   mkdir -p "$(dirname "${target}")"
   temp="${target}.tmp.$$"
   "${PYTHON_BIN:-python}" - "${candidate}/manifest.json" "${temp}" "${release_id}" "${expected_sha}" "${package_url}" "${WEBGL_PUBLIC_BASE_URL}" "${edge_blocked}" <<'PY'
@@ -461,7 +463,7 @@ for name in "${release_dirs[@]}"; do
   if (( kept > retention - 2 )); then rm -rf -- "${releases:?}/${name}"; fi
 done
 
-record_known_good
+record_current
 prune_legacy_releases
 status=SUCCEEDED
 if [[ "${edge_blocked}" == 1 ]]; then

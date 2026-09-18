@@ -39,7 +39,7 @@
 
 - [X] T010 `db/migration/V8__booth_published_layout_version.sql` — `booths.published_layout_version INTEGER NULL` 추가 + **복합 FK** `(id, published_layout_version) → booth_layout_published_versions(booth_id, version_no)`. NULL이면 MATCH SIMPLE로 검사가 면제되어 "공개된 것 없음"이 표현된다 (data-model I-3)
 - [X] T011 `db/migration/V9__booth_facade_fields.sql` — `facade_code` → `facade_theme_code` **rename**, `facade_primary_color VARCHAR(7)` · `facade_sign_text VARCHAR(60)` · `facade_logo_url VARCHAR(2048)` 추가 (전부 NULL 허용). **`booth/Booth.java`의 `facadeCode` 필드도 같은 커밋에서 고친다** — 아무도 안 읽는 필드라 빠뜨려도 테스트가 통과해 버린다 (data-model §5)
-- [X] T012 [P] `booth/LayoutObjectType.java` — canonical 10종 화이트리스트(`AI_AGENT` `VIDEO_SCREEN` `PROJECT_PANEL` `SURVEY_KIOSK` `RECRUITMENT_BOARD` `CONSULTATION_DESK` `LAPTOP` `LIKE_VOTE` `FURNITURE` `DECORATION`) + 기능형/장식형 구분. **Unity 하위 호환값 `SURVEY`·`CONSULT_DESK`는 저장에 허용하지 않는다** (spec §공통 계약)
+- [X] T012 [P] `booth/LayoutObjectType.java` — canonical 10종 화이트리스트(`AI_AGENT` `VIDEO_SCREEN` `PROJECT_PANEL` `SURVEY_KIOSK` `RECRUITMENT_BOARD` `CONSULTATION_DESK` `LAPTOP` `LIKE_VOTE` `FURNITURE` `DECORATION`) + 기능형/장식형 구분(`VIDEO_SCREEN` 은 2026-09-18 에 장식형으로 이동 — GitLab #194 ②, `S15P21A604-889`). **Unity 하위 호환값 `SURVEY`·`CONSULT_DESK`는 저장에 허용하지 않는다** (spec §공통 계약)
 - [X] T013 [P] `booth/LayoutTemplate.java` — `DEFAULT` · `PROJECT_EXHIBITION`. C-06 확정 시 목록만 늘린다 *(→ C-06 확정으로 `DEFAULT` 제거, `PROJECT_EXHIBITION` 단독 — T055)*
 - [X] T014 `booth/LayoutJson.java` — **요청 원문을 보관**하고 검증용 파싱만 별도로 수행. 좌표는 `BigDecimal`로 읽는다. **`double`로 파싱해 재직렬화하지 않는다** (research R-04). JPA는 `@JdbcTypeCode(SqlTypes.JSON) String`으로 매핑
 - [X] T015 [P] `booth/BoothLayoutDraft.java` — `booth_layout_drafts` 매핑. PK가 `booth_id`(I-1). `revision` 증가는 전용 메서드로만

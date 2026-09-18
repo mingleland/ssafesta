@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 // 임대 성공 → 상주 Unity 에 슬롯 재조회 알림 (S15P21A604-644).
 //
-// 임대하면 BE 가 그 슬롯의 게시본을 만든다(6번 임대 직후 layouts/published 200 실측). Unity 는
-// 진입 시 그 슬롯을 404 로 캐시하고 있으므로 알리지 않으면 임대한 부스에 들어갈 수 없다.
+// Unity 는 진입 시 슬롯별 게시본 조회 결과(대개 404)를 확정으로 들고 있으므로, 임대 뒤 알리지 않으면
+// 그 슬롯의 간판·점유 상태를 다시 읽지 않는다.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderHook, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';

@@ -7,6 +7,7 @@
 // 불꽃놀이) 토글이 이 줄에 나란히 들어온다. 그 토글은 동작할 것이 아직 없어 렌더하지 않는다.
 import { useEffect } from 'react';
 import { enterScreen, setMuted, unlockAndPlay, useScreenAudio } from '../model/screenAudio';
+import { Tooltip } from '../../../shared/ui/tooltip/Tooltip';
 import './screenControls.css';
 
 export function ScreenControls() {
@@ -35,29 +36,30 @@ export function ScreenControls() {
 
   return (
     <div className="screen-controls">
-      <button
-        type="button"
-        className="screen-control-btn"
-        aria-pressed={silent}
-        aria-label={silent ? '배경음악 켜기' : '배경음악 끄기'}
-        title={silent ? '배경음악 켜기' : '배경음악 끄기'}
-        onClick={toggle}
-      >
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-          <path d="M11 5 6 9H3v6h3l5 4z" />
-          {silent ? (
-            <>
-              <path d="m17 9 4 6" />
-              <path d="m21 9-4 6" />
-            </>
-          ) : (
-            <>
-              <path d="M15.6 8.4a5 5 0 0 1 0 7.2" />
-              <path d="M18.4 5.6a9 9 0 0 1 0 12.8" />
-            </>
-          )}
-        </svg>
-      </button>
+      <Tooltip content={silent ? '배경음악 켜기' : '배경음악 끄기'} placement="bottom">
+        <button
+          type="button"
+          className="screen-control-btn"
+          aria-pressed={silent}
+          aria-label={silent ? '배경음악 켜기' : '배경음악 끄기'}
+          onClick={toggle}
+        >
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M11 5 6 9H3v6h3l5 4z" />
+            {silent ? (
+              <>
+                <path d="m17 9 4 6" />
+                <path d="m21 9-4 6" />
+              </>
+            ) : (
+              <>
+                <path d="M15.6 8.4a5 5 0 0 1 0 7.2" />
+                <path d="M18.4 5.6a9 9 0 0 1 0 12.8" />
+              </>
+            )}
+          </svg>
+        </button>
+      </Tooltip>
     </div>
   );
 }

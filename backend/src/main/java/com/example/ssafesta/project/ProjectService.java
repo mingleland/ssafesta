@@ -41,12 +41,14 @@ public class ProjectService {
     private final ProjectRepository projects;
     private final BoothAccessGuard accessGuard;
     private final BoothRepository booths;
+    private final ProjectLogoService logos;
 
     public ProjectService(ProjectRepository projects, BoothAccessGuard accessGuard,
-                          BoothRepository booths) {
+                          BoothRepository booths, ProjectLogoService logos) {
         this.projects = projects;
         this.accessGuard = accessGuard;
         this.booths = booths;
+        this.logos = logos;
     }
 
     // ── 등록 ────────────────────────────────────────────────────────────────
@@ -77,6 +79,8 @@ public class ProjectService {
         } catch (DataIntegrityViolationException exception) {
             throw translate(exception, boothId);
         }
+        // 올려 둔 로고를 이 프로젝트가 가리키게 됐다 — 정리 후보에서 뺀다 (GitLab #241).
+        logos.referenceChanged(null, project.getThumbnailUrl());
         return ProjectView.of(project);
     }
 
@@ -101,15 +105,24 @@ public class ProjectService {
         }
         validateUrls(command);
 
+        String previousThumbnailUrl = project.getThumbnailUrl();
         boolean changed = apply(command.name, project.getName(), project::changeName);
         changed |= apply(command.description, project.getDescription(), project::changeDescription);
-        changed |= apply(command.thumbnailUrl, project.getThumbnailUrl(), project::changeThumbnailUrl);
+        boolean thumbnailChanged = apply(command.thumbnailUrl, project.getThumbnailUrl(),
+                project::changeThumbnailUrl);
+        changed |= thumbnailChanged;
         changed |= apply(command.videoUrl, project.getVideoUrl(), project::changeVideoUrl);
         changed |= apply(command.deployUrl, project.getDeployUrl(), project::changeDeployUrl);
         changed |= apply(command.gitUrl, project.getGitUrl(), project::changeGitUrl);
         changed |= apply(command.portfolioUrl, project.getPortfolioUrl(), project::changePortfolioUrl);
         if (changed) {
             project.touch(Instant.now());
+        }
+        if (thumbnailChanged) {
+            // 옛 로고는 이 순간부터 아무도 가리키지 않는다. 여기서 지우지 않고 표식만 남긴다 —
+            // 되돌리는 사용자가 흔하고, 실제 삭제의 판정은 정리 배치가 그 시점의 참조를 다시 보고
+            // 한다 (GitLab #241, ProjectLogoCleanup).
+            logos.referenceChanged(previousThumbnailUrl, project.getThumbnailUrl());
         }
         return ProjectView.of(project);
     }
@@ -279,10 +292,21 @@ public class ProjectService {
         validateUrl(command.portfolioUrl, "portfolioUrl", "포트폴리오");
     }
 
+    /**
+     * 서버가 발급한 로고 경로는 {@code http(s)} URL 이 아니다 — 통과시킨다 (GitLab #241).
+     *
+     * <p>절대 URL 로 발급하지 않은 이유는 {@link ManagedProjectLogoUrl} 에 적어 두었다. 형식 판정을
+     * 그 클래스 하나에 모아 두므로 여기서 문자열을 다시 들여다보지 않는다. 그 밖의 값은 기존 규칙
+     * 그대로다 — 이 예외가 "아무 상대 경로나 된다" 로 넓어지면 방문자 화면이 깨진 링크를 얻는다.
+     */
     private void validateUrl(PresenceField<String> field, String jsonField, String displayName) {
-        if (field.isPresent()) {
-            HttpUrlValidator.validate(field.value(), jsonField, displayName);
+        if (!field.isPresent() || field.value() == null) {
+            return;
         }
+        if ("thumbnailUrl".equals(jsonField) && ManagedProjectLogoUrl.isManaged(field.value())) {
+            return;
+        }
+        HttpUrlValidator.validate(field.value(), jsonField, displayName);
     }
 
     /**

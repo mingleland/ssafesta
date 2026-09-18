@@ -104,17 +104,18 @@ class BoothLayoutConfigLinkIntegrationTest {
     /**
      * A type nobody can check yet says so, rather than passing as if it had been verified.
      *
-     * <p>{@code VIDEO_SCREEN} because it is one of the four that are genuinely still unjudged
-     * (with {@code RECRUITMENT_BOARD}, {@code CONSULTATION_DESK}, {@code LIKE_VOTE}). This test used
-     * {@code PROJECT_PANEL} until that type moved to a per-booth predicate (S15P21A604-765) — the
-     * warning it pins would have quietly stopped existing.
+     * <p>{@code RECRUITMENT_BOARD} because it is one of the three that are genuinely still unjudged
+     * (with {@code CONSULTATION_DESK}, {@code LIKE_VOTE}). This test used {@code PROJECT_PANEL}
+     * until that type moved to a per-booth predicate (S15P21A604-765), then {@code VIDEO_SCREEN}
+     * until that one became decorative (S15P21A604-889, GitLab #194 ②) — in both cases the warning
+     * it pins would have quietly stopped existing.
      */
     @Test
     void anUncheckableTypeIsReportedAsUnverified() {
         Owner owner = leasedOwner("검증불가");
         layouts.saveDraft(owner.boothId(), owner.userId(), """
                 {"expectedRevision":0,"schemaVersion":1,"template":"PROJECT_EXHIBITION","objects":[
-                  {"objectId":"screen-1","type":"VIDEO_SCREEN","configId":4242,
+                  {"objectId":"board-1","type":"RECRUITMENT_BOARD","configId":4242,
                    "position":{"x":0,"y":0,"z":0},"rotationY":0}]}
                 """);
 
@@ -122,6 +123,47 @@ class BoothLayoutConfigLinkIntegrationTest {
 
         assertTrue(outcome.warnings().stream().anyMatch(w -> "CONFIG_UNVERIFIED".equals(w.rule())),
                 "확인할 수 없다는 사실이 조용해지면 안 됩니다: " + outcome.warnings());
+    }
+
+    /**
+     * 장식은 {@code configId} 를 실어 와도 저장되고 <b>아무 경고도 나지 않는다</b>
+     * (S15P21A604-889, GitLab #194 ②).
+     *
+     * <p>{@code VIDEO_SCREEN} 이 장식으로 내려간 자리다. 구버전 FE 가 아직 {@code configId} 를 보낼
+     * 수 있어 거부하지 않는데, 무시하면서 {@code CONFIG_UNVERIFIED} 만 남기면 FE 는 고칠 것이 없는
+     * 경고를 영구히 본다 — 그 애매한 상태가 없다는 것이 이 테스트가 지키는 것이다.
+     */
+    @Test
+    void aDecorativeObjectCarryingAConfigIdIsNeitherRefusedNorWarnedAbout() {
+        Owner owner = leasedOwner("장식설정");
+        layouts.saveDraft(owner.boothId(), owner.userId(), """
+                {"expectedRevision":0,"schemaVersion":1,"template":"PROJECT_EXHIBITION","objects":[
+                  {"objectId":"screen-1","type":"VIDEO_SCREEN","configId":4242,
+                   "position":{"x":0,"y":0,"z":0},"rotationY":0},
+                  {"objectId":"deco-1","type":"DECORATION","configId":777,
+                   "position":{"x":2,"y":0,"z":0},"rotationY":0}]}
+                """);
+
+        var outcome = layouts.publish(owner.boothId(), owner.userId());
+
+        assertTrue(outcome.warnings().isEmpty(),
+                "장식에는 콘텐츠 연결 경고가 없어야 합니다: " + outcome.warnings());
+    }
+
+    /** 장식이 된 뒤에는 {@code configId} 가 없어도 미연결 경고가 나지 않는다 (GitLab #194 ②). */
+    @Test
+    void aDecorativeObjectWithoutAConfigIdIsNotReportedAsUnlinked() {
+        Owner owner = leasedOwner("장식무설정");
+        layouts.saveDraft(owner.boothId(), owner.userId(), """
+                {"expectedRevision":0,"schemaVersion":1,"template":"PROJECT_EXHIBITION","objects":[
+                  {"objectId":"screen-1","type":"VIDEO_SCREEN",
+                   "position":{"x":0,"y":0,"z":0},"rotationY":0}]}
+                """);
+
+        var outcome = layouts.publish(owner.boothId(), owner.userId());
+
+        assertTrue(outcome.warnings().stream().noneMatch(w -> "CONFIG_NOT_LINKED".equals(w.rule())),
+                "장식은 연결할 콘텐츠가 없습니다: " + outcome.warnings());
     }
 
     /**

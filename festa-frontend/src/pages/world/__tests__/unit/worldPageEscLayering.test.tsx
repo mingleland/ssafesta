@@ -50,17 +50,17 @@ vi.mock('../../../../features/booth/ui/ManagementPanelHost', () => ({
 }));
 vi.mock('../../../../features/world/ui/WorldHud', () => ({ WorldHud: () => null }));
 // GameMenu 는 프로필·지갑 쿼리를 끌고 온다 — ESC 배선 테스트에 QueryClientProvider 를 세우지 않는다.
-// onOpenMyInfo 만 눌러 볼 수 있게 최소한의 버튼을 낸다.
+// onOpenPanel 만 눌러 볼 수 있게 최소한의 버튼을 낸다.
 vi.mock('../../../../features/world/ui/GameMenu', () => ({
-  GameMenu: ({ onOpenMyInfo }: { onOpenMyInfo: () => void }) => (
+  GameMenu: ({ onOpenPanel }: { onOpenPanel: (panel: 'myInfo') => void }) => (
     <div data-testid="game-menu">
-      <button type="button" onClick={onOpenMyInfo}>내 정보</button>
+      <button type="button" onClick={() => onOpenPanel('myInfo')}>내 정보</button>
     </div>
   ),
 }));
-// MyInfoOverlay 는 프로필·지갑 쿼리를 끌고 온다 — 배선(뜨는가·ESC 로 닫히는가)만 본다.
-vi.mock('../../../../features/profile/ui/MyInfoOverlay', () => ({
-  MyInfoOverlay: () => <div data-testid="my-info-overlay" />,
+// 메뉴 자식 화면은 프로필·지갑 쿼리를 끌고 온다 — 배선(뜨는가·ESC 로 메뉴로 돌아가는가)만 본다.
+vi.mock('../../../../features/world/ui/MenuPanelHost', () => ({
+  MenuPanelHost: () => <div data-testid="my-info-overlay" />,
 }));
 
 const pressEscape = () =>
@@ -88,9 +88,9 @@ afterEach(() => {
 });
 
 /** Unity 가 모달을 쥐었다고 알려 온 상태를 만든다 — 실제 경로와 같은 수신부를 탄다. */
-const unityModal = (patch: { focus?: boolean; minigame?: boolean }) =>
+const unityModal = (patch: { focus?: boolean; minigame?: boolean; avatar?: boolean }) =>
   act(() => {
-    applyWorldUiStateJson(JSON.stringify({ focus: false, minigame: false, ...patch }));
+    applyWorldUiStateJson(JSON.stringify({ focus: false, minigame: false, avatar: false, ...patch }));
   });
 
 async function renderWorld() {
@@ -150,13 +150,17 @@ describe('WorldPage ESC 계층 (-450)', () => {
     expect(getWorldScreen()).toBe('world');
   });
 
-  it('GameMenu의 내 정보를 누르면 오버레이가 열리고 ESC 한 번으로 닫힌다', async () => {
+  it('GameMenu의 내 정보를 누르면 오버레이가 열리고 ESC 한 번으로 메뉴로 돌아온다', async () => {
     await renderWorld();
     pressEscape();
 
     fireEvent.click(screen.getByRole('button', { name: '내 정보' }));
     expect(screen.getByTestId('my-info-overlay')).toBeTruthy();
-    expect(getWorldScreen()).toBe('myInfo');
+    expect(getWorldScreen()).toBe('menuPanel');
+
+    // 메뉴가 배경에 남아 있다 — 자식을 닫으면 월드가 아니라 메뉴가 드러난다
+    pressEscape();
+    expect(getWorldScreen()).toBe('menu');
 
     pressEscape();
     expect(getWorldScreen()).toBe('world');
@@ -221,42 +225,6 @@ describe('WorldPage Enter 판정 (-791)', () => {
   });
 });
 
-// Enter 판정도 같은 단일 중재자가 쥔다 (S15P21A604-706·-791) — 그래서 여기서 함께 잠근다.
-describe('WorldPage Enter 판정 (-791)', () => {
-  beforeEach(() => {
-    __resetWorldChatForTests();
-    __resetSessionForTests();
-    setMemberSession('at', '2026-12-31T00:00:00.000Z');
-  });
-  afterEach(() => {
-    __resetWorldChatForTests();
-    __resetSessionForTests();
-  });
-
-  it('월드에서 누른 Enter 는 채팅을 열고 입력창에 focus 를 준다', async () => {
-    await renderWorld();
-    pressEnter();
-
-    expect(getWorldChatSnapshot().open).toBe(true);
-    expect(document.activeElement?.id).toBe(WORLD_CHAT_INPUT_ID);
-  });
-
-  it('패널이 열린 채 focus 를 잃어도 Enter 가 그 입력창으로 되돌린다 — 새로 열지 않는다', async () => {
-    await renderWorld();
-    pressEnter();
-
-    // 캔버스를 클릭한 상태를 만든다 — 패널은 그대로 떠 있고 focus 만 빠진다
-    act(() => {
-      (document.activeElement as HTMLElement | null)?.blur();
-    });
-    expect(document.activeElement?.id).not.toBe(WORLD_CHAT_INPUT_ID);
-
-    pressEnter();
-    expect(getWorldChatSnapshot().open).toBe(true);
-    expect(document.activeElement?.id).toBe(WORLD_CHAT_INPUT_ID);
-  });
-});
-
 // Unity 가 쥔 모달까지 함께 중재한다 (-450 2차, GitLab #132).
 // 전에는 이 판정의 입력값이 FE store 둘뿐이라, 줌만 켜진 상태의 ESC 가 "떠 있는 게 없다" 로 읽혀
 // 줌은 풀리는데 Game Menu 가 같이 떴다.
@@ -279,6 +247,19 @@ describe('WorldPage ESC 중재 — Unity 모달 (-450, #132)', () => {
     pressEscape();
 
     expect(requestExitWorldUi).toHaveBeenCalledTimes(1);
+    expect(getWorldScreen()).toBe('world');
+  });
+
+  // S15P21A604-820, GitLab #197 — 월드를 떠나지 않는 아바타 커스터마이징. 이 필드를 판정에
+  // 넣지 않으면 ESC 가 아바타 화면 위에 Game Menu 를 연다.
+  it('아바타 커스터마이징도 같은 판정을 받는다 — Game Menu 를 덧열지 않는다', async () => {
+    await renderWorld();
+    unityModal({ avatar: true });
+
+    pressEscape();
+
+    expect(requestExitWorldUi).toHaveBeenCalledTimes(1);
+    expect(requestExitWorldUi).toHaveBeenCalledWith(fakeInstance, 'esc');
     expect(getWorldScreen()).toBe('world');
   });
 

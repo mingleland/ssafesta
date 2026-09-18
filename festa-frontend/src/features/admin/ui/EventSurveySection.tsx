@@ -5,6 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 import { adminApi } from '../../../entities/admin/api.select';
 import type { EventQuestionAggregate } from '../../../entities/admin/types';
 import { Empty, ErrorBanner, KeyValue, Loading, Pager, fmtTime } from './common';
+import { Select } from '../../../shared/ui/select/Select';
 
 export function EventSurveySection({ surveyKey, responseId, onSelectSurvey, onSelectResponse }: {
   surveyKey: string | null; responseId: number | null; onSelectSurvey: (key: string | null) => void; onSelectResponse: (id: number | null) => void;
@@ -19,9 +20,12 @@ export function EventSurveySection({ surveyKey, responseId, onSelectSurvey, onSe
     <div className="ad-work">
       {list.data.length > 1 && (
         <div className="ad-toolbar">
-          <select aria-label="설문 선택" value={key} onChange={(e) => { onSelectSurvey(e.target.value); onSelectResponse(null); }}>
-            {list.data.map((s) => <option key={s.surveyKey} value={s.surveyKey}>{s.title}</option>)}
-          </select>
+          <Select
+            aria-label="설문 선택"
+            value={key}
+            options={list.data.map((s) => ({ value: s.surveyKey, label: s.title }))}
+            onChange={(v) => { onSelectSurvey(v); onSelectResponse(null); }}
+          />
         </div>
       )}
       <SurveyDetail surveyKey={key} responseId={responseId} onSelectResponse={onSelectResponse} />

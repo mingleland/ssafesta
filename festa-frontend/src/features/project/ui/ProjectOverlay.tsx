@@ -6,6 +6,7 @@ import { closeOverlay } from '../../../shared/types/overlay';
 import { loadExhibition, resetExhibition, toggleLike, useExhibition } from '../model/exhibition';
 import type { ExhibitionProjectVM } from '../model/exhibition';
 import { OverlayError, OverlayFrame, OverlayLoading, OverlayEmpty } from '../../overlay/ui/OverlayFrame';
+import { Tooltip } from '../../../shared/ui/tooltip/Tooltip';
 import './projectOverlay.css';
 
 interface Props {
@@ -22,19 +23,21 @@ const IcProject = (
 function LikeButton({ project }: { project: ExhibitionProjectVM }) {
   const { like } = project;
   return (
-    <button
-      type="button"
-      className={'proj-like' + (like.likedByMe ? ' proj-like-on' : '')}
-      disabled={!like.canToggle || like.pending}
-      onClick={() => void toggleLike(project.projectId)}
-      title={like.canToggle ? '좋아요' : '회원만 누를 수 있습니다'}
-      aria-pressed={like.likedByMe}
-    >
-      <svg width="16" height="16" viewBox="0 0 24 24" fill={like.likedByMe ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="1.9" aria-hidden="true">
-        <path d="M12 20s-7-4.4-7-9.3A4 4 0 0 1 12 8a4 4 0 0 1 7 2.7c0 4.9-7 9.3-7 9.3Z" />
-      </svg>
-      {like.count}
-    </button>
+    <Tooltip content={like.canToggle ? '좋아요' : '회원만 누를 수 있습니다'}>
+      <button
+        type="button"
+        className={'proj-like' + (like.likedByMe ? ' proj-like-on' : '')}
+        disabled={!like.canToggle || like.pending}
+        onClick={() => void toggleLike(project.projectId)}
+        aria-label={like.canToggle ? '좋아요' : '회원만 누를 수 있습니다'}
+        aria-pressed={like.likedByMe}
+      >
+        <svg width="16" height="16" viewBox="0 0 24 24" fill={like.likedByMe ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="1.9" aria-hidden="true">
+          <path d="M12 20s-7-4.4-7-9.3A4 4 0 0 1 12 8a4 4 0 0 1 7 2.7c0 4.9-7 9.3-7 9.3Z" />
+        </svg>
+        {like.count}
+      </button>
+    </Tooltip>
   );
 }
 

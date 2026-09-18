@@ -129,16 +129,32 @@ export function TimerStopOverlay() {
     return () => document.removeEventListener('visibilitychange', onVisible);
   }, [stopAndSubmit]);
 
-  // Space 로도 시작·정지한다. 버튼은 정상적으로 focus 가능하게 두고(키보드 사용자가 Tab 으로
-  // 도달해야 한다), 그 자리에 focus 가 있으면 기본 동작이 같은 핸들러를 이미 부르므로 여기서 빠진다.
+  // Space 로도 시작·정지·다시 하기를 한다. 버튼은 정상적으로 focus 가능하게 두고(키보드 사용자가
+  // Tab 으로 도달해야 한다), 그 자리에 focus 가 있으면 기본 동작이 같은 핸들러를 이미 부르므로
+  // 여기서 빠진다.
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
       if (event.code !== 'Space' || event.repeat) return;
       if ((document.activeElement as HTMLElement | null)?.closest(INTERACTIVE)) return;
       event.preventDefault();
       const current = phaseRef.current;
-      if (current.kind === 'RUNNING') void stopAndSubmit(performance.now());
-      else if (current.kind === 'IDLE') void start();
+      if (current.kind === 'RUNNING') {
+        void stopAndSubmit(performance.now());
+        return;
+      }
+      if (current.kind === 'IDLE') {
+        void start();
+        return;
+      }
+      // 결과·오류 화면에서도 Space 가 곧바로 다시 시작한다.
+      //
+      // 여기에 "결과가 뜬 직후 잠깐 무시" 하는 시간 가드를 뒀다가 걷었다. 멈추려고 Space 를 두 번
+      // 누르는 경우를 막으려던 것인데, 그 두 번째는 제출 왕복 때문에 거의 항상 SUBMITTING 구간에
+      // 떨어지고 그 단계는 이미 아무 일도 하지 않는다. 즉 가드는 사고를 막지 못하면서 정상적인
+      // 재시작만 느리게 만들었다(실측 — 키가 먹었다 안 먹었다 하는 것으로 보인다).
+      if (current.kind === 'RESULT' || current.kind === 'RESULT_EXPIRED' || current.kind === 'ERROR') {
+        void start();
+      }
     }
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
@@ -189,21 +205,18 @@ function Body({ stageRef, phase, elapsed, onRetry }: {
   elapsed: number;
   onRetry: () => void;
 }) {
-  if (phase.kind === 'IDLE') {
+  // 세션을 발급받는 동안에도 대기 화면을 그대로 둔다 (2026-09-16).
+  //
+  // 전에는 이 구간만 다른 모양이었다 — 안내 문구가 사라지고 초시계에 테두리가 생겼다가 곧바로
+  // 진행 화면으로 또 바뀌었다. 왕복이 짧아 사람 눈에는 "시작을 누르면 뭔가 한 번 번쩍한다" 로만
+  // 보인다. 화면 전환은 실제로 달리기 시작하는 순간 한 번이면 된다. 눌렀다는 신호는 footer 버튼이
+  // '진행 중...' 으로 바뀌며 이미 준다.
+  if (phase.kind === 'IDLE' || phase.kind === 'ISSUING_SESSION') {
     return (
       <div ref={stageRef} className="ts-stage" tabIndex={-1}>
         <p className="ts-guide">시작을 누르면 목표 시간이 정해집니다. 그 시간에 맞춰 멈추세요.</p>
         <span className="ts-clock ts-clock-idle">0.000</span>
-        <p className="ts-key-hint"><kbd>Space</kbd> 로도 시작·정지할 수 있어요.</p>
-      </div>
-    );
-  }
-
-  if (phase.kind === 'ISSUING_SESSION') {
-    return (
-      <div ref={stageRef} className="ts-stage ts-stage-running" tabIndex={-1}>
-        <span className="ts-clock ts-clock-idle">0.000</span>
-        <p className="ov-note">판을 준비하는 중...</p>
+        <p className="ts-key-hint"><kbd>Space</kbd>로 시작하고, 다시 눌러 멈춰요.</p>
       </div>
     );
   }
@@ -217,8 +230,13 @@ function Body({ stageRef, phase, elapsed, onRetry }: {
         </p>
         <span className="ts-clock" aria-live="off">{shown.toFixed(3)}</span>
         <p className="ts-key-hint">
-          <kbd>Space</kbd>{' '}
-          {phase.kind === 'RUNNING' ? `${phase.session.failAfterSeconds.toFixed(3)}초를 넘기면 실패예요` : '결과를 보내는 중...'}
+          {phase.kind === 'RUNNING' ? (
+            <>
+              <kbd>Space</kbd>로 멈춰요 · {phase.session.failAfterSeconds.toFixed(3)}초를 넘기면 실패예요
+            </>
+          ) : (
+            '결과를 보내는 중...'
+          )}
         </p>
       </div>
     );
@@ -229,7 +247,7 @@ function Body({ stageRef, phase, elapsed, onRetry }: {
       <div className="festa-overlay-state">
         <strong>게임 세션이 만료됐어요</strong>
         <p className="ov-note">다시 시작해 주세요.</p>
-        <button type="button" className="ov-btn ov-btn-primary" onClick={onRetry}>다시 하기</button>
+        <RetryButton onRetry={onRetry} />
       </div>
     );
   }
@@ -243,7 +261,7 @@ function Body({ stageRef, phase, elapsed, onRetry }: {
       <div className="festa-overlay-state">
         <strong>{headline}</strong>
         {/* VALIDATION 은 자동으로 다시 달리지 않는다 — 같은 상태로 재개하면 같은 실패를 반복한다 */}
-        <button type="button" className="ov-btn ov-btn-primary" onClick={onRetry}>다시 하기</button>
+        <RetryButton onRetry={onRetry} />
       </div>
     );
   }
@@ -260,6 +278,15 @@ function Body({ stageRef, phase, elapsed, onRetry }: {
   );
 }
 
+/** 결과·오류 화면의 재시작. 키 표기는 시작·멈추기와 같은 모양으로 둔다 — 세 버튼이 같은 키를 쓴다 */
+function RetryButton({ onRetry }: { onRetry: () => void }) {
+  return (
+    <button type="button" className="ov-btn ov-btn-primary ts-action" aria-label="다시 하기" onClick={onRetry}>
+      다시 하기 <kbd aria-hidden="true">Space</kbd>
+    </button>
+  );
+}
+
 function Footer({ phase, onStart, onStop }: { phase: TimerStopPhase; onStart: () => void; onStop: () => void }) {
   if (phase.kind === 'RUNNING') {
     return <button type="button" className="ov-btn ov-btn-primary ts-action" aria-label="멈추기" onClick={onStop}>멈추기 <kbd aria-hidden="true">Space</kbd></button>;
@@ -270,5 +297,5 @@ function Footer({ phase, onStart, onStop }: { phase: TimerStopPhase; onStart: ()
   if (phase.kind === 'IDLE') {
     return <button type="button" className="ov-btn ov-btn-primary ts-action" aria-label="시작" onClick={onStart}>시작 <kbd aria-hidden="true">Space</kbd></button>;
   }
-  return <button type="button" className="ov-btn ov-btn-primary" onClick={onStart}>다시 하기</button>;
+  return <RetryButton onRetry={onStart} />;
 }

@@ -35,6 +35,13 @@ public enum ErrorCode {
     MEMBER_ONLY(HttpStatus.FORBIDDEN, "회원 계정만 이용할 수 있습니다."),
     UNTRUSTED_ORIGIN(HttpStatus.FORBIDDEN, "허용되지 않은 요청 출처입니다."),
 
+    // ── 일일 미션 ───────────────────────────────────────────────────────────
+    NOT_COMPLETED(HttpStatus.BAD_REQUEST, "아직 완료하지 않은 일일 미션입니다."),
+    ALREADY_CLAIMED(HttpStatus.CONFLICT, "오늘 이미 수령한 일일 미션입니다."),
+    DAILY_CAP_REACHED(HttpStatus.CONFLICT, "오늘의 일일 미션 보상 한도에 도달했습니다."),
+    WORLD_MISSION_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE,
+            "월드 입장 미션 진행도를 확인할 수 없습니다. 잠시 후 다시 시도해 주세요."),
+
     // ── 관리자 (S15P21A604-742) ─────────────────────────────────────────────
     /**
      * The master account, or something it owns, was named as the target of an admin action
@@ -273,6 +280,18 @@ public enum ErrorCode {
     GAME_ASSET_DELETED(HttpStatus.CONFLICT, "삭제된 자산입니다."),
     GAME_ASSET_IN_USE(HttpStatus.CONFLICT, "사용 중인 자산입니다."),
 
+    // ── 프로젝트 로고 업로드 (spec 009 C-03 개정, GitLab #241) ──────────────
+    // 게임 Asset 과 같은 흐름이지만 code 를 공유하지 않는다 — 같은 이름으로 두 도메인이 답하면
+    // 클라이언트가 "무엇에 대한 거절인가" 를 경로로만 추측하게 된다. 검증 실패의 구체값은 새 code 가
+    // 아니라 completed 응답의 failureRule 로 나간다.
+    PROJECT_LOGO_TYPE_UNSUPPORTED(HttpStatus.UNSUPPORTED_MEDIA_TYPE, "지원하지 않는 이미지 형식입니다."),
+    PROJECT_LOGO_TOO_LARGE(HttpStatus.PAYLOAD_TOO_LARGE, "이미지 용량이 너무 큽니다."),
+    PROJECT_LOGO_QUOTA_EXCEEDED(HttpStatus.CONFLICT,
+            "올렸지만 저장하지 않은 이미지가 너무 많습니다. 하나를 저장하거나 잠시 뒤 다시 시도해 주세요."),
+    // 없는 것과 볼 권한이 없는 것에 같은 답을 준다 — 있는지 여부가 남의 부스 편집 상태를 알려 주는
+    // 신호가 되면 안 된다.
+    PROJECT_LOGO_NOT_FOUND(HttpStatus.NOT_FOUND, "이미지를 찾을 수 없습니다."),
+
     // ── Survey (010) ────────────────────────────────────────────────────────
     // CLOSED · ALREADY_RESPONDED 는 docs/08 §18 이 예약해 둔 어휘다. 신설은 뒤 둘이다.
     SURVEY_NOT_FOUND(HttpStatus.NOT_FOUND, "설문을 찾을 수 없습니다."),
@@ -293,6 +312,10 @@ public enum ErrorCode {
      * 모르는 경우를 갈라야 하고, 그 분기가 code 하나에 달려 있다 (GitLab #205 게임 파트 회신).
      */
     SLOT_MACHINE_NOT_FOUND(HttpStatus.NOT_FOUND, "슬롯머신을 찾을 수 없습니다."),
+    /** 하이스트라이커 월드 기계 id가 서버가 아는 기계와 다르다 (GitLab #233). */
+    HIGH_STRIKER_NOT_FOUND(HttpStatus.NOT_FOUND, "하이스트라이커 게임기를 찾을 수 없습니다."),
+    /** 승인된 스윙보다 빠른 클라이언트 재전송은 미션 사실로 남기지 않는다. */
+    HIGH_STRIKER_TOO_FAST(HttpStatus.TOO_MANY_REQUESTS, "하이스트라이커 기록 요청이 너무 빠릅니다."),
 
     // ── 공통 ────────────────────────────────────────────────────────────────
     VALIDATION_FAILED(HttpStatus.BAD_REQUEST, "요청 값이 올바르지 않습니다."),

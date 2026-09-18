@@ -62,6 +62,9 @@
 
 /* 정체성 카드 — 썸네일 + 프로젝트명/부스 번호/상태/임대 + 이름 편집 */
 .bm-identity-head { display: flex; gap: 16px; align-items: flex-start; }
+/* 카드 오른쪽 게시 액션 — 썸네일·텍스트가 왼쪽에 붙고 이 칸이 남은 폭을 오른쪽 끝으로 민다 (S15P21A604-898) */
+.bm-identity-action { margin-left: auto; flex: none; display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
+.bm-identity-action .ov-note { text-align: right; max-width: 150px; word-break: keep-all; }
 .bm-thumb {
   flex: none;
   width: 96px;
@@ -69,6 +72,14 @@
   border-radius: 14px;
   object-fit: cover;
   background: rgba(255, 255, 255, 0.06);
+}
+/* 프로젝트 미등록 — 채우지 않고 비워 둔다. boothMiniPreview 의 bmp-logo-fallback 과 같은 결 */
+.bm-thumb-empty {
+  display: grid;
+  place-items: center;
+  border: 2px dashed rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.03);
+  color: rgba(255, 255, 255, 0.35);
 }
 .bm-identity-text {
   display: flex;

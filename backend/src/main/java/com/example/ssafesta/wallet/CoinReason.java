@@ -16,6 +16,9 @@ public final class CoinReason {
     /** Daily grant, once per member per KST date (spec 003 FR-003). */
     public static final String DAILY_GRANT = "DAILY_GRANT";
 
+    /** Daily-mission claim reward, once per mission per member per KST date (GitLab #233). */
+    public static final String DAILY_MISSION = "DAILY_MISSION";
+
     /** Manual administrator correction (spec 003 FR-013). */
     public static final String ADMIN_ADJUSTMENT = "ADMIN_ADJUSTMENT";
 

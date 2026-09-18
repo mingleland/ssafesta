@@ -38,6 +38,8 @@ import { useSession } from '../../features/auth/model/session';
 import { UNITY_BOOT_STALL_TIMEOUT_MS, WORLD_PREPARING_LONG_WAIT_MS } from '../../shared/config/unity';
 import { setHostPhase } from './hostPhase';
 import { getWorldMount, subscribeWorldMount } from './worldMount';
+import landingBackgroundUrl from '../../assets/festa/backgrounds/landing-background.webp';
+import ssafestaLogoUrl from '../../assets/festa/brand/ssafesta-logo.webp';
 import './unityHostStatus.css';
 import type { UnityInstance } from './types';
 
@@ -133,9 +135,9 @@ export function UnityHost() {
 
     // 첫 시도는 단순 획득, 재시도는 기존 인스턴스 종료를 기다린 뒤 새로 만든다(B-3).
     const start = attempt === 0 ? acquireUnitySession : restartUnitySession;
-    start(canvas, (p) => {
-      if (cancelled) return;
-      setProgress(p);
+    start(canvas, (nextProgress) => {
+      if (cancelled || !Number.isFinite(nextProgress)) return;
+      setProgress(Math.min(1, Math.max(0, nextProgress)));
       armWatchdog();
     }).then((instance) => {
       if (cancelled) return;
@@ -204,20 +206,6 @@ export function UnityHost() {
     if (!instanceReady || instance === null) return;
     syncAccessToken(instance);
   }, [instanceReady, status, session.kind, session.tokenVersion]);
-
-  // 프로필에서 이름을 바꾼 뒤 Unity가 재시도 boot를 하면, 새 인스턴스에도 마지막 확정 이름을 준다.
-  useEffect(() => {
-    const instance = instanceRef.current;
-    if (!instanceReady || instance === null) return;
-    syncPendingNickname(instance);
-  }, [instanceReady]);
-
-  // 프로필에서 이름을 바꾼 뒤 Unity가 재시도 boot를 하면, 새 인스턴스에도 마지막 확정 이름을 준다.
-  useEffect(() => {
-    const instance = instanceRef.current;
-    if (!instanceReady || instance === null) return;
-    syncPendingNickname(instance);
-  }, [instanceReady]);
 
   // 프로필에서 이름을 바꾼 뒤 Unity가 재시도 boot를 하면, 새 인스턴스에도 마지막 확정 이름을 준다.
   useEffect(() => {
@@ -351,18 +339,19 @@ export function UnityHost() {
         </div>
       )}
       {!connectionNotice && status === 'booting' && (
-        <div className="uh-status" role="status" aria-live="polite">
-          <span className="uh-status-spinner" aria-hidden="true" />
-          <strong className="uh-status-title">게임을 준비하고 있어요</strong>
-          {/* boot 구간은 진짜 진행률이 있다 — 여기서만 숫자를 보여준다 */}
-          <span className="uh-status-progress">{Math.round(progress * 100)}%</span>
+        <div className="uh-status uh-status--boot" role="status" aria-live="polite">
+          <img className="uh-boot-bg" src={landingBackgroundUrl} alt="" />
+          <div className="uh-boot-panel">
+            <img className="uh-boot-logo" src={ssafestaLogoUrl} alt="SSAFESTA" />
+            <strong className="uh-status-title">게임을 준비하고 있어요</strong>
+            <div className="uh-loading-bar" aria-hidden="true">
+              <span className="uh-loading-bar-fill" style={{ width: `${progress * 100}%` }} />
+            </div>
+          </div>
         </div>
       )}
       {!connectionNotice && status === 'preparing-world' && (
-        // 씬 전환 중이라 dim을 불투명하게 — 반투명이면 Unity가 아직 지우지 않은 직전 씬(커스터마이징 등)의
-        // 마지막 canvas 프레임이 그 뒤로 비쳐 보인다(S15P21A604-733, 실 데모 녹화로 확인).
-        <div className="uh-status uh-status--opaque" role="status" aria-live="polite">
-          {/* 진행률 신호가 없는 구간이다 — indeterminate 로 두고 가짜 백분율을 만들지 않는다 */}
+        <div className="uh-status" role="status" aria-live="polite">
           <span className="uh-status-spinner" aria-hidden="true" />
           <strong className="uh-status-title">
             {longWait ? '월드를 준비하고 있습니다' : '축제장을 불러오고 있어요'}
