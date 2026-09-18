@@ -8,6 +8,10 @@
   min-height: 0;
 }
 
+/* 부스 선택은 맵+측면 패널 2열이라 요약창만큼 좁히면 맵이 찌그러진다.
+   xl(1180)→l(880): 맵 ~650 + 패널 190 으로 둘 다 숨 쉬는 폭. */
+.festa-overlay:has(.br-width) .festa-overlay-frame { width: min(880px, 100%); }
+
 .br-map {
   min-width: 0;
   min-height: 0;

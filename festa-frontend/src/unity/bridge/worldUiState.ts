@@ -1,3 +1,5 @@
+import { useSyncExternalStore } from 'react';
+
 // Unity 가 쥐고 있는 모달 상태의 **관측값** (S15P21A604-450, GitLab #132).
 //
 // 왜 필요한가: ESC 판정의 입력값에 Unity 쪽이 들어갈 자리가 없었다. `worldScreen` 은 FE store
@@ -51,6 +53,11 @@ export function subscribeWorldUiState(listener: () => void): () => void {
   return () => {
     listeners.delete(listener);
   };
+}
+
+/** Unity 모달 관측값을 구독한다 — 아바타 화면 중 HUD 숨김 등 렌더 판정용 (S15P21A604-852). */
+export function useWorldUiState(): WorldUiState {
+  return useSyncExternalStore(subscribeWorldUiState, getWorldUiState, getWorldUiState);
 }
 
 /** Unity 모달이 하나라도 떠 있는가 — ESC 중재가 쓰는 유일한 판정. */

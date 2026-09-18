@@ -11,12 +11,16 @@ export const WORLD_CHAT_TOPIC = '/topic/world/chat';
 export const WORLD_CHAT_ERRORS = '/user/queue/world/chat/errors';
 /** D07 — the tenant only; Spring resolves this through the authenticated STOMP principal. */
 export const BOOTH_LEASE_EXPIRY_QUEUE = '/user/queue/booth-lease-expiry';
+/** 상담 알림 — 방문자 개인 큐. 수락·만료·종료가 온다 (spec 011 §B, S15P21A604-519 계약) */
+export const CONSULTATION_VISITOR_QUEUE = '/user/queue/consultation';
 
 export const ALLOWED_SEND_DESTINATIONS: readonly string[] = [WORLD_CHAT_SEND];
 
-// 상담 real 어댑터가 도착하면 `/user/queue/consultation` 과 부스 토픽이 여기 붙는다.
+// 부스 토픽(/topic/booths/{id}/consultation)은 직원 구독 코드가 아직 없다(운영 화면은
+// getQueue() 재조회로 돈다) — 구독을 붙이는 날 여기에 더한다.
 export const ALLOWED_SUBSCRIBE_DESTINATIONS: readonly string[] = [
   WORLD_CHAT_TOPIC,
   WORLD_CHAT_ERRORS,
   BOOTH_LEASE_EXPIRY_QUEUE,
+  CONSULTATION_VISITOR_QUEUE,
 ];
