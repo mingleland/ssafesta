@@ -14,6 +14,7 @@ import type {
   SurveyTextAnswerPage,
 } from './api.port';
 import { RUN_QUESTIONS } from './fixtures/run';
+import { EVENT_RUN_QUESTIONS } from './fixtures/eventRun';
 import { RESULT_AGGREGATES, TEXT_ANSWERS, TEXT_PAGE_SIZE } from './fixtures/result';
 
 /** 평범한 설문이 있는 부스 */
@@ -105,7 +106,8 @@ export const surveyMockPort: SurveyPort = {
         surveyKey === MOCK_EVENT_SURVEY_DONE
           ? { responseId: 9001, submittedAt: '2026-09-10T04:12:00Z' }
           : null,
-      questions: RUN_QUESTIONS,
+      // 이벤트 설문은 확정 문항(V37 시드)을 쓴다 — 부스 6유형 데모와 다르다
+      questions: EVENT_RUN_QUESTIONS,
     };
   },
 
