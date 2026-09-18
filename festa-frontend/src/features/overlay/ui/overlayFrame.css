@@ -279,6 +279,10 @@
    .ov-chip은 ConsultationOverlay 등 다른 화면도 쓰는 공용 클래스라 전역으로 안 건드린다.
    패딩 10px→8px(약 9% 축소)은 체감이 안 나서 5px로 더 줄인다(원래 대비 전체 폭 약 20%). */
 .ov-card-body .ov-chip { padding: 0 5px; }
+/* .ov-card-body는 align-items 기본값(stretch)이라 chip·버튼이 본문 폭 그대로 늘어져 있었다
+   (title의 nowrap+ellipsis는 stretch가 있어야 동작하니 body 자체는 그대로 두고 이 둘만 뺀다). */
+.ov-card-body .ov-chip,
+.ov-card-body .ov-btn { align-self: flex-start; }
 
 /* 코인 가격을 나타내는 chip — 나머지(재고 등)는 기본 .ov-chip 톤 그대로 */
 .ov-chip-coin { background: rgba(255, 184, 77, 0.16); color: #ffd08a; }
