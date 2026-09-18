@@ -2,6 +2,7 @@ package com.example.ssafesta.booth;
 
 import com.example.ssafesta.ai.BoothDocumentDeactivationService;
 import com.example.ssafesta.common.ConstraintViolations;
+import com.example.ssafesta.user.AdminGuard;
 import com.example.ssafesta.wallet.CoinReason;
 import com.example.ssafesta.wallet.CoinSpendCommand;
 import com.example.ssafesta.wallet.LedgerResult;
@@ -47,16 +48,18 @@ public class BoothLeaseService {
     private final BoothLeaseRepository leases;
     private final WalletService wallets;
     private final BoothDocumentDeactivationService aiDocuments;
+    private final AdminGuard admins;
     private final LeaseProperties properties;
 
     public BoothLeaseService(BoothSlotRepository slots, BoothRepository booths, BoothLeaseRepository leases,
                              WalletService wallets, BoothDocumentDeactivationService aiDocuments,
-                             LeaseProperties properties) {
+                             AdminGuard admins, LeaseProperties properties) {
         this.slots = slots;
         this.booths = booths;
         this.leases = leases;
         this.wallets = wallets;
         this.aiDocuments = aiDocuments;
+        this.admins = admins;
         this.properties = properties;
     }
 
@@ -97,25 +100,45 @@ public class BoothLeaseService {
             throw new SlotAlreadyLeasedException(slotId);
         }
 
-        leases.findValidByLesseeUserId(userId, now).ifPresent(active -> {
-            throw new ActiveLeaseLimitException(active.getId());
-        });
+        // An administrator leases free and forever, and holds one booth per slot (S15P21A604-905).
+        // Read once: the three branches below must agree, and isAdmin() is a row read.
+        boolean admin = admins.isAdmin(userId);
+
+        if (!admin) {
+            leases.findValidByLesseeUserId(userId, now).ifPresent(active -> {
+                throw new ActiveLeaseLimitException(active.getId());
+            });
+        }
 
         releaseStaleLeases(slotId, now);
-        releaseStaleLeasesOfMember(userId, now);
+        if (!admin) {
+            // Nothing of an administrator's is ever stale — their leases end in 2099 — and the
+            // helper reads one Optional per member, which several permanent rows would break.
+            releaseStaleLeasesOfMember(userId, now);
+        }
 
-        Booth booth = ownBooth(userId);
+        Booth booth = admin ? newAdminBooth(userId, slot) : ownBooth(userId);
         booth.attachSlot(slotId);
 
         BoothLease lease;
         try {
-            lease = leases.saveAndFlush(new BoothLease(booth.getId(), slotId, userId, now,
-                    properties.duration(), properties.priceCoin()));
+            lease = leases.saveAndFlush(admin
+                    ? BoothLease.permanent(booth.getId(), slotId, userId, now, properties.adminEndsAt())
+                    : new BoothLease(booth.getId(), slotId, userId, now,
+                            properties.duration(), properties.priceCoin()));
         } catch (DataIntegrityViolationException exception) {
             // Lost a race on one of the partial unique indexes (or on booths.current_slot_id). The
             // transaction is doomed, which is exactly what this case needs: the losing request
             // must leave nothing behind — no lease and no coin charge (SC-002).
             throw translateRace(exception, userId, slotId);
+        }
+
+        if (admin) {
+            // No ledger row at all, not a zero-coin one: a 0 Coin LEASE_PAYMENT would show up in
+            // the administrator's own wallet history as a transaction that never happened.
+            log.info("관리자 부스 임대 — userId={}, slotId={}, leaseId={}, 무상·영구, endsAt={}",
+                    userId, slotId, lease.getId(), lease.getEndsAt());
+            return new LeaseOutcome(lease, wallets.balanceOf(userId), false);
         }
 
         LedgerResult payment = charge(userId, lease);
@@ -147,10 +170,12 @@ public class BoothLeaseService {
      * <p>Against the sweeper both orderings are defined: whoever locks the row first decides it, and
      * a return that arrives after an expiry has committed is refused rather than overwriting it.
      *
-     * @param slotId the slot the caller believes they are returning. Redundant given D01's one
-     *               active lease, and kept exactly for that reason — a stale screen naming the wrong
-     *               slot is refused instead of tearing down whichever booth the member happens to
-     *               hold now.
+     * @param slotId the slot the caller believes they are returning, and since S15P21A604-905 the
+     *               key this method looks up. It was already required of members so a stale screen
+     *               naming the wrong slot would be refused rather than tearing down whichever booth
+     *               they happen to hold; an administrator holds several at once, so it is now the
+     *               only thing that says which one. A member's outcome is unchanged — the lessee is
+     *               checked right after, and naming someone else's slot is refused the same way.
      */
     @Transactional
     public void cancel(Long userId, Long slotId) {
@@ -159,12 +184,12 @@ public class BoothLeaseService {
         // holding two.
         wallets.lockOwner(userId);
 
-        if (leases.findActiveByLesseeUserIdForUpdate(userId).isEmpty()) {
+        if (leases.findActiveBySlotIdForUpdate(slotId).isEmpty()) {
             log.info("반납할 임대가 없습니다 — userId={}, slotId={}", userId, slotId);
             throw new ActiveLeaseNotFoundException();
         }
 
-        BoothLease lease = leases.findValidByLesseeUserId(userId, Instant.now())
+        BoothLease lease = leases.findValidBySlotId(slotId, Instant.now())
                 .orElseThrow(() -> {
                     // Held the lock, but the row is logically expired by the time we read it. Leave
                     // the transition to the sweeper: this path owns returns, not expiries.
@@ -172,9 +197,9 @@ public class BoothLeaseService {
                     return new ActiveLeaseNotFoundException();
                 });
 
-        if (!lease.getSlotId().equals(slotId)) {
-            log.info("반납 요청의 슬롯이 보유 임대와 다릅니다 — userId={}, 요청 slotId={}, 보유 slotId={}",
-                    userId, slotId, lease.getSlotId());
+        if (!lease.getLesseeUserId().equals(userId)) {
+            log.info("반납 요청의 슬롯을 그 회원이 보유하고 있지 않습니다 — userId={}, 요청 slotId={}, 보유자={}",
+                    userId, slotId, lease.getLesseeUserId());
             throw new ActiveLeaseNotFoundException();
         }
 
@@ -316,8 +341,26 @@ public class BoothLeaseService {
      * previous owner's layout, documents and survey answers (C-01, invariant I-5, SC-004).
      */
     private Booth ownBooth(Long userId) {
-        return booths.findByOwnerUserId(userId)
+        return booths.findByOwnerUserIdAndAdminOwnedFalse(userId)
                 .orElseGet(() -> booths.save(new Booth(userId, "내 부스")));
+    }
+
+    /**
+     * A fresh booth for each slot an administrator takes (S15P21A604-905).
+     *
+     * <p>Not {@link #ownBooth}: that one is the member rule — one booth carried across leases — and
+     * reusing it would make a second slot steal the first one's {@code current_slot_id}. The slot
+     * code goes into the name so the several booths are told apart in the slot list without anyone
+     * renaming them.
+     *
+     * <p>ponytail: a returned administrator booth is left detached rather than reused, so an
+     * administrator who leases and returns repeatedly accumulates dormant booth rows. They are
+     * invisible (no slot, nothing published) and bounded by how often a person clicks. Reuse would
+     * need a rule for <i>which</i> dormant booth a new slot inherits, and inheriting the wrong one
+     * moves content between slots — worth writing only if the rows actually pile up.
+     */
+    private Booth newAdminBooth(Long userId, BoothSlot slot) {
+        return booths.save(new Booth(userId, "관리자 부스 " + slot.getSlotCode(), true));
     }
 
     /** Result of a lease request. {@code alreadyHeld} marks the idempotent retry path (FR-018). */

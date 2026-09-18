@@ -91,7 +91,20 @@ public class BoothAccessGuard {
         return booth;
     }
 
+    /**
+     * Owner or editing staff — the authority an ordinary booth carries.
+     *
+     * <p><b>An administrator booth carries none of it</b> (S15P21A604-905). It follows the admin
+     * role rather than the person who set it up, so {@code owner_user_id} grants nothing here and
+     * both callers fall through to their {@code isAdmin} branch: a demoted administrator loses the
+     * booth on their next request, and every current administrator has it. Staff is refused for the
+     * same reason — an invitation accepted while its inviter was an administrator must not outlive
+     * that role either.
+     */
     private boolean isOrdinaryEditor(Booth booth, Long userId) {
+        if (booth.isAdminOwned()) {
+            return false;
+        }
         return booth.isOwnedBy(userId) || mayEditAsStaff(booth.getId(), userId);
     }
 
