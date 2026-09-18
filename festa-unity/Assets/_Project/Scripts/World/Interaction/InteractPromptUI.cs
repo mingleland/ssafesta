@@ -28,6 +28,19 @@ namespace Festa.World
         /// </summary>
         public static float UiScale() => Mathf.Clamp(Screen.height / 1080f, 0.75f, 2.0f);
 
+        /// <summary>
+        /// 프롬프트·안내·토스트가 공통으로 서는 가로줄(화면 높이 비율).
+        ///
+        /// <para>0.52 였다 — 화면 정중앙 바로 아래다. 3인칭 카메라에서 그 자리는 <b>자기 캐릭터의 머리와 상체</b> 다.
+        /// 상호작용은 대상에 붙어 서서 하는 일이라 프롬프트가 뜨는 동안 계속 캐릭터를 덮었다 (사용자 지적 2026-09-18).</para>
+        ///
+        /// <para>세 군데에 같은 숫자가 흩어져 있어 한쪽만 고치면 토스트와 알약이 어긋난다. 여기 한 곳에서 정한다.</para>
+        /// </summary>
+        const float PromptBandY = 0.78f;
+
+        /// <summary>프롬프트 줄의 화면 y(픽셀). 위로 쌓는 요소는 여기서 자기 높이를 뺀다.</summary>
+        static float BandY() => Mathf.Round(Screen.height * PromptBandY);
+
         static Rect Snap(float x, float y, float w, float h) =>
             new Rect(Mathf.Round(x), Mathf.Round(y), Mathf.Round(w), Mathf.Round(h));
 
@@ -45,7 +58,7 @@ namespace Festa.World
             float h = Mathf.Round(56f * ui);
             float w = padX + cap + Mathf.Round(12f * ui) + labelW + padX;
             float x = Mathf.Round((Screen.width - w) / 2f);
-            float y = Mathf.Round(Screen.height * 0.52f);
+            float y = BandY();
 
             DrawRounded(Snap(x, y, w, h), Mathf.RoundToInt(h / 2f), new Color(1f, 0.99f, 0.965f, 0.96f));
             var capRect = Snap(x + padX, y + (h - cap) / 2f, cap, cap);
@@ -69,7 +82,7 @@ namespace Festa.World
             float h = Mathf.Round(48f * ui);
             float w = padX + labelW + padX;
             float x = Mathf.Round((Screen.width - w) / 2f);
-            float y = Mathf.Round(Screen.height * 0.52f);
+            float y = BandY();
             DrawRounded(Snap(x, y, w, h), Mathf.RoundToInt(h / 2f), new Color(1f, 0.99f, 0.965f, 0.82f));
             PlainLabel(Snap(x + padX, y, labelW + 4f, h), label, _labelStyle, FestaUiKit.Muted);
         }
@@ -85,7 +98,7 @@ namespace Festa.World
             float w = Mathf.Round(_toastStyle.CalcSize(Measure(text)).x) + pad * 2f;
             float h = Mathf.Round(40f * ui);
             float x = Mathf.Round((Screen.width - w) / 2f);
-            float y = Mathf.Round(Screen.height * 0.52f - h - 10f * ui);
+            float y = Mathf.Round(BandY() - h - 10f * ui);
             DrawRounded(Snap(x, y, w, h), Mathf.RoundToInt(h / 2f), new Color(0.12f, 0.13f, 0.18f, 0.92f));
             PlainLabel(Snap(x, y, w, h), text, _toastStyle, Color.white);
         }
