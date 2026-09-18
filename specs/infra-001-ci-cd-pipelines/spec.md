@@ -288,6 +288,15 @@ Infra 담당자는 수집 Agent가 모은 로그와 서버 사용량을 조회�
 | C-12 | **확정**: 장애 구간 조사용으로 이력의 특정 과거 릴리스 재배포를 허용한다. 실서비스 복구 기준선은 known-good 으로 유지한다. | Infra + 팀 | 2026-09-18 |
 | C-13 | **미완**: Jenkins 팀원 6인 개별 계정 및 조회/승격 권한 분리. | Infra | 2026-09-18 |
 
+### Session 2026-09-18 (ssafesta.world 프로덕션 진입점 조기 오픈 — S15P21A604-928)
+
+- Q: 정규 main 승격 파이프라인(US2) 가동 전, 외부 공유를 위해 프로덕션 루트 도메인(`https://ssafesta.world`)을 어떻게 조기 오픈할 것인가? → A: Nginx `demo.conf.template`의 `server_name`에 `${ROOT_DOMAIN}`(`ssafesta.world`)을 추가하여, 루트 도메인 요청을 현재 검증된 `demo` 웹/WebGL/AI 오리진(`:18080`, `/unity/`, `:18082`)으로 동일 서빙한다. Cloudflare DNS A 레코드(`@` → EC2 탄력적 IP, 프록시 활성화) 및 Origin Certificate(`*.ssafesta.world`, `ssafesta.world`)를 재사용하여 즉시 HTTPS 암호화 접속을 지원한다.
+
+| ID | 질문/결정 | 결정 주체 | 결정 시점 |
+|---|---|---|---|
+| C-14 | **확정**: 프로덕션 승격 파이프라인 완성 전, Nginx demo vhost에 `${ROOT_DOMAIN}`을 결합하여 `https://ssafesta.world`를 조기 개방한다 (S15P21A604-928). | Infra + 팀 | 2026-09-18 |
+
+
 ## Out of Scope
 
 - dev/demo의 네트워크·도메인·인증서 상세 설계 (`infra-002`)
@@ -328,3 +337,4 @@ Infra 담당자는 수집 Agent가 모은 로그와 서버 사용량을 조회�
 ### 참고: MVP 이후 후속 과제 (P1)
 - **배포 이력 및 추적성 관리 (US3 / T031~T034)**: `provenance.sh` 및 `show-release.sh` 구현으로 현재 실행 중인 릴리스와 직전 정상 버전의 산출물 SHA/커밋 역추적 CLI 지원.
 - **운영 관측성 및 알림 연동 (US5 / T035~T037)**: Prometheus/Grafana 기반 자원(CPU, Memory, Disk) 대시보드 구축 및 Mattermost 이상 탐지 Webhook 알림 연동.
+
