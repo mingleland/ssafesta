@@ -1,4 +1,4 @@
-package com.example.ssafesta.game;
+package com.example.ssafesta.storage.image;
 
 import com.example.ssafesta.common.ApiErrorDetail;
 import com.example.ssafesta.common.ApiException;
@@ -28,12 +28,12 @@ import org.springframework.stereotype.Component;
  * the bytes the user chose. That silent-substitution shape is what T-24 was.
  */
 @Component
-public class GameAssetImageValidator {
+public class ImageBytesValidator {
 
     /** Contract §5, taken from the FE's existing limit so a locally-accepted file cannot be refused here. */
-    static final long MAX_BYTES = 5L * 1024 * 1024;
+    public static final long MAX_BYTES = 5L * 1024 * 1024;
 
-    static final int MAX_EDGE = 4096;
+    public static final int MAX_EDGE = 4096;
 
     /**
      * Total decoded pixels for the <b>whole file</b>, not one frame.
@@ -45,10 +45,10 @@ public class GameAssetImageValidator {
      * inventing a separate frame budget would be a new product number, which is not ours to set
      * (헌법 30조). A 4096×4096 animation therefore allows one frame, which is the intended strictness.
      */
-    static final long MAX_TOTAL_PIXELS = (long) MAX_EDGE * MAX_EDGE;
+    public static final long MAX_TOTAL_PIXELS = (long) MAX_EDGE * MAX_EDGE;
 
     /** Contract §5. SVG is absent deliberately — it can carry script, so we do not accept it as an upload. */
-    static final Set<String> ALLOWED_CONTENT_TYPES =
+    public static final Set<String> ALLOWED_CONTENT_TYPES =
             Set.of("image/png", "image/jpeg", "image/gif", "image/webp");
 
     /**

@@ -247,8 +247,13 @@ public class LayoutValidator {
      *       {@code requiresConfig} into a second "needs a viewing band" flag was considered and
      *       dropped: the flag has exactly two readers — the branch below and
      *       {@link LayoutPassageChecker} — and each of these types leaves the chain before reaching
-     *       the branch, so the passage check keeps seeing them with nothing to split. A fourth type
-     *       ({@code VIDEO_SCREEN}, pending a game-side decision) does not change that.
+     *       the branch, so the passage check keeps seeing them with nothing to split.
+     *       <p>{@code VIDEO_SCREEN} went the other way in the end: the game part decided not to make
+     *       video playable this festival, so it is <b>decorative</b> now (GitLab #194 ②,
+     *       S15P21A604-889). It needs no split either — the flag being {@code false} is the whole
+     *       answer, and it drops out of the passage check for the same reason furniture does.
+     *       Decorative objects leave the chain before any {@code configId} question: one arriving
+     *       from an older FE is stored, ignored, and <b>not</b> warned about.
      *   <li><b>warning</b> {@code CONFIG_UNVERIFIED} — the server does not judge this kind of
      *       content yet. Said out loud so "no error" is not mistaken for "verified". What is left
      *       here is not a missing spec any more but a missing check: each kind gets its own line in
@@ -287,7 +292,13 @@ public class LayoutValidator {
                 }
                 // Leaves the chain like SURVEY_KIOSK, and for the same reason (spec 009 C-01).
                 continue;
-            } else if (type.requiresConfig() && object.configId() == null) {
+            } else if (!type.requiresConfig()) {
+                // 장식(FURNITURE·DECORATION·VIDEO_SCREEN)은 가리킬 콘텐츠가 없다. configId 가
+                // 실려 와도 저장하되 무시하고 경고도 내지 않는다 (GitLab #194 ②) — 구버전 FE 가
+                // 아직 보낼 수 있어 거부는 과하고, 무시하면서 CONFIG_UNVERIFIED 만 남기면 FE 는
+                // 고칠 것이 없는 경고를 영구히 본다.
+                continue;
+            } else if (object.configId() == null) {
                 result.addWarning("CONFIG_NOT_LINKED", object.objectId(),
                         type.name() + "에 연결된 콘텐츠가 없습니다.");
                 continue;

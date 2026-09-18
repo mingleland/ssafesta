@@ -273,6 +273,18 @@ public enum ErrorCode {
     GAME_ASSET_DELETED(HttpStatus.CONFLICT, "삭제된 자산입니다."),
     GAME_ASSET_IN_USE(HttpStatus.CONFLICT, "사용 중인 자산입니다."),
 
+    // ── 프로젝트 로고 업로드 (spec 009 C-03 개정, GitLab #241) ──────────────
+    // 게임 Asset 과 같은 흐름이지만 code 를 공유하지 않는다 — 같은 이름으로 두 도메인이 답하면
+    // 클라이언트가 "무엇에 대한 거절인가" 를 경로로만 추측하게 된다. 검증 실패의 구체값은 새 code 가
+    // 아니라 completed 응답의 failureRule 로 나간다.
+    PROJECT_LOGO_TYPE_UNSUPPORTED(HttpStatus.UNSUPPORTED_MEDIA_TYPE, "지원하지 않는 이미지 형식입니다."),
+    PROJECT_LOGO_TOO_LARGE(HttpStatus.PAYLOAD_TOO_LARGE, "이미지 용량이 너무 큽니다."),
+    PROJECT_LOGO_QUOTA_EXCEEDED(HttpStatus.CONFLICT,
+            "올렸지만 저장하지 않은 이미지가 너무 많습니다. 하나를 저장하거나 잠시 뒤 다시 시도해 주세요."),
+    // 없는 것과 볼 권한이 없는 것에 같은 답을 준다 — 있는지 여부가 남의 부스 편집 상태를 알려 주는
+    // 신호가 되면 안 된다.
+    PROJECT_LOGO_NOT_FOUND(HttpStatus.NOT_FOUND, "이미지를 찾을 수 없습니다."),
+
     // ── Survey (010) ────────────────────────────────────────────────────────
     // CLOSED · ALREADY_RESPONDED 는 docs/08 §18 이 예약해 둔 어휘다. 신설은 뒤 둘이다.
     SURVEY_NOT_FOUND(HttpStatus.NOT_FOUND, "설문을 찾을 수 없습니다."),

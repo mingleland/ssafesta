@@ -1,5 +1,6 @@
 package com.example.ssafesta.ai;
 
+import com.example.ssafesta.storage.ObjectDeleteQueue;
 import com.example.ssafesta.storage.ObjectStorage;
 import java.sql.Timestamp;
 import java.time.Duration;
@@ -32,7 +33,7 @@ import org.springframework.stereotype.Component;
  *       simply restarts its grace.</li>
  * </ul>
  *
- * <p>Plain {@link JdbcTemplate} throughout, the same shape as {@code GameAssetDeleteQueue}: deletion
+ * <p>Plain {@link JdbcTemplate} throughout, the same shape as {@code ObjectDeleteQueue}: deletion
  * happens outside any transaction (a storage round trip cannot sit inside one that also holds a row
  * lock), and there is no delete queue — instead this reads a snapshot of the columns that matter,
  * deletes by that snapshot's coordinates, and only clears {@code s3_key} if <b>every</b> one of those
@@ -57,7 +58,7 @@ class AiDocumentOriginalDeleteSweeper {
     private static final Duration RECOVERY_WINDOW = Duration.ofHours(24);
 
     /**
-     * No retry-count column exists here, unlike {@code GameAssetDeleteQueue.attempts}, so escalation
+     * No retry-count column exists here, unlike {@code ObjectDeleteQueue.attempts}, so escalation
      * is read off age instead: a row still holding its original a full day past when deletion was
      * even allowed to start is worth a page, not another silent retry — whether the reason it is
      * still stuck is a storage failure or a coordinate race makes no difference to that judgment.
@@ -68,15 +69,15 @@ class AiDocumentOriginalDeleteSweeper {
     private static final Duration STUCK_AFTER = Duration.ofHours(24);
 
     /**
-     * Caps storage round trips per pass — same reasoning as {@code GameAssetDeleteQueue.BATCH}.
+     * Caps storage round trips per pass — same reasoning as {@code ObjectDeleteQueue.BATCH}.
      *
      * <p>ponytail: {@code ORDER BY} the grace column always re-offers the oldest rows first, and
      * there is no attempt counter to push a stuck row to the back of the line (unlike
-     * {@code GameAssetDeleteQueue}, which has one). If failures ever pile past this many rows, every
+     * {@code ObjectDeleteQueue}, which has one). If failures ever pile past this many rows, every
      * pass retries the same {@value #BATCH} and newer documents starve behind them — the
      * {@link #STUCK_AFTER} promotion to {@code ERROR} is the alarm for that, not a fix.
      * Upgrade path if it fires for real: order by {@code least(attempts, N)} with a small counter
-     * column, the same shape {@code GameAssetDeleteQueue} already uses.
+     * column, the same shape {@code ObjectDeleteQueue} already uses.
      */
     private static final int BATCH = 50;
 
