@@ -58,6 +58,26 @@ describe('worldChat 길이·도배', () => {
     expect(getWorldChatSnapshot().notice).toContain(String(MAX_CHAT_CODE_POINTS));
   });
 
+  // 초과 입력은 **입력 단계에서 잘린다**(2026-09-18) — 초과 상태를 두고 보내기만 막던 것을
+  // 바꿨다. 코드 포인트 단위라 이모지도 반쪽이 남지 않는다
+  it('setWorldChatDraft 는 100자를 넘기면 잘라 저장한다', () => {
+    setWorldChatDraft('가'.repeat(150));
+    expect(countCodePoints(getWorldChatSnapshot().draft)).toBe(MAX_CHAT_CODE_POINTS);
+    expect(getWorldChatSnapshot().draft).toBe('가'.repeat(MAX_CHAT_CODE_POINTS));
+  });
+
+  it('잘라내기는 코드 포인트 경계에서 끊긴다 — 이모지 반쪽이 남지 않는다', () => {
+    setWorldChatDraft('🙂'.repeat(150));
+    const s = getWorldChatSnapshot();
+    expect(countCodePoints(s.draft)).toBe(MAX_CHAT_CODE_POINTS);
+    expect(s.draft).toBe('🙂'.repeat(MAX_CHAT_CODE_POINTS));
+  });
+
+  it('상한 안쪽 입력은 그대로 저장된다', () => {
+    setWorldChatDraft('안녕하세요');
+    expect(getWorldChatSnapshot().draft).toBe('안녕하세요');
+  });
+
   it('보낸 뒤 3초 동안 다시 보내지 않는다', () => {
     expect(sendWorldChat('안녕하세요', 1_000)).toBe(true);
     expect(sendWorldChat('또 보냅니다', 2_000)).toBe(false);

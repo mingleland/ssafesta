@@ -86,7 +86,7 @@ export function BoothRentalOverlay({ onClose }: { onClose: () => void }) {
       )}
 
       {slotsQuery.isSuccess && !myBoothQuery.isLoading && !alreadyLeasing && (
-        <div className="br-body">
+        <div className="br-body br-width">
           <div className="br-map">
             <SlotMap slots={slots} selectedId={selectedId} onSelect={(slot) => setSelectedId(slot.slotId)} />
           </div>

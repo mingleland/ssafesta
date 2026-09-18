@@ -106,6 +106,12 @@ export function countCodePoints(text: string): number {
   return [...text].length;
 }
 
+/** 코드 포인트 단위 절단 — `[...text]` 순회라 서러게이트 쌍이 반쪽으로 남지 않는다 */
+export function truncateToCodePoints(text: string, max: number): string {
+  if (countCodePoints(text) <= max) return text;
+  return [...text].slice(0, max).join('');
+}
+
 /** 회원만 연결이 선다 — WS 토큰이 회원에게만 발급된다. 게이트를 두 곳에 두지 않는다 */
 export function canUseWorldChat(): boolean {
   return getSessionSnapshot().kind === 'member';
@@ -127,7 +133,11 @@ export function useWorldChat(): WorldChatState {
 }
 
 export function setWorldChatDraft(draft: string): void {
-  set({ draft });
+  // 상한 초과는 **입력 단계에서 막는다**(2026-09-18 지적). 초과 입력을 두고 보내기만 막으면
+  // 카운터가 빨갛게 남고 "보낼 수 없습니다" 안내가 따로 필요하다 — 잘라 내면 초과 상태
+  // 자체가 없다. 붙여넣기 500자도 100자에 끊긴다. sendWorldChat 의 TOO_LONG 검사는
+  // 프로그램 경로(서버 재전송 등)를 위한 후방 선으로 남는다.
+  set({ draft: truncateToCodePoints(draft, MAX_CHAT_CODE_POINTS) });
 }
 
 export function openWorldChat(): void {

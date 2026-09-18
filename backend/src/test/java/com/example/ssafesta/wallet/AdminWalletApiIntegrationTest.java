@@ -206,6 +206,25 @@ class AdminWalletApiIntegrationTest {
         }
     }
 
+    /** 마스터 본인의 자기 조정은 허용된다 — 보호는 "타 관리자가 마스터를 건드리지 못한다" 는 규칙이다. */
+    @Test
+    void theMasterCanAdjustTheirOwnWallet() throws Exception {
+        Long master = newMemberWithWallet("관리자지갑S");
+        jdbc.update("UPDATE users SET account_type = 'ADMIN', is_master = TRUE WHERE id = ?", master);
+        try {
+            int balanceBefore = wallets.balanceOf(master);
+
+            mockMvc.perform(adjustment(master, master, UUID.randomUUID().toString(), 100, "마스터 자기 조정"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.balanceAfter").value(balanceBefore + 100));
+
+            assertEquals(1, auditRows(master));
+            assertBalanceMatchesLedger(wallets, master);
+        } finally {
+            jdbc.update("UPDATE users SET is_master = FALSE WHERE id = ?", master);
+        }
+    }
+
     /** A malformed key is a bad request, not a constraint violation surfacing as a server fault. */
     @Test
     void aMalformedIdempotencyKeyIsAClientError() throws Exception {

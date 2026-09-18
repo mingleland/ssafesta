@@ -117,9 +117,9 @@ describe('ESC 아바타 변경', () => {
 // 패널 안에서 접었다 펴는 대신 자식 오버레이로 연다 — 메뉴 높이가 튀지 않고, 닫는 방법이
 // ESC 하나로 통일된다.
 describe('ESC 하위 화면 진입', () => {
-  it('조작 안내·설정은 목록을 펼치지 않고 오버레이 요청만 보낸다', () => {
+  it('이용 안내·설정은 목록을 펼치지 않고 오버레이 요청만 보낸다', () => {
     renderMenu();
-    fireEvent.click(screen.getByRole('button', { name: '조작 안내' }));
+    fireEvent.click(screen.getByRole('button', { name: '이용 안내' }));
     expect(openPanel).toHaveBeenCalledWith('guide');
     expect(screen.queryByText('이동')).toBeNull();
 
@@ -150,5 +150,41 @@ describe('ESC 미션 항목', () => {
     renderMenu();
 
     expect(screen.queryByRole('button', { name: '미션' })).toBeNull();
+  });
+});
+
+// 메뉴를 닫으면 포커스가 복구된다 — OverlayFrame(-428)과 같은 규칙. 복구하지 않으면
+// focus 가 body 에 남고 Unity 가 키를 못 받아 F 모달 뒤 ESC 메뉴를 거치면 F 가 죽는다.
+describe('ESC 메뉴 포커스 복구', () => {
+  it('닫으면 이전 요소(캔버스)로 포커스가 돌아간다', () => {
+    const canvas = document.createElement('canvas');
+    // 실제 Unity 캔버스는 tabIndex={-1} 로 포커스가 된다(-421) — 그대로 재현한다
+    canvas.tabIndex = -1;
+    document.body.appendChild(canvas);
+    canvas.focus();
+    expect(document.activeElement).toBe(canvas);
+
+    const view = renderMenu();
+    expect(document.activeElement).not.toBe(canvas);
+
+    view.unmount();
+    expect(document.activeElement).toBe(canvas);
+    canvas.remove();
+  });
+
+  it('이전 요소가 사라졌으면 캔버스로 떨어진다', () => {
+    const canvas = document.createElement('canvas');
+    canvas.tabIndex = -1;
+    document.body.appendChild(canvas);
+    const victim = document.createElement('button');
+    document.body.appendChild(victim);
+    victim.focus();
+
+    const view = renderMenu();
+    victim.remove();
+    view.unmount();
+
+    expect(document.activeElement).toBe(canvas);
+    canvas.remove();
   });
 });
