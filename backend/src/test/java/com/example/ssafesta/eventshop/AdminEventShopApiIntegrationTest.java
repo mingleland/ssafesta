@@ -156,6 +156,40 @@ class AdminEventShopApiIntegrationTest {
     }
 
     @Test
+    void cancellingRefundsTheCoinsAndPutsTheStockBack() throws Exception {
+        Long admin = admin("취소운영자");
+        Long buyer = member("취소대상자");
+        EventPrize prize = prizes.saveAndFlush(new EventPrize("취소용품", 20, 3));
+        // Read after the purchase, not before: the buyer's first request of the day also lands a
+        // daily grant, so a balance captured beforehand is not the one the refund adds to.
+        Long purchaseId = buy(buyer, prize.getId());
+        int charged = wallets.balanceOf(buyer);
+        assertEquals(2, prizes.findById(prize.getId()).orElseThrow().getStock());
+
+        mockMvc.perform(post("/api/v1/admin/event-shop/purchases/" + purchaseId + "/fulfillment")
+                        .header("Authorization", bearer(admin))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"status\":\"CANCELLED\",\"note\":\"품절\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.fulfillment").value("CANCELLED"));
+
+        assertEquals(charged + 20, wallets.balanceOf(buyer));
+        assertEquals(3, prizes.findById(prize.getId()).orElseThrow().getStock());
+        assertEquals(1, jdbc.queryForObject(
+                "SELECT count(*) FROM coin_ledger_entries WHERE reason_type='PRIZE_REFUND' AND amount=20",
+                Integer.class));
+
+        // CANCELLED is terminal, so no second cancel can pay the refund twice.
+        mockMvc.perform(post("/api/v1/admin/event-shop/purchases/" + purchaseId + "/fulfillment")
+                        .header("Authorization", bearer(admin))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"status\":\"CANCELLED\"}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("EVENT_PURCHASE_FULFILLMENT_INVALID"));
+        assertEquals(charged + 20, wallets.balanceOf(buyer));
+    }
+
+    @Test
     void theListCarriesTheRecipientAndStillRendersPurchasesMadeBeforeItExisted() throws Exception {
         Long admin = admin("수령자운영자");
         Long buyer = member("수령자구매자");

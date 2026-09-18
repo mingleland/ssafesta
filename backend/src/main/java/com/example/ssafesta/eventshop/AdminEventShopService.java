@@ -5,6 +5,10 @@ import com.example.ssafesta.common.ErrorCode;
 import com.example.ssafesta.user.AdminActionRecorder;
 import com.example.ssafesta.user.User;
 import com.example.ssafesta.user.UserRepository;
+import com.example.ssafesta.wallet.CoinCreditCommand;
+import com.example.ssafesta.wallet.CoinReason;
+import com.example.ssafesta.wallet.LedgerEntryType;
+import com.example.ssafesta.wallet.WalletService;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.Instant;
 import java.util.HashMap;
@@ -30,13 +34,15 @@ public class AdminEventShopService {
     private final EventPrizeRepository prizes;
     private final EventPurchaseRepository purchases;
     private final UserRepository users;
+    private final WalletService wallets;
     private final AdminActionRecorder audit;
 
     public AdminEventShopService(EventPrizeRepository prizes, EventPurchaseRepository purchases,
-                                 UserRepository users, AdminActionRecorder audit) {
+                                 UserRepository users, WalletService wallets, AdminActionRecorder audit) {
         this.prizes = prizes;
         this.purchases = purchases;
         this.users = users;
+        this.wallets = wallets;
         this.audit = audit;
     }
 
@@ -83,6 +89,9 @@ public class AdminEventShopService {
     }
 
     /**
+     * Moves a purchase along its fulfillment track. Cancelling also unwinds the purchase — the
+     * coins go back to the buyer and the units go back on the shelf (S15P21A604-922 후속).
+     *
      * @throws ApiException {@code NOT_FOUND} no such purchase, {@code
      *                      EVENT_PURCHASE_FULFILLMENT_INVALID} the transition is not allowed from
      *                      the current state (see {@link PurchaseFulfillment#canTransitionTo})
@@ -95,10 +104,40 @@ public class AdminEventShopService {
         if (!purchase.getFulfillment().canTransitionTo(next)) {
             throw new ApiException(ErrorCode.EVENT_PURCHASE_FULFILLMENT_INVALID);
         }
+        if (next == PurchaseFulfillment.CANCELLED) {
+            unwind(purchase);
+        }
         purchase.transitionTo(next, note);
         audit.record(actorUserId, AdminActionRecorder.PRIZE_FULFILLMENT_UPDATE,
                 AdminActionRecorder.TARGET_EVENT_PURCHASE, purchaseId, next.name());
         return decorate(purchase);
+    }
+
+    /**
+     * Gives a cancelled purchase's coins and stock back.
+     *
+     * <p>Wallet lock first, then the prize's row — the same order {@code EventShopService.purchase}
+     * takes them in. Reversing it here would let a cancel and a purchase of the same prize
+     * deadlock against each other.
+     *
+     * <p>Idempotency is keyed on the purchase rather than a caller-supplied value: the transition
+     * guard above already refuses a second cancel of the same row, and this key is what keeps a
+     * retry that lost its response from paying the refund twice.
+     */
+    private void unwind(EventPurchase purchase) {
+        wallets.lockOwner(purchase.getBuyerUserId());
+        if (purchase.getCoinSpent() > 0) {
+            wallets.credit(new CoinCreditCommand(purchase.getBuyerUserId(), LedgerEntryType.REFUND,
+                    purchase.getCoinSpent(), CoinReason.PRIZE_REFUND, CoinReason.EVENT_PRIZE_REFERENCE_TYPE,
+                    purchase.getPrizeId().toString(), refundKey(purchase.getId())));
+        }
+        prizes.findByIdForUpdate(purchase.getPrizeId())
+                .ifPresent(prize -> prize.restore(purchase.getQuantity()));
+    }
+
+    /** {@code PRIZE_REFUND:{purchaseId}} — one refund per purchase, ever. */
+    static String refundKey(Long purchaseId) {
+        return CoinReason.PRIZE_REFUND + ":" + purchaseId;
     }
 
     /** {@code won} narrows to winners or losers; {@code filter} to a fulfillment state. Either may be null. */

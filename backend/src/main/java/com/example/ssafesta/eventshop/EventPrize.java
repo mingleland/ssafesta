@@ -136,6 +136,21 @@ public class EventPrize {
         return true;
     }
 
+    /**
+     * Puts {@code quantity} units back on the shelf — the exact counterpart of {@link #reserve},
+     * called when a purchase is cancelled (S15P21A604-922 후속).
+     *
+     * <p>Untracked stock ({@code null}) stays untracked: it was never decremented, so restoring it
+     * would invent inventory. Takes the same row lock as {@link #reserve} for the same reason.
+     */
+    public void restore(int quantity) {
+        if (stock == null) {
+            return;
+        }
+        stock += quantity;
+        updatedAt = Instant.now();
+    }
+
     public Long getId() {
         return id;
     }
