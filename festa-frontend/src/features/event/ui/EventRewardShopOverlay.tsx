@@ -49,6 +49,8 @@ interface ResultDialogState {
 // 먼저 받아야 한다(S15P21A604-842 후속). 그 폼이 뜨는 동안 "무엇을 하려던 참이었는지"를 들고 있는 상태.
 type PendingAction = { kind: 'purchase'; prize: EventPrize } | { kind: 'raffle'; raffle: RafflePrize };
 
+const PRIZE_DISPLAY_ORDER = ['마이구미', '초코송이', '아이스아메리카노', '말랑이', '교보문고 10000원권'];
+
 const IcGift = (
   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
     <path d="M4 11h16v9H4zM3 7h18v4H3zM12 7v13" />
@@ -182,7 +184,11 @@ export function EventRewardShopOverlay() {
     };
   }
 
-  const instantCards = prizesQuery.isSuccess ? prizesQuery.data.map(toInstantCard) : [];
+  const instantCards = prizesQuery.isSuccess
+    ? [...prizesQuery.data]
+        .sort((a, b) => PRIZE_DISPLAY_ORDER.indexOf(a.name) - PRIZE_DISPLAY_ORDER.indexOf(b.name))
+        .map(toInstantCard)
+    : [];
 
   function toRaffleCard(raffle: RafflePrize): OverlayCard {
     const soldOut = isSoldOut(raffle);
