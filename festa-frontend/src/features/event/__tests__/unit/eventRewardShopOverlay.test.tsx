@@ -167,6 +167,59 @@ describe('경품이 들어온 뒤', () => {
     await waitFor(() => expect(screen.queryByText('구매 완료')).toBeNull());
   });
 
+  it('실패 후 같은 상품을 다시 구매하면 같은 idempotency key로 재시도한다 — 성공하면 다음 구매는 새 key다', async () => {
+    listPrizes.mockResolvedValue(prizes);
+    resolveEventSurveyTarget.mockReturnValue(null);
+    purchasePrize
+      .mockRejectedValueOnce({ code: 'INSUFFICIENT_COIN', message: '코인이 부족합니다.', requestId: 'r1', errors: [], warnings: [] })
+      .mockResolvedValueOnce({
+        purchaseId: 1,
+        prizeId: 1,
+        prizeName: '마이구미',
+        quantity: 1,
+        coinSpent: 400,
+        fulfillment: 'PURCHASED',
+        purchasedAt: new Date().toISOString(),
+      });
+
+    renderOverlay();
+    const openForm = async () => {
+      const buyable = (await screen.findAllByRole('button', { name: '구매' })).find((b) => !(b as HTMLButtonElement).disabled);
+      fireEvent.click(buyable!);
+      await screen.findByRole('button', { name: '구매 확정' });
+      fillRecipientForm('구매');
+    };
+
+    await openForm();
+    await waitFor(() => expect(purchasePrize).toHaveBeenCalledTimes(1));
+    const firstKey = (purchasePrize.mock.calls[0] as [number, string])[1];
+
+    // 실패했다 — 같은 상품을 다시 구매한다(재시도)
+    await openForm();
+    await waitFor(() => expect(purchasePrize).toHaveBeenCalledTimes(2));
+    const secondKey = (purchasePrize.mock.calls[1] as [number, string])[1];
+    expect(secondKey).toBe(firstKey);
+
+    await screen.findByText('구매 완료');
+    fireEvent.click(screen.getByRole('button', { name: '확인' }));
+    await waitFor(() => expect(screen.queryByText('구매 완료')).toBeNull());
+
+    // 성공했으니 다음 구매는 새 key여야 한다
+    purchasePrize.mockResolvedValueOnce({
+      purchaseId: 2,
+      prizeId: 1,
+      prizeName: '마이구미',
+      quantity: 1,
+      coinSpent: 400,
+      fulfillment: 'PURCHASED',
+      purchasedAt: new Date().toISOString(),
+    });
+    await openForm();
+    await waitFor(() => expect(purchasePrize).toHaveBeenCalledTimes(3));
+    const thirdKey = (purchasePrize.mock.calls[2] as [number, string])[1];
+    expect(thirdKey).not.toBe(firstKey);
+  });
+
   it('취소하면 폼만 닫히고 API는 안 탄다', async () => {
     listPrizes.mockResolvedValue(prizes);
     resolveEventSurveyTarget.mockReturnValue(null);

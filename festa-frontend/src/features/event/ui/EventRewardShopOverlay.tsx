@@ -10,6 +10,7 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { isApiError } from '../../../shared/api/client';
+import { newIdempotencyKey } from '../../../shared/api/idempotencyKey';
 import { eventShopApi } from '../../../entities/eventShop/api.select';
 import type { EventPrize } from '../../../entities/eventShop/types';
 import { raffleApi } from '../../../entities/raffle/api.select';
@@ -87,16 +88,27 @@ export function EventRewardShopOverlay() {
   const [resultDialog, setResultDialog] = useState<ResultDialogState | null>(null);
   const [pendingAction, setPendingAction] = useState<PendingAction | null>(null);
 
+  // Idempotency-Key는 시도 한 건의 이름이다(요청 한 번이 아니다) — 클릭마다 새로 만들면 실패 후
+  // 재시도가 새 구매로 처리돼 코인이 두 번 빠질 수 있다(adjustmentKey.ts와 같은 이유). 경품별로
+  // 붙들고 있다가 성공했을 때만 버린다.
+  const [purchaseKeys] = useState(() => new Map<number, string>());
+  const [raffleKeys] = useState(() => new Map<number, string>());
+
   const purchase = useMutation({
-    mutationFn: ({ prize, recipient }: { prize: EventPrize; recipient: PurchaseRecipient }) =>
-      eventShopApi.purchasePrize(prize.prizeId, crypto.randomUUID(), 1, recipient),
-    onSuccess: (result) => {
+    mutationFn: ({ prize, recipient }: { prize: EventPrize; recipient: PurchaseRecipient }) => {
+      const key = purchaseKeys.get(prize.prizeId) ?? newIdempotencyKey();
+      purchaseKeys.set(prize.prizeId, key);
+      return eventShopApi.purchasePrize(prize.prizeId, key, 1, recipient);
+    },
+    onSuccess: (result, { prize }) => {
+      purchaseKeys.delete(prize.prizeId);
       setPendingAction(null);
       setResultDialog({ title: '구매 완료', itemName: result.prizeName, coinSpent: result.coinSpent });
       void queryClient.invalidateQueries({ queryKey: ['event-shop-prizes'] });
       void queryClient.invalidateQueries({ queryKey: ['wallet-balance'] });
     },
     onError: (error) => {
+      // 여기서는 키를 지우지 않는다 — 다음 클릭이 재시도가 되어야 한다
       setPendingAction(null);
       const message = isApiError(error) ? PURCHASE_ERROR_LABELS[error.code] ?? error.message : '구매에 실패했습니다.';
       showToast(message, 'error');
@@ -107,9 +119,13 @@ export function EventRewardShopOverlay() {
   });
 
   const enter = useMutation({
-    mutationFn: ({ raffle, recipient }: { raffle: RafflePrize; recipient: PurchaseRecipient }) =>
-      raffleApi.enterRaffle(raffle.raffleId, crypto.randomUUID(), recipient),
-    onSuccess: (result) => {
+    mutationFn: ({ raffle, recipient }: { raffle: RafflePrize; recipient: PurchaseRecipient }) => {
+      const key = raffleKeys.get(raffle.raffleId) ?? newIdempotencyKey();
+      raffleKeys.set(raffle.raffleId, key);
+      return raffleApi.enterRaffle(raffle.raffleId, key, recipient);
+    },
+    onSuccess: (result, { raffle }) => {
+      raffleKeys.delete(raffle.raffleId);
       setPendingAction(null);
       setResultDialog({
         title: '응모 완료',
@@ -121,6 +137,7 @@ export function EventRewardShopOverlay() {
       void queryClient.invalidateQueries({ queryKey: ['wallet-balance'] });
     },
     onError: (error) => {
+      // 여기서는 키를 지우지 않는다 — 다음 클릭이 재시도가 되어야 한다
       setPendingAction(null);
       const message = isApiError(error) ? PURCHASE_ERROR_LABELS[error.code] ?? error.message : '응모에 실패했습니다.';
       showToast(message, 'error');
