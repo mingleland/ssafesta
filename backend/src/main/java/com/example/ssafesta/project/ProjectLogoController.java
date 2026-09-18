@@ -154,6 +154,11 @@ public class ProjectLogoController {
      * @param contentType 올릴 파일의 MIME. 서명에 박히므로 {@code PUT} 이 같은 값을 보내야 한다
      * @param byteSize    올릴 파일의 바이트 수. 선언값이고, 실제 검증은 완료에서 한다
      */
+    // 스키마 이름을 명시한다. 이름을 비워 두면 중첩 클래스 단순명(StartRequest)이 쓰이고, 게임 Asset
+    // 업로드의 같은 이름 DTO 와 충돌해 나중에 등록된 쪽이 앞의 것을 덮는다 — 한 endpoint 의 요청
+    // 본문이 남의 필드로 문서화되는 그 증상이다 (GitLab #172, S15P21A604-502 에서 밟았고
+    // OpenApiSchemaNameTest 가 그때 생겼다).
+    @Schema(name = "ProjectLogoStartRequest")
     public record StartRequest(
             @Schema(description = "PNG · JPEG · GIF · WebP", example = "image/png") String contentType,
             @Schema(description = "파일 크기(바이트). 5MB 이하", example = "204800") Long byteSize) {
