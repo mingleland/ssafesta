@@ -37,6 +37,24 @@ public class EventPrize {
     @Column(nullable = false)
     private boolean active = true;
 
+    /**
+     * When this prize stops being sold. {@code null} means it never closes on its own.
+     *
+     * <p>The scheduler flips {@link #active} once this passes, but the scheduler is not the
+     * boundary — {@code EventShopService.purchase} checks this directly, so a purchase arriving
+     * between the deadline and the next sweep is still refused.
+     */
+    @Column(name = "closes_at")
+    private Instant closesAt;
+
+    /** How many entrants win. {@code 0} means this is an ordinary prize — nothing is drawn. */
+    @Column(name = "winner_count", nullable = false)
+    private int winnerCount;
+
+    /** When the draw actually ran. The only thing that stops a second draw. */
+    @Column(name = "drawn_at")
+    private Instant drawnAt;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt = Instant.now();
 
@@ -46,18 +64,54 @@ public class EventPrize {
     protected EventPrize() {
     }
 
+    /** An ordinary prize: bought outright, no deadline, nothing drawn. */
     public EventPrize(String name, int priceCoin, Integer stock) {
+        this(name, priceCoin, stock, null, 0);
+    }
+
+    public EventPrize(String name, int priceCoin, Integer stock, Instant closesAt, int winnerCount) {
         this.name = name;
         this.priceCoin = priceCoin;
         this.stock = stock;
+        this.closesAt = closesAt;
+        this.winnerCount = winnerCount;
     }
 
-    public void update(String name, int priceCoin, Integer stock, boolean active) {
+    public void update(String name, int priceCoin, Integer stock, boolean active, Instant closesAt,
+                       int winnerCount) {
         this.name = name;
         this.priceCoin = priceCoin;
         this.stock = stock;
         this.active = active;
+        this.closesAt = closesAt;
+        this.winnerCount = winnerCount;
         this.updatedAt = Instant.now();
+    }
+
+    /**
+     * A prize entrants enter rather than buy outright: coins buy a chance, and the winners are
+     * picked after it closes.
+     */
+    public boolean isRaffle() {
+        return winnerCount > 0;
+    }
+
+    /** Whether {@code now} is past the deadline. A prize with no deadline never closes. */
+    public boolean isClosedAt(Instant now) {
+        return closesAt != null && !now.isBefore(closesAt);
+    }
+
+    /** Takes the prize off sale. Idempotent — closing an already-closed prize changes nothing. */
+    public void close(Instant now) {
+        if (active) {
+            this.active = false;
+            this.updatedAt = now;
+        }
+    }
+
+    public void markDrawn(Instant now) {
+        this.drawnAt = now;
+        this.updatedAt = now;
     }
 
     /**
@@ -100,6 +154,18 @@ public class EventPrize {
 
     public boolean isActive() {
         return active;
+    }
+
+    public Instant getClosesAt() {
+        return closesAt;
+    }
+
+    public int getWinnerCount() {
+        return winnerCount;
+    }
+
+    public Instant getDrawnAt() {
+        return drawnAt;
     }
 
     public Instant getCreatedAt() {
