@@ -106,6 +106,17 @@ describe('경품이 들어온 뒤', () => {
     expect(screen.queryByText('경품 상점 준비 중')).toBeNull();
   });
 
+  it('상품이 있어도 설문 참여 버튼이 상시 보인다 — footer 로 옮겼다', async () => {
+    listPrizes.mockResolvedValue(prizes);
+    resolveEventSurveyTarget.mockReturnValue({ kind: 'event', surveyKey: 'SSAFESTA_2026' });
+
+    renderOverlay();
+
+    await screen.findByText('마이구미');
+    fireEvent.click(screen.getByRole('button', { name: '설문 참여하기' }));
+    expect(openVisitorOverlay).toHaveBeenCalledWith('SURVEY', { kind: 'event', surveyKey: 'SSAFESTA_2026' });
+  });
+
   it('카드가 코인 가격과 재고를 함께 보인다', async () => {
     listPrizes.mockResolvedValue(prizes);
     resolveEventSurveyTarget.mockReturnValue(null);

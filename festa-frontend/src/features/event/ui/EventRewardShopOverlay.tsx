@@ -234,6 +234,13 @@ export function EventRewardShopOverlay() {
       icon={IcGift}
       onClose={closeOverlay}
       headerAction={<WalletBadge />}
+      // 설문 참여는 상점이 비었을 때만이 아니라 늘 가능해야 한다 — 상품이 있으면 아래 안내판이
+      // 걷히므로 그 버튼도 사라진다. 그래서 상시 노출되는 footer 에 둔다(-608, 대상 -842).
+      footer={
+        <button type="button" className="ov-btn ov-btn-primary" onClick={() => openVisitorOverlay('SURVEY', surveyTarget)}>
+          설문 참여하기
+        </button>
+      }
     >
       {isPending && <OverlayLoading label="상품 목록을 불러오는 중..." />}
       {!isPending && isError && (
@@ -251,16 +258,8 @@ export function EventRewardShopOverlay() {
         <div className="ov-grid-wrap">
           <OverlayCardGrid cards={allCards} label="이벤트 상점 상품 목록" columns={3} />
           {allCards.length === 0 && (
-            <OverlayNotice
-              title="경품 상점 준비 중"
-              message="설문 참여 시 추첨을 통해 경품을 드립니다."
-              action={
-                // 부스 설문과 같은 오버레이로 간다 — 다른 것은 payload의 source 하나다 (-608)
-                <button type="button" className="ov-btn ov-btn-primary" onClick={() => openVisitorOverlay('SURVEY', surveyTarget)}>
-                  설문 참여하기
-                </button>
-              }
-            />
+            // 설문 버튼은 상시 footer 로 옮겼다 — 여기선 안내 문구만 남긴다
+            <OverlayNotice title="경품 상점 준비 중" message="설문 참여 시 추첨을 통해 경품을 드립니다." />
           )}
         </div>
       )}

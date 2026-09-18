@@ -106,6 +106,9 @@ export function useSurveyRun(): SurveyRunState {
   return useSyncExternalStore(subscribe, getSurveyRunSnapshot);
 }
 
+// 이벤트 설문에서 화면에 세우지 않는 문항의 문구 조각 — "이벤트 상점 추가 물품"(V37 Q6).
+const EVENT_HIDDEN_PROMPT = '추가되었으면 하는 경품';
+
 /**
  * 설문을 연다. **부스든 이벤트든 같은 함수다** (S15P21A604-608) — 갈리는 것은 어느 어댑터를
  * 부르는가 한 줄이고, 그 뒤의 문항·검증·제출·상태 전이는 하나다.
@@ -118,16 +121,23 @@ export async function loadSurveyRun(source: SurveySource): Promise<void> {
         ? await surveyApi.getRun(source.boothId)
         : await surveyApi.getEventRun(source.surveyKey);
     if (!isSameSurveySource(state.source, source)) return; // 늦은 응답 가드 — 진입 기준으로 본다
+    // 이벤트 상점에 물품이 이미 있어 "추가 물품" 문항(V37 Q6)은 받아도 화면에 세우지 않는다.
+    // mock·실서버 둘 다 6개를 내리므로 여기 한 곳에서 거른다. 안정 id 가 없어 문구로 짚는다.
+    // ponytail: 문구 매칭 필터 — 백엔드가 그 문항을 시드에서 빼면 이 줄을 지운다.
+    const questions =
+      source.kind === 'event'
+        ? run.questions.filter((q) => !q.prompt.includes(EVENT_HIDDEN_PROMPT))
+        : run.questions;
     const status: SurveyRunStatus =
-      run.status === 'closed' ? 'closed' : run.questions.length === 0 ? 'empty' : 'ready';
+      run.status === 'closed' ? 'closed' : questions.length === 0 ? 'empty' : 'ready';
     setState({
       status,
       surveyId: run.surveyId,
       rewardCoin: run.rewardCoin,
       memberOnly: run.memberOnly,
       respondedAt: run.responded?.submittedAt ?? null,
-      questions: run.questions,
-      progress: { current: 0, total: run.questions.length },
+      questions,
+      progress: { current: 0, total: questions.length },
     });
   } catch (error) {
     if (!isSameSurveySource(state.source, source)) return;
