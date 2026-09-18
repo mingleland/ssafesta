@@ -228,6 +228,12 @@ public class BoothLeaseService {
     /**
      * An administrator takes a slot back from whoever holds it (S15P21A604-927).
      *
+     * <p><b>Reached through {@code POST /admin/booths/{boothId}/unpublish}</b>, not through a URL of
+     * its own. 강제 비공개 is the one administrator action on a booth, and a console that had to call
+     * a second endpoint to finish the same intent is how the original report happened — the booth was
+     * hidden and the seat stayed taken. {@link AdminBoothPublicationService} resolves the booth's
+     * slot and calls this.
+     *
      * <p><b>It is the tenant's return, performed by someone else.</b> Nothing about the ending
      * differs: {@link #release} writes {@code CANCELLED}, detaches the slot and deactivates the AI
      * documents in this transaction, and the member's booth and all its content are preserved
@@ -277,8 +283,13 @@ public class BoothLeaseService {
         Booth booth = booths.findById(lease.getBoothId())
                 .orElseThrow(() -> new BoothNotFoundException(lease.getBoothId()));
         // 마스터의 부스를 관리자가 빼앗는 것은 막는다 — AdminGuard 의 보호가 자원을 통해서도
-        // 성립해야 한다는 같은 이유다.
-        admins.requireOwnerNotMaster(booth.getOwnerUserId());
+        // 성립해야 한다는 같은 이유다. 관리자 부스는 예외다: 그 부스는 사람이 아니라 권한을
+        // 따라가므로(S15P21A604-905), 설치자가 마스터라는 이유로 막으면 운영 부스가 한 사람에게
+        // 묶인다 — AdminBoothPublicationService.unpublish 와 같은 예외다 (규칙이 갈리면 편집은
+        // 되는데 회수는 안 되는 상태가 된다).
+        if (!booth.isAdminOwned()) {
+            admins.requireOwnerNotMaster(booth.getOwnerUserId());
+        }
 
         // 감사 행이 먼저다. 같은 트랜잭션(Propagation.MANDATORY)이라 함께 커밋되거나 함께 사라지고,
         // 관리자 부스는 이 다음 줄에서 삭제되므로 그 뒤에 쓰면 target 으로 남길 부스가 이미 없다.

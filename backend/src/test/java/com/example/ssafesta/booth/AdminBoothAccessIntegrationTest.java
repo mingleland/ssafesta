@@ -126,6 +126,7 @@ class AdminBoothAccessIntegrationTest {
 
     @Test
     void administratorCanUnpublishWithoutDeletingTheDraftOrHistoryAndReplayIsNoOp() throws Exception {
+        // 강제 비공개는 자리까지 회수한다 (S15P21A604-927) — Draft·게시 이력은 그대로다.
         Owner owner = leasedOwner("비공개대상");
         Long administrator = administrator("비공개운영자");
         publishLayout(mockMvc, owner.boothId(), bearer(owner.userId()));
@@ -136,9 +137,11 @@ class AdminBoothAccessIntegrationTest {
                         .content("{\"reason\":\"운영상 비공개\"}"))
                 .andExpect(status().isNoContent());
 
+        // 회수까지 함께 일어나므로 방문자 거절 사유는 "게시본이 없다" 가 아니라 "임대가 끝났다" 다
+        // (S15P21A604-927). 둘 다 입장 불가이고, 자리를 비운 쪽이 더 정확한 사유다.
         mockMvc.perform(get("/api/v1/booths/{id}/layouts/published", owner.boothId()))
-                .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.code").value("LAYOUT_NOT_PUBLISHED"));
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("BOOTH_LEASE_EXPIRED"));
         org.junit.jupiter.api.Assertions.assertEquals(1, count("booth_layout_drafts", "booth_id", owner.boothId()));
         org.junit.jupiter.api.Assertions.assertEquals(1,
                 count("booth_layout_published_versions", "booth_id", owner.boothId()));

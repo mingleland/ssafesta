@@ -1760,25 +1760,21 @@ Asset 업로드는 [`contracts/game-asset-upload.md`](../specs/019-game-studio/c
 
 ### POST `/admin/booths/{boothId}/unpublish`
 
-부스의 현재 공개 배치 포인터를 즉시 해제한다 (`S15P21A604-742` #40). 본문은 `{ "reason": "사유" }`이며 사유는 1~500자로 필수다. → `204 No Content`.
+부스를 방문자에게서 내리고 **그 자리까지 회수한다** (`S15P21A604-742` #40, 회수는 `S15P21A604-927`). 본문은 `{ "reason": "사유" }`이며 사유는 1~500자로 필수다. → `204 No Content`.
 
-Draft와 공개 회차 이력은 삭제하지 않는다. 방문자·Unity 공개 배치 조회만 즉시 `404 LAYOUT_NOT_PUBLISHED`가 되며, 임대·코인·부스 콘텐츠에도 영향을 주지 않는다. 이미 비공개면 `204` no-op이고 감사 행도 더 만들지 않는다. 성공만 `admin_actions`에 `BOOTH_UNPUBLISH`·`BOOTH`·사유를 남긴다.
+**자리를 함께 비우는 이유** — 공개 포인터만 해제하면 임대가 살아 있어 `GET /booth-slots`가 그 슬롯을 계속 `OCCUPIED`로 보고한다. 관리자 화면이 그 목록을 읽으므로 조치를 해도 아무 변화가 보이지 않았다. 처리 직후 슬롯은 `AVAILABLE`이 되고, 임차인의 활성 임대 한도(D01)도 풀려 다른 자리를 바로 빌릴 수 있다. **엔드포인트는 이것 하나다** — 회수 전용 URL은 없다.
 
-오류: `400 VALIDATION_FAILED`(사유 누락·길이 초과) · `403 FORBIDDEN`(관리자 아님) · `403 MASTER_PROTECTED`(마스터 소유 부스) · `404 BOOTH_NOT_FOUND`.
+**부스 콘텐츠는 보존된다.** Draft·공개 회차 이력·프로젝트·설문·AI 문서가 그대로 남는다 — 임차인이 직접 반납한 것과 같은 경로이고 spec 004 FR-010 그대로다. 다시 임대하면 Draft부터 이어진다(D08). **관리자 자신이 임차한 부스만 예외로 삭제된다**(`S15P21A604-905` — 그 부스는 원래 반납과 함께 사라지는 구조다).
 
-### POST `/admin/booth-slots/{slotId}/lease/release`
+**코인은 환불되지 않는다** (spec 004 D06을 이 경로까지 적용). 임차인의 잔액은 변하지 않는다.
 
-임차인의 동의 없이 그 자리의 임대를 끝낸다 (`S15P21A604-927`). 본문은 `{ "reason": "사유" }`이며 사유는 1~500자로 필수다. → `204 No Content`.
+⚠️ **방문자 거절 사유가 바뀐다.** 이전에는 공개 배치 조회가 `404 LAYOUT_NOT_PUBLISHED`였다. 자리까지 비우므로 이제 **`409 BOOTH_LEASE_EXPIRED`**다 — 클라이언트는 둘 다 "입장 불가"로 처리한다.
 
-**`unpublish`와 무엇이 다른가** — 비공개는 공개 포인터만 해제하므로 임대가 살아 있고 `GET /booth-slots`는 그 슬롯을 계속 `OCCUPIED`로 보고한다. 자리를 비우는 것은 이 API다. 처리 직후 슬롯이 `AVAILABLE`이 되어 다른 회원이 임대할 수 있고, 임차인의 활성 임대 한도(D01)도 함께 풀린다.
+임대가 없는 부스(이미 만료됨)는 공개 포인터만 내린다. 이미 비공개이고 임대도 없으면 `204` no-op이고 감사 행도 더 만들지 않는다. 감사는 두 줄로 남는다: 게시본을 내렸으면 `BOOTH_UNPUBLISH`, 자리를 회수했으면 `BOOTH_LEASE_RELEASE` — 둘 다 `BOOTH`·대상 부스·사유다.
 
-**부스 콘텐츠는 보존된다.** 임차인이 직접 반납한 것과 같은 경로이므로 부스·Layout·프로젝트·설문·AI 문서가 그대로 남고(spec 004 FR-010), 다시 임대하면 Draft부터 이어진다(D08). 임대 행은 `CANCELLED`로 남고 AI 문서는 같은 트랜잭션에서 비활성화된다. **관리자 자신이 임차한 부스만 예외다** — 그 부스는 원래 반납과 함께 삭제되는 구조다(`S15P21A604-905`).
+마스터 계정 소유 부스는 `403 MASTER_PROTECTED`다. 단 **마스터가 설치한 관리자 부스는 대상이 된다** — 관리자 부스는 사람이 아니라 권한을 따라간다(`S15P21A604-905`).
 
-**코인은 환불되지 않는다** — spec 004 D06을 이 경로까지 적용한다. 임차인의 잔액은 변하지 않는다.
-
-성공만 `admin_actions`에 `BOOTH_LEASE_RELEASE`·`BOOTH`·사유를 남긴다.
-
-오류: `400 VALIDATION_FAILED`(사유 누락·길이 초과) · `403 FORBIDDEN`(관리자 아님) · `403 MASTER_PROTECTED`(마스터 소유 부스) · `404 BOOTH_SLOT_NOT_FOUND` · `404 ACTIVE_LEASE_NOT_FOUND`(회수할 활성 임대가 없다 — 이미 만료·반납됐다).
+오류: `400 VALIDATION_FAILED`(사유 누락·길이 초과) · `403 FORBIDDEN`(관리자 아님) · `403 MASTER_PROTECTED`(마스터 개인 소유 부스) · `404 BOOTH_NOT_FOUND`.
 
 ### GET `/admin/event-surveys/{surveyKey}/entrants?page=0&size=20`
 
