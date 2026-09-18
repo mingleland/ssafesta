@@ -344,24 +344,83 @@ namespace Festa.World
         /// 끌어내려 계산이 통째로 무의미했다 — 실측하면 의도한 −1.45 가 아니라 바닥인 0.22 에 있었고,
         /// 그래서 엉덩이가 좌면 위 19 cm 에 떠 있었다 (2026-09-18). 루트는 바닥에 두고 보이는 몸만 올린다.</para>
         ///
-        /// <para>착석이 끝나면 좌석이 0 을 넣어 되돌린다. 외형 기준값(<see cref="_baseVisualLocalY"/>)은
-        /// 건드리지 않는다 — 일어설 때 원래 접지로 정확히 복귀해야 한다.</para>
+        /// <para>착석이 끝나면 좌석이 <see cref="ClearSeatOffsetImmediate"/> 로 되돌린다. 외형
+        /// 기준값(<see cref="_baseVisualLocalY"/>)은 건드리지 않는다 — 일어설 때 원래 접지로 정확히
+        /// 복귀해야 한다.</para>
+        ///
+        /// <para><b>목표만 정하고 즉시 옮기지 않는다.</b> 처음에는 좌석이 잰 값을 그 프레임에 통째로
+        /// 대입했는데, 착석 0.4 초 뒤 몸이 1.6u 내려가고 1.8u 앞으로 가는 것이 한 프레임에 일어나
+        /// 순간이동처럼 끊겨 보였다 (사용자 지적 2026-09-18). 값은 <see cref="TickSeatOffset"/> 가
+        /// 매 프레임 지수 감쇠로 따라간다.</para>
         /// </summary>
-        public void SetSeatLift(float worldDeltaY)
+        public void SetSeatOffset(Vector3 worldDelta)
         {
             if (_currentVisual == null) return;
-            float scale = Mathf.Max(0.0001f, transform.lossyScale.y);
-            float local = worldDeltaY / scale;
-            if (Mathf.Approximately(local, _seatLiftLocal)) return;
             var t = _currentVisual.transform;
-            var p = t.localPosition;
-            p.y += local - _seatLiftLocal;
-            t.localPosition = p;
-            _seatLiftLocal = local;
+            var parent = t.parent;
+            _seatOffsetTarget = parent != null ? parent.InverseTransformVector(worldDelta) : worldDelta;
         }
 
-        /// <summary>지금 적용 중인 좌석 보정(로컬 단위). 되돌릴 때 이 값을 뺀다.</summary>
-        float _seatLiftLocal;
+        /// <summary>
+        /// 좌석 보정을 <b>즉시</b> 0 으로 되돌린다. 일어서는 순간은 루트가 좌석 밖으로 이동하고
+        /// 자세도 선 자세로 바뀌므로, 여기서 감쇠로 천천히 풀면 걸어 나가는 동안 몸이 솟아오른다.
+        /// </summary>
+        public void ClearSeatOffsetImmediate()
+        {
+            _seatOffsetTarget = Vector3.zero;
+            if (_currentVisual == null || _seatOffsetLocal == Vector3.zero) { _seatOffsetLocal = Vector3.zero; return; }
+            var t = _currentVisual.transform;
+            t.localPosition -= _seatOffsetLocal;
+            _seatOffsetLocal = Vector3.zero;
+        }
+
+        /// <summary>기존 세로 보정 호출과의 호환용. 새 좌석 코드는 수평까지 포함한 <see cref="SetSeatOffset"/> 을 쓴다.</summary>
+        public void SetSeatLift(float worldDeltaY) => SetSeatOffset(Vector3.up * worldDeltaY);
+
+        /// <summary>
+        /// 좌석 보정을 목표까지 부드럽게 따라가게 한다. 다른 보정(접지 유지 등)과 같은
+        /// <c>localPosition</c> 을 쓰므로 <b>증분만</b> 더한다 — 절대 대입하면 서로를 지운다.
+        /// </summary>
+        void TickSeatOffset()
+        {
+            if (_currentVisual == null) return;
+            var remaining = _seatOffsetTarget - _seatOffsetLocal;
+            if (remaining.sqrMagnitude < 1e-8f)
+            {
+                if (_seatOffsetLocal != _seatOffsetTarget) _seatOffsetLocal = _seatOffsetTarget;
+                return;
+            }
+
+            // 0.18 초쯤에 눈에 띄지 않게 수렴한다. 남은 양이 아주 작으면 남기지 않고 붙인다 —
+            // 지수 감쇠는 영원히 도달하지 않아 매 프레임 미세 이동이 남는다.
+            float k = 1f - Mathf.Exp(-SeatOffsetResponse * Time.deltaTime);
+            var step = remaining.sqrMagnitude < 0.0004f ? remaining : remaining * k;
+            _currentVisual.transform.localPosition += step;
+            _seatOffsetLocal += step;
+        }
+
+        /// <summary>좌석 보정 추종 속도(1/초). 18 이면 0.18 초에 약 96% 도달한다.</summary>
+        const float SeatOffsetResponse = 12f;
+
+        /// <summary>
+        /// 지금 <b>실제로 적용돼 있는</b> 좌석 보정(월드 벡터). 좌석이 앉은 자세를 다시 잴 때 이 값을
+        /// 빼야 한다 — 재는 대상이 이미 보정된 몸이라, 빼지 않으면 보정이 자기 자신을 지운다.
+        /// </summary>
+        public Vector3 SeatOffsetWorld
+        {
+            get
+            {
+                if (_currentVisual == null) return Vector3.zero;
+                var parent = _currentVisual.transform.parent;
+                return parent != null ? parent.TransformVector(_seatOffsetLocal) : _seatOffsetLocal;
+            }
+        }
+
+        /// <summary>지금 적용 중인 좌석 보정(외형 부모의 로컬 단위). 되돌릴 때 이 값을 뺀다.</summary>
+        Vector3 _seatOffsetLocal;
+
+        /// <summary>좌석이 요청한 보정 목표(외형 부모의 로컬 단위).</summary>
+        Vector3 _seatOffsetTarget;
 
         /// <summary>조립 뒤 실제 포즈로 키를 다시 맞췄는가. 조립 한 번에 한 번만 한다.</summary>
         bool _heightCalibrated;
@@ -815,6 +874,7 @@ namespace Festa.World
                 RunScheduledReground();
             }
 
+            TickSeatOffset();
             HoldFeetOnGround();
             if (_groundShadow == null || _groundShadowRenderer == null) return;
 
