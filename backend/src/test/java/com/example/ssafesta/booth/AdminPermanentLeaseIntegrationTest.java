@@ -141,11 +141,14 @@ class AdminPermanentLeaseIntegrationTest {
         mockMvc.perform(get("/api/v1/booths/mine").header("Authorization", bearer(admin)))
                 .andExpect(status().isNoContent());
 
+        // 응답 순서는 findAllOrdered 와 같다. 필터 표현식 대신 자리로 짚어 어느 칸을 보는지 남긴다.
+        int index = indexOfSlot(slotId);
         mockMvc.perform(get("/api/v1/booth-slots").header("Authorization", bearer(admin)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[?(@.slotId == " + slotId + ")].mine").value(List.of(true)))
-                .andExpect(jsonPath("$[?(@.slotId == " + slotId + ")].boothId")
-                        .value(List.of(boothId.intValue())));
+                .andExpect(jsonPath("$[" + index + "].slotId").value(slotId.intValue()))
+                .andExpect(jsonPath("$[" + index + "].mine").value(true))
+                .andExpect(jsonPath("$[" + index + "].boothId").value(boothId.intValue()))
+                .andExpect(jsonPath("$[" + index + "].leaseEndsAt").value("2099-12-31T00:00:00Z"));
     }
 
     /** 반납은 슬롯을 지목한다 — 여러 개를 든 관리자에게는 그것만이 어느 부스인지 말한다. */
@@ -174,6 +177,16 @@ class AdminPermanentLeaseIntegrationTest {
         assertFalse(lease.isPermanent());
         assertEquals(lease.getStartsAt().plus(properties.duration()), lease.getEndsAt());
         assertFalse(booths.findById(lease.getBoothId()).orElseThrow().isAdminOwned());
+    }
+
+    private int indexOfSlot(Long slotId) {
+        List<BoothSlot> ordered = slots.findAllOrdered();
+        for (int i = 0; i < ordered.size(); i++) {
+            if (ordered.get(i).getId().equals(slotId)) {
+                return i;
+            }
+        }
+        throw new IllegalStateException("슬롯 목록에 없는 slotId=" + slotId);
     }
 
     private Long administrator(String prefix) {
