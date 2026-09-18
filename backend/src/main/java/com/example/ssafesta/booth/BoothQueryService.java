@@ -4,7 +4,10 @@ import com.example.ssafesta.ai.AiAgent;
 import com.example.ssafesta.ai.AiAgentRepository;
 import com.example.ssafesta.project.Project;
 import com.example.ssafesta.project.ProjectRepository;
+import com.example.ssafesta.user.User;
+import com.example.ssafesta.user.UserRepository;
 import java.time.Instant;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 import org.slf4j.Logger;
@@ -37,16 +40,19 @@ public class BoothQueryService {
     private final BoothAccessGuard accessGuard;
     private final ProjectRepository projects;
     private final AiAgentRepository agents;
+    private final UserRepository users;
 
     public BoothQueryService(BoothSlotRepository slots, BoothRepository booths,
                              BoothLeaseRepository leases, BoothAccessGuard accessGuard,
-                             ProjectRepository projects, AiAgentRepository agents) {
+                             ProjectRepository projects, AiAgentRepository agents,
+                             UserRepository users) {
         this.slots = slots;
         this.booths = booths;
         this.leases = leases;
         this.accessGuard = accessGuard;
         this.projects = projects;
         this.agents = agents;
+        this.users = users;
     }
 
     /**
@@ -87,6 +93,39 @@ public class BoothQueryService {
             BoothSlot slot = lease == null ? null : slots.findById(lease.getSlotId()).orElse(null);
             return MyBoothView.of(booth, lease, slot, now);
         });
+    }
+
+    /**
+     * Every administrator booth, for the administrator console (S15P21A604-933).
+     *
+     * <p><b>Not scoped to the caller.</b> An administrator booth follows the role rather than the
+     * person who set it up (FR-023, S15P21A604-905), so one console lists them all and any
+     * administrator can act on any of them — otherwise a booth put up by someone who is away, or
+     * since demoted, is a booth nobody can reach.
+     *
+     * <p>Sorted by slot code so the list reads in floor order rather than in the order the booths
+     * happened to be taken.
+     */
+    // ponytail: 부스당 임대·자리·설치자를 따로 읽는다. 관리자 부스는 슬롯 수(현재 12)를 넘지 못해
+    // 상한이 작다 — 목록이 길어지면 슬롯 목록처럼 한 문장으로 읽는 조인 쿼리로 바꿄다.
+    @Transactional(readOnly = true)
+    public List<AdminBoothView> listAdminBooths() {
+        Instant now = Instant.now();
+        return booths.findByAdminOwnedTrue().stream()
+                .map(booth -> {
+                    BoothLease lease = leases.findValidByBoothId(booth.getId(), now).orElse(null);
+                    BoothSlot slot = lease == null ? null : slots.findById(lease.getSlotId()).orElse(null);
+                    String installedBy = users.findById(booth.getOwnerUserId())
+                            .map(User::getNickname).orElse(null);
+                    return new AdminBoothView(booth.getId(),
+                            lease == null ? null : lease.getSlotId(),
+                            slot == null ? null : slot.getSlotCode(),
+                            booth.getName(), booth.isPublished(),
+                            lease == null ? null : lease.getStartsAt(), installedBy);
+                })
+                .sorted(Comparator.comparing(AdminBoothView::slotCode,
+                        Comparator.nullsLast(Comparator.naturalOrder())))
+                .toList();
     }
 
     /**
@@ -218,6 +257,21 @@ public class BoothQueryService {
             return new LeaseView(lease.getId(), lease.getSlotId(), slot == null ? null : slot.getSlotCode(),
                     lease.getStartsAt(), lease.getEndsAt(), lease.remainingSecondsAt(now), lease.getChargedCoin());
         }
+    }
+
+    /**
+     * One row of the administrator console's booth list (S15P21A604-933).
+     *
+     * @param slotId       null only in the window where the booth exists without a valid lease.
+     *        A returned administrator booth is deleted outright, so in practice it is always set;
+     *        the console still has to render the row rather than drop a booth it cannot explain.
+     * @param published    whether visitors can see it right now — the one status the console acts on
+     *        (강제 비공개)
+     * @param installedBy  the nickname of whoever leased it. <b>Not an owner</b>: the booth follows
+     *        the administrator role, and this only answers "who put it up".
+     */
+    public record AdminBoothView(Long boothId, Long slotId, String slotCode, String name,
+                                 boolean published, Instant leaseStartedAt, String installedBy) {
     }
 
     /**

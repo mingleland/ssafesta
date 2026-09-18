@@ -67,6 +67,18 @@ class AdminBoothPurger {
             "DELETE FROM consultations WHERE booth_id = ?",
 
             // AI — 청크·문서·작업이 에이전트와 부스 양쪽을 가리킨다.
+            //
+            // 문서의 바이트는 DB 밖(객체 저장소)에 있다. 행이 사라지면 provider·bucket·key 좌표가
+            // 함께 사라져 객체를 다시 찾을 방법이 없으므로, AccountDeletionService 와 같은 순서로
+            // 같은 트랜잭션에서 삭제 큐로 먼저 옮긴다 (S15P21A604-927). 이 줄이 없으면 부스를 지울
+            // 때마다 저장소에 주인 없는 객체가 남는다.
+            """
+            INSERT INTO game_asset_delete_queue (provider, storage_bucket, object_key)
+            SELECT storage_provider, storage_bucket, s3_key FROM ai_documents
+            WHERE s3_key IS NOT NULL
+              AND (booth_id = ? OR agent_id IN (SELECT id FROM ai_agents WHERE booth_id = ?))
+            ON CONFLICT (provider, storage_bucket, object_key) DO NOTHING
+            """,
             """
             DELETE FROM ai_document_chunks
             WHERE booth_id = ? OR agent_id IN (SELECT id FROM ai_agents WHERE booth_id = ?)
@@ -83,6 +95,12 @@ class AdminBoothPurger {
 
             // 프로젝트 — 좋아요가 먼저다.
             "DELETE FROM project_likes WHERE project_id IN (SELECT id FROM projects WHERE booth_id = ?)",
+            // 로고도 객체 저장소에 실물이 있다 — 문서와 같은 이유로 좌표를 먼저 옮긴다.
+            """
+            INSERT INTO game_asset_delete_queue (provider, storage_bucket, object_key)
+            SELECT provider, storage_bucket, object_key FROM project_logo_uploads WHERE booth_id = ?
+            ON CONFLICT (provider, storage_bucket, object_key) DO NOTHING
+            """,
             "DELETE FROM project_logo_uploads WHERE booth_id = ?",
             "DELETE FROM projects WHERE booth_id = ?",
 

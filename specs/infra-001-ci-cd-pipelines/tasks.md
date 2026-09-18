@@ -118,6 +118,7 @@
  - [X] T027 [US2] `infra/jenkins/pipelines/demo-promotion.groovy`를 추가해 demo 에서 검증된 known-good release manifest 만 입력으로 받는 수동 Production Promotion pipeline을 구현한다
  - [X] T028 [US2] `infra/jenkins/pipelines/demo-promotion.groovy`에서 기존 `build-release-manifest.sh`, `deploy-release.sh`, `verify-release.sh`, `decide-recovery.sh`, `rollback-release.sh`를 재사용해 프로덕션(`ssafesta.world`) 배포를 수행하도록 연결한다
  - [X] T029 [US2] `infra/jenkins/jobs/gitlab-demo-promotion.groovy`를 추가해 승인 권한과 manifest 입력 파라미터를 가진 수동 Jenkins job을 정의한다
+ - [ ] T029A [US2] 프로덕션 진입점 조기 오픈을 위해 `infra/environments/nginx/sites/demo.conf.template`에 `${ROOT_DOMAIN}` 라우팅을 추가하고 Cloudflare TLS 프록시를 검증한다 (S15P21A604-928)
  - [X] T030 [US2] `infra/tests/acceptance/us2-demo-promotion.sh`에 정상, 비AI 가역 rollback, DB·secret/config 수동대기, AI-only 재시도 대기 rehearsal을 추가한다
 
 **Checkpoint**: develop push 는 demo.ssafesta.world 로 자동 배포되고, 사람 검증을 통과한 known-good 릴리스만 No-Squash MR 을 통해 main 및 ssafesta.world 에 배포된다.
@@ -204,3 +205,4 @@ all implementation → T038–T043 live evidence
 - `[P]` means separate files with no incomplete direct dependency; it does not bypass the one Unity executor or a dev batch lock.
 - Do not modify `festa-unity/Docker/`. Do not commit `.env`, tokens, license files, or runtime state.
 - Every task uses exact repository-owned paths; external Unity source repair and credentials are recorded as dependencies, not simulated in Infra code.
+

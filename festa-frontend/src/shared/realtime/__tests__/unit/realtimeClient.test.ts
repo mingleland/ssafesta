@@ -248,3 +248,45 @@ describe('유휴 끊김 방지 heartbeat (S15P21A604-819)', () => {
     expect(chat).toEqual(['{"content":"hi"}']);
   });
 });
+
+// 2026-09-18 — 마운트 시점에 나란히 호출되면 둘 다 가드를 통과해 소켓이 두 개 열리고,
+// 서버가 두 세션으로 보고 broadcast 마다 MESSAGE 를 두 번 보내 채팅이 두 줄씩 보인다.
+describe('병렬 연결 race', () => {
+  it('connectRealtime 을 동시에 두 번 불러도 소켓은 하나만 열린다', async () => {
+    let sockets = 0;
+    let releaseToken!: (token: { token: string; expiresInSeconds: number }) => void;
+    const tokenGate = new Promise<{ token: string; expiresInSeconds: number }>((resolve) => {
+      releaseToken = resolve;
+    });
+    __configureRealtimeForTests({
+      openSocket: (url) => {
+        sockets += 1;
+        return new FakeSocket(url) as unknown as WebSocket;
+      },
+      fetchToken: () => tokenGate,
+    });
+
+    const first = connectRealtime();
+    const second = connectRealtime();
+    // 둘 다 토큰 대기 중 — 이 사이에는 socket 이 아직 null 이라 구 가드가 소용없다
+    releaseToken({ token: 'ws-token-1', expiresInSeconds: 300 });
+    await Promise.all([first, second]);
+
+    expect(sockets).toBe(1);
+  });
+
+  it('연결이 끝난 뒤에는 다음 호출이 새로 연결한다 — promise 공유가 재연결을 막지 않는다', async () => {
+    subscribeRealtime(WORLD_CHAT_TOPIC, () => {});
+    await connectRealtime();
+    const first = FakeSocket.last!;
+    first.accept();
+    expect(FakeSocket.last).toBe(first);
+
+    // 소켓이 닫히면 다음 connectRealtime 은 새 소켓을 열어야 한다
+    vi.useFakeTimers();
+    first.close(1006, '', false);
+    await vi.advanceTimersByTimeAsync(1500);
+    expect(FakeSocket.last).not.toBe(first);
+    vi.useRealTimers();
+  });
+});

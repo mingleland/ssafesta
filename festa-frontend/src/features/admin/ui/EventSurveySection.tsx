@@ -1,5 +1,5 @@
 // 이벤트 설문 — 운영·모니터링·결과 확인이 중심이다. 부스 설문 작성 UI 를 재사용하지 않는다.
-// entrants(BE)·run(BE) 는 real 로 잇고, 집계·개별 응답·목록은 [FE contract] 다.
+// 목록·요약·entrants·집계·개별 응답 전부 BE AdminEventSurveyController 로 잇는다(#217 5번).
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { adminApi } from '../../../entities/admin/api.select';
@@ -62,7 +62,7 @@ function SurveyDetail({ surveyKey, responseId, onSelectResponse }: { surveyKey: 
 
       <div className="ad-split">
         <section className="sc-card ad-work" aria-label="응답 결과">
-          <h3 className="sc-section-title">질문별 집계 <span className="ad-badge-fe">FE 계약</span></h3>
+          <h3 className="sc-section-title">질문별 집계</h3>
           {aggregate.isPending && <Loading />}
           {aggregate.isError && <ErrorBanner error={aggregate.error} onRetry={() => void aggregate.refetch()} />}
           {aggregate.isSuccess && aggregate.data.length === 0 && <Empty title="집계할 응답이 없습니다" />}
@@ -106,9 +106,9 @@ function QuestionAggregate({ q }: { q: EventQuestionAggregate }) {
       <strong>{q.prompt} <span className="ad-muted">· {q.answered}명 응답</span></strong>
       {q.options.map((o) => (
         <div key={o.label} className="ad-bar">
-          <span style={{ minWidth: 96 }}>{o.label}</span>
+          <span className="ad-bar-label">{o.label}</span>
           <span className="ad-bar-track"><i style={{ width: `${(o.count / max) * 100}%` }} /></span>
-          <span className="num" style={{ minWidth: 28, textAlign: 'right' }}>{o.count}</span>
+          <span className="num">{o.count}</span>
         </div>
       ))}
       {q.textSamples.length > 0 && (
@@ -125,7 +125,7 @@ function ResponseDetail({ surveyKey, responseId, onClose }: { surveyKey: string;
   return (
     <div className="sc-card ad-work" aria-label="개별 응답">
       <div className="ad-head">
-        <h3 className="sc-section-title" style={{ margin: 0 }}>개별 응답 #{responseId} <span className="ad-badge-fe">FE 계약</span></h3>
+        <h3 className="sc-section-title" style={{ margin: 0 }}>개별 응답 #{responseId}</h3>
         <button type="button" className="sc-btn sc-btn-sm" onClick={onClose}>닫기</button>
       </div>
       {detail.isPending && <Loading />}
@@ -133,7 +133,7 @@ function ResponseDetail({ surveyKey, responseId, onClose }: { surveyKey: string;
       {detail.isSuccess && (
         <>
           <KeyValue rows={[['참여자', `${detail.data.nickname} (#${detail.data.userId})`], ['제출', fmtTime(detail.data.submittedAt)]]} />
-          <dl className="ad-kv">
+          <dl className="ad-answers">
             {detail.data.answers.map((a) => (
               <div key={a.questionId}><dt>{a.prompt}</dt><dd>{a.value === '' ? <span className="ad-muted">(무응답)</span> : a.value}</dd></div>
             ))}

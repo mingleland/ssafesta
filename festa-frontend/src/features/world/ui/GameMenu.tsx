@@ -5,7 +5,7 @@
 // 메뉴를 닫는 것이 곧 World 복귀다.
 //
 // 데이터는 기존 모델을 그대로 쓴다 — profile.ts(닉네임·provider·avatar) + wallet 쿼리(잔액).
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { loadProfile, useProfile } from '../../profile/model/profile';
@@ -13,10 +13,11 @@ import { useSession } from '../../auth/model/session';
 import { logout } from '../../auth/model/logout';
 import { walletApi } from '../../../entities/wallet/api.select';
 import { leaseApi } from '../../../entities/booth/leaseApi.select';
-import { openManagement } from '../model/worldScreen';
+import { openManagement, openVisitorOverlay } from '../model/worldScreen';
 import { useAdminCapability } from '../../admin/model/capability';
 import { getReadyUnityInstance } from '../../../unity/host/sessionManager';
 import { requestAvatarCustomization } from '../../../unity/host/worldUiBridge';
+import { useGameClientUi } from '../model/gameClientUi';
 import type { MenuPanel } from '../model/gameClientUi';
 import './gameMenu.css';
 
@@ -25,6 +26,33 @@ const PROVIDER_LABEL: Record<string, string> = { google: 'Google', kakao: 'Kakao
 const IcChevron = (
   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
     <path d="M9 5l7 7-7 7" />
+  </svg>
+);
+
+const IcCheck = (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M5 13l4 4L19 7" />
+  </svg>
+);
+
+const IcStore = (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M4 9l1.2-4h13.6L20 9M5 9v11h14V9M10 20v-5h4v5" />
+  </svg>
+);
+
+const IcUser = (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" aria-hidden="true">
+    <circle cx="12" cy="8" r="3.6" />
+    <path d="M5 20c1.4-3.6 4.4-5.2 7-5.2s5.6 1.6 7 5.2" />
+  </svg>
+);
+
+const IcHelp = (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" aria-hidden="true">
+    <circle cx="12" cy="12" r="8.6" />
+    <path d="M9.6 9.2a2.4 2.4 0 1 1 3.3 2.2c-.7.3-.9.9-.9 1.6" />
+    <path d="M12 16.4h.01" />
   </svg>
 );
 
@@ -74,6 +102,8 @@ export function GameMenu({ onClose, onOpenPanel }: Props) {
   const { kind } = useSession();
   const isMember = kind === 'member';
   const state = useProfile();
+  const ui = useGameClientUi();
+  const panelRef = useRef<HTMLElement>(null);
   const navigate = useNavigate();
 
   const walletQuery = useQuery({
@@ -95,6 +125,31 @@ export function GameMenu({ onClose, onOpenPanel }: Props) {
   useEffect(() => {
     if (isMember && state.status === 'idle') void loadProfile();
   }, [isMember, state.status]);
+
+  // 닫힐 때 포커스를 돌려준다 — OverlayFrame(-428)과 같은 규칙. 복구하지 않으면 focus 가
+  // body 에 남고, Unity 6 WebGL 은 키를 canvas 타깃으로만 받으므로(captureAllKeyboardInput=false)
+  // 메뉴를 닫은 뒤 WASD·F 가 죽는다. F 모달 뒤 ESC 메뉴를 거치면 F 가 안 먹는 것으로 보인다.
+  // 이 효과가 포커스를 가져가는 효과보다 먼저 등록되어야 한다 — mount 시 이전 요소를 캡처하는데,
+  // 순서가 뒤바뀌면 패널 자신을 이전 요소로 잡아 닫힐 때 이미 떼어낸 노드에 focus 를 보내게 된다.
+  useEffect(() => {
+    const previous = document.activeElement;
+    return () => {
+      if (previous instanceof HTMLElement && previous.isConnected && previous !== document.body) {
+        previous.focus();
+        return;
+      }
+      document.querySelector('canvas')?.focus();
+    };
+  }, []);
+
+  // 포커스는 **대화 상자 컨테이너**가 가져간다 — 하위 오버레이(설정·관리자 콘솔…)가 닫히며
+  // 돌려주는 포커스(-428)가 메뉴 항목 버튼에 남으면 :focus-visible 링이 선택 흔적처럼
+  // 계속 보인다(2026-09-18 지적). 컨테이너는 링을 끊어 뒀으니(menu.css) 항목에는 흔적이
+  // 남지 않고, Tab 탐색은 그대로다. mount 와 하위 닫힘 둘 다 이 효과 하나가 처리한다.
+  useEffect(() => {
+    if (ui.menuPanel !== null) return;
+    panelRef.current?.focus();
+  }, [ui.menuPanel]);
 
   async function handleLogout() {
     await logout();
@@ -121,9 +176,17 @@ export function GameMenu({ onClose, onOpenPanel }: Props) {
   return (
     <div className="gm-root" role="presentation">
       <button type="button" className="gm-dim" aria-label="메뉴 닫기" onClick={onClose} />
-      <section className="gm-panel" role="dialog" aria-modal="true" aria-label="게임 메뉴">
-        {/* 상단 Profile Summary — 회원이면 행 전체가 내 정보 진입이다. 별도 pill 버튼을 옆에
-            달면 닫기 버튼과 같은 모서리에서 다투고, 행을 눌러도 아무 일이 없어 어색했다. */}
+      <section ref={panelRef} tabIndex={-1} className="gm-panel" role="dialog" aria-modal="true" aria-label="게임 메뉴">
+        <header className="gm-head">
+          <strong className="gm-title">메뉴</strong>
+          <button type="button" className="gm-close" onClick={onClose} aria-label="닫기">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden="true">
+              <path d="M6 6l12 12M18 6L6 18" />
+            </svg>
+          </button>
+        </header>
+
+        {/* 프로필 요약 — 회원이면 행 전체가 내 정보 진입이다 */}
         <ProfileSummary
           nickname={nickname}
           sub={isMember ? (provider !== undefined ? PROVIDER_LABEL[provider] ?? provider : '회원') : '게스트로 둘러보는 중'}
@@ -131,62 +194,63 @@ export function GameMenu({ onClose, onOpenPanel }: Props) {
           coinError={isMember && walletQuery.isError}
           onOpenMyInfo={isMember ? () => onOpenPanel('myInfo') : null}
         />
-        <button type="button" className="gm-close" onClick={onClose} aria-label="닫기">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden="true">
-            <path d="M6 6l12 12M18 6L6 18" />
-          </svg>
-        </button>
 
-        <div className="gm-system">
-          {/* 넷 다 오버레이로 연다 — 패널 안에서 접었다 폈다 하면 높이가 튀고, 항목마다 닫는
-              방법이 달라진다(어떤 건 같은 버튼, 어떤 건 ESC). 자식 화면은 ESC 하나로 닫히고
-              닫으면 이 메뉴로 돌아온다. */}
-          <button type="button" className="gm-item" onClick={() => onOpenPanel('guide')}>
-            조작 안내
-            {IcChevron}
-          </button>
-
-          {/* 게스트에게는 감춘다 — 보상 수령이 `403 MEMBER_ONLY` 이고(GitLab #233), 헌법 12조상
-              게스트는 비영속이라 코인을 줄 자리가 없다. 눌리는 버튼을 두면 열어 놓고 전부 막는 화면이 된다. */}
-          {isMember && (
-            <button type="button" className="gm-item" onClick={() => onOpenPanel('missions')}>
-              미션
-              {IcChevron}
-            </button>
-          )}
-
-          {myBoothQuery.data && (
-            <button type="button" className="gm-item" onClick={openManagement}>
-              부스 관리
-              {IcChevron}
-            </button>
-          )}
+        <div className="gm-body">
+          <section className="gm-section">
+            <h4 className="gm-section-title">바로가기</h4>
+            <div className="gm-shortcut-grid">
+              {/* 게스트에게는 감춘다 — 보상 수령이 `403 MEMBER_ONLY` 이고(GitLab #233), 헌법 12조상
+                  게스트는 비영속이라 코인을 줄 자리가 없다. */}
+              {isMember && (
+                <button type="button" className="gm-card" onClick={() => onOpenPanel('missions')}>
+                  {IcCheck}
+                  <span>미션</span>
+                </button>
+              )}
+              {myBoothQuery.data && (
+                <button type="button" className="gm-card" onClick={openManagement}>
+                  {IcStore}
+                  <span>부스 관리</span>
+                </button>
+              )}
+              {/* 게스트에게는 감춘다. Unity 가 거부하고 로그만 남기므로(S15P21A604-437) 눌리는 버튼을
+                  두면 아무 일도 안 일어난 것처럼 보인다 — 게임 파트가 #197 회신에서 요청한 처리다. */}
+              {isMember && (
+                <button type="button" className="gm-card" onClick={openAvatarCustomization}>
+                  {IcUser}
+                  <span>아바타 변경</span>
+                </button>
+              )}
+              {/* 이용 안내는 조작 안내가 아니라 안내 가이드(WORLD_GUIDE) 오버레이를 연다.
+                  조작 안내는 HUD 우하단 버튼이 맡는다. visitor 층으로 열므로 메뉴는
+                  clearOthers 가 걷는다 — onClose 를 따로 부르지 않는다. */}
+              <button type="button" className="gm-card" onClick={() => openVisitorOverlay('WORLD_GUIDE', {})}>
+                {IcHelp}
+                <span>이용 안내</span>
+              </button>
+            </div>
+          </section>
 
           {capability.isSuccess && capability.data.admin && (
-            <button type="button" className="gm-item" onClick={() => onOpenPanel('admin')}>
-              관리자 콘솔
-              {IcChevron}
-            </button>
-          )}
-
-          {/* 게스트에게는 감춘다. Unity 가 거부하고 로그만 남기므로(S15P21A604-437) 눌리는 버튼을
-              두면 아무 일도 안 일어난 것처럼 보인다 — 게임 파트가 #197 회신에서 요청한 처리다. */}
-          {isMember && (
-            <button type="button" className="gm-item" onClick={openAvatarCustomization}>
-              아바타 변경
-              {IcChevron}
-            </button>
+            <section className="gm-section">
+              <h4 className="gm-section-title">관리</h4>
+              <button type="button" className="gm-item" onClick={() => onOpenPanel('admin')}>
+                관리자 콘솔
+                {IcChevron}
+              </button>
+            </section>
           )}
 
           {/* 설정에 있는 것은 음악뿐이다 — 없는 항목을 만들지 않는다(S15P21A604-618) */}
-          <button type="button" className="gm-item" onClick={() => onOpenPanel('settings')}>
-            설정
-            {IcChevron}
-          </button>
-
-          <button type="button" className="gm-item gm-item-out" onClick={() => void handleLogout()}>
-            로그아웃
-          </button>
+          <section className="gm-section">
+            <button type="button" className="gm-item" onClick={() => onOpenPanel('settings')}>
+              설정
+              {IcChevron}
+            </button>
+            <button type="button" className="gm-item gm-item-out" onClick={() => void handleLogout()}>
+              로그아웃
+            </button>
+          </section>
         </div>
       </section>
     </div>

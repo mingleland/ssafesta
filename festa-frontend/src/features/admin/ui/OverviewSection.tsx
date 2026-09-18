@@ -34,7 +34,7 @@ export function OverviewSection() {
       </section>
       <section className="sc-card">
         <h3 className="sc-section-title">이 콘솔이 하는 일</h3>
-        <p className="sc-note">권한 판정은 매 요청 서버가 합니다 — 여기서 보이는 것은 안내이고, 실제 조치는 서버가 관리자임을 확인한 뒤에만 실행됩니다. <span className="ad-badge-fe">FE 계약</span> 표시가 붙은 자리는 BE 도달 전이라 mock 또는 오류 상태로 보입니다.</p>
+        <p className="sc-note">권한 판정은 매 요청 서버가 합니다 — 여기서 보이는 것은 안내이고, 실제 조치는 서버가 관리자임을 확인한 뒤에만 실행됩니다. 모든 섹션은 BE 관리자 API(#217)와 연결돼 있다.</p>
       </section>
     </div>
   );

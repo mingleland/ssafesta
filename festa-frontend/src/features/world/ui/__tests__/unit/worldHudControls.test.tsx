@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
 // 조작 안내 목록 — FE 임베드에서 이 목록이 **유일한** 조작 안내다(Unity 카드는 -456 으로
 // 숨겨졌다). 그래서 snapshot 을 찍지 않고 "사용자가 실제로 보는 조작 항목"을 검증한다.
-// 2026-09-16 에 HUD 상시 카드를 걷고 ESC 메뉴 오버레이로 옮겼다 — 목록 자체는 그대로다.
+// 2026-09-16 에 HUD 상시 카드를 걷고 ESC 메뉴 오버레이로 옮겼다. 목록은 그룹(이동/상호작용/
+// 월드 UI)으로 묶여 2열로 배치된다 — 검증은 그룹과 무관하게 전체 li 기준으로 본다.
 //
 // 설명은 **한 단어**로 끝낸다 (S15P21A604-631). 우클릭 시야조작은 -631 에서 "손에 익어 안 읽힌다"며
 // 뺐던 항목이나, S15P21A604-798 에서 요청자 확인 하에 결정을 번복해 다시 넣는다.
@@ -35,11 +36,12 @@ function descriptions(): string[] {
 }
 
 describe('조작 항목', () => {
-  it('사용자가 실제로 묻는 기본 7종이 있다 (우클릭 포함)', () => {
+  it('사용자가 실제로 묻는 기본 8종이 있다 (우클릭·Enter 채팅 포함)', () => {
     render(<ControlGuideList />);
     expect(hasControl(['W', 'A', 'S', 'D'], '이동')).toBe(true);
     expect(hasControl(['Shift'], '달리기')).toBe(true);
     expect(hasControl(['Space'], '점프')).toBe(true);
+    expect(hasControl(['Enter'], '채팅')).toBe(true);
     expect(hasControl(['F'], '상호작용')).toBe(true);
     expect(hasControl(['Alt', '클릭'], '감정')).toBe(true);
     expect(hasControl(['우클릭'], '시야')).toBe(true);
@@ -63,7 +65,7 @@ describe('tab 미니맵 안내 — 축제장(부스 밖)일 때만', () => {
     applyBoothContext(true, 1);
     render(<ControlGuideList />);
     expect(hasControl(['Tab'], '미니맵')).toBe(false);
-    expect(descriptions()).toHaveLength(7);
+    expect(descriptions()).toHaveLength(8);
   });
 });
 
@@ -71,8 +73,8 @@ describe('설명 길이', () => {
   it('설명이 한 단어다 — 이 조건이 깨지면 카드가 다시 복잡해진다', () => {
     render(<ControlGuideList />);
     const found = descriptions();
-    // 기본 7종 + 부스 밖에서만 보이는 Tab 미니맵
-    expect(found.length).toBe(8);
+    // 기본 8종 + 부스 밖에서만 보이는 Tab 미니맵
+    expect(found.length).toBe(9);
     for (const text of found) {
       expect(text).not.toBe('');
       expect(text.includes(' ')).toBe(false);

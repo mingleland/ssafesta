@@ -152,6 +152,62 @@ class AdminPermanentLeaseIntegrationTest {
                 .andExpect(jsonPath("$[" + index + "].leaseEndsAt").value("2099-12-31T00:00:00Z"));
     }
 
+    /**
+     * 관리자 콘솔의 부스 목록은 <b>관리자 부스만</b>, 그리고 <b>전부</b> 돌려준다 (S15P21A604-933).
+     *
+     * <p>호출한 사람의 것으로 좁히지 않는다 — 부스가 권한을 따라가는데 목록만 사람별로 갈라 있으면
+     * 자리를 비운 관리자의 부스는 아무도 못 본다.
+     */
+    @Test
+    void theAdminBoothListShowsEveryAdminBoothAndNoMemberBooth() throws Exception {
+        Long admin = administrator("목록주인");
+        Long otherAdmin = administrator("다른운영자");
+        Long member = createMemberWithWallet(users, wallets, "목록회원");
+
+        Long mine = leaseService.lease(admin, freeSlotId(), 1).lease().getBoothId();
+        Long theirs = leaseService.lease(otherAdmin, freeSlotId(), 1).lease().getBoothId();
+        Long memberBooth = leaseService.lease(member, freeSlotId(), 1).lease().getBoothId();
+
+        String body = mockMvc.perform(get("/api/v1/admin/booths").header("Authorization", bearer(admin)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(2))
+                .andReturn().getResponse().getContentAsString();
+
+        assertTrue(body.contains("\"boothId\":" + mine));
+        assertTrue(body.contains("\"boothId\":" + theirs), "다른 관리자의 부스도 보여야 한다");
+        assertFalse(body.contains("\"boothId\":" + memberBooth), "회원 부스는 나오면 안 된다");
+    }
+
+    /** 공개 여부는 콘솔이 행동을 가르는 값이라 값이 실제로 움직이는지까지 본다. 설치자 이름도 같이 온다. */
+    @Test
+    void theAdminBoothListReportsPublicationAndWhoInstalledIt() throws Exception {
+        Long admin = administrator("게시운영자");
+        Long slotId = freeSlotId();
+        Long boothId = leaseService.lease(admin, slotId, 1).lease().getBoothId();
+
+        mockMvc.perform(get("/api/v1/admin/booths").header("Authorization", bearer(admin)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].boothId").value(boothId.intValue()))
+                .andExpect(jsonPath("$[0].slotId").value(slotId.intValue()))
+                .andExpect(jsonPath("$[0].published").value(false))
+                .andExpect(jsonPath("$[0].installedBy").value(users.findById(admin).orElseThrow().getNickname()));
+
+        BoothLayoutTestSupport.publishLayout(mockMvc, boothId, bearer(admin));
+
+        mockMvc.perform(get("/api/v1/admin/booths").header("Authorization", bearer(admin)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].published").value(true));
+    }
+
+    /** 관리자 전용 면이다 — 회원은 목록 자체를 보지 못한다. */
+    @Test
+    void theAdminBoothListIsRefusedToMembers() throws Exception {
+        Long member = createMemberWithWallet(users, wallets, "권한없는회원");
+
+        mockMvc.perform(get("/api/v1/admin/booths").header("Authorization", bearer(member)))
+                .andExpect(status().isForbidden());
+    }
+
     /** 반납은 슬롯을 지목한다 — 여러 개를 든 관리자에게는 그것만이 어느 부스인지 말한다. */
     @Test
     void administratorReturnsExactlyTheSlotTheyName() {

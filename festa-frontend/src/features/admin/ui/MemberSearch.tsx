@@ -1,10 +1,9 @@
 // 회원 검색 — 회원 관리와 지갑 관리가 같은 검색으로 대상을 고른다.
-// BE 검색 API 는 아직 없다([FE contract]) — real 에서는 404 로 떨어져 오류 배너가 뜨고, mock 에서는 닉네임·번호로 찾는다.
+// 회원 검색은 BE AdminUserController(GET /api/v1/admin/users)로 잇는다 — 닉네임 일부나 userId 로 찾는다.
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { adminApi } from '../../../entities/admin/api.select';
 import { Empty, ErrorBanner, Loading, Pager, StatusChip } from './common';
-import { Tooltip } from '../../../shared/ui/tooltip/Tooltip';
 
 const PAGE_SIZE = 10;
 
@@ -30,9 +29,6 @@ export function MemberSearch({ selectedUserId, onSelect }: { selectedUserId: num
       >
         <input aria-label="회원 검색" placeholder="닉네임 또는 회원 번호" value={draft} onChange={(e) => setDraft(e.target.value)} />
         <button type="submit" className="sc-btn sc-btn-primary">검색</button>
-        <Tooltip content="BE 검색 API 미도달 — FE 계약 기준">
-          <span className="ad-badge-fe">FE 계약</span>
-        </Tooltip>
       </form>
       {result.isPending && <Loading label="회원을 찾는 중..." />}
       {result.isError && <ErrorBanner error={result.error} onRetry={() => void result.refetch()} />}

@@ -1,12 +1,11 @@
 // 관리자 콘솔 real adapter — shared/api 의 api() 를 타므로 Authorization 이 자동으로 붙는다.
 //
-// 존재하는 endpoint 는 그대로 부르고, BE 가 아직 없는 것은 types.ts 의 [FE contract] 경로를 부른다.
-// 그 호출은 지금 404 로 떨어지고 화면은 오류 상태를 그린다 — BE 가 그 경로를 채우면 여기서 바꿀 것이 없다.
-// 응답 모양이 다르게 오면 이 파일의 매핑만 고친다.
+// 모든 endpoint 가 BE 정본과 연결돼 있다 — user/Admin*Controller·wallet/AdminWalletController·
+// booth/AdminBoothPublicationController·survey/AdminEventSurveyController (#217 5건).
+// 응답 모양이 바뀌면 이 파일의 매핑만 고친다 — 화면은 계약(types.ts)만 본다.
 import { api, isApiError } from '../../shared/api/client';
 import type { MyAccountResponse } from '../user/types';
 import type { SlotView } from '../booth/types';
-import type { EventSurveyRunWire } from '../survey/types';
 import type {
   AccountStatusHistoryView,
   AdjustmentResult,
@@ -29,8 +28,6 @@ import type {
 
 const q = (s: string) => encodeURIComponent(s);
 
-/** 공식 이벤트 설문 key. 목록 API 가 없어 알려진 key 를 들고 있다 — BE 가 목록을 주면 이 상수를 지운다 */
-export const KNOWN_EVENT_SURVEY_KEYS = ['SSAFESTA_2026'] as const;
 
 /**
  * 내가 관리자인가 — **관리자 API 에 직접 물어서** 답한다.
@@ -79,12 +76,10 @@ function demoteAdmin(userId: number, note?: string): Promise<void> {
 }
 
 function searchMembers(query: string, page: number, size: number): Promise<Page<AdminMemberView>> {
-  // [FE contract]
   return api<Page<AdminMemberView>>(`/api/v1/admin/users?query=${q(query)}&page=${page}&size=${size}`);
 }
 
 function getMember(userId: number): Promise<AdminMemberView> {
-  // [FE contract]
   return api<AdminMemberView>(`/api/v1/admin/users/${userId}`);
 }
 
@@ -135,7 +130,7 @@ function unpublishBooth(boothId: number, reason: string): Promise<void> {
   return api<void>(`/api/v1/admin/booths/${boothId}/unpublish`, { method: 'POST', body: JSON.stringify({ reason }) });
 }
 
-// ── 이벤트 상점 [FE contract 전부] ──
+// ── 이벤트 상점 — AdminEventShopController(S15P21A604-853 에 연결) ──
 function listPrizes(): Promise<PrizeView[]> {
   return api<PrizeView[]>('/api/v1/admin/event-shop/prizes');
 }
@@ -152,27 +147,16 @@ function updateFulfillment(purchaseId: number, status: PrizeFulfillmentStatus, n
   });
 }
 
-// ── 이벤트 설문 — run(BE)·entrants(BE) 로 요약을 만들고, 집계·개별 응답은 [FE contract] ──
-async function getEventSurvey(surveyKey: string): Promise<EventSurveySummary> {
-  const [run, entrants] = await Promise.all([
-    api<EventSurveyRunWire>(`/api/v1/event-surveys/${q(surveyKey)}/run`),
-    listEntrants(surveyKey, 0, 1),
-  ]);
-  return {
-    surveyKey,
-    surveyId: run.surveyId,
-    // run 응답에 제목이 없다 — key 를 그대로 보여 준다. 목록 API 가 생기면 그쪽 제목을 쓴다
-    title: surveyKey,
-    closed: run.closed,
-    rewardCoin: run.rewardCoin,
-    questionCount: run.questions.length,
-    entrantCount: entrants.totalElements,
-  };
+// ── 이벤트 설문 — 목록·요약·집계·개별 응답 모두 BE 정본(AdminEventSurveyController, #217 5번) ──
+function listEventSurveys(): Promise<EventSurveySummary[]> {
+  return api<EventSurveySummary[]>('/api/v1/admin/event-surveys');
 }
 
-async function listEventSurveys(): Promise<EventSurveySummary[]> {
-  // [FE contract] GET /api/v1/admin/event-surveys 가 생기면 그것으로 바꾼다
-  return Promise.all(KNOWN_EVENT_SURVEY_KEYS.map((key) => getEventSurvey(key)));
+async function getEventSurvey(surveyKey: string): Promise<EventSurveySummary> {
+  const list = await listEventSurveys();
+  const found = list.find((survey) => survey.surveyKey === surveyKey);
+  if (found === undefined) throw new Error(`이벤트 설문을 찾을 수 없습니다: ${surveyKey}`);
+  return found;
 }
 
 function listEntrants(surveyKey: string, page: number, size: number): Promise<Page<EventEntrantView>> {
@@ -180,12 +164,10 @@ function listEntrants(surveyKey: string, page: number, size: number): Promise<Pa
 }
 
 function getEventAggregate(surveyKey: string): Promise<EventQuestionAggregate[]> {
-  // [FE contract]
   return api<EventQuestionAggregate[]>(`/api/v1/admin/event-surveys/${q(surveyKey)}/aggregate`);
 }
 
 function getEventResponse(surveyKey: string, responseId: number): Promise<EventResponseDetail> {
-  // [FE contract]
   return api<EventResponseDetail>(`/api/v1/admin/event-surveys/${q(surveyKey)}/responses/${responseId}`);
 }
 
