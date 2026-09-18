@@ -22,6 +22,7 @@ namespace Festa.World
         const int ScanInterval = 90;     // 프레임 — 1.5 초쯤
 
         int _lastReported = -1;
+        Transform _root;
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         static void AutoRegister()
@@ -36,9 +37,9 @@ namespace Festa.World
         {
             if (Time.frameCount % ScanInterval != 0) return;
 
-            var root = GameObject.Find("@BoothInteriors");
+            var root = ResolveRoot();
             if (root == null) return;
-            int attached = Scan(root.transform);
+            int attached = Scan(root);
 
             // **한 번 붙이고 끝내지 않는다.** 처음에는 12부스를 다 붙이면 스스로 꺼졌는데, 인테리어가
             // 그 뒤에 다시 만들어지면서 붙여 둔 컴포넌트가 통째로 사라졌다 — 실측하니 48개가 0개가 됐고
@@ -72,12 +73,63 @@ namespace Festa.World
                     chair.SetSeatHeightRatio(SeatRatioOf(seat));
                     attachedNow++;
                 }
+
+                // 파티션·전시 벽은 **콜라이더가 아예 없어 통과된다** (실측 2026-09-18: Panel_Back x3 ·
+                // Panel_Side x6 · ProjectPanel_LED 전부 0개). 부스 안이 방으로 읽히려면 막혀야 한다.
+                // 좌석과 같은 자리에서 처리하는 이유는 같은 이유로 사라지기 때문이다 — 인테리어가 다시
+                // 만들어지면 붙인 것이 통째로 없어지므로, 여기서 함께 계속 지켜본다.
+                foreach (Transform part in studio)
+                {
+                    if (!IsSolidName(part.name)) continue;
+                    attachedNow += EnsureColliders(part);
+                }
             }
             return attachedNow;
         }
 
         static bool IsSeatName(string name) =>
             name.StartsWith("Chair") || name.StartsWith("Stool") || name.StartsWith("Seat");
+
+        /// <summary>
+        /// 인테리어 루트. <b><c>GameObject.Find</c> 로는 안 된다</b> — 그 함수는 활성 오브젝트만 찾는데,
+        /// 부스 밖에 있으면 <c>BoothInteriorCulling</c> 이 인테리어를 통째로 꺼 둔다. 그래서 축제장을
+        /// 걸어 다니는 동안에는 루트를 못 찾아 좌석·콜라이더가 하나도 붙지 않았다 (실측 2026-09-18:
+        /// 좌석 48개 중 0개). 씬 루트 목록은 꺼진 것도 포함한다.
+        /// </summary>
+        Transform ResolveRoot()
+        {
+            if (_root != null) return _root;
+            var scene = UnityEngine.SceneManagement.SceneManager.GetActiveScene();
+            if (!scene.isLoaded) return null;
+            foreach (var go in scene.GetRootGameObjects())
+                if (go.name == "@BoothInteriors") { _root = go.transform; return _root; }
+            return null;
+        }
+
+        /// <summary>막혀 있어야 하는 것 — 칸막이 패널과 전시 벽.</summary>
+        static bool IsSolidName(string name) =>
+            name.StartsWith("Panel_") || name.StartsWith("ProjectPanel");
+
+        /// <summary>
+        /// 메시가 있는 자식마다 <see cref="BoxCollider"/> 를 보장한다. 붙인 수를 돌려준다.
+        ///
+        /// <para><b>루트가 아니라 메시가 있는 자식에 붙인다.</b> 루트에 붙이면 Unity 가 크기를 재 주지 못해
+        /// 1×1×1 짜리가 생긴다 — 얇은 패널에는 전혀 맞지 않는다. 메시와 같은 오브젝트에 붙이면
+        /// 그 메시에 정확히 맞춰진다.</para>
+        /// </summary>
+        static int EnsureColliders(Transform part)
+        {
+            if (part.GetComponentsInChildren<Collider>(true).Length > 0) return 0;
+            int added = 0;
+            foreach (var filter in part.GetComponentsInChildren<MeshFilter>(true))
+            {
+                if (filter == null || filter.sharedMesh == null) continue;
+                if (filter.GetComponent<Collider>() != null) continue;
+                filter.gameObject.AddComponent<BoxCollider>();
+                added++;
+            }
+            return added;
+        }
 
         /// <summary>
         /// 좌면이 전체 높이의 어디쯤인가. 쓰이는 가구 프리팹이 둘뿐이라 그것으로 가른다 —
