@@ -5,6 +5,7 @@ import {
   MAX_CHAT_CODE_POINTS,
   NOTICE_TTL_MS,
   __pushWorldChatForTests,
+  __pushWorldChatErrorForTests,
   __resetWorldChatForTests,
   canUseWorldChat,
   closeWorldChat,
@@ -78,11 +79,27 @@ describe('worldChat 길이·도배', () => {
     expect(getWorldChatSnapshot().draft).toBe('안녕하세요');
   });
 
-  it('보낸 뒤 3초 동안 다시 보내지 않는다', () => {
+  it('보낸 뒤 0.8초 동안 다시 보내지 않는다 — 서버 최소 간격과 같다 (S15P21A604-904)', () => {
     expect(sendWorldChat('안녕하세요', 1_000)).toBe(true);
-    expect(sendWorldChat('또 보냅니다', 2_000)).toBe(false);
+    expect(sendWorldChat('너무 빠릅니다', 1_500)).toBe(false);
     expect(getWorldChatSnapshot().notice).toBe(CHAT_ERROR_MESSAGE.CHAT_TOO_FAST);
-    expect(sendWorldChat('이제 됩니다', 4_100)).toBe(true);
+    expect(sendWorldChat('이제 됩니다', 1_900)).toBe(true);
+    expect(sent).toHaveLength(2);
+  });
+
+  it('서버 retryAfterMs 가 오면 그만큼 전송만 잠그고 draft 는 유지한다 (S15P21A604-904)', () => {
+    setWorldChatDraft('쓰던 말');
+    __pushWorldChatErrorForTests(JSON.stringify({ code: 'CHAT_TOO_FAST', message: '잠시 후', retryAfterMs: 60_000 }));
+    expect(getWorldChatSnapshot().notice).toBe(CHAT_ERROR_MESSAGE.CHAT_TOO_FAST);
+    expect(getWorldChatSnapshot().draft).toBe('쓰던 말');
+    expect(sendWorldChat('벌칙 중', Date.now())).toBe(false);
+  });
+
+  it('retryAfterMs 가 없거나 숫자가 아니면 클라이언트 계산으로 떨어진다', () => {
+    __pushWorldChatErrorForTests(JSON.stringify({ code: 'CHAT_TOO_FAST', message: '잠시 후' }));
+    expect(sendWorldChat('바로 됩니다', 5_000)).toBe(true);
+    __pushWorldChatErrorForTests(JSON.stringify({ code: 'CHAT_TOO_FAST', message: '잠시 후', retryAfterMs: 'PT5S' }));
+    expect(sendWorldChat('이것도 됩니다', 6_000)).toBe(true);
     expect(sent).toHaveLength(2);
   });
 
