@@ -393,7 +393,7 @@ class BoothApiIntegrationTest {
         Long slotId = freeSlotId();
         mockMvc.perform(leaseRequest(slotId, bearer)).andExpect(status().isCreated());
         Long leaseId = leases.findValidByLesseeUserId(userId, Instant.now()).orElseThrow().getId();
-        Long boothId = booths.findByOwnerUserId(userId).orElseThrow().getId();
+        Long boothId = booths.findByOwnerUserIdAndAdminOwnedFalse(userId).orElseThrow().getId();
         int afterLease = wallets.balanceOf(userId);
 
         mockMvc.perform(delete("/api/v1/booth-slots/{slotId}/leases/mine", slotId)

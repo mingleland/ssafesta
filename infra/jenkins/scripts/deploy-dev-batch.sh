@@ -21,7 +21,9 @@ for candidate in "${PYTHON_BIN:-}" python3 python; do
 done
 [[ -n "${python_bin}" ]] || { echo 'Python 3 is required' >&2; exit 69; }
 
-state_root="${DEV_BATCH_STATE_DIR:-${ENVIRONMENT_STATE_DIR:-/tmp/festa-environments}/dev/batches}"
+# 기본값은 approve-known-good.sh · release-history.sh 와 같아야 한다. /tmp 로 두면 배포는 쓰고
+# 승인은 읽지 못해 known-good 이 영원히 비어 있다 (2026-09-18 실측).
+state_root="${DEV_BATCH_STATE_DIR:-${ENVIRONMENT_STATE_DIR:-/var/lib/festa-environments}/dev/batches}"
 target_environment="${FESTA_DEPLOY_ENVIRONMENT:-demo}"
 case "${target_environment}" in dev|demo) ;; *) echo 'FESTA_DEPLOY_ENVIRONMENT must be dev or demo' >&2; exit 64 ;; esac
 batch_dir="${state_root}/${DEV_BATCH_ID}"
@@ -187,6 +189,11 @@ rollback() {
   component="${changed[index]}"; snapshot="${snapshot_dir}/${component}.json"
     if [[ ! -f "${snapshot}" ]] || ! run_component rollback "${component}" "${snapshot}" || ! run_component verify "${component}" "${snapshot}"; then
       manual=true
+    else
+      # 되돌렸으면 current 도 그 릴리스다 — 그러지 않으면 실행본과 기록이 갈린다
+      # (spec §Session 2026-09-18 규칙 6).
+      mkdir -p "${state_root}/current"
+      cp "${snapshot}" "${state_root}/current/${component}.json"
     fi
   done
   if [[ "${manual}" == true ]]; then
@@ -218,5 +225,9 @@ for component in "${components[@]}"; do
   cp "${RELEASE_MANIFEST_PATH}" "${temp}"
   mv -f "${temp}" "${target}"
 done
+# current 가 된 릴리스만 이력에 남는다. candidate 에서 죽은 릴리스는 기록하지 않는다
+# (spec §Session 2026-09-18 규칙 1·7). 이력 적재 실패가 정상 배포를 되돌릴 이유는 없다.
+DEV_BATCH_STATE_DIR="${state_root}" bash "${repo_root}/infra/deploy/scripts/release-history.sh" record "${DEV_BATCH_ID}" \
+  || echo 'WARN: release history was not recorded' >&2
 write_status ACTIVE 'all selected component deployments and verifications passed'
 echo "${status_path}"

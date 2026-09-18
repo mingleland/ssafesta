@@ -92,6 +92,10 @@ public class MemberSessionService {
      * <p>계보 키가 없으면 {@code GET} 이 {@code false} 를 주고 비교가 실패한다 — 끊을 계보가 없다는
      * 뜻이므로 아무것도 지우지 않는 것이 맞다.
      *
+     * <p>{@code KEYS[4]} 는 회전 유예로 남은 옛 {@code sid}({@link #previousSessionKey}) 다. 계보를
+     * 끊으면서 그것을 남기면 <b>방금 끊은 세션의 옛 Access Token 이 유예 동안 계속 통과한다</b> —
+     * 폐기가 폐기가 아니게 된다 (GitLab #216).
+     *
      * <p>해시로 만드는 키 이름이 {@code KEYS} 가 아니라 {@code ARGV} 접두사로 들어간다. 단일
      * 인스턴스 Redis 전제이며, 클러스터로 가면 이 스크립트부터 손봐야 한다.
      */
@@ -105,7 +109,7 @@ public class MemberSessionService {
                 redis.call('DEL', refreshKey)
               end
             end
-            redis.call('DEL', KEYS[1], KEYS[2], KEYS[3])
+            redis.call('DEL', KEYS[1], KEYS[2], KEYS[3], KEYS[4])
             return 1
             """, Long.class);
 
@@ -164,19 +168,31 @@ public class MemberSessionService {
         this.keyspace = keyspace.prefix();
     }
 
-    /** 새 로그인. 새 계보를 시작한다 — 이전 계보의 토큰은 이 시점부터 {@code SUPERSEDED} 다. */
+    /**
+     * 새 로그인. 새 계보를 시작한다 — 이전 계보의 토큰은 이 시점부터 {@code SUPERSEDED} 다.
+     *
+     * <p>회전 유예는 주지 않는다. 새 로그인이 옛 Access Token 을 <b>즉시</b> 밀어내는 것이 spec 001
+     * 시나리오 4 이고, 유예는 같은 사람의 갱신에만 있는 장치다 (GitLab #216).
+     */
     public MemberSession issue(Long userId) {
-        return issue(userId, UUID.randomUUID().toString());
+        return issue(userId, UUID.randomUUID().toString(), false);
     }
 
-    /** 발급 본체. 회전은 계보를 물려받고, 새 로그인은 새 계보를 들고 들어온다. */
-    private MemberSession issue(Long userId, String familyId) {
+    /**
+     * 발급 본체. 회전은 계보를 물려받고, 새 로그인은 새 계보를 들고 들어온다.
+     *
+     * @param keepPreviousSid 회전이면 {@code true} — 방금 밀려난 {@code sid} 를 짧은 유예 동안 남겨
+     *                        {@link #check} 가 통과시키게 한다. 새 로그인은 {@code false} 이고 남은
+     *                        유예까지 지운다.
+     */
+    private MemberSession issue(Long userId, String familyId, boolean keepPreviousSid) {
         String activeKey = activeKey(userId);
         String previousHash = redis.opsForValue().get(activeKey);
         if (previousHash != null) {
             markSuperseded(previousHash);
             redis.delete(refreshKey(previousHash));
         }
+        rotateSessionGrace(userId, keepPreviousSid);
         String rawRefreshToken = randomToken();
         String hash = sha256(rawRefreshToken);
         String sessionId = UUID.randomUUID().toString();
@@ -234,7 +250,30 @@ public class MemberSessionService {
             throw new InvalidRefreshTokenException();
         }
         String familyId = session.familyId() != null ? session.familyId() : candidateFamilyId;
-        return issue(session.userId(), familyId);
+        return issue(session.userId(), familyId, true);
+    }
+
+    /**
+     * 회전 직전의 {@code sid} 를 유예 동안 남긴다 — 또는 유예를 끝낸다.
+     *
+     * <p><b>왜 필요한가.</b> 갱신마다 {@code sid} 가 새로 서므로, 갱신이 성공하는 순간 직전 Access
+     * Token 은 만료를 기다리지 않고 죽는다. 그 토큰을 React 와 Unity 가 나눠 쓰는 구조에서는 한쪽의
+     * 정상 갱신이 <b>다른 쪽을 즉사시킨다</b> — 월드가 12슬롯 게시본·{@code world-sessions} 를
+     * 한꺼번에 401 로 잃는 경로가 이것이다 (GitLab #216). 유예는 그 사이에만 열린다.
+     *
+     * <p>유예 값은 {@code app.auth.session-rotation-grace} 다. Refresh Token 재사용 판정의
+     * {@code refresh-reuse-grace} 와 지금 수치가 같지만 뜻이 다르다 — 한쪽은 "같은 토큰을 두 번 쓴
+     * 것을 도난으로 볼지", 이쪽은 "두 Access Token 이 겹쳐 사는 시간" 이다. 하나만 조이고 싶어질
+     * 때 서로를 끌고 가지 않도록 프로퍼티부터 갈라 둔다.
+     */
+    private void rotateSessionGrace(Long userId, boolean keepPreviousSid) {
+        String previousSessionId = keepPreviousSid ? redis.opsForValue().get(sessionKey(userId)) : null;
+        if (previousSessionId == null) {
+            redis.delete(previousSessionKey(userId));
+            return;
+        }
+        redis.opsForValue().set(previousSessionKey(userId), previousSessionId,
+                properties.sessionRotationGrace());
     }
 
     /**
@@ -251,6 +290,7 @@ public class MemberSessionService {
         }
         redis.delete(activeKey(userId));
         redis.delete(sessionKey(userId));
+        redis.delete(previousSessionKey(userId));
         redis.delete(familyKey(userId));
     }
 
@@ -269,7 +309,16 @@ public class MemberSessionService {
         if (current == null) {
             return SessionCheck.NO_SESSION;
         }
-        return current.equals(sessionId) ? SessionCheck.ACTIVE : SessionCheck.SID_MISMATCH;
+        if (current.equals(sessionId)) {
+            return SessionCheck.ACTIVE;
+        }
+        // 방금 회전으로 밀려난 sid 는 짧은 유예 동안 통과한다 (GitLab #216). 두 번째 읽기는 이미
+        // 어긋난 경우에만 일어나므로 정상 요청에는 왕복이 늘지 않는다. 새 로그인·로그아웃·계보
+        // 폐기는 이 키를 지우고 가므로, 유예는 "같은 사람의 갱신" 에만 열린다.
+        String previous = redis.opsForValue().get(previousSessionKey(userId));
+        return sessionId != null && sessionId.equals(previous)
+                ? SessionCheck.ACTIVE
+                : SessionCheck.SID_MISMATCH;
     }
 
     /** {@link #check} 의 결과. 거절 로그가 이 이름을 그대로 적는다. */
@@ -300,7 +349,8 @@ public class MemberSessionService {
             return Replay.WITHIN_GRACE;
         }
         redis.execute(REVOKE_FAMILY,
-                List.of(familyKey(used.userId()), activeKey(used.userId()), sessionKey(used.userId())),
+                List.of(familyKey(used.userId()), activeKey(used.userId()), sessionKey(used.userId()),
+                        previousSessionKey(used.userId())),
                 used.familyId(), refreshKeyPrefix(), reusedKeyPrefix(),
                 SUPERSEDED + ":" + used.userId() + ":" + used.familyId(),
                 String.valueOf(properties.refreshTokenTtl().toSeconds()));
@@ -350,6 +400,9 @@ public class MemberSessionService {
     private String refreshKey(String hash) { return refreshKeyPrefix() + hash; }
     private String reusedKey(String hash) { return reusedKeyPrefix() + hash; }
     private String sessionKey(Long userId) { return keyspace + "auth:session:" + userId; }
+
+    /** 회전 직전의 {@code sid}. 값 하나뿐이고 수명은 Redis TTL 이 전부다 (GitLab #216). */
+    private String previousSessionKey(Long userId) { return keyspace + "auth:session:prev:" + userId; }
     private String familyKey(Long userId) { return familyKeyPrefix() + userId; }
     private String familyKeyPrefix() { return keyspace + "auth:family:"; }
     private String refreshKeyPrefix() { return keyspace + "auth:refresh:"; }

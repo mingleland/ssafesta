@@ -39,8 +39,14 @@ public interface BoothRepository extends JpaRepository<Booth, Long> {
     /**
      * A member keeps one booth across leases, so re-leasing continues their own content rather
      * than handing them someone else's (spec 004 C-01).
+     *
+     * <p><b>Administrator booths are excluded, and that is what keeps this {@code Optional} true.</b>
+     * One administrator holds several of them at once (S15P21A604-905), so counting them here would
+     * make this query throw {@code IncorrectResultSizeDataAccessException} and lock that account out
+     * of leasing entirely — the same trap V7 was written to close. {@code ux_booths_owner} is
+     * partial on the same predicate, so the database enforces exactly what this signature promises.
      */
-    Optional<Booth> findByOwnerUserId(Long ownerUserId);
+    Optional<Booth> findByOwnerUserIdAndAdminOwnedFalse(Long ownerUserId);
 
     Optional<Booth> findByCurrentSlotId(Long currentSlotId);
 }

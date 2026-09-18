@@ -178,7 +178,7 @@ backend/src/test/java/com/example/ssafesta/project/
 |---|---|
 | `project_links` 테이블 | C-05가 3칼럼으로 닫았고 정본 Key Entities도 정정됐다 (R-01) |
 | URL allowlist (YouTube·GitHub 등) | D09는 형식 검증만. allowlist는 SC-002를 깬다. Jira -110 설명의 "allow 정책" 문구는 정본과 어긋난 것이고 #110에서 정정 통보 |
-| 대표 이미지 업로드 | C-03 — 업로드 미지원, URL 참조. `docs/sdd/parts/BE.md`의 "S3"는 낡았다 (R-10) |
+| 대표 이미지 업로드 | ~~C-03 — 업로드 미지원~~ → **2026-09-18 개정: 업로드 지원** (GitLab #241, `S15P21A604-895`). presigned PUT + 완료 검증 + 공개 프록시이고, 저장은 기존 `thumbnailUrl` 그대로다 |
 | 프로젝트를 Layout JSON에 넣기 | spec 005 계약과 무관 |
 | 방문자 조회 · published 게이트 · 좋아요 수 | **S15P21A604-177** |
 | `videoUrl` 제공자 제한 | **C-02 미결(기획).** 목록 확정 후 후속. 소급 삭제·숨김 안 함 (R-08) |

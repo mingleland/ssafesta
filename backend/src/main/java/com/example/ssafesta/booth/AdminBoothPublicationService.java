@@ -30,7 +30,11 @@ public class AdminBoothPublicationService {
         admins.requireAdmin(actorUserId);
         Booth booth = booths.findWithLockById(boothId)
                 .orElseThrow(() -> new BoothNotFoundException(boothId));
-        admins.requireOwnerNotMaster(booth.getOwnerUserId());
+        // 같은 이유로 관리자 부스에는 마스터 보호를 적용하지 않는다 — BoothAccessGuard.requireModifier
+        // 와 규칙이 갈리면 편집은 되는데 비공개는 안 되는 상태가 된다 (S15P21A604-905).
+        if (!booth.isAdminOwned()) {
+            admins.requireOwnerNotMaster(booth.getOwnerUserId());
+        }
         if (!booth.isPublished()) {
             return false;
         }
