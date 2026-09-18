@@ -53,11 +53,14 @@ public class WalletService {
     private final WalletRepository wallets;
     private final CoinLedgerEntryRepository ledger;
     private final WalletProperties properties;
+    private final CoinEventPublisher events;
 
-    public WalletService(WalletRepository wallets, CoinLedgerEntryRepository ledger, WalletProperties properties) {
+    public WalletService(WalletRepository wallets, CoinLedgerEntryRepository ledger, WalletProperties properties,
+                         CoinEventPublisher events) {
         this.wallets = wallets;
         this.ledger = ledger;
         this.properties = properties;
+        this.events = events;
     }
 
     /**
@@ -257,6 +260,12 @@ public class WalletService {
         wallet.apply(signedAmount);
         CoinLedgerEntry entry = ledger.save(new CoinLedgerEntry(wallet.getId(), entryType, signedAmount,
                 wallet.getBalance(), reasonType, referenceType, referenceId, idempotencyKey));
+        if (signedAmount > 0) {
+            // 증액만, 그리고 새 항목일 때만 알린다 (S15P21A604-920). 위쪽 alreadyApplied 는 이미
+            // 돌아갔으니 여기 오는 것은 실제로 잔액이 움직인 경우뿐이다.
+            events.granted(userId, entry.getId(), signedAmount, wallet.getBalance(), reasonType,
+                    referenceType, referenceId);
+        }
         return LedgerResult.applied(entry);
     }
 

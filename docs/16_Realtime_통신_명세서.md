@@ -216,7 +216,31 @@ Token 재사용도 허용하지 않는다 — 토큰 4계층 분리의 이유다
 /user/queue/consultation              방문자 — 내 요청의 상태 변화
 /topic/booths/{boothId}/consultation  직원 — 그 부스 대기열 변화
 /user/queue/booth-lease-expiry        부스 운영자 — 자기 임대 만료 1시간 전 알림 (D07)
+/user/queue/coin                      본인 — 내 코인이 늘어난 순간 (S15P21A604-920)
 ```
+
+#### `/user/queue/coin` — 코인 지급 알림
+
+```json
+{ "type": "granted", "entryId": "4821", "amount": 50, "balanceAfter": 250,
+  "reasonType": "DAILY_GRANT", "referenceType": null, "referenceId": null,
+  "occurredAt": "2026-09-18T04:41:33Z" }
+```
+
+**무엇 때문에 받았는지는 `reasonType` 하나로 가른다.** 금액으로 추측하지 않는다 — 가입 최초
+지급과 일일 접속 지급은 금액이 겹칠 수 있다.
+
+| `reasonType` | 무슨 지급인가 | `referenceType` / `referenceId` |
+|---|---|---|
+| `INITIAL_GRANT` | 가입 직후 최초 1회 | 없음 |
+| `DAILY_GRANT` | 그날 첫 접속 | 없음 |
+| `DAILY_MISSION` | 일일 미션 달성 보상 | `DAILY_MISSION` / 미션 이름(`AI_CONSULT` 등) |
+| `SURVEY_REWARD` | 설문 응답 보상 | `SURVEY` / 설문 id |
+| `MINIGAME_REWARD` · `SLOT_PAYOUT` | 미니게임·슬롯 보상 | 없음 |
+| `ADMIN_ADJUSTMENT` | 관리자 증액 조정 | `ADMIN_USER` / 관리자 id |
+
+**차감은 오지 않는다** — 구매·베팅·임대료는 그 요청의 REST 응답이 결과를 이미 담고 있다. 같은
+지급이 두 번 오지도 않는다: 멱등키로 걸러진 재요청은 발행하지 않는다.
 
 ### Client → Server: **없다**
 
