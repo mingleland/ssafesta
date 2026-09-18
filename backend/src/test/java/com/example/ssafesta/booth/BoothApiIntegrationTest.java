@@ -305,6 +305,44 @@ class BoothApiIntegrationTest {
                 .andExpect(status().isConflict());
     }
 
+    /**
+     * AI 직원이 없는 부스는 사람 상담도 없다 (GitLab #249, S15P21A604-914).
+     *
+     * <p>방문자 FE 는 이 값으로 채팅의 '사람 상담 요청' 버튼을 누르기 전에 지운다. 행이 없을 때
+     * 오류가 아니라 {@code false} 여야 버튼이 조용히 사라진다.
+     */
+    @Test
+    void aBoothWithoutAnAgentOffersNoHandoff() throws Exception {
+        Long userId = createMemberWithWallet(users, wallets, "API핸드오프없음");
+        BoothLease lease = leaseService.lease(userId, freeSlotId(), 1).lease();
+
+        mockMvc.perform(get("/api/v1/booths/{id}", lease.getBoothId()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.handoffEnabled").value(false));
+    }
+
+    /** 등록된 AI 직원의 handoff 설정이 방문자에게 그대로 나간다 (S15P21A604-914). */
+    @Test
+    void anAgentsHandoffSettingReachesTheVisitor() throws Exception {
+        Long userId = createMemberWithWallet(users, wallets, "API핸드오프허용");
+        BoothLease lease = leaseService.lease(userId, freeSlotId(), 1).lease();
+        insertAgent(lease.getBoothId(), true);
+
+        mockMvc.perform(get("/api/v1/booths/{id}", lease.getBoothId()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.handoffEnabled").value(true));
+    }
+
+    /**
+     * 에이전트 행을 직접 심는다 — 이 테스트가 확인하는 것은 방문자 응답이지 등록 API 가 아니다.
+     * 소유자용 POST 를 태우면 AI 파트 계약(필수 필드·검증)이 바뀔 때마다 여기가 같이 깨진다.
+     */
+    private void insertAgent(Long boothId, boolean handoffEnabled) {
+        jdbc.update("INSERT INTO ai_agents (booth_id, name, role_code, tone_code, system_prompt, "
+                + "handoff_enabled) VALUES (?, ?, 'GUIDE', 'FRIENDLY', '안내합니다', ?)",
+                boothId, "핸드오프테스트", handoffEnabled);
+    }
+
     // -- 슬롯 점유 한 질의 (S15P21A604-682) ------------------------------------
 
     /**
