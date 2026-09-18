@@ -315,7 +315,9 @@ namespace Festa.World
         // 끌어내려 파묻힌다(사용자 지적 2026-09-10). 원샷이라 끝나면 RestoreBaseGrounding 이 되돌린다.
         static bool ChangesGroundContact(PlayerEmoteId emote) =>
             emote == PlayerEmoteId.SitGround || emote == PlayerEmoteId.Strike
-            || LiePoseTable.IsLie(emote) || SitPoseTable.IsSit(emote);
+            || LiePoseTable.IsLie(emote);
+        // 의자 착석(SitChair*)은 여기 넣지 않는다 — 바닥이 아니라 **좌면**에 몸을 올려야 해서
+        // 기준면이 다르다. 좌석이 직접 재서 맞춘다 (BoothChairInteractable → SetSeatLift).
 
         /// <summary>
         /// **현재 포즈**의 최하단을 바닥에 맞춘다. 스킨 메시는 BakeMesh 로 굽으므로
@@ -334,6 +336,32 @@ namespace Festa.World
             _rootHeightAtGrounding = RootHeightAboveGround();
             return true;
         }
+
+        /// <summary>
+        /// 좌석이 잰 만큼 외형을 세로로 옮긴다 — <b>루트가 아니라 외형이다.</b>
+        ///
+        /// <para>왜 루트가 아닌가. 의자에 앉히려고 루트를 좌면 기준으로 내렸더니 중력이 캡슐을 바닥까지
+        /// 끌어내려 계산이 통째로 무의미했다 — 실측하면 의도한 −1.45 가 아니라 바닥인 0.22 에 있었고,
+        /// 그래서 엉덩이가 좌면 위 19 cm 에 떠 있었다 (2026-09-18). 루트는 바닥에 두고 보이는 몸만 올린다.</para>
+        ///
+        /// <para>착석이 끝나면 좌석이 0 을 넣어 되돌린다. 외형 기준값(<see cref="_baseVisualLocalY"/>)은
+        /// 건드리지 않는다 — 일어설 때 원래 접지로 정확히 복귀해야 한다.</para>
+        /// </summary>
+        public void SetSeatLift(float worldDeltaY)
+        {
+            if (_currentVisual == null) return;
+            float scale = Mathf.Max(0.0001f, transform.lossyScale.y);
+            float local = worldDeltaY / scale;
+            if (Mathf.Approximately(local, _seatLiftLocal)) return;
+            var t = _currentVisual.transform;
+            var p = t.localPosition;
+            p.y += local - _seatLiftLocal;
+            t.localPosition = p;
+            _seatLiftLocal = local;
+        }
+
+        /// <summary>지금 적용 중인 좌석 보정(로컬 단위). 되돌릴 때 이 값을 뺀다.</summary>
+        float _seatLiftLocal;
 
         /// <summary>조립 뒤 실제 포즈로 키를 다시 맞췄는가. 조립 한 번에 한 번만 한다.</summary>
         bool _heightCalibrated;

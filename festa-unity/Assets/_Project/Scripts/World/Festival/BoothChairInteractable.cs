@@ -50,6 +50,8 @@ namespace Festa.World
         Collider[] _sitterColliders;
         Vector3 _exitPoint;
         bool _sitConfirmed;
+        int _fitAtFrame = -1;
+        PlayerAvatarVisual _sitterVisual;
 
         /// <summary>좌면 비율을 붙이는 쪽이 정한다 — 스툴과 등받이 의자가 다르다.</summary>
         public void SetSeatHeightRatio(float ratio) => _seatHeightRatio = Mathf.Clamp01(ratio);
@@ -96,13 +98,11 @@ namespace Festa.World
             }
 
             var pose = SitPoseTable.ChairPoses[Random.Range(0, SitPoseTable.ChairPoses.Length)];
-            float scale = VisualScale(po, _fallbackVisualScale);
-
-            // 허벅지 관절이 좌면 위 ThighClearanceAboveSeat 에 오도록 루트를 내린다. 두 클립의 앉은 높이가
-            // 8 cm 다르므로(SitPoseTable) 이렇게 역산해야 같은 의자에 둘 다 맞는다.
+            // **루트는 바닥에 둔다.** 좌면 기준으로 내려 봤자 중력이 캡슐을 바닥까지 끌어내려
+            // 계산이 무의미하다 — 실측 2026-09-18: 의도한 −1.45 가 아니라 0.22 에 있었다.
+            // 앉은 높이는 자세가 자리잡은 뒤 **직접 재서 외형을 올린다**(FitToSeat).
             var b = Bounds();
-            float rootY = SeatTopY + (SitPoseTable.ThighClearanceAboveSeat - SitPoseTable.ThighAboveRoot(pose)) * scale;
-            var seat = new Vector3(b.center.x, rootY, b.center.z);
+            var seat = new Vector3(b.center.x, b.min.y, b.center.z);
 
             // 일어날 자리는 앉기 **전에** 정해 둔다. 좌석 정면 바닥이고, 막혀 있으면 원래 서 있던 자리로.
             _exitPoint = ResolveExitPoint(po.transform.position, b);
@@ -111,7 +111,50 @@ namespace Festa.World
             move.TeleportTo(seat);
             po.transform.rotation = Quaternion.LookRotation(SeatForward(), Vector3.up);
             player.EmoteId.Value = pose;
-            Debug.Log($"[BoothChair] {name} 착석 — pose={pose} seatTop={SeatTopY:F2} rootY={rootY:F2} scale={scale:F2}");
+            _sitterVisual = po.GetComponentInChildren<PlayerAvatarVisual>();
+            _fitAtFrame = Time.frameCount + FitDelayFrames;   // 크로스페이드가 끝나야 진짜 자세다
+            Debug.Log($"[BoothChair] {name} 착석 — pose={pose} seatTop={SeatTopY:F2}");
+        }
+
+        /// <summary>자세가 자리잡기를 기다리는 프레임 수. 크로스페이드가 섞이는 중에 재면 중간값이 나온다.</summary>
+        const int FitDelayFrames = 24;
+
+        /// <summary>
+        /// <b>앉은 높이를 재서 맞춘다.</b> 상수로 역산하지 않는다 — 클립마다 앉은 높이가 다르고,
+        /// 리타게팅·키 보정까지 곱해지면 표만으로는 맞지 않는다(사용자 지적 2026-09-18, 세 번째).
+        ///
+        /// <para>재는 것은 <b>엉덩이 살의 최저점</b>이다 — 골반 본에서 아래로 한 뼘 안쪽의 정점 중 가장 낮은 것.
+        /// 발·정강이는 좌면 밖으로 나가므로 전체 최저점을 쓰면 다리에 맞춰져 엉덩이가 뜬다.</para>
+        /// </summary>
+        void FitToSeat()
+        {
+            if (_sitter == null || _sitterVisual == null) return;
+            var anim = _sitterVisual.CurrentAnimator;
+            var hips = anim != null ? anim.GetBoneTransform(HumanBodyBones.Hips) : null;
+            if (hips == null) return;
+
+            float band = Mathf.Abs(_sitter.transform.lossyScale.y) * 0.25f;   // 골반 아래 25 cm 안쪽
+            float hipY = hips.position.y;
+            float buttY = float.PositiveInfinity;
+            foreach (var smr in _sitter.GetComponentsInChildren<SkinnedMeshRenderer>(true))
+            {
+                if (smr == null || !smr.enabled) continue;
+                var mesh = new Mesh();
+                smr.BakeMesh(mesh, true);
+                var m = smr.transform.localToWorldMatrix;
+                foreach (var v in mesh.vertices)
+                {
+                    var w = m.MultiplyPoint3x4(v);
+                    if (w.y > hipY || w.y < hipY - band) continue;
+                    if (w.y < buttY) buttY = w.y;
+                }
+                Destroy(mesh);
+            }
+            if (float.IsInfinity(buttY)) return;
+
+            float lift = SeatTopY - buttY;
+            _sitterVisual.SetSeatLift(lift);
+            Debug.Log($"[BoothChair] {name} 앉은 높이 맞춤 — 엉덩이 {buttY:F2} → 좌면 {SeatTopY:F2} (보정 {lift:F2}u)");
         }
 
         void Update()
@@ -119,7 +162,12 @@ namespace Festa.World
             if (_sitter == null) return;
             var np = _sitter.GetComponent<NetworkPlayer>();
             // 이동·점프로 이모트가 풀리면 PlayerMovement 가 None 으로 되돌린다. 그 순간이 "일어났다" 다.
-            if (np != null && SitPoseTable.IsSit(np.EmoteId.Value)) { _sitConfirmed = true; return; }
+            if (np != null && SitPoseTable.IsSit(np.EmoteId.Value))
+            {
+                _sitConfirmed = true;
+                if (_fitAtFrame > 0 && Time.frameCount >= _fitAtFrame) { _fitAtFrame = -1; FitToSeat(); }
+                return;
+            }
 
             // **앉은 것을 한 번이라도 본 뒤에만 내보낸다.** 이 확인이 없으면, 앉기가 성립하지 않았거나
             // 다른 자세(소파 눕기 등)로 덮인 경우에도 "일어났다" 로 읽고 사람을 의자 앞으로 끌어온다 —
@@ -157,6 +205,8 @@ namespace Festa.World
             SetIgnore(false);
             _sitter = null;
             _sitConfirmed = false;
+            _fitAtFrame = -1;
+            if (_sitterVisual != null) { _sitterVisual.SetSeatLift(0f); _sitterVisual = null; }
             _ownColliders = null;
             _sitterColliders = null;
         }
