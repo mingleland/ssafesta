@@ -8,6 +8,7 @@ import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import java.time.Instant;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import java.util.List;
@@ -58,7 +59,8 @@ public class AdminEventShopController {
     public AdminEventShopService.AdminPrizeView createPrize(@AuthenticationPrincipal Jwt jwt,
                                                              @RequestBody PrizeRequest request) {
         Long actor = guard.requireAdmin(jwt);
-        return shop.createPrize(actor, request.name(), request.priceCoin(), request.stock());
+        return shop.createPrize(actor, request.name(), request.priceCoin(), request.stock(),
+                request.closesAt(), winnerCountOf(request));
     }
 
     @Operation(summary = "경품 수정 — 판매 재개·중단 포함", description = "이름·가격·재고·판매 여부를 한 번에 덮어쓴다.")
@@ -73,7 +75,7 @@ public class AdminEventShopController {
                                                              @RequestBody PrizeRequest request) {
         Long actor = guard.requireAdmin(jwt);
         return shop.updatePrize(actor, prizeId, request.name(), request.priceCoin(), request.stock(),
-                request.active() == null || request.active());
+                request.active() == null || request.active(), request.closesAt(), winnerCountOf(request));
     }
 
     @Operation(summary = "구매 내역 조회", description = "`status` 를 생략하면 전체 상태를 최신순으로 돌려준다.")
@@ -85,13 +87,15 @@ public class AdminEventShopController {
     public PurchasePageResponse purchases(@AuthenticationPrincipal Jwt jwt,
                                           @Parameter(description = "PURCHASED · PENDING · FULFILLED · CANCELLED")
                                           @RequestParam(required = false) String status,
+                                          @Parameter(description = "true면 당첨자만, false면 낙첨자만")
+                                          @RequestParam(required = false) Boolean won,
                                           @RequestParam(defaultValue = "0") int page,
                                           @RequestParam(defaultValue = "20") int size) {
         guard.requireAdmin(jwt);
         validatePage(page, size);
         PurchaseFulfillment filter = parseStatus(status);
         Page<AdminEventShopService.AdminPurchaseView> result =
-                shop.listPurchases(filter, PageRequest.of(page, size));
+                shop.listPurchases(filter, won, PageRequest.of(page, size));
         return new PurchasePageResponse(result.getContent(), result.getNumber(), result.getSize(),
                 result.getTotalElements(), result.getTotalPages());
     }
@@ -115,6 +119,11 @@ public class AdminEventShopController {
             throw ApiException.fieldInvalid("status", "필수입니다.");
         }
         return shop.updateFulfillment(actor, purchaseId, next, request.note());
+    }
+
+    /** Absent means "not a raffle" — the same thing zero winners means. */
+    private static int winnerCountOf(PrizeRequest request) {
+        return request.winnerCount() == null ? 0 : request.winnerCount();
     }
 
     private static PurchaseFulfillment parseStatus(String status) {
@@ -141,8 +150,13 @@ public class AdminEventShopController {
     public record PrizeRequest(
             @Schema(description = "경품 이름", example = "무선 이어폰") String name,
             @Schema(description = "가격(코인)", example = "500") int priceCoin,
-            @Schema(description = "재고. 생략하면 무제한", example = "10", nullable = true) Integer stock,
-            @Schema(description = "판매 여부. 생성 시 생략하면 true", example = "true", nullable = true) Boolean active) {
+            @Schema(description = "재고. 생략하면 무제한. 응모형이면 응모권 수다", example = "10",
+                    nullable = true) Integer stock,
+            @Schema(description = "판매 여부. 생성 시 생략하면 true", example = "true", nullable = true) Boolean active,
+            @Schema(description = "마감 시각. 생략하면 마감 없음", example = "2026-09-23T06:00:00Z",
+                    nullable = true) Instant closesAt,
+            @Schema(description = "당첨자 수. 0이거나 생략하면 즉시 구매 상품이다", example = "1",
+                    nullable = true) Integer winnerCount) {
     }
 
     public record FulfillmentRequest(
