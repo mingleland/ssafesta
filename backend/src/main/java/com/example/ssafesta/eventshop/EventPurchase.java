@@ -48,6 +48,17 @@ public class EventPurchase {
     private String note;
 
     /**
+     * The draw's verdict (S15P21A604-922). {@code null} means the draw has not run, or this is an
+     * ordinary prize that is never drawn at all; {@code true} won, {@code false} lost.
+     *
+     * <p>Deliberately not folded into {@link #fulfillment}: {@code CANCELLED} reads as "the order
+     * was called off", while losing a raffle is a normal, completed outcome whose coins are gone
+     * for good. Winners go on through the usual {@code PENDING}/{@code FULFILLED} hand-off.
+     */
+    @Column
+    private Boolean won;
+
+    /**
      * Who the prize goes to (GitLab #239). Nullable because purchases made before this existed have
      * no answer, and inventing one would read as "a buyer who left the field blank". New purchases
      * are required to carry all three — {@link EventShopService#purchase} enforces that.
@@ -114,6 +125,16 @@ public class EventPurchase {
 
     public int getCoinSpent() {
         return coinSpent;
+    }
+
+    /** Records this entry's draw result. Called once, under the prize's row lock. */
+    public void recordDraw(boolean won, Instant now) {
+        this.won = won;
+        this.updatedAt = now;
+    }
+
+    public Boolean getWon() {
+        return won;
     }
 
     public Long getLedgerEntryId() {

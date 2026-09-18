@@ -56,6 +56,15 @@ public final class CoinReason {
     /** Event-shop prize purchase (S15P21A604-832 후속, GitLab #217). */
     public static final String PRIZE_PURCHASE = "PRIZE_PURCHASE";
 
+    /**
+     * Refund of a cancelled event-shop purchase (S15P21A604-922 후속).
+     *
+     * <p>A separate reason from {@link #PRIZE_PURCHASE} rather than a negative one: a wallet's
+     * history has to be able to say "this purchase was called off and the coins came back", and a
+     * reader summing by reason would otherwise see a purchase that cost nothing.
+     */
+    public static final String PRIZE_REFUND = "PRIZE_REFUND";
+
     /** {@code reference_type} recorded alongside {@link #PRIZE_PURCHASE}; the id is a prize. */
     public static final String EVENT_PRIZE_REFERENCE_TYPE = "EVENT_PRIZE";
 
