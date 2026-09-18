@@ -5,6 +5,10 @@ import com.example.ssafesta.common.ErrorCode;
 import com.example.ssafesta.user.AdminActionRecorder;
 import com.example.ssafesta.user.User;
 import com.example.ssafesta.user.UserRepository;
+import com.example.ssafesta.wallet.CoinCreditCommand;
+import com.example.ssafesta.wallet.CoinReason;
+import com.example.ssafesta.wallet.LedgerEntryType;
+import com.example.ssafesta.wallet.WalletService;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.Instant;
 import java.util.HashMap;
@@ -30,13 +34,15 @@ public class AdminEventShopService {
     private final EventPrizeRepository prizes;
     private final EventPurchaseRepository purchases;
     private final UserRepository users;
+    private final WalletService wallets;
     private final AdminActionRecorder audit;
 
     public AdminEventShopService(EventPrizeRepository prizes, EventPurchaseRepository purchases,
-                                 UserRepository users, AdminActionRecorder audit) {
+                                 UserRepository users, WalletService wallets, AdminActionRecorder audit) {
         this.prizes = prizes;
         this.purchases = purchases;
         this.users = users;
+        this.wallets = wallets;
         this.audit = audit;
     }
 
@@ -46,9 +52,10 @@ public class AdminEventShopService {
     }
 
     @Transactional
-    public AdminPrizeView createPrize(Long actorUserId, String name, int priceCoin, Integer stock) {
-        validatePrizeFields(name, priceCoin, stock);
-        EventPrize saved = prizes.save(new EventPrize(name.trim(), priceCoin, stock));
+    public AdminPrizeView createPrize(Long actorUserId, String name, int priceCoin, Integer stock,
+                                      Instant closesAt, int winnerCount) {
+        validatePrizeFields(name, priceCoin, stock, winnerCount);
+        EventPrize saved = prizes.save(new EventPrize(name.trim(), priceCoin, stock, closesAt, winnerCount));
         audit.record(actorUserId, AdminActionRecorder.PRIZE_CREATE, AdminActionRecorder.TARGET_EVENT_PRIZE,
                 saved.getId(), name.trim());
         return AdminPrizeView.of(saved);
@@ -57,21 +64,19 @@ public class AdminEventShopService {
     /** Edits every field at once, including {@code active} — there is no separate toggle endpoint. */
     @Transactional
     public AdminPrizeView updatePrize(Long actorUserId, Long prizeId, String name, int priceCoin, Integer stock,
-                                      boolean active) {
-        validatePrizeFields(name, priceCoin, stock);
+                                      boolean active, Instant closesAt, int winnerCount) {
+        validatePrizeFields(name, priceCoin, stock, winnerCount);
         EventPrize prize = prizes.findById(prizeId)
                 .orElseThrow(() -> new ApiException(ErrorCode.EVENT_PRIZE_NOT_FOUND));
-        prize.update(name.trim(), priceCoin, stock, active);
+        prize.update(name.trim(), priceCoin, stock, active, closesAt, winnerCount);
         audit.record(actorUserId, AdminActionRecorder.PRIZE_UPDATE, AdminActionRecorder.TARGET_EVENT_PRIZE,
                 prizeId, name.trim());
         return AdminPrizeView.of(prize);
     }
 
     @Transactional(readOnly = true)
-    public Page<AdminPurchaseView> listPurchases(PurchaseFulfillment filter, Pageable pageable) {
-        Page<EventPurchase> page = filter == null
-                ? purchases.findAllByOrderByPurchasedAtDesc(pageable)
-                : purchases.findAllByFulfillmentOrderByPurchasedAtDesc(filter, pageable);
+    public Page<AdminPurchaseView> listPurchases(PurchaseFulfillment filter, Boolean won, Pageable pageable) {
+        Page<EventPurchase> page = pageOf(filter, won, pageable);
 
         Map<Long, String> prizeNames = new HashMap<>();
         prizes.findAllById(page.getContent().stream().map(EventPurchase::getPrizeId).distinct().toList())
@@ -84,6 +89,9 @@ public class AdminEventShopService {
     }
 
     /**
+     * Moves a purchase along its fulfillment track. Cancelling also unwinds the purchase — the
+     * coins go back to the buyer and the units go back on the shelf (S15P21A604-922 후속).
+     *
      * @throws ApiException {@code NOT_FOUND} no such purchase, {@code
      *                      EVENT_PURCHASE_FULFILLMENT_INVALID} the transition is not allowed from
      *                      the current state (see {@link PurchaseFulfillment#canTransitionTo})
@@ -96,13 +104,55 @@ public class AdminEventShopService {
         if (!purchase.getFulfillment().canTransitionTo(next)) {
             throw new ApiException(ErrorCode.EVENT_PURCHASE_FULFILLMENT_INVALID);
         }
+        if (next == PurchaseFulfillment.CANCELLED) {
+            unwind(purchase);
+        }
         purchase.transitionTo(next, note);
         audit.record(actorUserId, AdminActionRecorder.PRIZE_FULFILLMENT_UPDATE,
                 AdminActionRecorder.TARGET_EVENT_PURCHASE, purchaseId, next.name());
         return decorate(purchase);
     }
 
-    private void validatePrizeFields(String name, int priceCoin, Integer stock) {
+    /**
+     * Gives a cancelled purchase's coins and stock back.
+     *
+     * <p>Wallet lock first, then the prize's row — the same order {@code EventShopService.purchase}
+     * takes them in. Reversing it here would let a cancel and a purchase of the same prize
+     * deadlock against each other.
+     *
+     * <p>Idempotency is keyed on the purchase rather than a caller-supplied value: the transition
+     * guard above already refuses a second cancel of the same row, and this key is what keeps a
+     * retry that lost its response from paying the refund twice.
+     */
+    private void unwind(EventPurchase purchase) {
+        wallets.lockOwner(purchase.getBuyerUserId());
+        if (purchase.getCoinSpent() > 0) {
+            wallets.credit(new CoinCreditCommand(purchase.getBuyerUserId(), LedgerEntryType.REFUND,
+                    purchase.getCoinSpent(), CoinReason.PRIZE_REFUND, CoinReason.EVENT_PRIZE_REFERENCE_TYPE,
+                    purchase.getPrizeId().toString(), refundKey(purchase.getId())));
+        }
+        prizes.findByIdForUpdate(purchase.getPrizeId())
+                .ifPresent(prize -> prize.restore(purchase.getQuantity()));
+    }
+
+    /** {@code PRIZE_REFUND:{purchaseId}} — one refund per purchase, ever. */
+    static String refundKey(Long purchaseId) {
+        return CoinReason.PRIZE_REFUND + ":" + purchaseId;
+    }
+
+    /** {@code won} narrows to winners or losers; {@code filter} to a fulfillment state. Either may be null. */
+    private Page<EventPurchase> pageOf(PurchaseFulfillment filter, Boolean won, Pageable pageable) {
+        if (filter == null) {
+            return won == null
+                    ? purchases.findAllByOrderByPurchasedAtDesc(pageable)
+                    : purchases.findAllByWonOrderByPurchasedAtDesc(won, pageable);
+        }
+        return won == null
+                ? purchases.findAllByFulfillmentOrderByPurchasedAtDesc(filter, pageable)
+                : purchases.findAllByFulfillmentAndWon(filter, won, pageable);
+    }
+
+    private void validatePrizeFields(String name, int priceCoin, Integer stock, int winnerCount) {
         if (name == null || name.isBlank()) {
             throw ApiException.fieldInvalid("name", "경품 이름을 입력해 주세요.");
         }
@@ -114,6 +164,17 @@ public class AdminEventShopService {
         }
         if (stock != null && stock < 0) {
             throw ApiException.fieldInvalid("stock", "0 이상이거나 무제한(생략)이어야 합니다.");
+        }
+        if (winnerCount < 0) {
+            throw ApiException.fieldInvalid("winnerCount", "0 이상이어야 합니다.");
+        }
+        // An unbounded raffle cannot be drawn fairly — everyone would win. Entries are capped by
+        // stock, so a raffle has to say how many entries exist before it says how many win.
+        if (winnerCount > 0 && stock == null) {
+            throw ApiException.fieldInvalid("stock", "응모형 경품은 응모권 수를 지정해야 합니다.");
+        }
+        if (stock != null && winnerCount > stock) {
+            throw ApiException.fieldInvalid("winnerCount", "응모권 수보다 많을 수 없습니다.");
         }
     }
 
@@ -140,14 +201,17 @@ public class AdminEventShopService {
                 purchase.getBuyerUserId(), buyerNickname, purchase.getQuantity(), purchase.getCoinSpent(),
                 purchase.getLedgerEntryId(), purchase.getPurchasedAt(), purchase.getFulfillment().name(),
                 purchase.getNote(), purchase.getUpdatedAt(), recipient.campus(), recipient.teamName(),
-                recipient.recipientName());
+                recipient.recipientName(), purchase.getWon());
     }
 
     public record AdminPrizeView(Long prizeId, String name, int priceCoin, Integer stock, boolean active,
+                                 @Schema(nullable = true) Instant closesAt, int winnerCount,
+                                 @Schema(description = "추첨을 마친 시각. null이면 아직", nullable = true) Instant drawnAt,
                                  Instant createdAt, Instant updatedAt) {
         static AdminPrizeView of(EventPrize prize) {
             return new AdminPrizeView(prize.getId(), prize.getName(), prize.getPriceCoin(), prize.getStock(),
-                    prize.isActive(), prize.getCreatedAt(), prize.getUpdatedAt());
+                    prize.isActive(), prize.getClosesAt(), prize.getWinnerCount(), prize.getDrawnAt(),
+                    prize.getCreatedAt(), prize.getUpdatedAt());
         }
     }
 
@@ -161,6 +225,8 @@ public class AdminEventShopService {
                                     Instant purchasedAt, String fulfillment, String note, Instant updatedAt,
                                     @Schema(nullable = true) String campus,
                                     @Schema(nullable = true) String teamName,
-                                    @Schema(nullable = true) String recipientName) {
+                                    @Schema(nullable = true) String recipientName,
+                                    @Schema(description = "추첨 결과. null이면 추첨 전이거나 응모형이 아니다",
+                                            nullable = true) Boolean won) {
     }
 }
