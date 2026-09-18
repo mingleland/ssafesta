@@ -18,7 +18,7 @@ from app.models.conversation import Conversation
 from app.providers.llm import LLMRequest, LLMToken
 from app.providers.managed_llm import ManagedLLMError
 from app.services.context_service import ContextBuildResult
-from app.services.rag_service import NoReadyContextResult
+from app.services.rag_service import NoReadyContextResult, QuickAnswerIntent, QuickAnswerResult
 from app.services.stream_service import (
     BoothLeaseExpired,
     ConversationNotFound,
@@ -442,6 +442,34 @@ async def test_no_ready_context_skips_llm_and_streams_fixed_message() -> None:
     saved_turn = repository.saved[0].turns[-1]
     assert saved_turn.answer == NoReadyContextResult().message
     assert saved_turn.sources == ()
+
+
+@pytest.mark.asyncio
+async def test_quick_answer_reuses_sse_and_commit_without_llm_or_source(caplog) -> None:
+    result = QuickAnswerResult(
+        intent=QuickAnswerIntent.TECH_STACK,
+        message="사용 기술: FastAPI, Spring Boot, React, Unity",
+    )
+    llm = FakeLLMProvider(tokens=("호출되면 안 됨",))
+    service, repository = _service(
+        conversation=_conversation(), rag=_RagContextService(result=result), llm=llm
+    )
+
+    with caplog.at_level(logging.INFO, logger="app.services.stream_service"):
+        events = _events(
+            [event async for event in service.stream(conversation=_conversation(), question="기술 스택")]
+        )
+
+    assert [event["type"] for event in events] == ["start", "token", "done"]
+    assert events[1]["delta"] == result.message
+    assert llm.calls == []
+    assert repository.saved[0].turns[-1].answer == result.message
+    assert repository.saved[0].turns[-1].sources == ()
+    assert any(
+        record.getMessage() == "conversation_quick_answer_used"
+        and record.intent == "TECH_STACK"
+        for record in caplog.records
+    )
 
 
 @pytest.mark.asyncio

@@ -7,8 +7,8 @@ import pytest
 from app.clients.spring_agent_config import AgentConfigDenied
 from app.clients.spring_chunk_search import ChunkScope, RetrievedChunk
 from app.models.conversation import Conversation
-from app.services.context_service import AgentPromptConfig, CompletedTurn
-from app.services.rag_service import NoReadyContextResult, RagContextService
+from app.services.context_service import AgentPromptConfig, CompletedTurn, ProjectFacts
+from app.services.rag_service import NoReadyContextResult, QuickAnswerResult, RagContextService
 
 
 def _chunk(index: int) -> RetrievedChunk:
@@ -54,12 +54,13 @@ class _PromptBuilder:
         return "BUILD_RESULT"
 
 
-def _agent_config() -> AgentPromptConfig:
+def _agent_config(project_facts: ProjectFacts | None = None) -> AgentPromptConfig:
     return AgentPromptConfig(
         role="GUIDE",
         tone="FRIENDLY",
         response_length="MEDIUM",
         system_prompt="안내한다.",
+        project_facts=project_facts,
     )
 
 
@@ -184,3 +185,73 @@ def test_rejects_non_positive_retrieval_top_k() -> None:
             prompt_builder=_PromptBuilder(),
             retrieval_top_k=0,
         )
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("question", "expected"),
+    [
+        ("프로젝트 소개?", "프로젝트 소개: 온라인 프로젝트 전시 플랫폼입니다."),
+        ("대상 사용자는 누구인가요", "대상 사용자: 프로젝트를 전시하고 싶은 교육생"),
+        ("기술 스택", "사용 기술: FastAPI, Spring Boot, React, Unity"),
+    ],
+)
+async def test_rule_match_skips_embedding_search_and_prompt(question: str, expected: str) -> None:
+    vector_search = _VectorSearch((_chunk(1),))
+    prompt_builder = _PromptBuilder()
+    service = RagContextService(
+        vector_search=vector_search,
+        agent_config_provider=_AgentConfigProvider(
+            _agent_config(
+                ProjectFacts(
+                    introduction="온라인 프로젝트 전시 플랫폼입니다.",
+                    target_audience="프로젝트를 전시하고 싶은 교육생",
+                    tech_stack="FastAPI, Spring Boot, React, Unity",
+                )
+            )
+        ),
+        prompt_builder=prompt_builder,
+        retrieval_top_k=5,
+    )
+
+    result = await service.build(conversation=_conversation(), question=question)
+
+    assert isinstance(result, QuickAnswerResult)
+    assert result.message == expected
+    assert vector_search.calls == []
+    assert prompt_builder.calls == []
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("question", ["프로젝트 소개와 기술 스택", "프로젝트가 뭐하는 곳인지 자세히 알려줘"])
+async def test_ambiguous_or_unlisted_question_falls_back_to_rag(question: str) -> None:
+    vector_search = _VectorSearch((_chunk(1),))
+    service = RagContextService(
+        vector_search=vector_search,
+        agent_config_provider=_AgentConfigProvider(
+            _agent_config(ProjectFacts(introduction="소개", target_audience=None, tech_stack="기술"))
+        ),
+        prompt_builder=_PromptBuilder(),
+        retrieval_top_k=5,
+    )
+
+    await service.build(conversation=_conversation(), question=question)
+
+    assert len(vector_search.calls) == 1
+
+
+@pytest.mark.asyncio
+async def test_missing_project_fact_falls_back_to_rag() -> None:
+    vector_search = _VectorSearch((_chunk(1),))
+    service = RagContextService(
+        vector_search=vector_search,
+        agent_config_provider=_AgentConfigProvider(
+            _agent_config(ProjectFacts(introduction="소개", target_audience=None, tech_stack=None))
+        ),
+        prompt_builder=_PromptBuilder(),
+        retrieval_top_k=5,
+    )
+
+    await service.build(conversation=_conversation(), question="대상 사용자")
+
+    assert len(vector_search.calls) == 1

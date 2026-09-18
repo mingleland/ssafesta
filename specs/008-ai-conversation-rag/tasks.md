@@ -20,6 +20,13 @@
 
 - [X] T055 [AI] `GET /internal/ai/agent-config` client를 공용 HTTP lifecycle과 연결하고, 질문마다 검색 전에 설정을 1회 조회한다. 성공 응답 다섯 필드를 엄격 변환하며 `AGENT_NOT_IN_BOOTH`·`AGENT_INACTIVE` 및 네트워크·계약 오류는 원문 노출 없이 Fail Closed 처리한다. 운영 `create_app()`의 Mock을 제거하고 단위·계약·회귀 테스트와 C-16 결정 문서를 갱신한다 (S15P21A604-507)
 
+## S15P21A604-396 정형 질문 Rule-based 단축 응답
+
+- [X] T056 [AI] 선택 `projectFacts`를 document finalize·Agent 설정 계약과 AI DTO에 추가하고 기존 Spring 응답 하위 호환 테스트를 작성한다 (S15P21A604-396, BE: S15P21A604-597)
+- [X] T057 [AI] Embedding 완료 Chunk에서 대상 사용자·사용 기술을 strict JSON으로 1회 추출하고, 실패 시 원문 없는 경고 후 정형 정보 없이 finalize하는 테스트와 구현을 추가한다 (S15P21A604-396)
+- [X] T058 [AI] 프로젝트 소개·대상 사용자·사용 기술의 보수적 전체 문자열 matcher와 값 누락·복합 질문 RAG 폴백 테스트를 작성한다 (S15P21A604-396)
+- [X] T059 [AI] Rule 성공 시 기존 SSE와 완료 turn 저장을 재사용하면서 질의 Embedding·검색·LLM 호출이 0건인지 회귀 검증한다 (S15P21A604-396)
+
 ## Phase 1: Setup
 
 - [ ] T001 Add Redis, tokenizer, SSE test dependencies and pytest markers in festa-ai/pyproject.toml

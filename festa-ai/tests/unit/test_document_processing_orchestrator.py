@@ -22,6 +22,7 @@ from app.clients.spring_document_result import (
 )
 from app.services.document_processing_orchestrator import DocumentProcessingOrchestrator
 from app.services.document_processing_service import EmbeddedChunk
+from app.services.context_service import ExtractedProjectFacts
 
 _ALLOWED = BoothAccessResult(allowed=True, lease_ends_at="2026-09-07T12:00:00Z", denial_code=None)
 _EXPIRED = BoothAccessResult(allowed=False, lease_ends_at=None, denial_code="BOOTH_LEASE_EXPIRED")
@@ -59,6 +60,19 @@ class _FakeEmbeddingService:
         if self._error is not None:
             raise self._error
         return self._chunks
+
+
+class _FakeProjectFactExtractor:
+    def __init__(self, result=None, error=None) -> None:
+        self._result = result
+        self._error = error
+        self.calls = []
+
+    async def extract(self, chunks):
+        self.calls.append(chunks)
+        if self._error is not None:
+            raise self._error
+        return self._result
 
 
 class _FakeResultClient:
@@ -136,6 +150,48 @@ async def test_run_sends_one_batch_and_finalizes_on_success() -> None:
         }
     ]
     assert result_client.failed_calls == []
+
+
+@pytest.mark.asyncio
+async def test_run_extracts_project_facts_once_and_publishes_with_finalize() -> None:
+    chunks = tuple(_chunk(i) for i in range(3))
+    facts = ExtractedProjectFacts(target_audience="교육생", tech_stack="FastAPI")
+    extractor = _FakeProjectFactExtractor(result=facts)
+    result_client = _FakeResultClient()
+    orchestrator = DocumentProcessingOrchestrator(
+        embedding_service=_FakeEmbeddingService(chunks=chunks),
+        result_client=result_client,
+        booth_access_client=_FakeBoothAccessClient(),
+        project_fact_extractor=extractor,
+        heartbeat_interval_seconds=60.0,
+    )
+
+    await orchestrator.run(_snapshot())
+
+    assert extractor.calls == [chunks]
+    assert result_client.finalize_calls[0]["project_facts"] == facts
+
+
+@pytest.mark.asyncio
+async def test_run_logs_extraction_failure_and_still_finalizes_without_facts(caplog) -> None:
+    raw_error = "문서 원문이 포함된 오류"
+    result_client = _FakeResultClient()
+    orchestrator = DocumentProcessingOrchestrator(
+        embedding_service=_FakeEmbeddingService(chunks=(_chunk(0),)),
+        result_client=result_client,
+        booth_access_client=_FakeBoothAccessClient(),
+        project_fact_extractor=_FakeProjectFactExtractor(error=ValueError(raw_error)),
+        heartbeat_interval_seconds=60.0,
+    )
+
+    with caplog.at_level(logging.WARNING, logger="app.services.document_processing_orchestrator"):
+        await orchestrator.run(_snapshot())
+
+    assert len(result_client.finalize_calls) == 1
+    assert "project_facts" not in result_client.finalize_calls[0]
+    assert result_client.failed_calls == []
+    assert any(record.getMessage() == "project_fact_extraction_failed" for record in caplog.records)
+    assert raw_error not in caplog.text
 
 
 @pytest.mark.asyncio
