@@ -49,6 +49,7 @@ namespace Festa.World
         Collider[] _ownColliders;
         Collider[] _sitterColliders;
         Vector3 _exitPoint;
+        bool _sitConfirmed;
 
         /// <summary>좌면 비율을 붙이는 쪽이 정한다 — 스툴과 등받이 의자가 다르다.</summary>
         public void SetSeatHeightRatio(float ratio) => _seatHeightRatio = Mathf.Clamp01(ratio);
@@ -118,8 +119,15 @@ namespace Festa.World
             if (_sitter == null) return;
             var np = _sitter.GetComponent<NetworkPlayer>();
             // 이동·점프로 이모트가 풀리면 PlayerMovement 가 None 으로 되돌린다. 그 순간이 "일어났다" 다.
-            if (np != null && SitPoseTable.IsSit(np.EmoteId.Value)) return;
-            ReleaseSitter(true);
+            if (np != null && SitPoseTable.IsSit(np.EmoteId.Value)) { _sitConfirmed = true; return; }
+
+            // **앉은 것을 한 번이라도 본 뒤에만 내보낸다.** 이 확인이 없으면, 앉기가 성립하지 않았거나
+            // 다른 자세(소파 눕기 등)로 덮인 경우에도 "일어났다" 로 읽고 사람을 의자 앞으로 끌어온다 —
+            // 실제로 라운지에 누운 플레이어가 부스로 순간이동했다(2026-09-18 실측).
+            // 이미 멀리 갔으면 자리만 정리하고 건드리지 않는다.
+            bool nearby = _sitter != null
+                && Vector3.Distance(_sitter.transform.position, Bounds().center) <= OccupantHeight;
+            ReleaseSitter(_sitConfirmed && nearby);
         }
 
         /// <summary>앉는 동안 이 좌석과의 충돌을 끈다. 끈 대상을 기억해 그대로 되돌린다.</summary>
@@ -130,6 +138,7 @@ namespace Festa.World
             _sitterColliders = po.GetComponentsInChildren<Collider>(true);
             SetIgnore(true);
             _sitter = po;
+            _sitConfirmed = false;
         }
 
         /// <summary>충돌을 되돌리고, 필요하면 좌석 밖으로 내보낸다.</summary>
@@ -147,6 +156,7 @@ namespace Festa.World
             }
             SetIgnore(false);
             _sitter = null;
+            _sitConfirmed = false;
             _ownColliders = null;
             _sitterColliders = null;
         }
@@ -225,4 +235,3 @@ namespace Festa.World
         }
     }
 }
-
