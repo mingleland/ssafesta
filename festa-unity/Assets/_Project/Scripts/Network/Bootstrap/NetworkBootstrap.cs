@@ -16,7 +16,7 @@ namespace Festa.Network
     {
         [Header("Server Defaults")]
         [SerializeField] ushort _defaultPort = 7777;
-        [SerializeField] int _maxPlayers = 40;
+        [SerializeField] int _maxPlayers = 100;
 
         public int MaxPlayers => _maxPlayers;
 
@@ -97,7 +97,15 @@ namespace Festa.Network
             GrantReplayLedger.Warmup();
 
             ushort port = GetArgValue("-port", _defaultPort);
-            _maxPlayers = (int)GetArgValue("-maxPlayers", (ushort)_maxPlayers);
+            // 우선순위: CLI 인자 > WORLD_MAX_PLAYERS 환경변수 > 인스펙터 기본값.
+            //
+            // **환경변수를 읽는 이유.** 인프라 compose 는 예전부터 WORLD_MAX_PLAYERS 를 컨테이너에
+            // 넣고 있었는데(unity-server·environments·deploy 셋 다), 여기서 CLI 인자만 읽어서
+            // 그 값이 아무 데도 쓰이지 않았다 — compose 의 command 재정의가 없으므로 실제로 적용된
+            // 값은 Dockerfile CMD 의 -maxPlayers 였다. 정원을 바꾸려면 이미지를 다시 구워야 했다는
+            // 뜻이다. env 를 읽게 해 두면 인프라가 이미지를 건드리지 않고 정원을 조정할 수 있다
+            // (Dockerfile 주석의 "향후 ECS Task 환경변수와 연동되는 지점" 이 여기다).
+            _maxPlayers = ResolveMaxPlayers(_maxPlayers);
 
             // 0.0.0.0: 컨테이너 내부에서 모든 인터페이스 바인딩
             transport.SetConnectionData("0.0.0.0", port, "0.0.0.0");
@@ -120,6 +128,31 @@ namespace Festa.Network
                 if (string.Equals(args[i], name, StringComparison.OrdinalIgnoreCase) &&
                     ushort.TryParse(args[i + 1], out var value))
                     return value;
+            return fallback;
+        }
+
+        /// <summary>
+        /// 정원을 정한다. CLI 인자가 최우선이고, 없으면 <c>WORLD_MAX_PLAYERS</c> 환경변수, 그것도
+        /// 없으면 인스펙터 값이다. 값이 이상하면(0 이하·숫자 아님) 그 사실을 로그로 드러내고
+        /// 기본값을 쓴다 — 조용히 0 으로 떨어지면 아무도 못 들어오는 서버가 된다.
+        /// </summary>
+        static int ResolveMaxPlayers(int fallback)
+        {
+            var args = Environment.GetCommandLineArgs();
+            for (int i = 0; i < args.Length - 1; i++)
+                if (string.Equals(args[i], "-maxPlayers", StringComparison.OrdinalIgnoreCase))
+                {
+                    if (int.TryParse(args[i + 1], out var cli) && cli > 0) return cli;
+                    Debug.LogWarning($"[NetworkBootstrap] -maxPlayers 값이 올바르지 않다 ('{args[i + 1]}') — 무시한다.");
+                    break;
+                }
+
+            var env = Environment.GetEnvironmentVariable("WORLD_MAX_PLAYERS");
+            if (!string.IsNullOrWhiteSpace(env))
+            {
+                if (int.TryParse(env, out var fromEnv) && fromEnv > 0) return fromEnv;
+                Debug.LogWarning($"[NetworkBootstrap] WORLD_MAX_PLAYERS 값이 올바르지 않다 ('{env}') — 무시한다.");
+            }
             return fallback;
         }
     }
