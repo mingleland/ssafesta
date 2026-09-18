@@ -7,14 +7,17 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
@@ -25,8 +28,8 @@ import org.springframework.web.bind.annotation.RestController;
  * bytes landed. {@code replacement} is the first of those two aimed at an existing {@code READY}
  * document (FR-019) — it answers with a grant for a <b>new</b> {@code documentId} and the client
  * finishes on the same {@code complete}. A fourth call lists what the agent has and where each
- * document is in processing. Deleting is a separate issue (FR-012), and handing the document to
- * FastAPI is S15P21A604-175.
+ * document is in processing, and a fifth deletes one (FR-012). Handing the document to FastAPI is
+ * S15P21A604-175.
  */
 @RestController
 @RequestMapping("/api/v1")
@@ -209,5 +212,29 @@ public class AiDocumentController {
                                                    @PathVariable Long documentId) {
         Long userId = MemberPrincipal.requireMemberId(jwt, MEMBER_ONLY);
         return documents.complete(documentId, userId);
+    }
+
+    @Operation(summary = "문서 삭제",
+            description = """
+                    부스 편집자가 문서를 지운다 (FR-012, C-15). **되돌릴 수 없다** — 원본과 메타데이터가 즉시
+                    삭제 대상이 되고, 삭제된 문서는 더 이상 AI 직원의 답변 근거로 쓰이지 않는다.
+
+                    업로드가 끝나 처리 대기 중인 `QUEUED`와 `PROCESSING` 문서는 지금 지울 수 없다.
+                    업로드 전 `QUEUED` 및 `READY`·`FAILED`·`EXPIRED`·`DISABLED`는 삭제할 수 있고,
+                    임대가 끝난 부스의 보존 문서도 편집 권한이 있으면 삭제할 수 있다.
+                    """)
+    @ApiResponses({
+            @ApiResponse(responseCode = "204", description = "삭제됨"),
+            @ApiResponse(responseCode = "403", description = "`MEMBER_ONLY`(게스트) 또는 `BOOTH_EDITOR_FORBIDDEN`(그 부스 편집 권한이 없다)"),
+            @ApiResponse(responseCode = "404", description = "`DOCUMENT_NOT_FOUND` — 그런 문서가 없다"),
+            @ApiResponse(responseCode = "409", description = "`DOCUMENT_NOT_DELETABLE` — 아직 처리 중이다")})
+    @DeleteMapping("/documents/{documentId}")
+    @SecurityRequirement(name = "bearerAuth")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void delete(@AuthenticationPrincipal Jwt jwt,
+                       @Parameter(description = "삭제할 문서", example = "1201")
+                       @PathVariable Long documentId) {
+        Long userId = MemberPrincipal.requireMemberId(jwt, MEMBER_ONLY);
+        documents.delete(documentId, userId);
     }
 }
