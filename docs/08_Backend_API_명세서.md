@@ -1368,12 +1368,17 @@ STOMP 연결용 **5분짜리** 토큰(FR-019·FR-020, C-14). → `201 { token, e
 엔드포인트  wss://<host>/ws/consultation     native WebSocket + STOMP, SockJS 없음 (C-05)
 구독        /user/queue/consultation              방문자 — 내 요청의 상태 변화
 /user/queue/booth-lease-expiry                    부스 운영자 — 임대 만료 1시간 전 알림
+/user/queue/coin                                  본인 — 코인 지급 (S15P21A604-920)
             /topic/booths/{boothId}/consultation  직원 — 그 부스 대기열 변화
 SEND        없다 — P1 은 서버에서 클라이언트로 가는 단방향 알림이고 행동은 전부 REST 다 (C-12)
 봉투        { type, requestId, occurredAt, … }
 ```
 
 방문자 `accepted`·`expired`·`ended` / 직원 `requested`·`cancelled`·`expired`·`taken`·`ended`. 종료는 양쪽으로 가며 종료를 호출한 직원 본인도 받는다 (2026-09-14, GitLab #133).
+
+코인 지급 알림(`/user/queue/coin`)의 봉투는 `{ type: "granted", entryId, amount, balanceAfter, reasonType, referenceType, referenceId, occurredAt }` 이며, 지급 종류는 `reasonType` 으로 가른다(`INITIAL_GRANT` 최초 지급 · `DAILY_GRANT` 일일 접속 · `DAILY_MISSION` 미션 달성 — 어느 미션인지는 `referenceId`). 차감은 발행하지 않는다. 전체 표는 `docs/16` §8 이 정본이다.
+
+**이 큐는 저지연 힌트이고 정본은 원장이다** (S15P21A604-923). 구독 전에 발행된 지급은 도착하지 않는다 — 가입 지급(`INITIAL_GRANT`)은 항상, 일일 지급(`DAILY_GRANT`)은 그날 첫 접속에서 그렇다. 서버는 재전송하지 않으며 회수 경로는 `GET /api/v1/wallets/me/transactions` 다. 소비자는 **구독 → REST 조회 → 조회 중 도착분 버퍼링 → 원장 id 로 중복 제거** 순서를 지키고, 재연결 때도 반복한다. STOMP `entryId`(문자열)와 REST `id`(숫자)는 같은 항목이므로 문자열로 정규화해 비교한다. 자세한 계약은 `docs/16` §8 이다.
 
 > **이벤트 재전송은 P1 에 없다.** 끊긴 사이의 변화는 유실되고 클라이언트는 재연결 직후 대기열과 요청 상태를 REST 로 다시 읽는다. **정본은 REST 이고 STOMP 는 알림이다.**
 

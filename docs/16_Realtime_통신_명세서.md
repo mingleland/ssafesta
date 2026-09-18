@@ -216,7 +216,66 @@ Token 재사용도 허용하지 않는다 — 토큰 4계층 분리의 이유다
 /user/queue/consultation              방문자 — 내 요청의 상태 변화
 /topic/booths/{boothId}/consultation  직원 — 그 부스 대기열 변화
 /user/queue/booth-lease-expiry        부스 운영자 — 자기 임대 만료 1시간 전 알림 (D07)
+/user/queue/coin                      본인 — 내 코인이 늘어난 순간 (S15P21A604-920)
 ```
+
+#### `/user/queue/coin` — 코인 지급 알림
+
+```json
+{ "type": "granted", "entryId": "4821", "amount": 50, "balanceAfter": 250,
+  "reasonType": "DAILY_GRANT", "referenceType": null, "referenceId": null,
+  "occurredAt": "2026-09-18T04:41:33Z" }
+```
+
+**무엇 때문에 받았는지는 `reasonType` 하나로 가른다.** 금액으로 추측하지 않는다 — 가입 최초
+지급과 일일 접속 지급은 금액이 겹칠 수 있다.
+
+| `reasonType` | 무슨 지급인가 | `referenceType` / `referenceId` |
+|---|---|---|
+| `INITIAL_GRANT` | 가입 직후 최초 1회 | 없음 |
+| `DAILY_GRANT` | 그날 첫 접속 | 없음 |
+| `DAILY_MISSION` | 일일 미션 달성 보상 | `DAILY_MISSION` / 미션 이름(`AI_CONSULT` 등) |
+| `SURVEY_REWARD` | 설문 응답 보상 | `SURVEY` / 설문 id |
+| `MINIGAME_REWARD` | 미니게임 보상 | `MINIGAME_SESSION` / 세션 UUID |
+| `SLOT_PAYOUT` | 슬롯 당첨 배당 | `SLOT_SPIN` / 스핀 UUID |
+| `ADMIN_ADJUSTMENT` | 관리자 증액 조정 | `ADMIN_USER` / 관리자 id |
+
+**차감은 오지 않는다** — 구매·베팅·임대료는 그 요청의 REST 응답이 결과를 이미 담고 있다. 같은
+지급이 두 번 오지도 않는다: 멱등키로 걸러진 재요청은 발행하지 않는다.
+
+##### 전달 보장 — **이 큐는 저지연 힌트이고, 정본은 원장(REST)이다** (S15P21A604-923)
+
+**구독 전에 발행된 지급은 도착하지 않는다.** STOMP 에 재전송이 없고, 지급 두 가지는 구조적으로
+연결보다 먼저 일어난다.
+
+| 지급 | 언제 발행되는가 | 결과 |
+|---|---|---|
+| `INITIAL_GRANT` | 가입 트랜잭션 안(`WalletService.openWallet`). WS 토큰 발급 전이다 | **항상 유실** |
+| `DAILY_GRANT` | 인증된 요청의 `preHandle`. 그날 첫 접속이면 `POST /api/v1/realtime/ws-token` 자신이 그 요청이다 | **보통 유실** |
+
+서버는 이것을 재전송으로 메우지 않는다. 지급 사실은 이미 원장에 내구성 있게 남아 있고, 회수
+경로는 `GET /api/v1/wallets/me/transactions` 다 — 이 응답은 큐 봉투와 같은 값을 전부 담는다
+(`id`·`amount`·`balanceAfter`·`reasonType`·`referenceType`·`referenceId`·`createdAt`).
+
+**실시간 알림은 반드시 보여야 하는 기능이 아니다.** 알림이 빠져도 REST 가 보장하는 것은 잔액과
+내역의 정합성이며, 화면이 틀린 잔액을 보이는 일은 없다.
+
+##### 소비자 계약 — 순서를 지켜야 유실이 메워진다
+
+1. **먼저 `/user/queue/coin` 을 구독한다.**
+2. 구독이 선 뒤에 거래내역 REST 를 조회한다.
+3. 조회가 끝날 때까지 도착하는 STOMP 이벤트를 **버퍼링한다.**
+4. 원장 식별자 기준으로 REST 결과와 버퍼를 합쳐 **중복을 제거한다.**
+5. **재연결 때도 1~4 를 그대로 반복한다.**
+
+**REST 를 먼저 조회하면 안 된다.** 조회가 끝난 시점과 구독이 서는 시점 사이의 지급이 양쪽 어디에도
+없어 다시 유실된다.
+
+**식별자 타입이 다르다.** STOMP 의 `entryId` 는 문자열, REST 의 `id` 는 숫자다. 같은 원장 항목이므로
+**문자열로 정규화해 비교**한다 — 타입이 다르면 중복 제거가 조용히 실패해 같은 지급이 두 번 뜬다.
+
+**첫 실행 초기화 규칙이 필요하다.** 위 순서를 그대로 밟으면 과거 보상 전부가 토스트로 재생된다.
+세션 시작 시각 이후의 증액만 표시하거나, 최초 조회분을 기준선으로 삼아 그 이후 것만 알린다.
 
 ### Client → Server: **없다**
 

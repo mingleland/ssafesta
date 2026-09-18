@@ -52,3 +52,7 @@ DELETE 후 Redis 원문 key가 즉시 없어지는지 확인한다. 종료 호�
 ### 7. React Overlay
 
 게스트 로그인 안내, 민감정보 경고, token 누적 표시, source 문서명, 잘린 sequence 안내, retryable 오류의 재시도, 닫기 시 DELETE 호출을 검증한다. AI 서비스 중단 중에도 기존 월드 overlay와 비AI 화면은 정상이어야 한다.
+
+### 8. 정형 질문 단축 응답
+
+Agent 설정에 프로젝트 소개·대상 사용자·사용 기술을 채운 뒤 화이트리스트 질문을 보낸다. `start→token→done`만 발생하고 질의 Embedding·Spring chunk-search·LLM 호출은 모두 0건이어야 한다. 복합 질문과 값이 없는 질문은 기존 검색·RAG 경로를 호출해야 한다.
