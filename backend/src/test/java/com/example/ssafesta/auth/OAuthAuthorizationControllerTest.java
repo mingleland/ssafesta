@@ -31,7 +31,7 @@ class OAuthAuthorizationControllerTest {
 
     private final AuthProperties properties = new AuthProperties("secret", Duration.ofMinutes(30),
             Duration.ofDays(14), Duration.ofMinutes(5), Duration.ofSeconds(60), Duration.ofSeconds(30),
-            "/api/v1/auth/refresh", FRONTEND, false);
+            Duration.ofSeconds(30), "/api/v1/auth/refresh", FRONTEND, false);
     /** What the deployment actually registered — the three of {@code application.yml} when its env is complete. */
     private final OAuthAuthorizationController controller = controllerWith("google", "kakao", "ssafy");
 

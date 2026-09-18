@@ -7,7 +7,6 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
 
 import com.example.ssafesta.TestcontainersConfiguration;
 import com.example.ssafesta.common.ApiException;
@@ -15,6 +14,10 @@ import com.example.ssafesta.common.RedisKeyspaceProperties;
 import com.example.ssafesta.user.AccountLifecycleService;
 import com.example.ssafesta.user.UserRepository;
 import com.example.ssafesta.wallet.WalletService;
+import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneId;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
 import org.junit.jupiter.api.Test;
@@ -50,6 +53,7 @@ class WorldChatIntegrationTest {
     @MockitoBean private SimpMessagingTemplate messaging;
     @Autowired private JsonMapper jsonMapper;
     @Autowired private RedisKeyspaceProperties keyspace;
+    @Autowired private StringRedisTemplate redis;
 
     /**
      * Redis 가 답하지 않으면 <b>막는다</b>(fail-closed, S15P21A604-693 테스트 공백).
@@ -61,8 +65,11 @@ class WorldChatIntegrationTest {
     @Test
     void whenRedisIsDownTheMessageIsRefusedNotBroadcast() {
         Long sender = member("레디스장애");
-        StringRedisTemplate downRedis = mock(StringRedisTemplate.class);
-        when(downRedis.opsForValue()).thenThrow(new RedisConnectionFailureException("redis down"));
+        // 어떤 호출이든 연결 실패로 답하는 Redis — 판정 경로가 바뀌어도 이 테스트는 계속 같은
+        // 것을 본다(스크립트 실행이든 단일 명령이든 "Redis 가 답하지 않는다" 가 전제다).
+        StringRedisTemplate downRedis = mock(StringRedisTemplate.class, invocation -> {
+            throw new RedisConnectionFailureException("redis down");
+        });
         WorldChatService withoutRedis = new WorldChatService(messaging, users,
                 new WorldChatRateLimiter(downRedis, keyspace));
 
@@ -144,16 +151,112 @@ class WorldChatIntegrationTest {
         assertThrows(ApiException.class, () -> chat.say(member("길이초과"), new WorldChatSend("가".repeat(101))));
     }
 
-    /** 3초 안 두 번째는 거부되고 <b>토픽에 나가지 않는다</b>. */
+    /**
+     * 최소 간격(0.8초) 안의 두 번째는 거부되고 <b>토픽에 나가지 않는다</b>.
+     *
+     * <p>서버가 대기 시간을 지정한다 — 클라이언트는 벌칙 단계를 모르므로 자기 계산으로 그 값을
+     * 알 수 없다 (GitLab #223).
+     */
     @Test
-    void aSecondMessageWithinThreeSecondsIsRefused() {
+    void aSecondMessageInsideTheMinimumIntervalIsRefused() {
         Long sender = member("도배");
 
         chat.say(sender, new WorldChatSend("첫 줄"));
-        assertThrows(WorldChatTooFastException.class,
+        WorldChatTooFastException refused = assertThrows(WorldChatTooFastException.class,
                 () -> chat.say(sender, new WorldChatSend("둘째 줄")));
 
+        assertEquals(WorldChatRateLimiter.PENALTY_MS[0], refused.retryAfterMs(),
+                "첫 초과의 대기는 5초다.");
         assertEquals(1, allCaptured().size(), "거부된 줄이 토픽에 나갔습니다.");
+    }
+
+    /**
+     * 짧은 연속 입력은 사람의 대화다 — 0.8초를 지키면 10초 안 5회까지 통과하고 6번째가 막힌다.
+     *
+     * <p>시각을 밖에서 넣어 판정한다. 실제로 기다리면 이 한 케이스가 10초를 먹고, 그 대기는
+     * 무엇도 증명하지 않는다.
+     */
+    @Test
+    void fiveMessagesInTenSecondsPassAndTheSixthIsRefused() {
+        Long sender = member("버스트");
+        MutableClock clock = new MutableClock();
+        WorldChatService burst = new WorldChatService(messaging, users,
+                new WorldChatRateLimiter(redis, keyspace, clock));
+
+        for (int index = 0; index < WorldChatRateLimiter.SHORT_WINDOW_MAX; index++) {
+            burst.say(sender, new WorldChatSend("연속 " + index));
+            clock.advance(WorldChatRateLimiter.MIN_INTERVAL_MS + 10);
+        }
+        WorldChatTooFastException refused = assertThrows(WorldChatTooFastException.class,
+                () -> burst.say(sender, new WorldChatSend("여섯 번째")));
+
+        assertEquals(WorldChatRateLimiter.SHORT_WINDOW_MAX, allCaptured().size());
+        assertEquals(WorldChatRateLimiter.PENALTY_MS[0], refused.retryAfterMs());
+    }
+
+    /**
+     * 벌칙은 5 → 10 → 30초로 오르고 상한을 넘지 않는다. <b>벌칙 중 재요청은 단계를 올리지 않고</b>
+     * 남은 대기만 돌려준다 (GitLab #223).
+     */
+    @Test
+    void thePenaltyClimbsToTheCapAndARetryInsideItDoesNotEscalate() {
+        Long sender = member("벌칙");
+        MutableClock clock = new MutableClock();
+        WorldChatService limited = new WorldChatService(messaging, users,
+                new WorldChatRateLimiter(redis, keyspace, clock));
+
+        limited.say(sender, new WorldChatSend("첫 줄"));
+        int allowed = 1;
+        long[] expected = {WorldChatRateLimiter.PENALTY_MS[0], WorldChatRateLimiter.PENALTY_MS[1],
+                WorldChatRateLimiter.PENALTY_MS[2], WorldChatRateLimiter.PENALTY_MS[2]};
+        for (long wait : expected) {
+            // 직전 줄과 최소 간격 안이라 초과다.
+            WorldChatTooFastException refused = assertThrows(WorldChatTooFastException.class,
+                    () -> limited.say(sender, new WorldChatSend("너무 빠름")));
+            assertEquals(wait, refused.retryAfterMs(), "벌칙 단계가 계약과 다릅니다.");
+
+            // 벌칙이 아직 도는 중에 한 번 더 — 단계는 그대로이고 남은 시간만 줄어든다.
+            clock.advance(1_000);
+            WorldChatTooFastException insideBlock = assertThrows(WorldChatTooFastException.class,
+                    () -> limited.say(sender, new WorldChatSend("기다리는 중")));
+            assertEquals(wait - 1_000, insideBlock.retryAfterMs(),
+                    "벌칙 중 재요청이 단계를 올렸습니다.");
+
+            // 대기가 끝나면 한 줄은 통과한다. 그 줄이 다음 초과의 기준 시각이 되고, 단계는
+            // 내려가지 않는다 — 정상 한 줄로 초기화되면 매크로가 영구히 첫 단계에 머문다.
+            clock.advance(wait - 1_000);
+            limited.say(sender, new WorldChatSend("대기 후 한 줄"));
+            allowed++;
+        }
+
+        assertEquals(allowed, allCaptured().size(), "통과한 줄 수가 다릅니다.");
+    }
+
+    /**
+     * 벌칙이 끝난 뒤 조용히 있으면 단계가 0으로 돌아간다. <b>정상 메시지 한 줄로는 돌아가지
+     * 않는다</b> — 그러면 "대기 → 한 줄 → 대기" 매크로가 영구히 첫 단계에 머물며 통과한다.
+     */
+    @Test
+    void theStageResetsAfterQuietTimeButNotAfterASingleMessage() {
+        MutableClock clock = new MutableClock();
+        WorldChatRateLimiter limiter = new WorldChatRateLimiter(redis, keyspace, clock);
+        WorldChatService limited = new WorldChatService(messaging, users, limiter);
+
+        Long macro = member("매크로");
+        limited.say(macro, new WorldChatSend("첫 줄"));
+        assertEquals(WorldChatRateLimiter.PENALTY_MS[0], refusalWait(limited, macro));
+        clock.advance(WorldChatRateLimiter.PENALTY_MS[0]);
+        limited.say(macro, new WorldChatSend("한 줄"));     // 벌칙이 끝나자마자 한 줄
+        assertEquals(WorldChatRateLimiter.PENALTY_MS[1], refusalWait(limited, macro),
+                "정상 한 줄로 단계가 초기화되면 매크로가 5초마다 한 줄을 영구히 보낸다.");
+
+        Long quiet = member("조용한이");
+        limited.say(quiet, new WorldChatSend("첫 줄"));
+        assertEquals(WorldChatRateLimiter.PENALTY_MS[0], refusalWait(limited, quiet));
+        clock.advance(WorldChatRateLimiter.PENALTY_MS[0] + WorldChatRateLimiter.STAGE_RESET_MS + 10);
+        limited.say(quiet, new WorldChatSend("한참 뒤 한 줄"));
+        assertEquals(WorldChatRateLimiter.PENALTY_MS[0], refusalWait(limited, quiet),
+                "벌칙 뒤 조용했으면 첫 단계로 돌아가야 한다.");
     }
 
     /** 제한은 사람마다 따로다 — 한 사람이 말했다고 옆 사람이 막히면 광장이 한 명짜리가 된다. */
@@ -229,10 +332,10 @@ class WorldChatIntegrationTest {
     }
 
     /**
-     * 거절된 줄은 3초 제한을 <b>소비하지 않는다</b>.
+     * 거절된 줄은 전송 제한을 <b>소비하지 않는다</b>.
      *
-     * <p>내용 검증이 도배 판정보다 먼저이기 때문이다. 순서가 뒤집히면 오탐 한 번에 3초를 기다려야
-     * 한다 — 막힌 이유를 모르는 사람은 그 3초 동안 같은 말을 다시 친다.
+     * <p>내용 검증이 도배 판정보다 먼저이기 때문이다. 순서가 뒤집히면 오탐 한 번에 벌칙 대기를
+     * 물어야 한다 — 막힌 이유를 모르는 사람은 그 시간 동안 같은 말을 다시 친다.
      */
     @Test
     void aRefusedProfanityDoesNotConsumeTheCooldown() {
@@ -245,6 +348,44 @@ class WorldChatIntegrationTest {
     }
 
     // ── 도우미 ──────────────────────────────────────────────────────────────
+
+    /** 한 번 거절시키고 서버가 지정한 대기를 돌려준다. */
+    private long refusalWait(WorldChatService service, Long sender) {
+        WorldChatTooFastException refused = assertThrows(WorldChatTooFastException.class,
+                () -> service.say(sender, new WorldChatSend("또 보냄")));
+        return refused.retryAfterMs();
+    }
+
+    /**
+     * 창과 벌칙을 기다리지 않고 지나가게 한다.
+     *
+     * <p>이 클래스에는 원래 시각 조작이 없었다 — 케이스마다 새 회원을 만들어 창을 피했다. 벌칙
+     * 단계와 창 만료는 그 방법으로 볼 수 없어서 시각을 밖에서 넣는다. 슬립은 쓰지 않는다: 10초·60초
+     * 창을 실제로 기다리면 이 테스트 하나가 스위트 전체보다 오래 걸린다.
+     */
+    private static final class MutableClock extends Clock {
+
+        private Instant now = Instant.parse("2026-09-18T00:00:00Z");
+
+        void advance(long millis) {
+            now = now.plusMillis(millis);
+        }
+
+        @Override
+        public ZoneId getZone() {
+            return ZoneOffset.UTC;
+        }
+
+        @Override
+        public Clock withZone(ZoneId zone) {
+            return this;
+        }
+
+        @Override
+        public Instant instant() {
+            return now;
+        }
+    }
 
     private Long member(String prefix) {
         return createMemberWithWallet(users, wallets, prefix);

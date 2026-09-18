@@ -108,6 +108,7 @@
 **Goal**: develop push 자동배포로 갱신된 demo.ssafesta.world 에서 팀 검증을 통과한 known-good 릴리스만 수동 승인(Production Promotion)으로 main 및 ssafesta.world 에 배포한다.
 **Architecture Invariant**: develop → main 승격 MR 은 절대 Squash 하지 않고 ancestry 를 보존한다 (`squash=false` 강제).
 **Artifact Invariant**: main 승격 시 아티팩트를 재빌드하지 않고 demo 에서 검증된 동일 아티팩트를 프로덕션에 승격한다 (`Demo Artifact == Production Artifact`).
+**Release State Invariant**: candidate → current → known-good 세 상태를 분리한다. readiness 통과는 current 까지만 보장하며, known-good 은 사람이 demo 를 실측한 뒤에만 갱신된다. 프로덕션 승격은 known-good 조합과 image ref 가 일치하는 릴리스에만 허용한다 (spec §Session 2026-09-18 규칙 5·10).
 
 **Independent Test**: 미검증 current 및 비승인 release는 승격이 거절되고, human 검증된 known-good manifest 만 main 반영 및 프로덕션 배포 후 web→login→world→AI 검증을 모두 통과할 때만 성공이다.
 
@@ -128,6 +129,13 @@
 **Independent Test**: 성공 batch와 rollback batch 각각에서 source range, candidate image, before state, verification, 현재 release를 원본 log 없이 확인한다.
 
 - [ ] T031 [P] [US3] `infra/tests/contract/test-dev-deployment-batch.sh`에 `DevDeploymentBatch` 상태 전이와 snapshot 참조 검증을 추가한다
+- [X] T031A [US3] `infra/deploy/scripts/release-history.sh`를 추가해 current 가 된 릴리스의 환경 전체 조합을 `history/<releaseId>/`에 적재하고 조회(`list`·`show`)와 과거 릴리스 재배포(`restore`)를 제공한다 (규칙 1·2·7)
+- [X] T031B [US3] `release-history.sh` 보관 정책을 최근 10개(`RELEASE_HISTORY_RETENTION`)로 두고 known-good 이 가리키는 이력은 개수와 무관하게 보호한다 (규칙 8)
+- [X] T031C [US3] `infra/deploy/scripts/approve-known-good.sh`에 `environment` 대상을 추가해 demo 전체 조합을 `known-good/environment.json`으로 굳히고 같은 조합의 이력 검증 상태를 `verified`로 올린다 (규칙 4·9)
+- [X] T031D [US3] `infra/jenkins/scripts/deploy-dev-batch.sh`의 상태 루트 기본값을 `/var/lib/festa-environments`로 정정하고, current 승격 직후 이력을 적재하며 롤백 성공 시 `current`를 되돌린 릴리스로 맞춘다 (규칙 6)
+- [X] T031E [US3] `infra/jenkins/scripts/validate-demo-promotion.sh`가 `known-good/environment.json` 승인 조합과 image ref 가 일치하지 않는 릴리스를 거절하도록 승격 게이트를 강화한다 (규칙 5)
+- [X] T031F [US3] `infra/jenkins/tests/release-history.sh`에 이력 적재·retention·known-good 보호·전체 조합 승인·검증 상태 전이·game restore 거절 검증을 추가한다
+- [ ] T031G [US3] Jenkins 팀원 6인 개별 계정과 조회 전용·배포/승격 승인 권한 분리를 구성해 known-good 승인·수동 롤백·프로덕션 승격 수행자를 추적한다 (규칙 3, C-13)
 - [ ] T032 [US3] `infra/jenkins/scripts/provenance.sh`에 selection record, batch ID, source range, candidate content ID, before state, rollback/verification evidence를 기록한다
 - [ ] T033 [US3] `infra/deploy/scripts/show-release.sh`에 dev batch와 demo release의 current/known-good provenance 조회를 추가한다
 - [ ] T034 [US3] `infra/tests/acceptance/us3-provenance.sh`에 성공·rollback·manual action 이력 재구성 검증을 추가한다

@@ -1,9 +1,9 @@
-package com.example.ssafesta.game;
+package com.example.ssafesta.storage;
 
-import com.example.ssafesta.storage.ObjectStorage;
 import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
@@ -22,14 +22,22 @@ import org.springframework.stereotype.Component;
  * and only then is any storage call made. Fifty rows times one round trip inside a transaction would
  * hold locks for as long as the slowest provider takes to answer.
  *
+ * <p>이 큐는 한 도메인의 것이 아니다 — 게임 Asset·AI 문서·탈퇴 정리, 그리고 프로젝트 로고
+ * (GitLab #241) 가 같은 줄을 쓴다. 클래스가 {@code storage} 로 옮겨온 이유가 그것이고, 테이블 이름은
+ * 아직 {@code game_asset_delete_queue} 다 — 이름만 바꾸는 마이그레이션은 동작을 바꾸지 않으면서 네
+ * 도메인의 SQL 을 동시에 건드려야 해서 지금 하지 않았다.
+ *
+ * <p>도메인별 "무엇을 지워야 하는가" 판정은 {@link StorageSweepTask} 구현이 갖는다. 여기에 두면
+ * 저장소 코드가 각 도메인의 스키마를 알게 된다.
+ *
  * <p>A crash between deleting the object and clearing its row leaves the row to be retried, and the
  * retry deletes an object that is already gone. That is a success, not an error — the idempotence
  * {@link ObjectStorage#deleteObject} promises is what makes this safe to run at least once.
  */
 @Component
-public class GameAssetDeleteQueue {
+public class ObjectDeleteQueue {
 
-    private static final Logger log = LoggerFactory.getLogger(GameAssetDeleteQueue.class);
+    private static final Logger log = LoggerFactory.getLogger(ObjectDeleteQueue.class);
 
     /** Enough to drain a withdrawal's assets in a few passes without a long-running sweep. */
     private static final int BATCH = 50;
@@ -48,10 +56,17 @@ public class GameAssetDeleteQueue {
 
     private final JdbcTemplate jdbc;
     private final ObjectStorage storage;
+    /**
+     * 지연 조회다. 정리 작업들은 이 큐에 좌표를 넣으므로 서로를 생성자에서 요구하면 순환이 된다 —
+     * 실행 시점에 찾으면 그 순환이 사라지고, 나중에 추가되는 도메인도 이 클래스를 안 고친다.
+     */
+    private final ObjectProvider<StorageSweepTask> sweepTasks;
 
-    public GameAssetDeleteQueue(JdbcTemplate jdbc, ObjectStorage storage) {
+    public ObjectDeleteQueue(JdbcTemplate jdbc, ObjectStorage storage,
+                             ObjectProvider<StorageSweepTask> sweepTasks) {
         this.jdbc = jdbc;
         this.storage = storage;
+        this.sweepTasks = sweepTasks;
     }
 
     /**
@@ -76,6 +91,17 @@ public class GameAssetDeleteQueue {
      */
     @Scheduled(fixedDelayString = "PT1M")
     public void sweep() {
+        // 도메인 정리가 먼저다 — 이번 회차에 새로 큐에 들어온 좌표까지 같은 실행에서 지운다.
+        // 하나가 던져도 나머지와 큐 드레인은 계속한다: 한 도메인의 실패가 다른 쪽의 객체를 남기는
+        // 이유가 되면 안 된다.
+        for (StorageSweepTask task : sweepTasks.orderedStream().toList()) {
+            try {
+                task.sweep();
+            } catch (RuntimeException failure) {
+                log.warn("저장소 정리 작업 실패 task={} 원인={}", task.getClass().getSimpleName(),
+                        failure.getClass().getSimpleName());
+            }
+        }
         for (Pending pending : lease()) {
             try {
                 storage.deleteObject(pending.provider(), pending.bucket(), pending.objectKey());

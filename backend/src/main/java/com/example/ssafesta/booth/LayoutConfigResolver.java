@@ -40,9 +40,13 @@ public class LayoutConfigResolver {
             // (spec 010 C-06), a panel by whether it has a project (spec 009 C-01) — all three bind
             // per booth, so configId is not an identifier there.
             //
-            // The rest — VIDEO_SCREEN, RECRUITMENT_BOARD, CONSULTATION_DESK, LIKE_VOTE — are still
-            // not judged, and say so as CONFIG_UNVERIFIED rather than being waved through:
-            // "not looked at" must not read as "verified".
+            // The rest — RECRUITMENT_BOARD, CONSULTATION_DESK, LIKE_VOTE — are still not judged, and
+            // say so as CONFIG_UNVERIFIED rather than being waved through: "not looked at" must not
+            // read as "verified".
+            //
+            // VIDEO_SCREEN used to be in that list and no longer is: it is decorative since
+            // GitLab #194 ②, so LayoutValidator drops it before this call is reached. It is not
+            // "unjudged" any more — there is nothing to judge.
             default -> true;
         };
     }
