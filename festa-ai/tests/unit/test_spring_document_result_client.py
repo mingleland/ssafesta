@@ -20,6 +20,7 @@ from app.clients.spring_document_result import (
     SpringDocumentResultUnavailable,
     SpringDocumentResultValidationFailed,
 )
+from app.services.context_service import ExtractedProjectFacts
 
 
 def _client(handler) -> SpringDocumentResultClient:
@@ -90,6 +91,28 @@ async def test_finalize_posts_expected_body() -> None:
         source_hash="a" * 64,
         total_chunk_count=3,
         embedding_model_id="text-embedding-3-large",
+    )
+
+
+@pytest.mark.asyncio
+async def test_finalize_includes_extracted_project_facts_when_available() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert json.loads(request.content)["projectFacts"] == {
+            "targetAudience": "프로젝트를 전시하고 싶은 교육생",
+            "techStack": "FastAPI, Spring Boot, React, Unity",
+        }
+        return httpx.Response(204)
+
+    await _client(handler).finalize(
+        job_id=501,
+        attempt_no=0,
+        source_hash="a" * 64,
+        total_chunk_count=3,
+        embedding_model_id="text-embedding-3-large",
+        project_facts=ExtractedProjectFacts(
+            target_audience="프로젝트를 전시하고 싶은 교육생",
+            tech_stack="FastAPI, Spring Boot, React, Unity",
+        ),
     )
 
 
