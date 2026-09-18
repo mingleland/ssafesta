@@ -30,7 +30,7 @@ from app.core.logging import log_event
 from app.providers.llm import LLMProvider
 from app.providers.managed_llm import ManagedLLMError
 from app.repositories.conversation_repository import ConversationRepository
-from app.services.rag_service import NoReadyContextResult, RagContextService
+from app.services.rag_service import NoReadyContextResult, QuickAnswerResult, RagContextService
 
 logger = logging.getLogger(__name__)
 
@@ -209,7 +209,19 @@ class ConversationStreamService:
             )
             return
 
-        if isinstance(context, NoReadyContextResult):
+        if isinstance(context, (NoReadyContextResult, QuickAnswerResult)):
+            if isinstance(context, QuickAnswerResult):
+                log_event(
+                    logger,
+                    logging.INFO,
+                    "conversation_quick_answer_used",
+                    conversation_id=conversation.conversation_id,
+                    request_id=request_id,
+                    booth_id=conversation.scope.booth_id,
+                    agent_id=conversation.scope.agent_id,
+                    status="COMPLETED",
+                    intent=context.intent.value,
+                )
             yield render("token", {"delta": context.message})
             yield render("done", {"handoffRecommended": False})
             now = self._clock()

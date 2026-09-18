@@ -16,6 +16,12 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
  * <p>SSE 를 새로 세우지 않고 기존 STOMP 채널을 쓴다 — 인증(WS Token)·heartbeat·FE 클라이언트가
  * 이미 있고, 개인 대상 발행도 {@code /user/queue} 로 상담이 쓰고 있는 길 그대로다.
  *
+ * <p><b>이 큐는 저지연 힌트이고 정본은 원장이다</b> (S15P21A604-923). 구독 전에 발행된 지급은
+ * 도착하지 않는다 — 가입 지급은 가입 트랜잭션 안에서, 일일 지급은 {@code ws-token} 요청의
+ * {@code preHandle} 에서 일어나 둘 다 소켓보다 먼저다. 재전송으로 메우지 않는 이유는 지급 사실이
+ * 이미 원장에 남아 있기 때문이고, 회수 경로는 {@code GET /api/v1/wallets/me/transactions} 다.
+ * 소비자 순서(구독 → REST → 버퍼 병합)는 {@code docs/16} §8 이 정본이다.
+ *
  * <p>{@code ConsultationEventPublisher}·{@code EventShopEventPublisher} 와 같은 모양이다: 커밋
  * 뒤에 보내 롤백된 지급을 알리지 않고, 발행 실패는 WARN 로그로 끝낸다 — 알림이 빠졌다고 이미
  * 확정된 지급을 되돌리면 그쪽이 훨씬 나쁜 사고다. 잔액의 정본은 REST 이고 이것은 알림이다.
