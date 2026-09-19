@@ -2,6 +2,7 @@ package com.example.ssafesta.game;
 
 import com.example.ssafesta.common.ApiException;
 import com.example.ssafesta.common.ErrorCode;
+import com.example.ssafesta.user.UserRepository;
 import java.util.List;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
@@ -24,10 +25,13 @@ public class ArcadeSeatService {
 
     private final ArcadeMachineBindingRepository bindings;
     private final ArcadeProperties properties;
+    private final UserRepository users;
 
-    public ArcadeSeatService(ArcadeMachineBindingRepository bindings, ArcadeProperties properties) {
+    public ArcadeSeatService(ArcadeMachineBindingRepository bindings, ArcadeProperties properties,
+                             UserRepository users) {
         this.bindings = bindings;
         this.properties = properties;
+        this.users = users;
     }
 
     /**
@@ -41,11 +45,27 @@ public class ArcadeSeatService {
      *                      {@code ARCADE_ALREADY_SEATED}(이 게임이 이미 다른 자리에 있다)
      */
     @Transactional(propagation = Propagation.MANDATORY)
-    public void claimOnPublish(Long gameId, Long ownerUserId, String machineId) {
+    public void claimOnPublish(Game game, Long ownerUserId, String machineId) {
         if (!properties.knows(machineId)) {
             // 씬에 없는 번호다. 통과시키면 아무도 갈 수 없는 자리에 게임이 걸린 채 한도만 먹는다.
             throw new ApiException(ErrorCode.MACHINE_NOT_FOUND);
         }
+        if (game.getVisibility() != GameVisibility.PUBLIC) {
+            // 공개 설정과 게시는 별개의 축이라(contracts §공개 설정 변경) 비공개인 채로도 게시가
+            // 된다. 그 상태로 자리를 주면 방문자에게는 못 켜는 캐비닛이 서고, "내리면 해제" 와도
+            // 어긋난다 — 비공개 전환이 자리를 비우는데 비공개인 채로 잡는 것은 허용되는 꼴이다.
+            throw new ApiException(ErrorCode.GAME_NOT_PUBLIC,
+                    "비공개 게임은 오락실에 걸 수 없습니다. 공개로 바꾼 뒤 다시 게시해 주세요.");
+        }
+
+        Long gameId = game.getId();
+
+        // 한도를 세기 전에 주인 행을 잠근다. 세고 나서 꽂는 사이에 같은 사람의 다른 요청이 같은
+        // 수를 읽으면 둘 다 통과해 세 대가 된다 — 자리마다 하나를 보장하는 기본키는 사람마다 몇
+        // 대인지 모른다. 잠글 대상이 "아직 없는 자리" 가 아니라 언제나 있는 주인 행이라, 빈 행을
+        // 잠그지 못해 생겼던 문제가 여기서는 생기지 않는다.
+        users.findByIdForUpdate(ownerUserId)
+                .orElseThrow(() -> new ApiException(ErrorCode.USER_NOT_FOUND));
 
         List<ArcadeMachineBinding> held = bindings.findByGameIdAndOwnerUserIdNotNull(gameId);
         for (ArcadeMachineBinding seat : held) {

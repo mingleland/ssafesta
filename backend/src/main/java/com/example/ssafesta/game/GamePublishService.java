@@ -85,7 +85,7 @@ public class GamePublishService {
         // 게시가 먼저 성립한 뒤에 자리를 잡는다 — 자리가 거절되면 이 트랜잭션 전체가 되돌아가므로
         // 순서는 결과를 바꾸지 않는다. 읽기 쉬운 쪽을 택했다.
         if (machineId != null) {
-            seats.claimOnPublish(gameId, userId, machineId);
+            seats.claimOnPublish(game, userId, machineId);
         }
 
         // The draft is deliberately left in place: the creator keeps editing from where they were

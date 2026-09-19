@@ -148,15 +148,42 @@ class ArcadeSeatClaimIntegrationTest {
     }
 
     @Test
+    void aPrivateGameCannotTakeACabinet() throws Exception {
+        Owner owner = draftedGame("비공개점유");
+        // 공개 설정과 게시는 별개의 축이다 — 비공개인 채로도 게시가 된다. 그 상태로 자리를 잡으면
+        // 방문자는 못 켜는 캐비닛을 보고, 내렸을 때 비우는 규칙과도 어긋난다.
+        makePrivate(owner);
+
+        publish(owner, "arcade-13").andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("GAME_NOT_PUBLIC"));
+
+        assertTrue(bindings.findById("arcade-13").isEmpty());
+    }
+
+    @Test
+    void theSecondAndThirdCabinetCannotBeTakenAtOnce() throws Exception {
+        Owner first = draftedGame("동시한도");
+        publish(first, "arcade-14").andExpect(status().isOk());
+        Owner second = sameOwnerGame(first);
+        Owner third = sameOwnerGame(first);
+
+        // 한도 검사는 세고 나서 꽂는다. 두 요청이 같은 수를 보면 둘 다 통과해 세 대가 된다 —
+        // 기본키는 자리마다 하나를 보장할 뿐 사람마다 몇 대인지는 모른다.
+        List<MockHttpServletResponse> responses = inParallel(
+                () -> publishRaw(second, "arcade-15"),
+                () -> publishRaw(third, "arcade-16"));
+
+        assertTrue(bindings.countByOwnerUserId(first.userId()) <= 2,
+                "한도를 넘겨 자리를 잡았습니다: " + bindings.countByOwnerUserId(first.userId())
+                        + "대, 응답 " + statuses(responses));
+    }
+
+    @Test
     void goingPrivateReleasesTheCabinet() throws Exception {
         Owner owner = draftedGame("비공개전환");
         publish(owner, "arcade-10").andExpect(status().isOk());
 
-        mockMvc.perform(patch("/api/v1/games/" + owner.gameId())
-                        .header("Authorization", bearerFor(owner.userId()))
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"visibility\":\"PRIVATE\"}"))
-                .andExpect(status().isOk());
+        makePrivate(owner);
 
         assertTrue(bindings.findById("arcade-10").isEmpty(), "내렸는데 자리가 남아 있습니다");
     }
@@ -244,7 +271,23 @@ class ArcadeSeatClaimIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(GameTestSupport.saveRequest(0, GameTestSupport.validProjectFor(gameId))))
                 .andExpect(status().isOk());
-        return new Owner(userId, gameId);
+        Owner owner = new Owner(userId, gameId);
+        // 자리를 잡으려면 공개여야 한다. 기본값은 PRIVATE 이라 여기서 올려 둔다 — 비공개인 채로
+        // 잡히는지는 aPrivateGameCannotTakeACabinet 이 따로 본다.
+        changeVisibility(owner, "PUBLIC");
+        return owner;
+    }
+
+    private void makePrivate(Owner owner) throws Exception {
+        changeVisibility(owner, "PRIVATE");
+    }
+
+    private void changeVisibility(Owner owner, String visibility) throws Exception {
+        mockMvc.perform(patch("/api/v1/games/" + owner.gameId())
+                        .header("Authorization", bearerFor(owner.userId()))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"visibility\":\"" + visibility + "\"}"))
+                .andExpect(status().isOk());
     }
 
     private String bearerFor(Long userId) {
