@@ -28,7 +28,11 @@ build_project() {
       cd "${component_dir}"
       if [[ ! -d node_modules || package-lock.json -nt node_modules ]]; then npm ci; fi
       npm run assets:verify
-      npm run build
+      # Game Studio 의 Draft 저장·게시를 서버 API 로 연결하는 빌드타임 스위치다 (#245).
+      # Vite 는 .env.example 을 읽지 않으므로 여기서 주지 않으면 undefined 가 되고,
+      # EditGamePage 가 publisher/repository 를 undefined 로 내려 저장이 조용히
+      # IndexedDB 로 빠진다 — 사용자는 저장됐다고 믿는데 서버엔 아무것도 없다.
+      VITE_GAME_STUDIO_API_ENABLED=true npm run build
       # Jenkins 는 develop workspace 를 재사용하고 checkout 은 artifacts/ 를 지우지 않는다.
       # 이전 run 의 front-dist 가 남아 있으면 그대로 비우고 이번 build 산출물로 채운다.
       rm -rf -- "${CI_ARTIFACT_DIR}/front-dist"
