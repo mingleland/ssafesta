@@ -111,12 +111,42 @@ docs_exact = {
     ".gitattributes",
 }
 
+# These files validate the deployment machinery itself. Changing a test must
+# never be interpreted as changing the Dedicated Server runtime artifact.
+validation_only_prefixes = (
+    "infra/unity-server/tests/",
+)
+
+# Shared CI changes still select all logical components, but Unity is much more
+# expensive than the app CI and requires an activated editor. Build a game
+# candidate only when an input that can actually change that candidate changed.
+game_build_prefixes = (
+    "festa-unity/",
+    "ci/",
+    "infra/jenkins/agents/",
+)
+game_runtime_prefixes = (
+    "infra/unity-server/",
+)
+game_build_exact = {
+    "infra/versions.env",
+    "infra/jenkins/pipelines/component.groovy",
+    "infra/jenkins/scripts/with-credentials.sh",
+    "infra/jenkins/scripts/transfer-local-images.sh",
+    "infra/deploy/scripts/package-local-image.sh",
+    "infra/deploy/compose/dev/game.compose.yaml",
+    "infra/environments/compose/dev/game.yaml",
+}
+
 components = set()
 deploy_components = set()
 reasons = set()
 unknown = []
 shared = False
 for path in paths:
+    if path.startswith(validation_only_prefixes):
+        reasons.add("validation-only")
+        continue
     if path in docs_exact or path.startswith(docs_prefixes):
         reasons.add("docs-only")
         continue
@@ -148,6 +178,17 @@ if unknown:
 if shared:
     components = set(order)
     deploy_components.clear()
+
+game_build_required = any(
+    path in game_build_exact
+    or path.startswith(game_build_prefixes)
+    or (
+        path.startswith(game_runtime_prefixes)
+        and not path.startswith(validation_only_prefixes)
+    )
+    for path in paths
+)
+
 if not paths:
     reasons.add("no-changes")
 
@@ -158,6 +199,7 @@ print(json.dumps({
     "headSha": head,
     "components": [component for component in order if component in components],
     "deployComponents": [component for component in order if component in deploy_components],
+    "gameBuildRequired": game_build_required,
     "reasons": sorted(reasons),
     "paths": paths,
 }, separators=(",", ":")))

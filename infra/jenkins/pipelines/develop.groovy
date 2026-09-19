@@ -18,6 +18,11 @@ def call() {
     archiveArtifacts artifacts: 'artifacts/develop/selection.json', allowEmptyArchive: false, fingerprint: true
 
     final List components = selection.components as List
+    if (!(selection.gameBuildRequired instanceof Boolean)) {
+        error('component detector must return boolean gameBuildRequired')
+    }
+    final boolean gameBuildRequired = selection.gameBuildRequired as boolean
+
     if (components.isEmpty()) {
         echo "NO_OP: ${selection.reasons.join(', ')}"
         return
@@ -175,6 +180,11 @@ def call() {
     }
 
     if (!hasGame) { return }
+
+    if (!gameBuildRequired) {
+        echo 'NO_OP: shared infra change does not alter game build inputs; Unity candidate build skipped'
+        return
+    }
 
     // 여기서부터 game 이다. 위의 앱 배포가 이미 끝났으므로 Unity 대기가 그 배포를 막지 않는다.
     buildComponent('game')

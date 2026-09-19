@@ -136,7 +136,6 @@ mr-status:
         compare_to: 'refs/heads/develop'
         paths:
           - festa-unity/**/*
-          - infra/unity-server/**/*
           - ci/test
           - ci/lib.sh
 
