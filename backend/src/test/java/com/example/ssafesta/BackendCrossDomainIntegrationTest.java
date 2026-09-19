@@ -6,6 +6,8 @@ import static com.example.ssafesta.booth.BoothTestSupport.releaseAllSlots;
 import static com.example.ssafesta.wallet.WalletTestSupport.assertBalanceMatchesLedger;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
@@ -20,8 +22,11 @@ import com.example.ssafesta.user.AdminActionRecorder;
 import com.example.ssafesta.ai.FakeDocumentProcessingClient;
 import com.example.ssafesta.auth.AccessTokenService;
 import com.example.ssafesta.auth.MemberSessionService;
+import com.example.ssafesta.booth.AdminBoothPublicationService;
+import com.example.ssafesta.booth.BoothFacadeService;
 import com.example.ssafesta.booth.BoothLeaseRepository;
 import com.example.ssafesta.booth.BoothLeaseService;
+import com.example.ssafesta.booth.LeaseStatus;
 import com.example.ssafesta.booth.BoothRepository;
 import com.example.ssafesta.eventshop.EventPrize;
 import com.example.ssafesta.eventshop.EventPrizeRepository;
@@ -59,6 +64,7 @@ import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
+import org.junit.jupiter.api.RepeatedTest;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
@@ -2097,6 +2103,245 @@ class BackendCrossDomainIntegrationTest {
         private static String freshSha() {
             String half = UUID.randomUUID().toString().replace("-", "");
             return half + half;
+        }
+    }
+
+    // ── 횡단 경합 (S15P21A604-941) ──────────────────────────────────────────
+
+    /**
+     * 도메인 <b>둘</b>이 같은 순간에 같은 행을 두고 부딪히는 경우.
+     *
+     * <p>동시성 테스트는 도메인마다 열두 개가 이미 있다. 그런데 전부 <b>같은 방향</b>의
+     * 경합이다 — 한 자리를 여럿이 빌리려 하고, 한 지갑에서 여럿이 빼고, 한 설문에 중복
+     * 제출한다. 서로 다른 도메인이 반대편에서 같은 행에 닿는 경우는 아무도 보지 않는다.
+     *
+     * <p><b>서비스 계층에서 부딪힌다.</b> 이 저장소의 동시성 테스트가 모두 그렇게 한다
+     * ({@code MinigameRewardIntegrationTest} 의 이유를 그대로 따른다) — 경합은 상태 코드가
+     * 아니라 예외와 숫자로 드러나야 하고, {@code MockMvc} 를 여러 스레드에서 부르는 것은
+     * 그 자체가 검증 대상이 아니다. HTTP 경계는 같은 흐름의 비동시 테스트가 이미 지난다.
+     *
+     * <p>{@code @RepeatedTest} 인 이유는 한 번 통과한 경합이 닫혔다는 증거가 아니어서다.
+     */
+    @Nested
+    @DisplayName("횡단 경합 — 두 도메인이 같은 행에 반대편에서 닿는다")
+    class CrossDomainRaces {
+
+        private static final int REPEATS = 5;
+
+        @Autowired private BoothLeaseService leaseService;
+        @Autowired private BoothLeaseRepository leases;
+        @Autowired private BoothRepository booths;
+        @Autowired private AdminBoothPublicationService publication;
+        @Autowired private BoothFacadeService facades;
+        @Autowired private DailyCoinGrantService dailyGrants;
+
+        /**
+         * 관리자의 강제 회수와 소유자의 편집이 같은 순간에 들어온다.
+         *
+         * <p>이 조합이 위험한 이유는 <b>감사 행이 임대 검사보다 먼저 쓰이기</b> 때문이다
+         * (spec 021 data-model §3·§4). 회수가 커밋되는 순간 편집은 임대 검사에서 떨어져야
+         * 하고 그 트랜잭션이 통째로 되감겨야 한다. 어느 쪽이 먼저 이기든 <b>남는 그림은
+         * 하나</b>여야 한다.
+         *
+         * <p>순서는 고정하지 않는다 — 둘 다 정상 결과다. 고정하는 것은 끝난 뒤의 상태다.
+         */
+        @RepeatedTest(REPEATS)
+        @DisplayName("강제 회수와 소유자 편집이 부딪혀도 남는 그림은 하나다")
+        void aForcedReleaseAndAnOwnerEditCollideIntoASingleOutcome() throws Exception {
+            Long ownerId = member("경합주인");
+            String owner = bearerFor(ownerId);
+            long slotId = firstAvailableRentalSlot();
+            String json = mockMvc.perform(lease(owner, slotId))
+                    .andExpect(status().isCreated())
+                    .andReturn().getResponse().getContentAsString();
+            long boothId = read(json).get("boothId").asLong();
+            publishLayout(mockMvc, boothId, owner);
+            Long adminId = administrator("경합운영");
+            int balanceAfterLease = wallets.balanceOf(ownerId);
+
+            CyclicBarrier gate = new CyclicBarrier(2);
+            boolean editLanded;
+            try (ExecutorService pool = Executors.newFixedThreadPool(2)) {
+                Future<?> release = pool.submit(waitThen(gate,
+                        () -> publication.unpublish(adminId, boothId, "경합 검증")));
+                Future<Boolean> edit = pool.submit(waitThen(gate, () -> {
+                    try {
+                        facades.update(boothId, ownerId, new BoothFacadeService.FacadeCommand(
+                                null, "WARM", null, "경합 간판", null));
+                        return true;
+                    } catch (RuntimeException refused) {
+                        // 회수가 먼저 커밋됐다 — 편집이 떨어지는 것이 정상이다.
+                        return false;
+                    }
+                }));
+                release.get(30, TimeUnit.SECONDS);
+                editLanded = edit.get(30, TimeUnit.SECONDS);
+            }
+
+            // 어느 쪽이 이겼든 자리는 비어 있다. 회수가 편집에 밀려 사라지면 안 된다.
+            assertTrue(leases.findValidBySlotId(slotId, Instant.now()).isEmpty(),
+                    "편집이 회수를 밀어냈습니다 — 자리에 유효한 임대가 남았습니다");
+            assertNull(booths.findById(boothId).orElseThrow().getCurrentSlotId());
+            assertNull(booths.findById(boothId).orElseThrow().getPublishedLayoutVersion(),
+                    "회수는 공개 포인터까지 내려야 합니다");
+
+            // 감사는 회수 두 줄뿐이다. 소유자 편집은 관리자 자격이 아니라 감사 대상이 아니고,
+            // 떨어진 편집이 남긴 흔적도 없어야 한다.
+            assertEquals(1, adminActionCount(adminId, "BOOTH_UNPUBLISH", boothId));
+            assertEquals(1, adminActionCount(adminId, "BOOTH_LEASE_RELEASE", boothId));
+            assertEquals(0, adminActionCount(ownerId, AdminActionRecorder.BOOTH_EDIT, boothId),
+                    "소유자 자격의 편집이 관리자 감사에 남았습니다");
+
+            // 돈은 어느 쪽 순서에서도 움직이지 않는다 (FR-021 무환불).
+            assertEquals(balanceAfterLease, wallets.balanceOf(ownerId));
+            assertEquals(1, ledgerCount(ownerId, CoinReason.LEASE_PAYMENT));
+            assertEquals(0, countOf("""
+                    SELECT count(*) FROM coin_ledger_entries e JOIN wallets w ON w.id = e.wallet_id
+                     WHERE w.user_id = ? AND e.reference_type = ? AND e.amount > 0
+                    """, ownerId, CoinReason.LEASE_REFERENCE_TYPE));
+            assertBalanceMatchesLedger(wallets, ownerId);
+
+            // 편집이 이겼다면 그 값이 남아 있어야 한다 — 롤백된 편집이 "성공" 을 돌려주면
+            // 사용자는 저장됐다고 믿고 화면을 떠난다.
+            String sign = jdbc.queryForObject("SELECT facade_sign_text FROM booths WHERE id = ?",
+                    String.class, boothId);
+            assertEquals(editLanded ? "경합 간판" : null, sign,
+                    editLanded ? "성공한 편집이 사라졌습니다" : "거부된 편집이 저장됐습니다");
+
+            // 반대 순서는 겹쳐서는 나오지 않는다 — 실측하면 편집이 늘 먼저 커밋한다(회수가
+            // 임대 조회·지갑·부스 잠금·감사 두 줄까지 하는 동안 편집은 한 행만 건드린다).
+            // 그 분기를 검증 없이 두면 위 삼항이 영영 안 도는 가지가 된다. 순서를 정해서
+            // 한 번 더 본다: 회수가 끝난 뒤의 편집은 거부되고 아무것도 남기지 않는다.
+            theEditThatArrivesAfterTheReleaseChangesNothing();
+        }
+
+        /** 겹침으로는 못 만드는 반대 순서를 순차로 고정한다. */
+        private void theEditThatArrivesAfterTheReleaseChangesNothing() throws Exception {
+            Long lateOwnerId = member("경합늦은");
+            String lateOwner = bearerFor(lateOwnerId);
+            long slotId = firstAvailableRentalSlot();
+            long boothId = read(mockMvc.perform(lease(lateOwner, slotId))
+                    .andExpect(status().isCreated())
+                    .andReturn().getResponse().getContentAsString()).get("boothId").asLong();
+            publishLayout(mockMvc, boothId, lateOwner);
+            Long adminId = administrator("경합늦은운영");
+
+            publication.unpublish(adminId, boothId, "경합 검증 — 반대 순서");
+
+            assertThrows(RuntimeException.class, () -> facades.update(boothId, lateOwnerId,
+                    new BoothFacadeService.FacadeCommand(null, "WARM", null, "늦은 간판", null)),
+                    "회수가 끝난 뒤의 편집은 거부돼야 합니다");
+            assertNull(jdbc.queryForObject("SELECT facade_sign_text FROM booths WHERE id = ?",
+                    String.class, boothId), "거부된 편집이 저장됐습니다");
+            assertEquals(0, adminActionCount(lateOwnerId, AdminActionRecorder.BOOTH_EDIT, boothId));
+        }
+
+        /**
+         * 만료 스위퍼가 도는 순간 다른 사람이 그 자리를 빌린다.
+         *
+         * <p>스위퍼는 임대를 전이시키고 부스에서 자리를 뗀다. 임대는 같은 자리를 새 임대로
+         * 채운다. 둘이 겹치면 <b>한 자리에 두 임대</b>가 남거나, 새 임차인이 <b>돈만 내고
+         * 자리를 못 받는</b> 경우가 생긴다 — 후자는 순차 테스트로는 나오지 않는다.
+         *
+         * <p>결과는 둘 중 하나로만 끝나야 한다: 성공했으면 정확히 한 번 과금되고 자리를
+         * 받았거나, 거부됐으면 한 푼도 안 나갔거나.
+         */
+        @RepeatedTest(REPEATS)
+        @DisplayName("만료 스위퍼와 재임대가 부딪혀도 돈과 자리가 어긋나지 않는다")
+        void theSweeperAndAFreshLeaseNeverLeaveMoneyWithoutASeat() throws Exception {
+            Long staleOwnerId = member("경합만료");
+            long slotId = firstAvailableRentalSlot();
+            long staleLeaseId = leaseService.lease(staleOwnerId, slotId, 1).lease().getId();
+            jdbc.update("UPDATE booth_leases SET starts_at = now() - interval '25 hours', "
+                    + "ends_at = now() - interval '1 hour' WHERE id = ?", staleLeaseId);
+
+            Long newcomerId = member("경합후임");
+            int before = wallets.balanceOf(newcomerId);
+
+            CyclicBarrier gate = new CyclicBarrier(2);
+            boolean gotTheSeat;
+            try (ExecutorService pool = Executors.newFixedThreadPool(2)) {
+                Future<?> sweep = pool.submit(waitThen(gate, () -> {
+                    leaseService.expireStaleLeases();
+                    return null;
+                }));
+                Future<Boolean> lease = pool.submit(waitThen(gate, () -> {
+                    try {
+                        leaseService.lease(newcomerId, slotId, 1);
+                        return true;
+                    } catch (RuntimeException refused) {
+                        return false;
+                    }
+                }));
+                sweep.get(30, TimeUnit.SECONDS);
+                gotTheSeat = lease.get(30, TimeUnit.SECONDS);
+            }
+
+            // 한 자리에 유효한 임대는 많아야 하나다.
+            assertTrue(countOf("""
+                    SELECT count(*) FROM booth_leases
+                     WHERE slot_id = ? AND status = 'ACTIVE' AND ends_at > now()
+                    """, slotId) <= 1, "한 자리에 유효한 임대가 둘 남았습니다");
+
+            // 돈과 자리가 같은 답을 해야 한다.
+            int charged = ledgerCount(newcomerId, CoinReason.LEASE_PAYMENT);
+            if (gotTheSeat) {
+                assertEquals(1, charged, "자리를 받았으면 정확히 한 번 과금돼야 합니다");
+                assertEquals(before - LEASE_PRICE, wallets.balanceOf(newcomerId));
+                assertEquals(newcomerId, leases.findValidBySlotId(slotId, Instant.now())
+                                .orElseThrow().getLesseeUserId(),
+                        "과금은 됐는데 자리가 남의 것입니다");
+            } else {
+                assertEquals(0, charged, "거부된 임대가 과금했습니다 — 돈만 내고 자리가 없습니다");
+                assertEquals(before, wallets.balanceOf(newcomerId));
+            }
+
+            // 만료된 쪽은 어느 경로로 처리됐든 자리를 놓아야 한다.
+            assertNull(booths.findByOwnerUserIdAndAdminOwnedFalse(staleOwnerId).orElseThrow()
+                    .getCurrentSlotId(), "만료된 부스가 자리를 붙들고 있습니다");
+            assertBalanceMatchesLedger(wallets, newcomerId);
+            assertBalanceMatchesLedger(wallets, staleOwnerId);
+
+            // 겹침은 늘 임대 성공 쪽으로 떨어진다(스위퍼는 배치 조회부터 한다). 반대편 —
+            // 새 임대가 먼저 자리를 잡은 뒤 스위퍼가 도는 경우 — 를 순차로 고정한다.
+            theSweeperLeavesAFreshLeaseAlone();
+        }
+
+        /** 막 생긴 임대를 스위퍼가 만료된 것으로 착각하면 안 된다. */
+        private void theSweeperLeavesAFreshLeaseAlone() throws Exception {
+            Long freshId = member("경합신규");
+            long slotId = firstAvailableRentalSlot();
+            long leaseId = leaseService.lease(freshId, slotId, 1).lease().getId();
+            int charged = wallets.balanceOf(freshId);
+
+            leaseService.expireStaleLeases();
+
+            assertEquals(LeaseStatus.ACTIVE, leases.findById(leaseId).orElseThrow().getStatus(),
+                    "스위퍼가 막 생긴 임대를 만료시켰습니다");
+            assertTrue(leases.findValidBySlotId(slotId, Instant.now()).isPresent());
+            assertEquals(charged, wallets.balanceOf(freshId));
+            assertEquals(1, ledgerCount(freshId, CoinReason.LEASE_PAYMENT));
+        }
+
+        // ── 단계 ────────────────────────────────────────────────────────────
+
+        private int adminActionCount(Long actorUserId, String action, long boothId) {
+            return countOf("""
+                    SELECT count(*) FROM admin_actions
+                     WHERE actor_user_id = ? AND action = ? AND target_type = ? AND target_id = ?
+                    """, actorUserId, action, AdminActionRecorder.TARGET_BOOTH, boothId);
+        }
+
+        private Long administrator(String prefix) {
+            Long userId = member(prefix);
+            jdbc.update("UPDATE users SET account_type='ADMIN' WHERE id=?", userId);
+            return userId;
+        }
+
+        private Long member(String prefix) {
+            Long userId = createMemberWithWallet(users, wallets, prefix);
+            dailyGrants.grantIfDue(userId);
+            return userId;
         }
     }
 }
