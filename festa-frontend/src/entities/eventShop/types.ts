@@ -9,6 +9,9 @@ export interface EventPrize {
   /** null = 무제한 재고 */
   stock: number | null;
   active: boolean;
+  closesAt?: string | null;
+  /** 당첨자 수. 0이면 즉시구매, > 0이면 응모형 경품이다 (S15P21A604-922) */
+  winnerCount: number;
 }
 
 // POST /api/v1/event-shop/purchases 201 응답

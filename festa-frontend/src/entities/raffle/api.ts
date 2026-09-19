@@ -1,16 +1,22 @@
-// 응모권 real API — 경로·필드는 event-shop(EventShopController) 계약을 본떠 만든 추정치다.
-// BE에 이 엔드포인트는 아직 없다(-836 스펙에 추첨 개념 없음, 담당자 확인 결과 추후 추가 예정).
-//
-// 실 계약이 나오면 이 파일만 경로·필드명에 맞춰 고치면 된다 — 화면(EventRewardShopOverlay)은
-// entities/raffle/api.select 너머를 모르므로 건드릴 필요가 없다. 전환은 api.select.ts에서
-// `raffleApi = mockApi` 를 `raffleApi = realApi` 로 바꾸는 한 줄이 전부다.
-import { api } from '../../shared/api/client';
+// 응모권 실 API 배선 — BE는 별도 엔드포인트가 아니라 event-shop 엔드포인트를 공용으로 쓴다 (S15P21A604-922).
+// winnerCount > 0 인 경품이 응모형이고, 구매와 동일하게 POST /api/v1/event-shop/purchases 로 응모한다.
+import { eventShopApi } from '../eventShop/api.select';
 import type { PurchaseRecipient } from '../../shared/contracts/purchaseRecipient';
 import type { RaffleEntryResult, RafflePrize } from './types';
 
 export async function listRaffles(): Promise<RafflePrize[]> {
-  const res = await api<{ raffles: RafflePrize[] }>('/api/v1/event-shop/raffles');
-  return res.raffles;
+  const prizes = await eventShopApi.listPrizes();
+  return prizes
+    .filter((p) => p.winnerCount > 0)
+    .map((p) => ({
+      raffleId: p.prizeId,
+      name: p.name,
+      priceCoin: p.priceCoin,
+      stock: p.stock,
+      active: p.active,
+      closesAt: p.closesAt,
+      drawAt: p.closesAt ?? null,
+    }));
 }
 
 export async function enterRaffle(
@@ -18,9 +24,13 @@ export async function enterRaffle(
   idempotencyKey: string,
   recipient?: PurchaseRecipient,
 ): Promise<RaffleEntryResult> {
-  return api<RaffleEntryResult>(`/api/v1/event-shop/raffles/${raffleId}/entries`, {
-    method: 'POST',
-    headers: { 'Idempotency-Key': idempotencyKey },
-    body: JSON.stringify({ ...recipient }),
-  });
+  const res = await eventShopApi.purchasePrize(raffleId, idempotencyKey, 1, recipient);
+  return {
+    entryId: res.purchaseId,
+    raffleId: res.prizeId,
+    raffleName: res.prizeName,
+    coinSpent: res.coinSpent,
+    enteredAt: res.purchasedAt,
+    drawAt: null,
+  };
 }

@@ -77,6 +77,9 @@ const PURCHASE_ERROR_LABELS: Record<string, string> = {
   EVENT_PRIZE_INACTIVE: '판매가 중단된 경품입니다.',
   INSUFFICIENT_COIN: '코인이 부족합니다.',
   EVENT_PRIZE_NOT_FOUND: '경품을 찾을 수 없습니다.',
+  EVENT_PRIZE_CLOSED: '응모가 마감되었습니다.',
+  EVENT_PRIZE_ALREADY_ENTERED: '이미 응모한 경품입니다.',
+  IDEMPOTENCY_CONFLICT: '다른 요청이 이미 진행 중입니다.',
   RAFFLE_OUT_OF_STOCK: '방금 응모권이 모두 소진됐습니다.',
   RAFFLE_NOT_FOUND: '응모권을 찾을 수 없습니다.',
 };
@@ -185,6 +188,7 @@ export function EventRewardShopOverlay() {
 
   const instantCards = prizesQuery.isSuccess
     ? [...prizesQuery.data]
+        .filter((p) => !p.winnerCount || p.winnerCount === 0)
         .sort((a, b) => PRIZE_DISPLAY_ORDER.indexOf(a.name) - PRIZE_DISPLAY_ORDER.indexOf(b.name))
         .map(toInstantCard)
     : [];

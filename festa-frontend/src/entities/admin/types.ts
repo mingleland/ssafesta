@@ -112,6 +112,7 @@ export function nextFulfillmentOptions(current: PrizeFulfillmentStatus): PrizeFu
     case 'PENDING': return ['FULFILLED', 'CANCELLED'];
     case 'FULFILLED': return [];
     case 'CANCELLED': return [];
+    default: return [];
   }
 }
 
@@ -143,6 +144,8 @@ export interface PrizePurchaseView {
   campus: string | null;
   teamName: string | null;
   recipientName: string | null;
+  /** 추첨 결과 (true: 당첨, false: 낙첨, null: 추첨 전 또는 일반 구매) (S15P21A604-922) */
+  won?: boolean | null;
 }
 
 // ── 이벤트 설문 ─────────────────────────────────────────────────────────────────────────
@@ -228,4 +231,3 @@ export interface AdminRepository {
   getEventAggregate(surveyKey: string): Promise<EventQuestionAggregate[]>;
   getEventResponse(surveyKey: string, responseId: number): Promise<EventResponseDetail>;
 }
-
