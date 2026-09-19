@@ -10,11 +10,13 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.example.ssafesta.user.AdminActionRecorder;
 import com.example.ssafesta.ai.FakeDocumentProcessingClient;
 import com.example.ssafesta.auth.AccessTokenService;
 import com.example.ssafesta.auth.MemberSessionService;
@@ -47,6 +49,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.Function;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.ExecutorService;
@@ -66,6 +69,7 @@ import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.RequestBuilder;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
@@ -104,6 +108,10 @@ class BackendCrossDomainIntegrationTest {
     /** {@code app.lease.price-coin}. */
     private static final int LEASE_PRICE = 50;
     private static final int SURVEY_REWARD = 5;
+
+    /** 기간 필터를 사실상 끄는 창 — 이 파일의 단언은 집계 창이 아니라 값을 본다. */
+    private static final String ALL_TIME_FROM = "2000-01-01T00:00:00Z";
+    private static final String ALL_TIME_TO = "2100-01-01T00:00:00Z";
 
     /** {@code src/test/resources/application-local.properties} 가 넣는 값과 같아야 한다. */
     private static final String SERVICE_TOKEN = "test-ai-to-spring";
@@ -1501,6 +1509,312 @@ class BackendCrossDomainIntegrationTest {
             Long userId = createMemberWithWallet(users, wallets, prefix);
             dailyGrants.grantIfDue(userId);
             return userId;
+        }
+    }
+
+    // ── 권한·감사 관통 (S15P21A604-941) ─────────────────────────────────────
+
+    /**
+     * 부스 권한의 면 전체를 역할별로 한 번씩 밟고, 감사가 정확히 계약대로 남는지 본다.
+     *
+     * <p>현재 {@code AdminBoothAccessIntegrationTest} 는 homepage 와 layout <b>둘만</b> 본다.
+     * 실제 관리자 통과 면은 {@code requireModifier} 를 타는 모든 경로이고, 그 사이에 계약이
+     * 갈리는 지점이 셋 있다 — 읽기는 통과하되 감사하지 않고, 마스터 소유 부스는 읽기만 되고,
+     * 실패한 변경은 감사 행을 남기지 않는다.
+     *
+     * <p><b>기대값은 전부 문서에 있다.</b> 권한 결정표는
+     * {@code specs/021-admin-booth-operations/data-model.md} 의 "권한 결정표" 이고, 감사 필드는
+     * 같은 spec 의 {@code contracts/admin-booth-access.md} 다. 구현 주석을 근거로 보안 정책을
+     * 고정하지 않는다 — "실패 감사 0건" 은 롤백 검증인 동시에 감사 정책이라, 거부 시도도
+     * 남겨야 한다는 정책이 서면 기대값이 정반대가 된다. 지금 계약은 명시적으로 이쪽이다
+     * (data-model §5, research R-04 "실패한 변경의 거짓 기록을 막는다", spec 023 "성공만").
+     */
+    @Nested
+    @DisplayName("권한·감사 — 역할마다 같은 면을 한 번씩 밟는다")
+    class RoleMatrix {
+
+        @Autowired private DailyCoinGrantService dailyGrants;
+
+        /** 한 쓰기 경로. {@code label} 은 실패했을 때 어느 칸인지 말해 준다. */
+        private record Write(String label, Function<String, RequestBuilder> request) { }
+
+        private record Fixture(Long ownerId, String owner, long boothId, long agentId) { }
+
+        /**
+         * 관리자가 타 부스의 쓰기 경로를 전부 밟고, 경로마다 감사 행이 정확히 하나 남는다.
+         *
+         * <p>계약은 <b>{@code BOOTH_EDIT} 1행</b>이다 (권한 결정표). 한 요청이 가드를 두 번
+         * 지나면 두 줄이 남는데, 그러면 "관리자가 몇 번 손댔는가" 를 감사가 부풀려 답한다.
+         */
+        @Test
+        @DisplayName("관리자의 쓰기는 경로마다 감사 행을 정확히 하나 남긴다")
+        void anAdministratorTouchesEveryWritingPathAndLeavesExactlyOneAuditRowEach()
+                throws Exception {
+            Fixture booth = aLeasedBooth("감사대상");
+            Long adminId = administrator("감사운영");
+            String admin = bearerFor(adminId);
+
+            for (Write write : writes(booth)) {
+                int before = auditRows(adminId, booth.boothId());
+                passes(write, admin);
+                assertEquals(before + 1, auditRows(adminId, booth.boothId()),
+                        write.label() + " — 관리자 변경은 BOOTH_EDIT 감사 행을 정확히 하나 남겨야 합니다");
+            }
+
+            assertEquals(writes(booth).size(), countOf("""
+                    SELECT count(*) FROM admin_actions
+                     WHERE actor_user_id = ? AND action = ? AND target_type = ? AND target_id = ?
+                    """, adminId, AdminActionRecorder.BOOTH_EDIT, AdminActionRecorder.TARGET_BOOTH,
+                    booth.boothId()));
+        }
+
+        /**
+         * 소유자와 편집 스태프가 같은 면을 지나가되 <b>관리자 감사 행은 남기지 않는다</b>
+         * (계약: "Owner 또는 부스 직원 권한으로 성공한 요청은 이 관리자 감사 행을 만들지 않는다").
+         * {@code CONSULTANT} 는 같은 면 전체에서 거부된다 — 이 역할이 {@code StaffRole} 이
+         * 존재하는 이유다.
+         */
+        @Test
+        @DisplayName("편집 스태프는 소유자와 같은 면을 지나고 CONSULTANT 는 전부 거부된다")
+        void editingStaffPassesWhereTheOwnerDoesAndAConsultantNowhere() throws Exception {
+            Fixture booth = aLeasedBooth("스태프대상");
+            Long editorId = member("스태프편집");
+            Long consultantId = member("스태프상담");
+            addStaff(booth.boothId(), editorId, "CONTENT_EDITOR");
+            addStaff(booth.boothId(), consultantId, "CONSULTANT");
+
+            for (Write write : writes(booth)) {
+                passes(write, bearerFor(editorId));
+                mockMvc.perform(write.request().apply(bearerFor(consultantId)))
+                        .andExpect(status().isForbidden())
+                        .andExpect(jsonPath("$.code").value("BOOTH_EDITOR_FORBIDDEN"));
+            }
+            assertEquals(0, auditRows(editorId, booth.boothId()),
+                    "스태프 자격으로 지난 요청은 관리자 감사 대상이 아닙니다");
+            assertEquals(0, auditRows(consultantId, booth.boothId()));
+
+            // 읽기도 같은 게이트다 — CONSULTANT 는 상담을 하지 운영 지표를 보지 않는다.
+            mockMvc.perform(dashboard(booth.boothId(), bearerFor(editorId)))
+                    .andExpect(status().isOk());
+            mockMvc.perform(dashboard(booth.boothId(), bearerFor(consultantId)))
+                    .andExpect(status().isForbidden());
+        }
+
+        /**
+         * 관리자의 읽기는 통과하고 감사 행을 남기지 않는다.
+         *
+         * <p>계약은 "타 부스를 <b>변경</b>할 때 기록한다" 이므로 읽기는 무감사다. 관리자가 타
+         * 부스의 방문·상담·설문·코인 집계를 흔적 없이 여는 것이 지금의 정책이며, 이 테스트가
+         * 그 정책을 눈에 보이게 고정한다 — 바뀌면 여기가 먼저 빨개진다.
+         */
+        @Test
+        @DisplayName("관리자의 읽기는 통과하되 감사 행을 남기지 않는다")
+        void anAdministratorsReadsPassWithoutLeavingAnyAuditRow() throws Exception {
+            Fixture booth = aLeasedBooth("읽기대상");
+            Long adminId = administrator("읽기운영");
+            String admin = bearerFor(adminId);
+
+            mockMvc.perform(dashboard(booth.boothId(), admin)).andExpect(status().isOk());
+            mockMvc.perform(get("/api/v1/booths/{id}/visit-metrics", booth.boothId())
+                            .header("Authorization", admin)
+                            .param("from", ALL_TIME_FROM).param("to", ALL_TIME_TO))
+                    .andExpect(status().isOk());
+            mockMvc.perform(get("/api/v1/booths/{id}/layouts/draft", booth.boothId())
+                    .header("Authorization", admin)).andExpect(status().isOk());
+            mockMvc.perform(get("/api/v1/booths/{id}/agents", booth.boothId())
+                    .header("Authorization", admin)).andExpect(status().isOk());
+
+            assertEquals(0, auditRows(adminId, booth.boothId()),
+                    "읽기는 감사 대상이 아닙니다 — 계약이 바뀌었다면 이 줄부터 고쳐야 합니다");
+        }
+
+        /**
+         * 거부되거나 실패한 관리자 변경은 감사 행을 남기지 않는다.
+         *
+         * <p>두 가지를 함께 본다. 검증 실패는 감사 행이 같은 트랜잭션으로 되돌아가고
+         * (data-model §5), <b>만료된 부스</b>는 그보다 미묘하다 — 계약 순서상 감사는 마스터
+         * 검사 <b>직후</b>, 임대 검사 <b>앞</b>에 기록된다(§3·§4). 즉 한 번 쓰였다가 409 와
+         * 함께 롤백되는 경로이고, 롤백이 빠지면 "일어나지 않은 관리자 조치" 가 감사에 남는다.
+         */
+        @Test
+        @DisplayName("거부된 관리자 변경은 감사 행을 남기지 않는다")
+        void aRefusedAdministratorChangeLeavesNoAuditRow() throws Exception {
+            Fixture booth = aLeasedBooth("실패대상");
+            Long adminId = administrator("실패운영");
+            String admin = bearerFor(adminId);
+
+            mockMvc.perform(put("/api/v1/booths/{id}/facade", booth.boothId())
+                            .header("Authorization", admin)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"primaryColor\":\"not-a-colour\"}"))
+                    .andExpect(status().isBadRequest());
+            assertEquals(0, auditRows(adminId, booth.boothId()),
+                    "검증에 실패한 변경이 감사에 남았습니다 — 일어나지 않은 조치입니다");
+
+            jdbc.update("UPDATE booth_leases SET starts_at = now() - interval '25 hours', "
+                    + "ends_at = now() - interval '1 hour' WHERE booth_id = ?", booth.boothId());
+            mockMvc.perform(put("/api/v1/booths/{id}/homepage", booth.boothId())
+                            .header("Authorization", admin)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"homepageUrl\":\"https://after.example.com\"}"))
+                    .andExpect(status().isConflict())
+                    .andExpect(jsonPath("$.code").value("BOOTH_LEASE_EXPIRED"));
+            assertEquals(0, auditRows(adminId, booth.boothId()),
+                    "감사는 임대 검사보다 먼저 기록되므로(021 data-model §3·§4) 롤백이 빠지면 "
+                            + "여기서만 드러납니다");
+        }
+
+        /** 마스터 소유 부스는 <b>읽기만</b> 열린다. 변경은 전부 {@code MASTER_PROTECTED} 다. */
+        @Test
+        @DisplayName("마스터 소유 부스는 관리자에게 읽기만 열린다")
+        void theMastersBoothIsReadableButNotChangeableByAnotherAdministrator() throws Exception {
+            Fixture booth = aLeasedBooth("마스터대상");
+            jdbc.update("UPDATE users SET is_master=TRUE WHERE id=?", booth.ownerId());
+            Long adminId = administrator("마스터운영");
+            String admin = bearerFor(adminId);
+            try {
+                mockMvc.perform(dashboard(booth.boothId(), admin))
+                        .andExpect(status().isOk());
+
+                for (Write write : writes(booth)) {
+                    mockMvc.perform(write.request().apply(admin))
+                            .andExpect(status().isForbidden())
+                            .andExpect(jsonPath("$.code").value("MASTER_PROTECTED"));
+                }
+                assertEquals(0, auditRows(adminId, booth.boothId()));
+            } finally {
+                jdbc.update("UPDATE users SET is_master=FALSE WHERE id=?", booth.ownerId());
+            }
+        }
+
+        /**
+         * 강등된 관리자는 두 경로가 아니라 <b>면 전체</b>에서 다음 요청부터 막힌다.
+         *
+         * <p>기존 테스트가 homepage·layout 둘만 보고 있어서, 어느 한 경로가 판정을 캐시하거나
+         * 다른 게이트를 타면 그것만 살아남는다.
+         */
+        @Test
+        @DisplayName("강등된 관리자는 다음 요청부터 면 전체를 잃는다")
+        void aDemotedAdministratorLosesEveryPathNotJustTheTwoUnderTest() throws Exception {
+            Fixture booth = aLeasedBooth("강등대상");
+            Long adminId = administrator("강등운영");
+            String admin = bearerFor(adminId);
+            mockMvc.perform(dashboard(booth.boothId(), admin)).andExpect(status().isOk());
+
+            jdbc.update("UPDATE users SET account_type='MEMBER' WHERE id=?", adminId);
+
+            for (Write write : writes(booth)) {
+                mockMvc.perform(write.request().apply(admin))
+                        .andExpect(status().isForbidden())
+                        .andExpect(jsonPath("$.code").value("BOOTH_EDITOR_FORBIDDEN"));
+            }
+            mockMvc.perform(dashboard(booth.boothId(), admin)).andExpect(status().isForbidden());
+            assertEquals(0, auditRows(adminId, booth.boothId()),
+                    "강등 뒤 거부된 요청이 감사에 남으면 안 됩니다");
+        }
+
+        // ── 단계 ────────────────────────────────────────────────────────────
+
+        /**
+         * 쓰기 면. {@code requireActiveEditor} 와 {@code requireModifier} 양쪽을 섞어 둔다 —
+         * 한쪽만 담으면 다른 쪽 게이트가 통째로 빠져도 매트릭스가 초록이다.
+         */
+        private List<Write> writes(Fixture booth) {
+            long boothId = booth.boothId();
+            return List.of(
+                    new Write("facade", bearer -> put("/api/v1/booths/{id}/facade", boothId)
+                            .header("Authorization", bearer)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("""
+                                    {"themeCode":"SSAFY_BLUE","primaryColor":"#3B82F6",
+                                     "signText":"권한 매트릭스"}""")),
+                    new Write("homepage", bearer -> put("/api/v1/booths/{id}/homepage", boothId)
+                            .header("Authorization", bearer)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"homepageUrl\":\"https://matrix.example.com\"}")),
+                    new Write("layout publish",
+                            bearer -> post("/api/v1/booths/{id}/layouts/publish", boothId)
+                                    .header("Authorization", bearer)),
+                    new Write("project", bearer -> post("/api/v1/booths/{id}/projects", boothId)
+                            .header("Authorization", bearer)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("""
+                                    {"name":"매트릭스 전시","gitUrl":"https://git.example.com/m"}""")),
+                    // 생성이 아니라 수정이다 — AI 직원은 부스당 하나라(AGENT_LIMIT_EXCEEDED)
+                    // 생성을 매트릭스에 두면 두 번째 역할부터 권한이 아니라 한도로 갈린다.
+                    // 같은 requireActiveEditor 게이트를 지난다.
+                    new Write("agent", bearer -> patch("/api/v1/agents/{id}", booth.agentId())
+                            .header("Authorization", bearer)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"name\":\"매트릭스 도슨트\"}")),
+                    new Write("survey", bearer -> put("/api/v1/booths/{id}/survey", boothId)
+                            .header("Authorization", bearer)
+                            .contentType(MediaType.APPLICATION_JSON).content(SURVEY)),
+                    // sha 는 호출마다 다르다 — 같은 값이면 에이전트별 활성 중복 색인(V17)에
+                    // 걸려 두 번째 호출이 권한이 아니라 중복으로 갈린다.
+                    new Write("document upload-url",
+                            bearer -> post("/api/v1/agents/{id}/documents/upload-url", booth.agentId())
+                                    .header("Authorization", bearer)
+                                    .contentType(MediaType.APPLICATION_JSON)
+                                    .content("""
+                                            {"fileName":"m.pdf","contentType":"application/pdf",
+                                             "size":%d,"contentSha256":"%s"}"""
+                                            .formatted(DOCUMENT_SIZE, freshSha()))));
+        }
+
+        /** 게시할 draft 와 문서를 걸 에이전트까지 갖춘 부스. */
+        private Fixture aLeasedBooth(String prefix) throws Exception {
+            Long ownerId = member(prefix);
+            String owner = bearerFor(ownerId);
+            String json = mockMvc.perform(lease(owner, firstAvailableRentalSlot()))
+                    .andExpect(status().isCreated())
+                    .andReturn().getResponse().getContentAsString();
+            long boothId = read(json).get("boothId").asLong();
+            publishLayout(mockMvc, boothId, owner);
+            return new Fixture(ownerId, owner, boothId, createAgent(owner, boothId));
+        }
+
+        /** 실패했을 때 어느 칸이 어떤 몸통으로 막혔는지 말한다 — 매트릭스는 그러지 않으면 못 읽는다. */
+        private void passes(Write write, String bearer) throws Exception {
+            MvcResult result = mockMvc.perform(write.request().apply(bearer)).andReturn();
+            int status = result.getResponse().getStatus();
+            assertTrue(status >= 200 && status < 300, write.label() + " — 지나가야 하는데 " + status
+                    + " 입니다: " + result.getResponse().getContentAsString());
+        }
+
+        private RequestBuilder dashboard(long boothId, String bearer) {
+            return get("/api/v1/booths/{id}/dashboard/summary", boothId)
+                    .header("Authorization", bearer)
+                    .param("from", ALL_TIME_FROM).param("to", ALL_TIME_TO);
+        }
+
+        private int auditRows(Long actorUserId, long boothId) {
+            return countOf("""
+                    SELECT count(*) FROM admin_actions
+                     WHERE actor_user_id = ? AND target_type = ? AND target_id = ?
+                    """, actorUserId, AdminActionRecorder.TARGET_BOOTH, boothId);
+        }
+
+        private void addStaff(long boothId, Long userId, String role) {
+            jdbc.update("INSERT INTO booth_staffs(booth_id, user_id, role) VALUES(?, ?, ?)",
+                    boothId, userId, role);
+        }
+
+        private Long administrator(String prefix) {
+            Long userId = member(prefix);
+            jdbc.update("UPDATE users SET account_type='ADMIN' WHERE id=?", userId);
+            return userId;
+        }
+
+        private Long member(String prefix) {
+            Long userId = createMemberWithWallet(users, wallets, prefix);
+            dailyGrants.grantIfDue(userId);
+            return userId;
+        }
+
+        private static String freshSha() {
+            String half = UUID.randomUUID().toString().replace("-", "");
+            return half + half;
         }
     }
 }
