@@ -1281,4 +1281,226 @@ class BackendCrossDomainIntegrationTest {
                     CoinReason.ADMIN_ADJUSTMENT, null, null, "TEST_LEASE_DRAIN:" + userId));
         }
     }
+
+    // ── 임대 종료 전파 (S15P21A604-941) ─────────────────────────────────────
+
+    /**
+     * 임대가 끝나면 부스의 <b>모든</b> 문이 같은 임대를 기준으로 닫힌다.
+     *
+     * <p>게이트는 한 곳에 모여 있다({@code BoothAccessGuard}). 문제는 <b>호출부가 넷 중
+     * 무엇을 쓰는지가 각자의 결정</b>이라는 점이다 — {@code requireActiveEditor} 는 종료 뒤
+     * 막고 {@code requireEditor} 는 통과시킨다. 한 호출부가 잘못된 쪽을 고르면 그 도메인
+     * 테스트는 소유자·스태프 판정만 보므로 끝까지 초록이고, 만료된 부스의 내용이 계속 열린다.
+     * 데이터 노출이라 여기서 한 번에 쏜다.
+     *
+     * <p><b>종료 사유를 파라미터로 받는다.</b> 만료·반납·관리자 강제해제는 원인만 다르고
+     * 요구가 같다 (spec 007 FR-015 — "두 경우의 처리는 같다", 2026-09-14 확정). 따로 쓰면
+     * 같은 단언을 세 벌 유지하게 되고 나중에 한 벌만 고쳐진다.
+     *
+     * <p><b>보존 쪽도 함께 본다.</b> 종료 뒤에도 열려야 하는 것이 있다 — 소유자는 자기 내용을
+     * 계속 열 수 있어야 한다(spec 004 FR-010 보존). 닫히는 것만 단언하면 과잉 차단이
+     * "테스트 통과" 로 보인다.
+     */
+    @Nested
+    @DisplayName("임대 종료 — 세 가지 종료가 같은 문들을 닫는다")
+    class LeaseTermination {
+
+        @Autowired private BoothLeaseService leaseService;
+        @Autowired private BoothLeaseRepository leases;
+        @Autowired private DailyCoinGrantService dailyGrants;
+
+        enum Termination { EXPIRY, RETURN, ADMIN_RELEASE }
+
+        /** 한 번 세운 부스를 종료 사유마다 다시 세운다 — 상태를 공유하면 순서 의존이 생긴다. */
+        private record Booth(Long ownerId, String owner, long slotId, long boothId, long projectId,
+                             long agentId, long documentId) { }
+
+        @ParameterizedTest(name = "{0}")
+        @EnumSource(Termination.class)
+        @DisplayName("종료하면 방문자 경로와 쓰기 경로가 함께 닫힌다")
+        void terminationClosesTheVisitorDoorsAndTheWritingDoorsAlike(Termination cause)
+                throws Exception {
+            Booth booth = aFullyDressedBooth("종료방문" + cause.ordinal());
+            terminate(cause, booth);
+
+            String guest = "Bearer " + accessTokens.issueGuestToken().token();
+            // 부스 키와 슬롯 키 양쪽이다 — 월드는 슬롯으로 열고 웹은 부스로 연다.
+            mockMvc.perform(get("/api/v1/booths/{id}", booth.boothId()).header("Authorization", guest))
+                    .andExpect(status().isConflict())
+                    .andExpect(jsonPath("$.code").value("BOOTH_LEASE_EXPIRED"));
+            mockMvc.perform(get("/api/v1/booth-slots/{id}/layouts/published", booth.slotId())
+                            .header("Authorization", guest))
+                    .andExpect(status().is4xxClientError());
+            mockMvc.perform(get("/api/v1/booths/{id}/projects/published", booth.boothId())
+                            .header("Authorization", guest))
+                    .andExpect(status().isConflict())
+                    .andExpect(jsonPath("$.code").value("BOOTH_LEASE_EXPIRED"));
+
+            // 상담은 유효한 임대를 직접 요구한다 (ConsultationService).
+            Long visitorId = member("종료상담" + cause.ordinal());
+            mockMvc.perform(post("/api/v1/consultation/requests")
+                            .header("Authorization", bearerFor(visitorId))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"boothId\":" + booth.boothId() + "}"))
+                    .andExpect(status().isConflict())
+                    .andExpect(jsonPath("$.code").value("BOOTH_LEASE_EXPIRED"));
+
+            // 소유자의 쓰기도 전부 닫힌다 — 보이지 않는 것을 고칠 수는 없다.
+            mockMvc.perform(put("/api/v1/booths/{id}/facade", booth.boothId())
+                            .header("Authorization", booth.owner())
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"signText\":\"종료후\"}"))
+                    .andExpect(status().isConflict());
+            mockMvc.perform(put("/api/v1/booths/{id}/homepage", booth.boothId())
+                            .header("Authorization", booth.owner())
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"homepageUrl\":\"https://after.example.com\"}"))
+                    .andExpect(status().isConflict());
+            mockMvc.perform(post("/api/v1/booths/{id}/layouts/publish", booth.boothId())
+                            .header("Authorization", booth.owner()))
+                    .andExpect(status().isConflict());
+            mockMvc.perform(post("/api/v1/booths/{id}/agents", booth.boothId())
+                            .header("Authorization", booth.owner())
+                            .contentType(MediaType.APPLICATION_JSON).content(AGENT))
+                    .andExpect(status().isConflict());
+            mockMvc.perform(put("/api/v1/booths/{id}/survey", booth.boothId())
+                            .header("Authorization", booth.owner())
+                            .contentType(MediaType.APPLICATION_JSON).content(SURVEY))
+                    .andExpect(status().isConflict());
+        }
+
+        /**
+         * 종료 뒤에도 소유자는 자기 내용을 계속 연다 (spec 004 FR-010 보존).
+         *
+         * <p>이 테스트가 없으면 "전부 닫기" 가 정답으로 보인다. 그 상태에서는 임대가 끝난
+         * 사람이 자기 배치도 설문 결과도 못 보게 되는데, 닫힘만 단언하는 테스트는 그것을
+         * 통과로 읽는다.
+         */
+        @ParameterizedTest(name = "{0}")
+        @EnumSource(Termination.class)
+        @DisplayName("종료해도 소유자의 읽기는 보존된다")
+        void theOwnerStillReadsTheirOwnContentAfterTermination(Termination cause) throws Exception {
+            Booth booth = aFullyDressedBooth("종료보존" + cause.ordinal());
+            terminate(cause, booth);
+
+            mockMvc.perform(get("/api/v1/booths/{id}/layouts/draft", booth.boothId())
+                            .header("Authorization", booth.owner()))
+                    .andExpect(status().isOk());
+            mockMvc.perform(get("/api/v1/booths/{id}/survey", booth.boothId())
+                            .header("Authorization", booth.owner()))
+                    .andExpect(status().isOk());
+            mockMvc.perform(get("/api/v1/booths/{id}/visit-metrics", booth.boothId())
+                            .header("Authorization", booth.owner())
+                            .param("from", "2000-01-01T00:00:00Z")
+                            .param("to", "2100-01-01T00:00:00Z"))
+                    .andExpect(status().isOk());
+            mockMvc.perform(get("/api/v1/booths/{id}/dashboard/summary", booth.boothId())
+                            .header("Authorization", booth.owner())
+                            .param("from", "2000-01-01T00:00:00Z")
+                            .param("to", "2100-01-01T00:00:00Z"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.leaseCostCoin").value(LEASE_PRICE));
+        }
+
+        /**
+         * 종료는 문서를 비활성으로 돌리고, 그 판정은 늦은 완료 요청으로도 뒤집히지 않는다.
+         *
+         * <p>계약은 <b>{@code complete} 의 상태 코드를 정하지 않는다.</b> 정하는 것은 상태다 —
+         * spec 007 FR-015 "그 문서가 {@code READY} 로 전환되어서는 안 된다", FR-040 "임대
+         * 만료는 FR-015 가 정한 비즈니스 판정이며 finalize 가 그것을 뒤집을 자리가 아니다".
+         * {@code AiDocumentService.complete} 가 {@code requireEditor} 를 쓰는 것은 의도이며
+         * (만료 뒤에도 소유자의 완료 요청 자체는 받는다), 그래서 여기서는 응답이 아니라
+         * <b>상태와 검색 가능성</b>을 단언한다.
+         */
+        @ParameterizedTest(name = "{0}")
+        @EnumSource(Termination.class)
+        @DisplayName("종료한 부스의 문서는 검색에서 사라지고 늦은 완료로도 되살아나지 않는다")
+        void aTerminatedBoothsDocumentLeavesSearchAndNoLateCompleteBringsItBack(Termination cause)
+                throws Exception {
+            Booth booth = aFullyDressedBooth("종료문서" + cause.ordinal());
+            assertEquals(1, chunkHits(booth), "종료 전에는 검색돼야 합니다 — 전제가 깨지면 "
+                    + "이 테스트의 0 은 아무것도 증명하지 않습니다");
+
+            terminate(cause, booth);
+
+            assertEquals("DISABLED", documentStatus(booth.documentId()));
+            assertEquals(0, chunkHits(booth), "종료한 부스의 문서가 검색에 남아 있습니다");
+
+            // 늦은 완료 — 응답은 계약이 아니라서 보지 않고, 상태가 뒤집혔는지만 본다.
+            mockMvc.perform(post("/api/v1/documents/{id}/complete", booth.documentId())
+                    .header("Authorization", booth.owner()));
+
+            assertEquals("DISABLED", documentStatus(booth.documentId()),
+                    "늦은 완료가 임대 만료 판정을 뒤집었습니다 (spec 007 FR-040)");
+            assertEquals(0, chunkHits(booth));
+        }
+
+        // ── 단계 ────────────────────────────────────────────────────────────
+
+        /** 아크 1 이 세우는 것과 같은 부스를 세운다 — 헬퍼를 그대로 쓴다. */
+        private Booth aFullyDressedBooth(String prefix) throws Exception {
+            Long ownerId = member(prefix);
+            String owner = bearerFor(ownerId);
+            long slotId = firstAvailableRentalSlot();
+            String json = mockMvc.perform(lease(owner, slotId))
+                    .andExpect(status().isCreated())
+                    .andReturn().getResponse().getContentAsString();
+            long boothId = read(json).get("boothId").asLong();
+
+            dressTheBooth(owner, boothId);
+            publishLayout(mockMvc, boothId, owner);
+            registerHomepage(owner, boothId);
+            long projectId = registerProject(owner, boothId);
+            saveSurvey(owner, boothId);
+            long agentId = createAgent(owner, boothId);
+            long documentId = uploadDocument(owner, agentId, boothId);
+            deliverProcessingResults(completeUploadOnce(owner, documentId));
+            return new Booth(ownerId, owner, slotId, boothId, projectId, agentId, documentId);
+        }
+
+        private void terminate(Termination cause, Booth booth) throws Exception {
+            switch (cause) {
+                case EXPIRY -> {
+                    jdbc.update("UPDATE booth_leases SET starts_at = now() - interval '25 hours', "
+                            + "ends_at = now() - interval '1 hour' WHERE booth_id = ?",
+                            booth.boothId());
+                    leaseService.expireStaleLeases();
+                }
+                case RETURN -> mockMvc.perform(
+                                delete("/api/v1/booth-slots/{id}/leases/mine", booth.slotId())
+                                        .header("Authorization", booth.owner()))
+                        .andExpect(status().isNoContent());
+                case ADMIN_RELEASE -> {
+                    Long adminId = member("종료운영" + booth.boothId());
+                    jdbc.update("UPDATE users SET account_type='ADMIN' WHERE id=?", adminId);
+                    leaseService.releaseByAdmin(adminId, booth.slotId(), "횡단 검증");
+                }
+            }
+            assertTrue(leases.findValidBySlotId(booth.slotId(), Instant.now()).isEmpty(),
+                    "종료했는데 자리에 유효한 임대가 남아 있습니다 — 뒤 단언이 무의미해집니다");
+        }
+
+        private int chunkHits(Booth booth) throws Exception {
+            String json = mockMvc.perform(post("/internal/ai/chunk-search")
+                            .header("Authorization", "Bearer " + SERVICE_TOKEN)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("""
+                                    {"boothId":%d,"agentId":%d,"queryEmbedding":%s,"topK":10}"""
+                                    .formatted(booth.boothId(), booth.agentId(), unitVector())))
+                    .andExpect(status().isOk())
+                    .andReturn().getResponse().getContentAsString();
+            return read(json).get("items").size();
+        }
+
+        private String documentStatus(long documentId) {
+            return jdbc.queryForObject("SELECT processing_status FROM ai_documents WHERE id = ?",
+                    String.class, documentId);
+        }
+
+        private Long member(String prefix) {
+            Long userId = createMemberWithWallet(users, wallets, prefix);
+            dailyGrants.grantIfDue(userId);
+            return userId;
+        }
+    }
 }
