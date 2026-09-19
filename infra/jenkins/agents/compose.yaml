@@ -11,6 +11,7 @@ x-agent: &agent
       PYTHON_JSONSCHEMA_VERSION: ${PYTHON_JSONSCHEMA_VERSION:?load infra/versions.env}
   image: festa/jenkins-agent:${JENKINS_AGENT_TAG:-local}
   restart: unless-stopped
+  init: true
   user: jenkins
   security_opt:
     - no-new-privileges:true
