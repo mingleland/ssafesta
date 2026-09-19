@@ -283,11 +283,12 @@ public class GameController {
                     (`GET /{gameId}/published` 가 `403 GAME_NOT_PUBLIC`).
                     """)
     @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "게시 성공. 새 회차·게시 시각·`warnings`"),
-            @ApiResponse(responseCode = "400", description = "`VALIDATION_FAILED` — `expectedRevision` 이 없거나 음수다"),
+            @ApiResponse(responseCode = "200", description = "게시 성공. 새 회차·게시 시각·`arcadeMachineId`·`warnings`"),
+            @ApiResponse(responseCode = "400", description = "`VALIDATION_FAILED` — `expectedRevision` 이 없거나 음수, 또는 `machineId` 가 빈 문자열이다"),
             @ApiResponse(responseCode = "403", description = "`GAME_FORBIDDEN` — 내 게임이 아니다"),
-            @ApiResponse(responseCode = "404", description = "`GAME_NOT_FOUND`(없다), `GAME_DELETED`(삭제됨), 또는 게시할 작업본이 없다"),
-            @ApiResponse(responseCode = "409", description = "`GAME_REVISION_CONFLICT`(작업본 회차 불일치), `GAME_VALIDATION_FAILED`(완성 규칙 위반), `GAME_SCHEMA_UNSUPPORTED`")})
+            @ApiResponse(responseCode = "404", description = "`GAME_NOT_FOUND`(없다), `GAME_DELETED`(삭제됨), 게시할 작업본이 없다, 또는 `MACHINE_NOT_FOUND`(그런 캐비닛이 없다)"),
+            @ApiResponse(responseCode = "409", description = "`GAME_REVISION_CONFLICT`(작업본 회차 불일치), `GAME_VALIDATION_FAILED`(완성 규칙 위반), `GAME_SCHEMA_UNSUPPORTED`, "
+                    + "`ARCADE_MACHINE_TAKEN`(남이 잡은 자리), `ARCADE_SEAT_LIMIT`(1인 2대 초과), `ARCADE_ALREADY_SEATED`(이 게임이 이미 다른 자리에 있다)")})
     @PostMapping("/{gameId}/publish")
     @SecurityRequirement(name = "bearerAuth")
     public PublishResponse publish(@AuthenticationPrincipal Jwt jwt,
@@ -295,10 +296,11 @@ public class GameController {
                                    @PathVariable Long gameId,
                                    @RequestBody String body) {
         Long userId = GamePrincipal.requireMemberId(jwt);
+        PublishRequest request = PublishRequest.read(body);
         GamePublishService.PublishOutcome outcome =
-                publishService.publish(gameId, userId, PublishRequest.read(body));
+                publishService.publish(gameId, userId, request.expectedRevision(), request.machineId());
         return new PublishResponse(outcome.gameId(), outcome.publishedVersion(),
-                outcome.publishedAt(), outcome.warnings());
+                outcome.publishedAt(), outcome.arcadeMachineId(), outcome.warnings());
     }
 
     @Operation(summary = "버전 목록 — 게시 이력을 새 것부터 본다",
@@ -433,9 +435,10 @@ public class GameController {
     public record MineResponse(
             @Schema(description = "내가 만든 게임 전체. 소프트 삭제된 것도 포함한다") List<GameLifecycleService.GameSummary> games) { }
 
-    private record PublishRequest() {
+    /** {@code machineId} 는 선택이다 — 오락실에 걸지 않고 게시하는 것이 기본이다 (S15P21A604-942). */
+    private record PublishRequest(int expectedRevision, String machineId) {
 
-        static int read(String body) {
+        static PublishRequest read(String body) {
             com.fasterxml.jackson.databind.JsonNode root = GameProjectJson.parse(body);
             com.fasterxml.jackson.databind.JsonNode revision = root.get("expectedRevision");
             if (revision == null || !revision.isIntegralNumber() || revision.asInt() < 0) {
@@ -444,7 +447,25 @@ public class GameController {
                         List.of(ApiErrorDetail.field("expectedRevision",
                                 "0 이상의 정수여야 합니다.")), null);
             }
-            return revision.asInt();
+            return new PublishRequest(revision.asInt(), machineId(root));
+        }
+
+        /**
+         * 빈 문자열은 400 이다. 없는 것과 같이 취급하면 "자리를 고른 줄 알았는데 안 걸렸다" 가
+         * 조용히 성립하고, 사용자는 게시 성공만 보고 프라임 자리를 놓친다.
+         */
+        private static String machineId(com.fasterxml.jackson.databind.JsonNode root) {
+            com.fasterxml.jackson.databind.JsonNode machine = root.get("machineId");
+            if (machine == null || machine.isNull()) {
+                return null;
+            }
+            if (!machine.isTextual() || machine.asText().isBlank()) {
+                throw new ApiException(ErrorCode.VALIDATION_FAILED,
+                        "machineId 가 올바르지 않습니다.",
+                        List.of(ApiErrorDetail.field("machineId",
+                                "비어 있지 않은 문자열이거나 아예 없어야 합니다.")), null);
+            }
+            return machine.asText();
         }
     }
 
@@ -467,6 +488,9 @@ public class GameController {
             @Schema(description = "게임 식별자", example = "42") Long gameId,
             @Schema(description = "새로 만들어진 게시 회차", example = "3") int publishedVersion,
             @Schema(description = "게시 시각(UTC)", example = "2026-09-02T05:41:00Z") Instant publishedAt,
+            @Schema(description = "이번 게시로 잡은 오락실 캐비닛. 자리를 고르지 않았으면 `null` 이며, "
+                    + "이전에 잡아 둔 자리가 있다면 그대로 유지된다", example = "arcade-01")
+            String arcadeMachineId,
             @Schema(description = "게시를 막지 않은 경고. 없으면 빈 배열이다") List<String> warnings) { }
 
     public record VersionsResponse(
