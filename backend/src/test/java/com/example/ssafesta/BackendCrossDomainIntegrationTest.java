@@ -832,12 +832,7 @@ class BackendCrossDomainIntegrationTest {
                     .andExpect(jsonPath("$.code").value("DAILY_CAP_REACHED"));
 
             int balanceBefore = wallets.balanceOf(userId);
-            TimerStopService.SessionIssued issued = timerStop.issue(userId);
-            BigDecimal target = issued.targetSeconds();
-            Thread.sleep(target.multiply(new BigDecimal("1000")).longValue());
-
-            TimerStopService.SubmitResult result = timerStop.submit(userId, issued.sessionId(),
-                    new TimerStopService.SubmitCommand(target));
+            TimerStopService.SubmitResult result = playOneRound(userId);
 
             assertTrue(result.accepted(), "미션 캡은 미니게임 판정에 관여하지 않습니다");
             assertTrue(result.rewardedCoins() > 0,
@@ -917,6 +912,12 @@ class BackendCrossDomainIntegrationTest {
                     .andExpect(status().isOk());
             mockMvc.perform(claim(bearer)).andExpect(status().isOk());
 
+            // 실제로 한 판 돈다. 캡 교차 테스트의 다른 사용자가 받은 보상으로는 "한 지갑의
+            // 하루" 를 증명할 수 없다 — MINIGAME_REWARD 가 이 지갑에 실제로 들어와야 아래
+            // 사유 집합과 산술이 그 사유를 포함한 채로 맞는지 알 수 있다.
+            int minigameReward = playOneRound(userId).rewardedCoins();
+            assertTrue(minigameReward > 0, "이 아크는 지급되는 판을 전제로 합니다");
+
             int bet = slotProperties.betCoins();
             int spins = 5;
             int paidOut = 0;
@@ -945,6 +946,7 @@ class BackendCrossDomainIntegrationTest {
             assertEquals(1, ledgerCount(userId, CoinReason.INITIAL_GRANT));
             assertEquals(1, ledgerCount(userId, CoinReason.DAILY_GRANT));
             assertEquals(1, ledgerCount(userId, CoinReason.DAILY_MISSION));
+            assertEquals(1, ledgerCount(userId, CoinReason.MINIGAME_REWARD));
             assertEquals(spins, ledgerCount(userId, CoinReason.SLOT_BET));
             assertEquals(wins, ledgerCount(userId, CoinReason.SLOT_PAYOUT));
             assertEquals(1, ledgerCount(userId, CoinReason.PRIZE_PURCHASE));
@@ -952,8 +954,8 @@ class BackendCrossDomainIntegrationTest {
                     "환불은 한 건입니다 — 구매당 한 번뿐인 멱등키가 그것을 지킵니다");
 
             Set<String> expected = new HashSet<>(List.of(CoinReason.INITIAL_GRANT,
-                    CoinReason.DAILY_GRANT, CoinReason.DAILY_MISSION, CoinReason.SLOT_BET,
-                    CoinReason.PRIZE_PURCHASE, CoinReason.PRIZE_REFUND));
+                    CoinReason.DAILY_GRANT, CoinReason.DAILY_MISSION, CoinReason.MINIGAME_REWARD,
+                    CoinReason.SLOT_BET, CoinReason.PRIZE_PURCHASE, CoinReason.PRIZE_REFUND));
             if (wins > 0) {
                 expected.add(CoinReason.SLOT_PAYOUT);
             }
@@ -961,7 +963,7 @@ class BackendCrossDomainIntegrationTest {
                     "아무도 부르지 않은 사유가 원장에 들어왔거나, 불렀어야 할 사유가 빠졌습니다");
 
             // 산술: 미션 보상이 들어오고, 슬롯이 오간 만큼 움직이고, 구매와 환불이 상쇄된다.
-            assertEquals(opening + DailyMission.REWARD_COIN + paidOut - bet * spins,
+            assertEquals(opening + DailyMission.REWARD_COIN + minigameReward + paidOut - bet * spins,
                     wallets.balanceOf(userId),
                     "구매와 환불이 상쇄되지 않았거나 슬롯 산술이 어긋났습니다");
             assertBalanceMatchesLedger(wallets, userId);
@@ -981,7 +983,21 @@ class BackendCrossDomainIntegrationTest {
         }
 
         /**
-         * 캡을 그 사유로 직접 적립해 채운다. 캡의 정의가 "오늘 그 사유로 지급된 합계" 라서
+         * 보상이 나오는 타이밍스톱 한 판. 목표 시각에 맞춰 멈추려면 그만큼 실제로 흘러야
+         * 한다 — 신고한 정지 시각이 서버 경과 시각과 허용 오차 안에서 일치해야 하기
+         * 때문이다({@code elapsed-tolerance-seconds}). 비동기 상태를 폴링하는 잠이 아니라
+         * 게임 규칙이 요구하는 대기이고, 목표는 2~4초다.
+         */
+        private TimerStopService.SubmitResult playOneRound(Long userId) throws Exception {
+            TimerStopService.SessionIssued issued = timerStop.issue(userId);
+            BigDecimal target = issued.targetSeconds();
+            Thread.sleep(target.multiply(new BigDecimal("1000")).longValue());
+            return timerStop.submit(userId, issued.sessionId(),
+                    new TimerStopService.SubmitCommand(target));
+        }
+
+        /**
+         * 캡을 그 사유로 직접 적립한다. 캡의 정의가 "오늘 그 사유로 지급된 합계" 라서
          * 이 적립이 곧 캡 상태다 ({@code MinigameRewardIntegrationTest} 가 쓰는 것과 같은 수).
          */
         private void seed(Long userId, String reason, int coins) {
@@ -1253,6 +1269,19 @@ class BackendCrossDomainIntegrationTest {
 
         // ── 단계 ────────────────────────────────────────────────────────────
 
+        private void forceRelease(long boothId, Long adminId) throws Exception {
+            jdbc.update("UPDATE users SET account_type='ADMIN' WHERE id=?", adminId);
+            mockMvc.perform(post("/api/v1/admin/booths/{id}/unpublish", boothId)
+                            .header("Authorization", bearerFor(adminId))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"reason\":\"횡단 검증 — 강제 회수\"}"))
+                    .andExpect(status().isNoContent());
+        }
+
+        private long boothIdOf(long leaseId) {
+            return leases.findById(leaseId).orElseThrow().getBoothId();
+        }
+
         private void terminate(Termination cause, Long userId, String bearer, long slotId,
                                long leaseId) throws Exception {
             switch (cause) {
@@ -1264,11 +1293,10 @@ class BackendCrossDomainIntegrationTest {
                 case RETURN -> mockMvc.perform(delete("/api/v1/booth-slots/{id}/leases/mine", slotId)
                                 .header("Authorization", bearer))
                         .andExpect(status().isNoContent());
-                case ADMIN_RELEASE -> {
-                    Long adminId = member("회수운영" + userId);
-                    jdbc.update("UPDATE users SET account_type='ADMIN' WHERE id=?", adminId);
-                    leaseService.releaseByAdmin(adminId, slotId, "횡단 검증");
-                }
+                // 서비스가 아니라 HTTP 경계로 간다 — 관리자 인증·컨트롤러 매핑·사유 검증까지
+                // 지나야 실제 강제해제 경로의 회귀를 잡는다. 이 엔드포인트가 게시본을 내리고
+                // 같은 트랜잭션에서 자리를 회수한다 (AdminBoothPublicationService).
+                case ADMIN_RELEASE -> forceRelease(boothIdOf(leaseId), member("회수운영" + userId));
             }
         }
 
@@ -1322,6 +1350,9 @@ class BackendCrossDomainIntegrationTest {
         /** 한 번 세운 부스를 종료 사유마다 다시 세운다 — 상태를 공유하면 순서 의존이 생긴다. */
         private record Booth(Long ownerId, String owner, long slotId, long boothId, long projectId,
                              long agentId, long documentId) { }
+
+        /** 종료 전후로 비교할 집계. 0 끼리 같은 것은 아무 뜻이 없어 값을 실제로 만든다. */
+        private record Numbers(int visits, int responses, long leaseCost, long surveyReward) { }
 
         @ParameterizedTest(name = "{0}")
         @EnumSource(Termination.class)
@@ -1389,8 +1420,17 @@ class BackendCrossDomainIntegrationTest {
         @DisplayName("종료해도 소유자의 읽기는 보존된다")
         void theOwnerStillReadsTheirOwnContentAfterTermination(Termination cause) throws Exception {
             Booth booth = aFullyDressedBooth("종료보존" + cause.ordinal());
+            Numbers before = numbersOf(booth);
+            assertEquals(1, before.visits(), "종료 전에 방문이 있어야 비교가 의미를 가집니다");
+            assertEquals(1, before.responses());
+            assertEquals(LEASE_PRICE, before.leaseCost());
+            assertEquals(SURVEY_REWARD, before.surveyReward());
+
             terminate(cause, booth);
 
+            assertEquals(before, numbersOf(booth),
+                    "종료가 과거 집계를 바꿨습니다 — 보존은 화면이 열리는 것만이 아니라 "
+                            + "숫자가 그대로인 것입니다");
             mockMvc.perform(get("/api/v1/booths/{id}/layouts/draft", booth.boothId())
                             .header("Authorization", booth.owner()))
                     .andExpect(status().isOk());
@@ -1402,12 +1442,6 @@ class BackendCrossDomainIntegrationTest {
                             .param("from", "2000-01-01T00:00:00Z")
                             .param("to", "2100-01-01T00:00:00Z"))
                     .andExpect(status().isOk());
-            mockMvc.perform(get("/api/v1/booths/{id}/dashboard/summary", booth.boothId())
-                            .header("Authorization", booth.owner())
-                            .param("from", "2000-01-01T00:00:00Z")
-                            .param("to", "2100-01-01T00:00:00Z"))
-                    .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.leaseCostCoin").value(LEASE_PRICE));
         }
 
         /**
@@ -1434,9 +1468,12 @@ class BackendCrossDomainIntegrationTest {
             assertEquals("DISABLED", documentStatus(booth.documentId()));
             assertEquals(0, chunkHits(booth), "종료한 부스의 문서가 검색에 남아 있습니다");
 
-            // 늦은 완료 — 응답은 계약이 아니라서 보지 않고, 상태가 뒤집혔는지만 본다.
-            mockMvc.perform(post("/api/v1/documents/{id}/complete", booth.documentId())
-                    .header("Authorization", booth.owner()));
+            // 늦은 완료 — 어떤 상태 코드인지는 계약이 아니라 단언하지 않는다. 다만 5xx 가
+            // 아닌 것은 본다: 상태만 보면 complete 가 터져도 "DISABLED 유지" 로 통과한다.
+            int late = mockMvc.perform(post("/api/v1/documents/{id}/complete", booth.documentId())
+                            .header("Authorization", booth.owner()))
+                    .andReturn().getResponse().getStatus();
+            assertTrue(late < 500, "늦은 완료가 서버 오류로 끝났습니다: " + late);
 
             assertEquals("DISABLED", documentStatus(booth.documentId()),
                     "늦은 완료가 임대 만료 판정을 뒤집었습니다 (spec 007 FR-040)");
@@ -1463,7 +1500,50 @@ class BackendCrossDomainIntegrationTest {
             long agentId = createAgent(owner, boothId);
             long documentId = uploadDocument(owner, agentId, boothId);
             deliverProcessingResults(completeUploadOnce(owner, documentId));
+            aVisitorComesAndAnswers(boothId);
             return new Booth(ownerId, owner, slotId, boothId, projectId, agentId, documentId);
+        }
+
+        /**
+         * 실제 API 로 방문 하나와 설문 응답 하나를 남긴다. 집계 표에 직접 INSERT 하지 않는
+         * 이유는 그렇게 심은 값이 실제 쓰기 경로와 갈라져도 조용하기 때문이다 —
+         * {@code BoothDashboardApiIntegrationTest} 가 그렇게 심는다.
+         */
+        private void aVisitorComesAndAnswers(long boothId) throws Exception {
+            Long visitorId = member("종료방문객" + boothId);
+            String visitor = bearerFor(visitorId);
+
+            String enter = mockMvc.perform(post("/api/v1/booths/{id}/visits", boothId)
+                            .header("Authorization", visitor))
+                    .andExpect(status().isCreated())
+                    .andReturn().getResponse().getContentAsString();
+            mockMvc.perform(post("/api/v1/booths/{boothId}/visits/{visitId}/exit", boothId,
+                            read(enter).get("visitId").asLong())
+                    .header("Authorization", visitor)).andExpect(status().isNoContent());
+
+            String run = mockMvc.perform(get("/api/v1/booths/{id}/survey/run", boothId)
+                            .header("Authorization", visitor))
+                    .andExpect(status().isOk())
+                    .andReturn().getResponse().getContentAsString();
+            JsonNode view = read(run);
+            mockMvc.perform(submit(visitor, view.get("surveyId").asLong(), """
+                            {"answers":[{"questionId":%d,"rating":4}]}"""
+                            .formatted(view.get("questions").get(0).get("questionId").asLong())))
+                    .andExpect(status().isCreated());
+        }
+
+        private Numbers numbersOf(Booth booth) throws Exception {
+            String json = mockMvc.perform(get("/api/v1/booths/{id}/dashboard/summary",
+                            booth.boothId())
+                            .header("Authorization", booth.owner())
+                            .param("from", ALL_TIME_FROM).param("to", ALL_TIME_TO))
+                    .andExpect(status().isOk())
+                    .andReturn().getResponse().getContentAsString();
+            JsonNode summary = read(json);
+            return new Numbers(summary.get("visits").asInt(),
+                    summary.get("surveyResponses").asInt(),
+                    summary.get("leaseCostCoin").asLong(),
+                    summary.get("surveyRewardCoin").asLong());
         }
 
         private void terminate(Termination cause, Booth booth) throws Exception {
@@ -1478,10 +1558,15 @@ class BackendCrossDomainIntegrationTest {
                                 delete("/api/v1/booth-slots/{id}/leases/mine", booth.slotId())
                                         .header("Authorization", booth.owner()))
                         .andExpect(status().isNoContent());
+                // HTTP 경계로 간다 — 관리자 인증·매핑·사유 검증까지 지나야 실제 경로다.
                 case ADMIN_RELEASE -> {
                     Long adminId = member("종료운영" + booth.boothId());
                     jdbc.update("UPDATE users SET account_type='ADMIN' WHERE id=?", adminId);
-                    leaseService.releaseByAdmin(adminId, booth.slotId(), "횡단 검증");
+                    mockMvc.perform(post("/api/v1/admin/booths/{id}/unpublish", booth.boothId())
+                                    .header("Authorization", bearerFor(adminId))
+                                    .contentType(MediaType.APPLICATION_JSON)
+                                    .content("{\"reason\":\"횡단 검증 — 강제 회수\"}"))
+                            .andExpect(status().isNoContent());
                 }
             }
             assertTrue(leases.findValidBySlotId(booth.slotId(), Instant.now()).isEmpty(),
@@ -1522,6 +1607,16 @@ class BackendCrossDomainIntegrationTest {
      * 갈리는 지점이 셋 있다 — 읽기는 통과하되 감사하지 않고, 마스터 소유 부스는 읽기만 되고,
      * 실패한 변경은 감사 행을 남기지 않는다.
      *
+     * <p><b>이 매트릭스가 덮는 면.</b> 세 게이트를 모두 담는다 —
+     * {@code requireActiveEditor}(facade·homepage·project 수정·agent 수정·survey·
+     * upload-url), {@code requireModifier}(layout publish), {@code requireEditor}
+     * (document complete·읽기 넷). 덮지 않는 것은 <b>역할마다 다시 부를 수 없는 경로</b>다:
+     * agent·project 생성은 부스당 하나라({@code AGENT_LIMIT_EXCEEDED}·
+     * {@code PROJECT_ALREADY_EXISTS}) 두 번째 역할부터 권한이 아니라 한도로 갈리고, agent·document·project 삭제는 뒤 역할이 밟을 대상을 없앤다.
+     * layout draft 저장은 {@code expectedRevision} 이 매번 달라져 고정 목록에 들어가지
+     * 않는다 — 같은 {@code requireModifier} 게이트를 publish 가 대신 지킨다. 삭제 계열의
+     * 역할 판정은 각 도메인 테스트 소관으로 남는다.
+     *
      * <p><b>기대값은 전부 문서에 있다.</b> 권한 결정표는
      * {@code specs/021-admin-booth-operations/data-model.md} 의 "권한 결정표" 이고, 감사 필드는
      * 같은 spec 의 {@code contracts/admin-booth-access.md} 다. 구현 주석을 근거로 보안 정책을
@@ -1538,7 +1633,8 @@ class BackendCrossDomainIntegrationTest {
         /** 한 쓰기 경로. {@code label} 은 실패했을 때 어느 칸인지 말해 준다. */
         private record Write(String label, Function<String, RequestBuilder> request) { }
 
-        private record Fixture(Long ownerId, String owner, long boothId, long agentId) { }
+        private record Fixture(Long ownerId, String owner, long boothId, long agentId,
+                               long projectId, long documentId) { }
 
         /**
          * 관리자가 타 부스의 쓰기 경로를 전부 밟고, 경로마다 감사 행이 정확히 하나 남는다.
@@ -1735,11 +1831,6 @@ class BackendCrossDomainIntegrationTest {
                     new Write("layout publish",
                             bearer -> post("/api/v1/booths/{id}/layouts/publish", boothId)
                                     .header("Authorization", bearer)),
-                    new Write("project", bearer -> post("/api/v1/booths/{id}/projects", boothId)
-                            .header("Authorization", bearer)
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content("""
-                                    {"name":"매트릭스 전시","gitUrl":"https://git.example.com/m"}""")),
                     // 생성이 아니라 수정이다 — AI 직원은 부스당 하나라(AGENT_LIMIT_EXCEEDED)
                     // 생성을 매트릭스에 두면 두 번째 역할부터 권한이 아니라 한도로 갈린다.
                     // 같은 requireActiveEditor 게이트를 지난다.
@@ -1750,6 +1841,21 @@ class BackendCrossDomainIntegrationTest {
                     new Write("survey", bearer -> put("/api/v1/booths/{id}/survey", boothId)
                             .header("Authorization", bearer)
                             .contentType(MediaType.APPLICATION_JSON).content(SURVEY)),
+                    // 생성이 아니라 수정이다 — 프로젝트도 부스당 하나라
+                    // (PROJECT_ALREADY_EXISTS) 생성은 두 번째 역할부터 권한이 아니라
+                    // 중복으로 갈린다. 같은 requireActiveEditor 게이트를 지난다.
+                    new Write("project update", bearer -> patch("/api/v1/projects/{id}",
+                            booth.projectId())
+                            .header("Authorization", bearer)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"name\":\"매트릭스 개정\"}")),
+                    // requireEditor 쪽 유일한 쓰기다. 이 줄이 없으면 매트릭스가
+                    // requireActiveEditor·requireModifier 두 게이트만 보게 되고, 만료를
+                    // 허용하는 세 번째 게이트가 역할 판정을 잃어도 초록이다. 멱등이라
+                    // 역할마다 다시 불러도 된다.
+                    new Write("document complete",
+                            bearer -> post("/api/v1/documents/{id}/complete", booth.documentId())
+                                    .header("Authorization", bearer)),
                     // sha 는 호출마다 다르다 — 같은 값이면 에이전트별 활성 중복 색인(V17)에
                     // 걸려 두 번째 호출이 권한이 아니라 중복으로 갈린다.
                     new Write("document upload-url",
@@ -1771,7 +1877,9 @@ class BackendCrossDomainIntegrationTest {
                     .andReturn().getResponse().getContentAsString();
             long boothId = read(json).get("boothId").asLong();
             publishLayout(mockMvc, boothId, owner);
-            return new Fixture(ownerId, owner, boothId, createAgent(owner, boothId));
+            long agentId = createAgent(owner, boothId);
+            return new Fixture(ownerId, owner, boothId, agentId,
+                    registerProject(owner, boothId), uploadDocument(owner, agentId, boothId));
         }
 
         /** 실패했을 때 어느 칸이 어떤 몸통으로 막혔는지 말한다 — 매트릭스는 그러지 않으면 못 읽는다. */
