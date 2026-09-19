@@ -63,4 +63,22 @@ class ArcadeMachineSingleQueryTest {
         assertTrue(bindingReads.getFirst().contains("games"),
                 "게임이 같은 문장에 없다 — 따로 읽으면 두 snapshot 이 갈린다: " + bindingReads.getFirst());
     }
+
+    @Test
+    void resolvingAllMachinesIssuesExactlyOneStatement() {
+        Long userId = GameTestSupport.createMember(users, "목록단일질의");
+        Long gameId = games.save(new Game(userId, "목록단일질의 게임")).getId();
+        bindings.save(new ArcadeMachineBinding("all-query-arcade-" + gameId, gameId));
+
+        CapturingStatementInspector.clear();
+
+        resolver.resolveAll();
+
+        List<String> bindingReads = CapturingStatementInspector.matching("arcade_machine_bindings");
+        assertEquals(1, bindingReads.size(),
+                "목록도 바인딩과 게임을 한 질의로 읽어야 탈퇴 커밋 사이에서 찢어지지 않는다. 실행된 문장: "
+                        + bindingReads);
+        assertTrue(bindingReads.getFirst().contains("games"),
+                "게임이 같은 목록 질의에 없다: " + bindingReads.getFirst());
+    }
 }
