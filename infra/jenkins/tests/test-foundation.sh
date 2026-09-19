@@ -235,8 +235,35 @@ grep -q "permission('hudson.model.Item.Build', 'unity-mr-validator')" "${unity_m
   || fail "Unity MR validator cannot build its own job"
 grep -q "node('unity-6000.0.78f1')" "${unity_mr_pipeline}" \
   || fail "Unity MR validation does not use Unity agent"
-grep -q "gitlabCommitStatus(name: 'unity-mr-validation')" "${unity_mr_pipeline}" \
+
+"${python_bin}" - "${repo_root}/.gitlab-ci.yml" <<'PY_GAME_RULE'
+import pathlib
+import sys
+
+text = pathlib.Path(sys.argv[1]).read_text(encoding="utf-8")
+start = text.index(".game-changes:")
+end = text.index("unity-mr-validation-dispatch:", start)
+block = text[start:end]
+
+assert "festa-unity/**/*" in block
+assert "ci/test" in block
+assert "ci/lib.sh" in block
+assert "infra/unity-server/" not in block
+PY_GAME_RULE
+
+grep -q '"gameBuildRequired": game_build_required'   "${repo_root}/infra/jenkins/scripts/detect-changed-components.sh"   || fail "component detector omits the explicit Unity game-build decision"
+
+grep -q 'infra/unity-server/tests/'   "${repo_root}/infra/jenkins/scripts/detect-changed-components.sh"   || fail "Unity Server tests are not classified as validation-only"
+
+grep -q 'selection.gameBuildRequired' "${develop_pipeline}"   || fail "develop pipeline ignores the detector Unity build decision"
+
+grep -q 'Unity candidate build skipped' "${develop_pipeline}"   || fail "develop pipeline lacks the shared-infra Unity skip path"
+grep -q "gitlabCommitStatus(" "${unity_mr_pipeline}" \
   || fail "Unity MR validation does not publish the required GitLab status context"
+grep -Fq "connection: gitLabConnection(gitlabConnectionName)" "${unity_mr_pipeline}" \
+  || fail "Unity MR validation does not bind the configured GitLab connection"
+grep -Fq "builds: [[projectId: gitlabProjectId, revisionHash: sourceSha]]" "${unity_mr_pipeline}" \
+  || fail "Unity MR validation does not bind the exact MR commit to its GitLab status"
 grep -q 'with-credentials.sh -- bash ci/test' "${unity_mr_pipeline}" \
   || fail "Unity MR validation does not use the credential-masking command wrapper"
 grep -q '^set +x$' "${repo_root}/infra/jenkins/scripts/with-credentials.sh" \

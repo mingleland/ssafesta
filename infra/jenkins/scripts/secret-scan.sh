@@ -19,6 +19,18 @@ if [[ -z "${python_bin}" ]]; then
     exit 69
   fi
 fi
+# fixture를 명시적으로 검사했는지는 --tracked 확장 이전의 요청 path로 판정한다.
+# git ls-files 이후에는 디렉터리가 개별 파일 roots로 바뀌므로 그 시점의
+# root.is_dir()로 판정하면 explicit fixture가 사라진다.
+explicit_fixture=false
+for requested_path in "${paths[@]}"; do
+  normalized_requested="${requested_path//\\//}"
+  if [[ "${normalized_requested}" == *"infra/tests/security/fixtures"* ]]; then
+    explicit_fixture=true
+    break
+  fi
+done
+
 if "${tracked_only}"; then
   git rev-parse --is-inside-work-tree >/dev/null 2>&1 || { echo '--tracked requires a Git worktree.' >&2; exit 64; }
   mapfile -d '' python_paths < <(git ls-files -z -- "${paths[@]}")
@@ -30,12 +42,13 @@ if command -v cygpath >/dev/null 2>&1; then
   for path in "${python_paths[@]}"; do windows_paths+=("$(cygpath -w "${path}")"); done
   python_paths=("${windows_paths[@]}")
 fi
-"${python_bin}" - "${SECRET_CANARY:-}" "${python_paths[@]}" <<'PY'
+"${python_bin}" - "${SECRET_CANARY:-}" "${explicit_fixture}" "${python_paths[@]}" <<'PY'
 import pathlib,re,sys
-canary=sys.argv[1]; roots=[pathlib.Path(p) for p in sys.argv[2:]]
+canary=sys.argv[1]
+explicit_fixture=sys.argv[2] == 'true'
+roots=[pathlib.Path(p) for p in sys.argv[3:]]
 excluded={'.git','Library','Temp','Logs','obj','Builds','node_modules','.venv','venv','jenkins_home'}
 fixture_path='infra/tests/security/fixtures'
-explicit_fixture=any(root.is_dir() and fixture_path in root.as_posix() for root in roots)
 safe_values={'[REDACTED]','[PLACEHOLDER]','[TEST-CANARY]','[TEST-ONLY]'}
 def safe_literal(value): return value in safe_values or value.startswith('$') or '...' in value
 sensitive_key=r'(?:[A-Za-z0-9_-]*(?:password|passwd|secret|api[_-]?key|access[_-]?token|refresh[_-]?token))'
