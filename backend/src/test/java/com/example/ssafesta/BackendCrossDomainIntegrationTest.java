@@ -23,10 +23,12 @@ import com.example.ssafesta.ai.FakeDocumentProcessingClient;
 import com.example.ssafesta.auth.AccessTokenService;
 import com.example.ssafesta.auth.MemberSessionService;
 import com.example.ssafesta.booth.AdminBoothPublicationService;
+import com.example.ssafesta.booth.BoothExpiredException;
 import com.example.ssafesta.booth.BoothFacadeService;
 import com.example.ssafesta.booth.BoothLeaseRepository;
 import com.example.ssafesta.booth.BoothLeaseService;
 import com.example.ssafesta.booth.LeaseStatus;
+import com.example.ssafesta.booth.SlotAlreadyLeasedException;
 import com.example.ssafesta.booth.BoothRepository;
 import com.example.ssafesta.eventshop.EventPrize;
 import com.example.ssafesta.eventshop.EventPrizeRepository;
@@ -1878,16 +1880,16 @@ class BackendCrossDomainIntegrationTest {
                 String bearer = bearerFor(actorId);
                 boolean allowed = ALLOWED.contains(who);
 
-                mockMvc.perform(post("/api/v1/booths/{id}/projects", booth.boothId())
-                                .header("Authorization", bearer)
-                                .contentType(MediaType.APPLICATION_JSON)
-                                .content("""
-                                        {"name":"생성 전시","gitUrl":"https://git.example.com/c"}"""))
-                        .andExpect(allowed ? status().isCreated() : status().isForbidden());
-                mockMvc.perform(post("/api/v1/booths/{id}/agents", booth.boothId())
-                                .header("Authorization", bearer)
-                                .contentType(MediaType.APPLICATION_JSON).content(AGENT))
-                        .andExpect(allowed ? status().isCreated() : status().isForbidden());
+                judge(post("/api/v1/booths/{id}/projects", booth.boothId())
+                        .header("Authorization", bearer)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"name":"생성 전시","gitUrl":"https://git.example.com/c"}"""),
+                        allowed, status().isCreated(), who + " project create");
+                judge(post("/api/v1/booths/{id}/agents", booth.boothId())
+                        .header("Authorization", bearer)
+                        .contentType(MediaType.APPLICATION_JSON).content(AGENT),
+                        allowed, status().isCreated(), who + " agent create");
 
                 assertEquals(auditExpectedFor(who, 2), auditRows(actorId, booth.boothId()),
                         who + " — 생성의 감사 계약이 어긋났습니다");
@@ -1910,15 +1912,14 @@ class BackendCrossDomainIntegrationTest {
                 Fixture booth = aLeasedBooth("삭제" + who);
                 Long actorId = actorFor(who, booth);
                 String bearer = bearerFor(actorId);
-                ResultMatcher expected = ALLOWED.contains(who)
-                        ? status().isNoContent() : status().isForbidden();
+                boolean allowed = ALLOWED.contains(who);
 
-                mockMvc.perform(delete("/api/v1/documents/{id}", booth.documentId())
-                                .header("Authorization", bearer))
-                        .andExpect(expected);
-                mockMvc.perform(delete("/api/v1/agents/{id}", booth.agentId())
-                                .header("Authorization", bearer))
-                        .andExpect(expected);
+                judge(delete("/api/v1/documents/{id}", booth.documentId())
+                                .header("Authorization", bearer),
+                        allowed, status().isNoContent(), who + " document delete");
+                judge(delete("/api/v1/agents/{id}", booth.agentId())
+                                .header("Authorization", bearer),
+                        allowed, status().isNoContent(), who + " agent delete");
 
                 // 삭제도 관리자 자격으로 지나면 감사 대상이다 — 둘 다 requireModifier 를
                 // 거친다(문서는 직접, 에이전트는 requireActiveEditor 를 통해).
@@ -1928,6 +1929,23 @@ class BackendCrossDomainIntegrationTest {
         }
 
         // ── 단계 ────────────────────────────────────────────────────────────
+
+        /**
+         * 통과면 주어진 성공 코드, 아니면 {@code 403 BOOTH_EDITOR_FORBIDDEN} 이다.
+         *
+         * <p>거부를 상태 코드로만 보면 다른 이유의 403 이 권한 판정을 대신 통과시킨다 —
+         * 종료 단언에서 {@code AGENT_LIMIT_EXCEEDED} 가 409 를 대신했던 것과 같은 함정이다.
+         */
+        private void judge(RequestBuilder request, boolean allowed, ResultMatcher success,
+                           String label) throws Exception {
+            if (allowed) {
+                mockMvc.perform(request).andExpect(success);
+                return;
+            }
+            mockMvc.perform(request)
+                    .andExpect(status().isForbidden())
+                    .andExpect(jsonPath("$.code").value("BOOTH_EDITOR_FORBIDDEN"));
+        }
 
         /** 관리자 자격으로 지난 것만 감사 대상이다 — 소유자·스태프는 0 이고 거부는 0 이다. */
         private int auditExpectedFor(String who, int writesAttempted) {
@@ -2076,11 +2094,16 @@ class BackendCrossDomainIntegrationTest {
             return revision == null ? 0 : revision;
         }
 
+        /**
+         * {@code action} 까지 거른다. 종류를 안 보면 엉뚱한 감사(회수·비공개 등)가 들어와도
+         * 생성·삭제 테스트가 수만 맞으면 통과한다 — 감사는 "몇 건" 이 아니라 "무엇" 이다.
+         */
         private int auditRows(Long actorUserId, long boothId) {
             return countOf("""
                     SELECT count(*) FROM admin_actions
-                     WHERE actor_user_id = ? AND target_type = ? AND target_id = ?
-                    """, actorUserId, AdminActionRecorder.TARGET_BOOTH, boothId);
+                     WHERE actor_user_id = ? AND action = ? AND target_type = ? AND target_id = ?
+                    """, actorUserId, AdminActionRecorder.BOOTH_EDIT,
+                    AdminActionRecorder.TARGET_BOOTH, boothId);
         }
 
         private void addStaff(long boothId, Long userId, String role) {
@@ -2169,8 +2192,10 @@ class BackendCrossDomainIntegrationTest {
                         facades.update(boothId, ownerId, new BoothFacadeService.FacadeCommand(
                                 null, "WARM", null, "경합 간판", null));
                         return true;
-                    } catch (RuntimeException refused) {
-                        // 회수가 먼저 커밋됐다 — 편집이 떨어지는 것이 정상이다.
+                    } catch (BoothExpiredException refused) {
+                        // 회수가 먼저 커밋됐다 — 편집이 떨어지는 유일한 정상 사유다.
+                        // 더 넓게 잡으면 교착·낙관적 잠금 실패 같은 운영 장애가 "경합에서
+                        // 졌다" 로 삼켜져, 이 테스트가 가장 잡아야 할 것을 숨긴다.
                         return false;
                     }
                 }));
@@ -2228,7 +2253,7 @@ class BackendCrossDomainIntegrationTest {
 
             publication.unpublish(adminId, boothId, "경합 검증 — 반대 순서");
 
-            assertThrows(RuntimeException.class, () -> facades.update(boothId, lateOwnerId,
+            assertThrows(BoothExpiredException.class, () -> facades.update(boothId, lateOwnerId,
                     new BoothFacadeService.FacadeCommand(null, "WARM", null, "늦은 간판", null)),
                     "회수가 끝난 뒤의 편집은 거부돼야 합니다");
             assertNull(jdbc.queryForObject("SELECT facade_sign_text FROM booths WHERE id = ?",
@@ -2269,7 +2294,10 @@ class BackendCrossDomainIntegrationTest {
                     try {
                         leaseService.lease(newcomerId, slotId, 1);
                         return true;
-                    } catch (RuntimeException refused) {
+                    } catch (SlotAlreadyLeasedException refused) {
+                        // 스위퍼가 아직 자리를 안 놓았다 — 거부의 유일한 정상 사유다.
+                        // RuntimeException 으로 잡으면 결제 실패·교착·제약 위반이 전부
+                        // "정상 거부" 가 되고, 아래 "과금 0" 단언이 그것을 덮어 준다.
                         return false;
                     }
                 }));
