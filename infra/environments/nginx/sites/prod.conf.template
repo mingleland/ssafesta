@@ -1,0 +1,24 @@
+server {
+    listen 80;
+    server_name ${ROOT_DOMAIN};
+    return 301 https://$host$request_uri;
+}
+server {
+    listen 443 ssl;
+    server_name ${ROOT_DOMAIN};
+    ssl_certificate ${NGINX_ORIGIN_CERTIFICATE_FILE};
+    ssl_certificate_key ${NGINX_ORIGIN_PRIVATE_KEY_FILE};
+    location = /unity { return 301 /unity/; }
+    location = /unity/manifest.json { alias /srv/festa/webgl/prod/current/manifest.json; default_type application/json; add_header Cache-Control "no-cache" always; }
+    location = /unity/index.html { alias /srv/festa/webgl/prod/current/index.html; default_type text/html; add_header Cache-Control "no-cache" always; }
+    location ~ ^/unity/Build/([^/]+\.wasm)\.(br|unityweb)$ { alias /srv/festa/webgl/prod/current/Build/$1.$2; default_type application/wasm; add_header Content-Encoding br always; add_header Vary Accept-Encoding always; add_header Cache-Control "public, max-age=31536000, immutable" always; }
+    location ~ ^/unity/Build/([^/]+\.js)\.(br|unityweb)$ { alias /srv/festa/webgl/prod/current/Build/$1.$2; default_type application/javascript; add_header Content-Encoding br always; add_header Vary Accept-Encoding always; add_header Cache-Control "public, max-age=31536000, immutable" always; }
+    location ~ ^/unity/Build/([^/]+\.data)\.(br|unityweb)$ { alias /srv/festa/webgl/prod/current/Build/$1.$2; default_type application/octet-stream; add_header Content-Encoding br always; add_header Vary Accept-Encoding always; add_header Cache-Control "public, max-age=31536000, immutable" always; }
+    location /unity/ { alias /srv/festa/webgl/prod/current/; add_header Cache-Control "no-cache" always; }
+    location ^~ /ws { proxy_pass http://127.0.0.1:28081; proxy_http_version 1.1; proxy_set_header Upgrade $http_upgrade; proxy_set_header Connection "upgrade"; proxy_set_header Host $host; proxy_set_header X-Forwarded-Proto https; proxy_read_timeout 180s; proxy_send_timeout 180s; proxy_buffering off; }
+    location /api/ { proxy_pass http://127.0.0.1:28081; proxy_set_header Host $host; proxy_set_header X-Forwarded-Proto https; }
+    location /oauth2/ { proxy_pass http://127.0.0.1:28081; proxy_set_header Host $host; proxy_set_header X-Forwarded-Proto https; }
+    location /login/oauth2/ { proxy_pass http://127.0.0.1:28081; proxy_set_header Host $host; proxy_set_header X-Forwarded-Proto https; }
+    location /ai/v1/ { proxy_pass http://127.0.0.1:28082; proxy_buffering off; proxy_set_header Host $host; proxy_set_header X-Forwarded-Proto https; }
+    location / { proxy_pass http://127.0.0.1:28080; proxy_set_header Host $host; proxy_set_header X-Forwarded-Proto https; }
+}

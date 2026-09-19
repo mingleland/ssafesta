@@ -6,5 +6,6 @@ jobs:
   - file: /var/jenkins_home/job_dsl/gitlab-webgl-package-deploy.groovy
   - file: /var/jenkins_home/job_dsl/gitlab-world-package-publish.groovy
   - file: /var/jenkins_home/job_dsl/gitlab-demo-promotion.groovy
+  - file: /var/jenkins_home/job_dsl/gitlab-production-promotion.groovy
   - file: /var/jenkins_home/job_dsl/gitlab-postgres-backup.groovy
   - file: /var/jenkins_home/job_dsl/gitlab-postgres-restore-rehearsal.groovy
