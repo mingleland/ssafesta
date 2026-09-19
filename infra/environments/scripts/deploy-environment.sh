@@ -52,7 +52,7 @@ source_commit="${source_commit%$'\r'}"
 [[ "${DEV_MOCK_COMPONENTS:-}" =~ ^$|^(ai|back|front|game)(,(ai|back|front|game))*$ ]] || fail 'DEV_MOCK_COMPONENTS must be a comma-separated component list'
 
 if [[ "${DEV_BATCH_ROLLBACK:-0}" == 1 ]]; then
-  batch_state_root="${DEV_BATCH_STATE_ROOT:-${ENVIRONMENT_STATE_DIR:-/tmp/festa-environments}/dev/batches}"
+  batch_state_root="${DEV_BATCH_STATE_ROOT:-${ENVIRONMENT_STATE_DIR:-/var/lib/festa-environments}/dev/batches}"
   expected_snapshot="${batch_state_root}/${DEV_BATCH_ID:-}/before/${component}.json"
   [[ -n "${DEV_BATCH_ID:-}" && -f "${expected_snapshot}" ]] || fail 'dev batch rollback requires its captured snapshot'
   [[ "$(readlink -f -- "${release_manifest}")" == "$(readlink -f -- "${expected_snapshot}")" ]] || fail 'dev batch rollback manifest is not the captured snapshot'
@@ -117,7 +117,7 @@ snapshot() {
   sort -o "${output}" "${output}"
 }
 
-state_dir="${ENVIRONMENT_STATE_DIR:-/tmp/festa-environments}/${environment}/${component}"
+state_dir="${ENVIRONMENT_STATE_DIR:-/var/lib/festa-environments}/${environment}/${component}"
 mkdir -p "${state_dir}"
 snapshot "${state_dir}/before.tsv"
 
@@ -126,7 +126,12 @@ base="${repo_root}/infra/environments/compose/${environment}/base.yaml"
 overlay="${repo_root}/infra/environments/compose/${environment}/${component}.yaml"
 compose=("${docker_bin}" compose --project-name "festa-${environment}" --file "${base}" --file "${overlay}" --profile "${component}")
 "${compose[@]}" config --quiet
-"${compose[@]}" up -d --no-deps --wait "${component}"
+if ! "${compose[@]}" up -d --no-deps --wait "${component}"; then
+  # 실패한 candidate를 unless-stopped 상태로 방치하면 배포 실패가 host-wide
+  # restart storm으로 확대된다. rollback 여부와 관계없이 먼저 target을 정지한다.
+  "${compose[@]}" stop "${component}" >/dev/null 2>&1 || true
+  fail "component deployment failed readiness; target stopped to prevent restart storm: ${environment}/${component}"
+fi
 snapshot "${state_dir}/after.tsv"
 printf '%s\t%s\t%s\t%s\t%s\n' "${release_id}" "${image_ref}" "${content_id}" "${source_commit}" "${DEV_MOCK_COMPONENTS:-}" \
   >"${state_dir}/deployment.tsv"
