@@ -24,7 +24,7 @@ done
 case "${environment}" in dev|demo) ;; *) usage; fail 'environment must be dev or demo' ;; esac
 case "${component}" in ai|back|front|game) ;; *) usage; fail 'component must be ai, back, front, or game' ;; esac
 
-state_dir="${ENVIRONMENT_STATE_DIR:-/tmp/festa-environments}/${environment}/${component}"
+state_dir="${ENVIRONMENT_STATE_DIR:-/var/lib/festa-environments}/${environment}/${component}"
 project="festa-${environment}"
 before="${state_dir}/before.tsv"
 deployed_after="${state_dir}/after.tsv"

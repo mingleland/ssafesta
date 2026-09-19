@@ -183,6 +183,11 @@ def call() {
     }
     candidateManifest('game', 'game', gameMetadataDir, gameManifest, gameBundle, 'candidate-release-manifest-game')
 
+    if (!deployGame) {
+        echo 'NO_OP: game candidate built for CI only; deployment was not requested by the component detector'
+        return
+    }
+
     stage('Deploy Dedicated Server') {
         node('deploy') {
             ws('/home/jenkins/agent/deploy/workspaces/develop-game-deploy') {

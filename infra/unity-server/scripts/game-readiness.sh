@@ -59,7 +59,7 @@ if [[ -z "${GAME_READINESS_SKIP_LISTENER_CONNECT:-}" ]]; then
   # 0.25초 만에 거부. Unity 데디케이티드 서버가 월드 씬을 올려 포트를 열기 전이다.
   # 단발 probe 는 구조적으로 이르므로 유한 예산 안에서 폴링한다. 예산을 넘기면 그대로 실패시킨다 —
   # 게이트를 무르게 하지 않는다. 걸린 시간을 남기는 이유는 다음 배포에서 예산을 근거로 조정하기 위해서다.
-  listener_budget_seconds="${GAME_READINESS_LISTENER_TIMEOUT_SECONDS:-120}"
+  listener_budget_seconds="${GAME_READINESS_LISTENER_TIMEOUT_SECONDS:-180}"
   listener_started_at="${SECONDS}"
   listener_deadline=$(( listener_started_at + listener_budget_seconds ))
   listener_attempts=0

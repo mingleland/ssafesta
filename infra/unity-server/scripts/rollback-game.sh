@@ -18,7 +18,7 @@ candidate_path="${GAME_DEPLOY_STATE_DIR}/candidate.json"
 known_good_path="${GAME_DEPLOY_STATE_DIR}/known-good.json"
 lock_timeout_seconds="${GAME_DEPLOY_LOCK_TIMEOUT_SECONDS:-300}"
 
-[[ -f "${GAME_ENV_FILE}" && -f "${candidate_path}" && -f "${known_good_path}" ]] || { echo 'game environment, candidate, and known-good state are required' >&2; exit 66; }
+[[ -f "${GAME_ENV_FILE}" && -f "${candidate_path}" ]] || { echo 'game environment and candidate state are required' >&2; exit 66; }
 [[ "${compose_project}" == 'festa-demo-world' && "${compose_service}" == 'demo-game' ]] || { echo 'unexpected game Compose target' >&2; exit 64; }
 [[ "${lock_timeout_seconds}" =~ ^[1-9][0-9]*$ ]] || { echo 'GAME_DEPLOY_LOCK_TIMEOUT_SECONDS must be positive' >&2; exit 64; }
 [[ "${reason}" =~ ^(candidate_verification_failed|internal_listener_failed|external_wss_failed|approved_admission_failed)$ ]] || { echo 'unsupported rollback reason' >&2; exit 64; }
@@ -26,6 +26,62 @@ command -v flock >/dev/null 2>&1 || { echo 'flock is required for the game deplo
 
 python_bin="${PYTHON_BIN:-python3}"
 command -v "${python_bin}" >/dev/null 2>&1 || { echo 'Python 3 is required' >&2; exit 69; }
+
+# rollback baseline 자체가 사라졌다면 unverified candidate를 live로 남기지 않는다.
+# candidate와 동일한 image가 현재 실행 중일 때만 정지하므로 다른 runtime을 오인 정지하지 않는다.
+if [[ ! -f "${known_good_path}" ]]; then
+  mkdir -p "${GAME_DEPLOY_STATE_DIR}/failed"
+
+  IFS=$'\t' read -r candidate_release candidate_id < <(
+    "${python_bin}" - "${candidate_path}" <<'PYFAILREAD'
+import json, pathlib, sys
+
+candidate = json.loads(pathlib.Path(sys.argv[1]).read_text(encoding='utf-8'))
+print(candidate.get('releaseId', ''), candidate.get('contentId', ''), sep='\t')
+PYFAILREAD
+  )
+
+  "${python_bin}" - "${candidate_path}" "${GAME_DEPLOY_STATE_DIR}/failed" <<'PYFAIL'
+import datetime, json, pathlib, sys
+
+candidate_path = pathlib.Path(sys.argv[1])
+failed_root = pathlib.Path(sys.argv[2])
+
+candidate = json.loads(candidate_path.read_text(encoding='utf-8'))
+failed = dict(candidate)
+failed.update({
+    'state': 'FAILED',
+    'failureReason': 'rollback_baseline_missing',
+    'failedAt': datetime.datetime.now(datetime.timezone.utc)
+        .replace(microsecond=0)
+        .isoformat()
+        .replace('+00:00', 'Z'),
+})
+
+tmp = candidate_path.with_suffix('.tmp')
+tmp.write_text(json.dumps(failed, indent=2) + '\n', encoding='utf-8')
+tmp.replace(candidate_path)
+
+release_id = candidate.get('releaseId')
+if release_id:
+    target = failed_root / f'{release_id}.json'
+    tmp = target.with_suffix('.tmp')
+    tmp.write_text(json.dumps(failed, indent=2) + '\n', encoding='utf-8')
+    tmp.replace(target)
+PYFAIL
+
+  container_id="$(
+    "${docker_bin}" ps -aq       --filter "label=com.docker.compose.project=${compose_project}"       --filter "label=com.docker.compose.service=${compose_service}"     | head -n 1
+  )"
+
+  if [[ -n "${container_id}" ]]       && [[ "$("${docker_bin}" inspect --format '{{.Image}}' "${container_id}")" == "${candidate_id}" ]]; then
+    "${docker_bin}" stop "${container_id}" >/dev/null       || { echo 'failed to stop unverified game candidate' >&2; exit 70; }
+  fi
+
+  echo 'known-good state is missing; unverified candidate was marked FAILED and stopped' >&2
+  exit 66
+fi
+
 IFS=$'\t' read -r candidate_release candidate_ref known_good_release known_good_ref known_good_id < <(
   "${python_bin}" - "${candidate_path}" "${known_good_path}" <<'PY'
 import json, pathlib, sys
