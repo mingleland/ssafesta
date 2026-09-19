@@ -29,7 +29,7 @@ afterEach(() => {
  * 재는 것은 라우팅 semantics 지 로딩 속도가 아니다. 속도를 지키고 싶으면 그것을 재는
  * 테스트를 따로 둔다 — 여기서 겸하면 무엇이 깨졌는지 알 수 없어진다.
  */
-const LAZY_ROUTE_TIMEOUT = { timeout: process.env.CI ? 15_000 : 5_000 };
+const LAZY_ROUTE_TIMEOUT = { timeout: 5000 };
 
 /**
  * World 도착 판정 — **HUD 로 재지 않는다** (S15P21A604-613).

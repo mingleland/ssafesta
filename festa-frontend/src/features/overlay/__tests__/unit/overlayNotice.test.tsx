@@ -26,15 +26,15 @@ describe('OverlayNotice', () => {
   });
 
   it('안내가 떠 있어도 뒤의 격자가 남는다 — 상품이 오면 안내만 사라진다', () => {
-    render(
-      <div>
+    const { container } = render(
+      <div className="ov-grid-wrap">
         <OverlayCardGrid label="경품 목록" cards={[]} />
         <OverlayNotice title="준비 중" />
       </div>,
     );
 
-    expect(screen.getByLabelText('경품 목록')).not.toBeNull();
-    expect(screen.getByRole('status').textContent).toContain('준비 중');
+    expect(container.querySelector('.ov-grid-wrap > .ov-card-grid')).not.toBeNull();
+    expect(container.querySelector('.ov-grid-wrap > .ov-notice')).not.toBeNull();
   });
 
   it('액션을 쓸 수 없는 사유를 hint 로 남긴다 — 눌러서 실패하게 두지 않는다', () => {

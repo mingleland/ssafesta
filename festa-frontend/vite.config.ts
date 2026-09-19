@@ -18,7 +18,5 @@ export default defineConfig({
     // tools/ 는 빌드타임 스크립트다(.mjs). 앱 코드가 아니라 tsc 대상이 아니지만, 판정 로직이
     // 들어 있어 회귀가 필요하다 — 그래서 테스트만 여기에 포함한다 (S15P21A604-480).
     include: ['src/**/*.test.ts', 'src/**/*.test.tsx', 'tools/**/*.test.mjs'],
-    // CI shared runner에서는 lazy import·jsdom 초기화가 겹쳐 기본 5초를 넘는다. 로컬 기본값은 유지한다.
-    testTimeout: process.env.CI ? 15_000 : 5_000,
   },
 })
