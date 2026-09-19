@@ -78,6 +78,11 @@ class ArcadeMachineSingleQueryTest {
         assertEquals(1, bindingReads.size(),
                 "목록도 바인딩과 게임을 한 질의로 읽어야 탈퇴 커밋 사이에서 찢어지지 않는다. 실행된 문장: "
                         + bindingReads);
+        // 바인딩만 읽고 게임을 행마다 다시 읽는 구현으로 바꿔도 위 단언은 그대로 통과한다 —
+        // 바인딩 읽기는 여전히 한 번이기 때문이다. 게임을 따로 읽은 문장이 없다는 것까지 봐야 한다.
+        assertEquals(List.of(), CapturingStatementInspector.matching("from games"),
+                "게임을 행마다 다시 읽는다 — 목록이 N+1 이다: "
+                        + CapturingStatementInspector.matching("from games"));
         assertTrue(bindingReads.getFirst().contains("games"),
                 "게임이 같은 목록 질의에 없다: " + bindingReads.getFirst());
     }
