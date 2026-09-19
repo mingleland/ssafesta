@@ -70,6 +70,8 @@ import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.test.web.servlet.ResultActions;
+import org.springframework.test.web.servlet.ResultMatcher;
 import org.springframework.test.web.servlet.RequestBuilder;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
@@ -931,17 +933,30 @@ class BackendCrossDomainIntegrationTest {
             }
 
             EventPrize prize = prizes.saveAndFlush(new EventPrize("일주경품", 20, 3));
-            long purchaseId = buy(bearer, userId, prize.getId());
+            String key = UUID.randomUUID().toString();
+            long purchaseId = buy(bearer, userId, prize.getId(), key);
             assertEquals(2, prizes.findById(prize.getId()).orElseThrow().getStock());
 
-            mockMvc.perform(post("/api/v1/admin/event-shop/purchases/{id}/fulfillment", purchaseId)
-                            .header("Authorization", bearerFor(admin))
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content("{\"status\":\"CANCELLED\",\"note\":\"일주 검증\"}"))
-                    .andExpect(status().isOk())
+            // 같은 키 재전송 — 이중 차감도 재고 감소도 없어야 한다. 이 줄이 없으면 아래
+            // "PRIZE_PURCHASE 1건" 은 한 번만 불렀으니 당연한 결과일 뿐이다.
+            int afterPurchase = wallets.balanceOf(userId);
+            buy(bearer, userId, prize.getId(), key);
+            assertEquals(afterPurchase, wallets.balanceOf(userId), "같은 키가 두 번 과금했습니다");
+            assertEquals(2, prizes.findById(prize.getId()).orElseThrow().getStock(),
+                    "같은 키가 재고를 두 번 깎았습니다");
+            assertEquals(1, ledgerCount(userId, CoinReason.PRIZE_PURCHASE));
+
+            cancel(admin, purchaseId).andExpect(status().isOk())
                     .andExpect(jsonPath("$.fulfillment").value("CANCELLED"));
             assertEquals(3, prizes.findById(prize.getId()).orElseThrow().getStock(),
                     "취소는 재고를 되돌려야 합니다");
+
+            // 재취소 — CANCELLED 는 종착이라 두 번째 환불이 나갈 자리가 없다.
+            int afterRefund = wallets.balanceOf(userId);
+            cancel(admin, purchaseId).andExpect(status().isConflict())
+                    .andExpect(jsonPath("$.code").value("EVENT_PURCHASE_FULFILLMENT_INVALID"));
+            assertEquals(afterRefund, wallets.balanceOf(userId), "재취소가 환불을 또 냈습니다");
+            assertEquals(3, prizes.findById(prize.getId()).orElseThrow().getStock());
 
             assertEquals(1, ledgerCount(userId, CoinReason.INITIAL_GRANT));
             assertEquals(1, ledgerCount(userId, CoinReason.DAILY_GRANT));
@@ -1033,13 +1048,22 @@ class BackendCrossDomainIntegrationTest {
             return read(body).get("payout").asInt();
         }
 
-        private long buy(String bearer, Long buyerUserId, Long prizeId) throws Exception {
+        private ResultActions cancel(Long adminUserId, long purchaseId) throws Exception {
+            return mockMvc.perform(post("/api/v1/admin/event-shop/purchases/{id}/fulfillment",
+                            purchaseId)
+                    .header("Authorization", bearerFor(adminUserId))
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"status\":\"CANCELLED\",\"note\":\"일주 검증\"}"));
+        }
+
+        private long buy(String bearer, Long buyerUserId, Long prizeId, String key)
+                throws Exception {
             mockMvc.perform(post("/api/v1/event-shop/purchases")
                             .header("Authorization", bearer)
-                            .header("Idempotency-Key", UUID.randomUUID().toString())
+                            .header("Idempotency-Key", key)
                             .contentType(MediaType.APPLICATION_JSON)
                             .content("{\"prizeId\":" + prizeId + ",\"quantity\":1" + RECIPIENT + "}"))
-                    .andExpect(status().isCreated());
+                    .andExpect(status().is2xxSuccessful());
             return purchases.findAll().stream()
                     .filter(purchase -> purchase.getPrizeId().equals(prizeId)
                             && purchase.getBuyerUserId().equals(buyerUserId))
@@ -1385,27 +1409,42 @@ class BackendCrossDomainIntegrationTest {
                     .andExpect(jsonPath("$.code").value("BOOTH_LEASE_EXPIRED"));
 
             // 소유자의 쓰기도 전부 닫힌다 — 보이지 않는 것을 고칠 수는 없다.
-            mockMvc.perform(put("/api/v1/booths/{id}/facade", booth.boothId())
-                            .header("Authorization", booth.owner())
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content("{\"signText\":\"종료후\"}"))
-                    .andExpect(status().isConflict());
-            mockMvc.perform(put("/api/v1/booths/{id}/homepage", booth.boothId())
-                            .header("Authorization", booth.owner())
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content("{\"homepageUrl\":\"https://after.example.com\"}"))
-                    .andExpect(status().isConflict());
-            mockMvc.perform(post("/api/v1/booths/{id}/layouts/publish", booth.boothId())
-                            .header("Authorization", booth.owner()))
-                    .andExpect(status().isConflict());
-            mockMvc.perform(post("/api/v1/booths/{id}/agents", booth.boothId())
-                            .header("Authorization", booth.owner())
-                            .contentType(MediaType.APPLICATION_JSON).content(AGENT))
-                    .andExpect(status().isConflict());
-            mockMvc.perform(put("/api/v1/booths/{id}/survey", booth.boothId())
-                            .header("Authorization", booth.owner())
-                            .contentType(MediaType.APPLICATION_JSON).content(SURVEY))
-                    .andExpect(status().isConflict());
+            // 사유 코드까지 본다. 409 만 보면 임대 가드가 사라져도 다른 이유의 409 가
+            // 대신 통과시킨다 — agent 생성이 그랬다(AGENT_LIMIT_EXCEEDED). 그래서 agent 는
+            // 종료 전이면 성공했을 수정 요청으로 쏜다.
+            expired(put("/api/v1/booths/{id}/facade", booth.boothId())
+                    .header("Authorization", booth.owner())
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"signText\":\"종료후\"}"));
+            expired(put("/api/v1/booths/{id}/homepage", booth.boothId())
+                    .header("Authorization", booth.owner())
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"homepageUrl\":\"https://after.example.com\"}"));
+            expired(post("/api/v1/booths/{id}/layouts/publish", booth.boothId())
+                    .header("Authorization", booth.owner()));
+            expired(patch("/api/v1/agents/{id}", booth.agentId())
+                    .header("Authorization", booth.owner())
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"name\":\"종료후 도슨트\"}"));
+            expired(put("/api/v1/booths/{id}/survey", booth.boothId())
+                    .header("Authorization", booth.owner())
+                    .contentType(MediaType.APPLICATION_JSON).content(SURVEY));
+
+            // 설문 제출 — 응답자는 종료 전에 답한 사람과 달라야 한다. 같은 사람이면
+            // SURVEY_ALREADY_RESPONDED 가 임대 거부를 가린다.
+            // surveyId 는 DB 에서 읽는다 — 종료 뒤에는 survey/run 이 이미 닫혀 있다.
+            // 본문이 비어도 된다: requireVisitorVisible 이 답 검증보다 먼저다.
+            Long surveyId = jdbc.queryForObject("SELECT id FROM surveys WHERE booth_id = ?",
+                    Long.class, booth.boothId());
+            expired(submit(bearerFor(member("종료응답" + cause.ordinal())), surveyId,
+                    "{\"answers\":[]}"));
+        }
+
+        /** 임대가 끝나서 막혔는지 — 코드까지 본다. 다른 이유의 409 는 이 단언을 못 지나간다. */
+        private void expired(RequestBuilder request) throws Exception {
+            mockMvc.perform(request)
+                    .andExpect(status().isConflict())
+                    .andExpect(jsonPath("$.code").value("BOOTH_LEASE_EXPIRED"));
         }
 
         /**
@@ -1809,7 +1848,61 @@ class BackendCrossDomainIntegrationTest {
                     "강등 뒤 거부된 요청이 감사에 남으면 안 됩니다");
         }
 
+        /**
+         * 삭제 경로는 역할마다 <b>새 부스</b>로 본다.
+         *
+         * <p>고정 목록에 담을 수 없어서다 — 첫 역할이 지우면 다음 역할이 밟을 대상이 없다.
+         * 그렇다고 빼 두면 "같은 가드를 쓰니 수정이 삭제를 대신한다" 가 되는데, 이 매트릭스가
+         * 존재하는 이유가 바로 <b>호출부마다 가드를 따로 고른다</b>는 것이다. 문서 삭제는
+         * {@code requireModifier}(만료돼도 정리할 수 있어야 한다), 에이전트 삭제는
+         * {@code requireActiveEditor} 로 서로 다른 가드를 쓴다.
+         */
+        @Test
+        @DisplayName("삭제 경로도 같은 역할 판정을 따른다")
+        void deletionPathsFollowTheSameRoleJudgementOnAFreshBoothPerRole() throws Exception {
+            for (boolean allowed : List.of(true, false)) {
+                for (String who : allowed ? List.of("owner", "editor", "admin")
+                        : List.of("consultant", "demoted", "stranger")) {
+                    Fixture booth = aLeasedBooth("삭제" + who);
+                    String bearer = bearerFor(actorFor(who, booth));
+
+                    ResultMatcher expected = allowed
+                            ? status().isNoContent() : status().isForbidden();
+                    mockMvc.perform(delete("/api/v1/documents/{id}", booth.documentId())
+                                    .header("Authorization", bearer))
+                            .andExpect(expected);
+                    mockMvc.perform(delete("/api/v1/agents/{id}", booth.agentId())
+                                    .header("Authorization", bearer))
+                            .andExpect(expected);
+                }
+            }
+        }
+
         // ── 단계 ────────────────────────────────────────────────────────────
+
+        /** 역할 이름 하나로 그 역할의 회원을 만든다 — 삭제 테스트가 부스마다 새로 부른다. */
+        private Long actorFor(String who, Fixture booth) throws Exception {
+            return switch (who) {
+                case "owner" -> booth.ownerId();
+                case "editor" -> {
+                    Long id = member("삭제편집" + booth.boothId());
+                    addStaff(booth.boothId(), id, "CONTENT_EDITOR");
+                    yield id;
+                }
+                case "admin" -> administrator("삭제운영" + booth.boothId());
+                case "consultant" -> {
+                    Long id = member("삭제상담" + booth.boothId());
+                    addStaff(booth.boothId(), id, "CONSULTANT");
+                    yield id;
+                }
+                case "demoted" -> {
+                    Long id = administrator("삭제강등" + booth.boothId());
+                    jdbc.update("UPDATE users SET account_type='MEMBER' WHERE id=?", id);
+                    yield id;
+                }
+                default -> member("삭제외부" + booth.boothId());
+            };
+        }
 
         /**
          * 쓰기 면. {@code requireActiveEditor} 와 {@code requireModifier} 양쪽을 섞어 둔다 —
@@ -1828,6 +1921,20 @@ class BackendCrossDomainIntegrationTest {
                             .header("Authorization", bearer)
                             .contentType(MediaType.APPLICATION_JSON)
                             .content("{\"homepageUrl\":\"https://matrix.example.com\"}")),
+                    // publish 가 draft 저장을 대신하지 못한다 — 같은 requireModifier 라도
+                    // 호출부가 각자 고르기 때문에, publish 가 옳아도 저장 쪽 회귀는 안 잡힌다.
+                    // expectedRevision 은 람다 안에서 읽는다: 역할마다 저장이 쌓여 값이 는다.
+                    new Write("layout draft", bearer -> put("/api/v1/booths/{id}/layouts/draft",
+                            boothId)
+                            .header("Authorization", bearer)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("""
+                                    {"expectedRevision":%d,"schemaVersion":1,
+                                     "template":"PROJECT_EXHIBITION","objects":[
+                                      {"objectId":"screen-1","type":"VIDEO_SCREEN",
+                                       "position":{"x":2.1,"y":0.0,"z":1.4},
+                                       "rotationY":90.0,"configId":%d}]}"""
+                                    .formatted(draftRevision(boothId), booth.agentId()))),
                     new Write("layout publish",
                             bearer -> post("/api/v1/booths/{id}/layouts/publish", boothId)
                                     .header("Authorization", bearer)),
@@ -1894,6 +2001,13 @@ class BackendCrossDomainIntegrationTest {
             return get("/api/v1/booths/{id}/dashboard/summary", boothId)
                     .header("Authorization", bearer)
                     .param("from", ALL_TIME_FROM).param("to", ALL_TIME_TO);
+        }
+
+        private long draftRevision(long boothId) {
+            Long revision = jdbc.queryForObject(
+                    "SELECT revision FROM booth_layout_drafts WHERE booth_id = ?",
+                    Long.class, boothId);
+            return revision == null ? 0 : revision;
         }
 
         private int auditRows(Long actorUserId, long boothId) {
