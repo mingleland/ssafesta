@@ -8,6 +8,7 @@
 // (`ControlGuideList`)을 그리므로 상시 카드로 화면 한 귀퉁이를 계속 차지할 이유가 없다.
 import { BoothExitButton } from './BoothExitButton';
 import { ConsultationQuickAccess } from './ConsultationQuickAccess';
+import { DailyMissionLauncher } from '../../mission/ui/DailyMissionLauncher';
 import { openMenuPanelScreen } from '../model/worldScreen';
 import { toggleFullscreen, useFullscreen } from '../../../shared/ui/fullscreen';
 import { Tooltip } from '../../../shared/ui/tooltip/Tooltip';
@@ -22,6 +23,9 @@ export function WorldHud() {
   // 그대로 오고, Tab 으로 HUD 버튼에 가는 키보드 경로도 그대로다. HUD 안에는 입력창이 없다.
   return (
     <div className="world-hud" onMouseDown={(event) => event.preventDefault()}>
+      {/* 좌상단 — 일일 미션 (S15P21A604-911) */}
+      <DailyMissionLauncher />
+
       {/* 우상단 한 줄 — 상담 · 전체화면 (2026-09-16). 세로로 쌓던 것을 가로로 폈다.
           순서는 DOM 그대로다: .cqa 가 row-reverse 라 상담이 오른쪽 끝에 서고 전체화면이 그 왼쪽에 붙는다. */}
       <ConsultationQuickAccess />
@@ -65,7 +69,7 @@ function FullscreenToggle() {
     <Tooltip content={label} placement="bottom">
       <button
         type="button"
-        className="world-hud-fullscreen"
+        className="world-hud-control world-hud-fullscreen"
         onClick={() => { void toggleFullscreen(); }}
         aria-pressed={full}
         aria-label={label}

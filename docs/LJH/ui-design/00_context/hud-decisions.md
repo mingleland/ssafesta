@@ -118,6 +118,8 @@ Minimap / Quest Tracker / HP Bar / Crosshair / Nameplate / Mission Panel
 
 **기능 Launcher 도 금지한다.** Project·LAPTOP·Survey·AI·GAME 을 여는 hotbar·dock·바로가기 바를 만들지 않는다 — 그 기능들의 진입은 Unity F 하나다(`user-flow-decisions.md` RULE 2). 현재 World 하단에 있는 Mock Interaction Bar 는 Unity 부재 환경에서 dispatcher 하류를 검증하기 위한 **DEV_ONLY 대역**이며 최종 제품 HUD 가 아니다.
 
+**예외 — 회원 일일 미션 런처 (2026-09-18, S15P21A604-911).** 사용자 승인으로 월드 좌상단에 기존 일일 미션 패널을 여는 버튼 하나를 허용한다. 월드 오브젝트의 Unity F 진입을 복제하지 않고 계정 단위 화면으로만 연결하며, 게스트·비로그인에는 보이지 않는다. 상시 CLAIMABLE 뱃지와 폴링은 만들지 않는다.
+
 판단 기준: 월드 객체를 따라가는가 → Unity / 프레임 결합인가 → Unity / 화면 고정 정보인가 → React / 실질 필요 없는가 → 폐기.
 
 ## Overlay open 기본 동작 (설계 원칙)
