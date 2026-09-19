@@ -11,6 +11,8 @@ export const WORLD_CHAT_TOPIC = '/topic/world/chat';
 export const WORLD_CHAT_ERRORS = '/user/queue/world/chat/errors';
 /** D07 — the tenant only; Spring resolves this through the authenticated STOMP principal. */
 export const BOOTH_LEASE_EXPIRY_QUEUE = '/user/queue/booth-lease-expiry';
+/** 코인 지급 실시간 알림 — 개인 큐 (S15P21A604-920, GitLab #250) */
+export const COIN_QUEUE = '/user/queue/coin';
 /** 상담 알림 — 방문자 개인 큐. 수락·만료·종료가 온다 (spec 011 §B, S15P21A604-519 계약) */
 export const CONSULTATION_VISITOR_QUEUE = '/user/queue/consultation';
 
@@ -22,5 +24,6 @@ export const ALLOWED_SUBSCRIBE_DESTINATIONS: readonly string[] = [
   WORLD_CHAT_TOPIC,
   WORLD_CHAT_ERRORS,
   BOOTH_LEASE_EXPIRY_QUEUE,
+  COIN_QUEUE,
   CONSULTATION_VISITOR_QUEUE,
 ];
