@@ -55,9 +55,9 @@ class ArcadeMachineListApiIntegrationTest {
     @Autowired private MemberSessionService sessions;
 
     @Test
-    void aGuestCanReadTheListWithoutCachingIt() throws Exception {
-        Owner owner = publicPublishedGame("목록게스트");
-        String machineId = bind("list-guest-" + SEQUENCE.incrementAndGet(), owner.gameId());
+    void anUnauthenticatedCallerReadsTheListAndIsToldNotToCacheIt() throws Exception {
+        Owner owner = publicPublishedGame("목록무토큰");
+        String machineId = bind("list-anon-" + SEQUENCE.incrementAndGet(), owner.gameId());
 
         JsonNode entries = list();
 
@@ -75,11 +75,26 @@ class ArcadeMachineListApiIntegrationTest {
         assertNotNull(listed);
         assertEquals(machineId, listed.path("machineId").asText());
         assertEquals(owner.gameId(), listed.path("gameId").asLong());
-        assertEquals("목록비공개 오락기게임", listed.path("title").asText());
+        assertTrue(listed.path("title").isNull(),
+                "비공개 게임의 제목이 무토큰 호출에 노출됩니다: " + listed);
         assertTrue(listed.path("publishedVersion").isNull());
         assertFalse(listed.path("playable").asBoolean());
         assertEquals("GAME_NOT_PUBLIC", listed.path("unavailableReason").asText());
         assertFalse(listed.has("thumbnailUrl"));
+    }
+
+    @Test
+    void aNeverPublishedGameIsListedAsNotPublished() throws Exception {
+        Owner owner = savedOwner("목록미게시");
+        mockMvc.perform(makePublic(owner)).andExpect(status().isOk());
+        String machineId = bind("list-unpublished-" + SEQUENCE.incrementAndGet(), owner.gameId());
+
+        JsonNode listed = entry(list(), machineId);
+
+        assertNotNull(listed);
+        assertFalse(listed.path("playable").asBoolean());
+        assertEquals("GAME_NOT_PUBLISHED", listed.path("unavailableReason").asText());
+        assertTrue(listed.path("title").isNull());
     }
 
     @Test

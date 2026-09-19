@@ -63,7 +63,7 @@ public class ArcadeMachineResolveService {
     private ListedView listedView(String machineId, Game game) {
         ErrorCode blocked = GamePublishedQueryService.blockedReason(game);
         boolean playable = blocked == null;
-        return new ListedView(machineId, game.getId(), game.getTitle(),
+        return new ListedView(machineId, game.getId(), playable ? game.getTitle() : null,
                 playable ? game.getPublishedVersion() : null,
                 playable, playable ? null : blocked.name());
     }
@@ -78,7 +78,15 @@ public class ArcadeMachineResolveService {
                                boolean playable, String unavailableReason) {
     }
 
-    /** The collection shape lets the world match an occupied scene slot to its game without a thumbnail. */
+    /**
+     * The collection shape lets the world match an occupied scene slot to its game without a
+     * thumbnail.
+     *
+     * <p><b>Only a playable game names itself.</b> This path is open to anyone, so a private game's
+     * title would otherwise be readable by walking the list — the same reason
+     * {@link #resolve(String)} withholds {@code publishedVersion} from a game that cannot start.
+     * The machine stays listed either way: the scene needs to know the slot is occupied.
+     */
     public record ListedView(String machineId, Long gameId, String title, Integer publishedVersion,
                              boolean playable, String unavailableReason) {
     }
