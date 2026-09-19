@@ -40,7 +40,7 @@ set -euo pipefail
 output=''; write_out=''; upload=''; fail_mode=0; url=''
 while [[ $# -gt 0 ]]; do case "$1" in --output) output="${2:-}";shift 2;; --write-out) write_out="${2:-}";shift 2;; --upload-file) upload="${2:-}";shift 2;; --header) shift 2;; --fail|--fail-with-body) fail_mode=1;shift;; --silent|--show-error|--location) shift;; -*) exit 64;; *) url="$1";shift;; esac; done
 [[ -n "${url}" ]]; relative="${url#*/packages/generic/}"; [[ "${relative}" != "${url}" ]]; target="${FAKE_REMOTE_ROOT}/${relative}"; code=200
-if [[ -n "${upload}" ]]; then mkdir -p "$(dirname "${target}")"; cp "${upload}" "${target}"; code=201; else if [[ -f "${target}" ]]; then [[ -z "${output}" ]] || cp "${target}" "${output}"; code=200; else [[ -z "${output}" ]] || : >"${output}"; code=404; fi; fi
+if [[ -n "${upload}" ]]; then mkdir -p "$(dirname "${target}")"; cp "${upload}" "${target}"; body='{"message":"201 Created"}'; if [[ -n "${output}" ]]; then printf '%s' "${body}" >"${output}"; else printf '%s' "${body}"; fi; code=201; else if [[ -f "${target}" ]]; then [[ -z "${output}" ]] || cp "${target}" "${output}"; code=200; else [[ -z "${output}" ]] || : >"${output}"; code=404; fi; fi
 [[ -z "${write_out}" ]] || printf '%s' "${code}"; (( ! fail_mode || code < 400 )) || exit 22
 SH
 chmod +x "${work}/bin/curl"

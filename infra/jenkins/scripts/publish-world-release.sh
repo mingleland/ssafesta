@@ -146,7 +146,7 @@ doc = {
 }
 path.write_text(json.dumps(doc, indent=2)+'\n', encoding='utf-8')
 PY
-curl --fail --silent --show-error --header "PRIVATE-TOKEN: ${GITLAB_PACKAGE_TOKEN}" --upload-file "${archive}" "${package_url}"
-curl --fail --silent --show-error --header "PRIVATE-TOKEN: ${GITLAB_PACKAGE_TOKEN}" --upload-file "${work}/${sha_filename}" "${sha_url}"
-curl --fail --silent --show-error --header "PRIVATE-TOKEN: ${GITLAB_PACKAGE_TOKEN}" --upload-file "${work}/${metadata_filename}" "${metadata_url}"
+curl --fail --silent --show-error --output /dev/null --header "PRIVATE-TOKEN: ${GITLAB_PACKAGE_TOKEN}" --upload-file "${archive}" "${package_url}"
+curl --fail --silent --show-error --output /dev/null --header "PRIVATE-TOKEN: ${GITLAB_PACKAGE_TOKEN}" --upload-file "${work}/${sha_filename}" "${sha_url}"
+curl --fail --silent --show-error --output /dev/null --header "PRIVATE-TOKEN: ${GITLAB_PACKAGE_TOKEN}" --upload-file "${work}/${metadata_filename}" "${metadata_url}"
 echo "PUBLISHED_WORLD_RELEASE: ${release_id} ${archive_sha} ${expected_content_id}"
