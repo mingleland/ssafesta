@@ -7,6 +7,20 @@ deploy="${repo_root}/infra/jenkins/scripts/deploy-webgl-release.sh"
 fixture="$(mktemp -d)"
 trap 'rm -rf "${fixture}"' EXIT
 
+python_bin="${PYTHON_BIN:-}"
+if [[ -z "${python_bin}" ]]; then
+  if command -v python3 >/dev/null 2>&1; then
+    python_bin=python3
+  elif command -v python >/dev/null 2>&1; then
+    python_bin=python
+  else
+    echo 'Python 3 is required.' >&2
+    exit 69
+  fi
+fi
+"${python_bin}" -c 'import sys; assert sys.version_info.major == 3'
+export PYTHON_BIN="${python_bin}"
+
 export WEBGL_RELEASE_ROOT="${fixture}/webgl"
 export ENVIRONMENT_STATE_DIR="${fixture}/state"
 export WEBGL_PUBLIC_BASE_URL='https://demo.example.invalid/unity'

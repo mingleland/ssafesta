@@ -74,11 +74,18 @@ shared_exact = {
     # 통과하므로 전체 재빌드로 둔다.
     ".dockerignore",
     "infra/environments/compose/dev/base.yaml",
+    "infra/environments/compose/demo/base.yaml",
     "infra/environments/config/manifests/dev.json",
     "infra/environments/config/environments/dev.env.example",
     "infra/.env.example",
     "infra/versions.env",
 }
+strict_config_prefixes = (
+    "infra/environments/compose/dev/",
+    "infra/environments/compose/demo/",
+    "infra/deploy/compose/dev/",
+)
+
 shared_prefixes = (
     "ci/",
     "infra/jenkins/",
@@ -123,7 +130,12 @@ for path in paths:
         components.add(component)
         deploy_components.add(component)
         reasons.add("component-deploy-config")
-    elif path in shared_exact or path.startswith(shared_prefixes):
+    elif path in shared_exact:
+        shared = True
+        reasons.add("shared-ci")
+    elif path.startswith(strict_config_prefixes):
+        unknown.append(path)
+    elif path.startswith(shared_prefixes):
         shared = True
         reasons.add("shared-ci")
     elif path.startswith(docs_prefixes) or path.endswith(".md"):
