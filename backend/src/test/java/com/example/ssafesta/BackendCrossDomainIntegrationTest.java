@@ -5,8 +5,10 @@ import static com.example.ssafesta.booth.BoothTestSupport.createMemberWithWallet
 import static com.example.ssafesta.booth.BoothTestSupport.releaseAllSlots;
 import static com.example.ssafesta.wallet.WalletTestSupport.assertBalanceMatchesLedger;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
@@ -16,6 +18,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.example.ssafesta.ai.FakeDocumentProcessingClient;
 import com.example.ssafesta.auth.AccessTokenService;
 import com.example.ssafesta.auth.MemberSessionService;
+import com.example.ssafesta.booth.BoothLeaseRepository;
+import com.example.ssafesta.booth.BoothLeaseService;
+import com.example.ssafesta.booth.BoothRepository;
 import com.example.ssafesta.eventshop.EventPrize;
 import com.example.ssafesta.eventshop.EventPrizeRepository;
 import com.example.ssafesta.eventshop.EventPurchaseRepository;
@@ -30,10 +35,12 @@ import com.example.ssafesta.user.UserRepository;
 import com.example.ssafesta.wallet.CoinAdminAdjustCommand;
 import com.example.ssafesta.wallet.CoinCreditCommand;
 import com.example.ssafesta.wallet.CoinReason;
+import com.example.ssafesta.wallet.CoinSpendCommand;
 import com.example.ssafesta.wallet.DailyCoinGrantService;
 import com.example.ssafesta.wallet.LedgerEntryType;
 import com.example.ssafesta.wallet.WalletService;
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.HashSet;
@@ -50,6 +57,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
@@ -1019,6 +1028,257 @@ class BackendCrossDomainIntegrationTest {
                       JOIN wallets w ON w.id = e.wallet_id
                      WHERE w.user_id = ?
                     """, String.class, userId);
+        }
+    }
+
+    // ── 임대 결제 (S15P21A604-941) ──────────────────────────────────────────
+
+    /**
+     * 지갑과 부스가 만나는 한 줄 — 임대료.
+     *
+     * <p>임대는 코인을 쓰는 유일한 부스 경로이고, 그 원장 행은 {@code BOOTH_LEASE} 참조로
+     * 특정 임대를 가리킨다. 지갑 테스트는 차감이 맞는지 보고 부스 테스트는 임대가 생겼는지
+     * 보는데, <b>그 둘이 같은 건을 가리키는지</b>는 참조 컬럼에만 있다. 참조가 어긋나면 부스
+     * 대시보드가 남의 임대료를 자기 지출로 세고, 두 도메인 테스트는 그대로 초록이다.
+     *
+     * <p><b>멱등키는 클라이언트가 주지 않는다.</b> 서버가 leaseId 로 만든다
+     * ({@code BoothLeaseService.charge}). {@code (user, slot)} 으로 잡으면 같은 사람이 같은
+     * 자리를 나중에 다시 빌릴 때 두 번째 과금이 조용히 건너뛰어져 공짜 부스가 된다 — 그래서
+     * 재시도 계약은 "살아 있는 임대에는 추가 과금 없음" 과 "종료 뒤 재임대는 다시 과금" 두 줄이다.
+     *
+     * <p><b>범위 밖.</b> 차감과 임대 저장 사이의 원자성은 여기서 보지 않는다. 실패 주입점이 없어
+     * 테스트 전용 훅을 억지로 만들게 되므로, 트랜잭션 경계와 DB 제약을 확인한 뒤 따로 둔다.
+     */
+    @Nested
+    @DisplayName("임대 결제 — 원장 한 줄이 임대 하나를 가리킨다")
+    class LeasePayment {
+
+        @Autowired private BoothLeaseService leaseService;
+        @Autowired private BoothLeaseRepository leases;
+        @Autowired private BoothRepository booths;
+        @Autowired private DailyCoinGrantService dailyGrants;
+
+        /** 임대가 끝나는 세 가지 — 원인만 다르고 원장에 대한 요구는 같다. */
+        enum Termination { EXPIRY, RETURN, ADMIN_RELEASE }
+
+        @Test
+        @DisplayName("유료 임대는 그 임대를 가리키는 결제 원장 한 줄을 남긴다")
+        void aPaidLeaseWritesExactlyOnePaymentBoundToItsLeaseId() throws Exception {
+            Long userId = member("임대결제");
+            String bearer = bearerFor(userId);
+            int opening = wallets.balanceOf(userId);
+            long slotId = firstAvailableRentalSlot();
+
+            mockMvc.perform(lease(bearer, slotId))
+                    .andExpect(status().isCreated())
+                    .andExpect(jsonPath("$.chargedCoin").value(LEASE_PRICE))
+                    .andExpect(jsonPath("$.balanceAfter").value(opening - LEASE_PRICE));
+
+            long leaseId = activeLeaseId(userId);
+            assertEquals(1, ledgerCount(userId, CoinReason.LEASE_PAYMENT));
+            assertEquals(1, countOf("""
+                    SELECT count(*) FROM coin_ledger_entries e JOIN wallets w ON w.id = e.wallet_id
+                     WHERE w.user_id = ? AND e.reason_type = ? AND e.reference_type = ?
+                       AND e.reference_id = ? AND e.amount = ?
+                    """, userId, CoinReason.LEASE_PAYMENT, CoinReason.LEASE_REFERENCE_TYPE,
+                    String.valueOf(leaseId), -LEASE_PRICE),
+                    "결제 원장이 방금 생긴 임대를 가리키지 않습니다 — 참조가 어긋나면 부스 지출 집계가 "
+                            + "남의 임대료를 셉니다");
+            assertEquals(opening - LEASE_PRICE, wallets.balanceOf(userId));
+            assertBalanceMatchesLedger(wallets, userId);
+        }
+
+        /**
+         * 살아 있는 임대에는 다시 과금하지 않고, 종료 뒤 같은 자리를 다시 빌리면 다시 과금한다.
+         *
+         * <p>두 줄을 한 테스트에 두는 이유는 이것이 <b>하나의</b> 계약이기 때문이다. 멱등키를
+         * leaseId 가 아니라 {@code (user, slot)} 으로 잡으면 앞 줄은 그대로 통과하고 뒤 줄만
+         * 깨진다 — 따로 두면 그 실패가 "재임대 테스트가 빨갛다" 로만 보이고 원인이 멱등키라는
+         * 것은 드러나지 않는다.
+         */
+        @Test
+        @DisplayName("살아 있는 임대는 재과금 없고, 종료 뒤 재임대는 다시 과금한다")
+        void aRetryChargesNothingMoreButALaterLeaseOfTheSameSlotChargesAgain() throws Exception {
+            Long userId = member("임대재시도");
+            String bearer = bearerFor(userId);
+            long slotId = firstAvailableRentalSlot();
+            String first = mockMvc.perform(lease(bearer, slotId))
+                    .andExpect(status().isCreated())
+                    .andReturn().getResponse().getContentAsString();
+            long boothId = read(first).get("boothId").asLong();
+            long firstLeaseId = activeLeaseId(userId);
+            int afterFirst = wallets.balanceOf(userId);
+
+            mockMvc.perform(lease(bearer, slotId))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.boothId").value(boothId));
+
+            assertEquals(1, ledgerCount(userId, CoinReason.LEASE_PAYMENT),
+                    "살아 있는 임대에 재요청은 원장을 늘리면 안 됩니다");
+            assertEquals(afterFirst, wallets.balanceOf(userId));
+
+            mockMvc.perform(delete("/api/v1/booth-slots/{id}/leases/mine", slotId)
+                            .header("Authorization", bearer))
+                    .andExpect(status().isNoContent());
+            mockMvc.perform(lease(bearer, slotId)).andExpect(status().isCreated());
+
+            long secondLeaseId = activeLeaseId(userId);
+            assertNotEquals(firstLeaseId, secondLeaseId);
+            assertEquals(2, ledgerCount(userId, CoinReason.LEASE_PAYMENT),
+                    "종료 뒤 재임대는 다시 과금되어야 합니다 — 멱등키가 leaseId 가 아니라 자리로 "
+                            + "잡히면 두 번째가 조용히 공짜가 됩니다");
+            assertEquals(1, countOf("""
+                    SELECT count(*) FROM coin_ledger_entries e JOIN wallets w ON w.id = e.wallet_id
+                     WHERE w.user_id = ? AND e.reason_type = ? AND e.reference_id = ?
+                    """, userId, CoinReason.LEASE_PAYMENT, String.valueOf(secondLeaseId)));
+            assertEquals(afterFirst - LEASE_PRICE, wallets.balanceOf(userId));
+            assertBalanceMatchesLedger(wallets, userId);
+        }
+
+        @Test
+        @DisplayName("잔액이 모자라면 임대도 원장도 남지 않고 자리는 비어 있다")
+        void anUnaffordableLeaseLeavesNoLeaseNoLedgerAndTheSlotFree() throws Exception {
+            Long userId = member("임대잔액부족");
+            String bearer = bearerFor(userId);
+            drainToZero(userId);
+            long slotId = firstAvailableRentalSlot();
+            int ledgerBefore = ledgerCount(userId, CoinReason.LEASE_PAYMENT);
+
+            mockMvc.perform(lease(bearer, slotId))
+                    .andExpect(status().isConflict())
+                    .andExpect(jsonPath("$.code").value("INSUFFICIENT_COIN"));
+
+            assertEquals(ledgerBefore, ledgerCount(userId, CoinReason.LEASE_PAYMENT));
+            assertEquals(0, wallets.balanceOf(userId));
+            assertTrue(leases.findValidBySlotId(slotId, Instant.now()).isEmpty(),
+                    "거부된 임대가 자리를 잡고 있으면 안 됩니다");
+            mockMvc.perform(get("/api/v1/booth-slots"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$[?(@.slotId == " + slotId + ")].status").value("AVAILABLE"));
+            assertBalanceMatchesLedger(wallets, userId);
+        }
+
+        /**
+         * 관리자 임대는 0 코인 원장이 아니라 <b>원장 행 자체를 남기지 않는다</b>
+         * ({@code BoothLeaseService} — 일어나지 않은 거래가 지갑 내역에 보이면 안 된다).
+         */
+        @Test
+        @DisplayName("관리자 무상 임대는 원장 행을 아예 만들지 않는다")
+        void anAdministratorsFreeLeaseWritesNoLedgerRowAtAll() throws Exception {
+            Long adminId = member("무상임대운영");
+            jdbc.update("UPDATE users SET account_type='ADMIN' WHERE id=?", adminId);
+            int before = wallets.balanceOf(adminId);
+
+            BoothLeaseService.LeaseOutcome outcome =
+                    leaseService.lease(adminId, firstAvailableRentalSlot(), 1);
+
+            assertEquals(0, outcome.lease().getChargedCoin());
+            assertEquals(before, wallets.balanceOf(adminId));
+            assertEquals(0, ledgerCount(adminId, CoinReason.LEASE_PAYMENT),
+                    "0 코인 결제 행도 남기면 안 됩니다");
+            assertBalanceMatchesLedger(wallets, adminId);
+        }
+
+        /**
+         * 지갑이 기록한 그 결제가 부스 대시보드의 지출로 그대로 보인다.
+         *
+         * <p>집계는 사유와 참조 타입 <b>쌍</b>으로 걸린다 ({@code BoothDashboardService}). 한쪽만
+         * 맞고 다른 쪽이 어긋나면 합계는 0 이 되는데, 빈 부스도 0 이라 대시보드 테스트만으로는
+         * 구분되지 않는다 — 실제로 지불한 금액과 맞춰 보는 이 줄에서만 드러난다.
+         */
+        @Test
+        @DisplayName("대시보드의 임대 지출이 지갑이 기록한 그 결제다")
+        void theDashboardLeaseCostIsTheSamePaymentSeenFromTheBooth() throws Exception {
+            Long userId = member("임대대시보드");
+            String bearer = bearerFor(userId);
+            String body = mockMvc.perform(lease(bearer, firstAvailableRentalSlot()))
+                    .andExpect(status().isCreated())
+                    .andReturn().getResponse().getContentAsString();
+            long boothId = read(body).get("boothId").asLong();
+
+            mockMvc.perform(get("/api/v1/booths/{id}/dashboard/summary", boothId)
+                            .header("Authorization", bearer)
+                            .param("from", "2000-01-01T00:00:00Z")
+                            .param("to", "2100-01-01T00:00:00Z"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.leaseCostCoin").value(LEASE_PRICE))
+                    .andExpect(jsonPath("$.surveyRewardCoin").value(0));
+        }
+
+        /**
+         * 임대가 어떻게 끝나든 결제 기록은 그대로 남고 환불은 없다 (FR-021).
+         *
+         * <p>세 가지를 한 메서드로 도는 이유는 원인만 다르고 요구가 같기 때문이다. 따로 쓰면 같은
+         * 단언을 세 벌 유지하게 되고, 환불 정책이 바뀔 때 한 벌만 고쳐진다.
+         *
+         * <p>환불 없음은 <b>참조 기준</b>으로 단언한다 — {@code LEASE_REFUND} 사유 코드는 존재하지
+         * 않으므로 사유로 세면 새 사유를 달고 들어오는 환불을 통째로 놓친다.
+         */
+        @ParameterizedTest(name = "{0}")
+        @EnumSource(Termination.class)
+        @DisplayName("임대가 어떻게 끝나도 결제는 남고 환불은 없다")
+        void everyWayALeaseEndsLeavesThePaymentInPlaceAndRefundsNothing(Termination cause)
+                throws Exception {
+            Long userId = member("임대종료" + cause.ordinal());
+            String bearer = bearerFor(userId);
+            long slotId = firstAvailableRentalSlot();
+            mockMvc.perform(lease(bearer, slotId)).andExpect(status().isCreated());
+            long leaseId = activeLeaseId(userId);
+            int afterLease = wallets.balanceOf(userId);
+
+            terminate(cause, userId, bearer, slotId, leaseId);
+            // 한 번 더 쓸어도 아무것도 움직이지 않는다 — 종료가 두 번 계산되면 여기서 드러난다.
+            leaseService.expireStaleLeases();
+
+            assertTrue(leases.findValidBySlotId(slotId, Instant.now()).isEmpty(),
+                    "종료했으면 자리가 비어야 합니다");
+            assertEquals(1, ledgerCount(userId, CoinReason.LEASE_PAYMENT),
+                    "종료가 결제 기록을 지우거나 늘리면 안 됩니다");
+            assertEquals(0, countOf("""
+                    SELECT count(*) FROM coin_ledger_entries e JOIN wallets w ON w.id = e.wallet_id
+                     WHERE w.user_id = ? AND e.reference_type = ? AND e.amount > 0
+                    """, userId, CoinReason.LEASE_REFERENCE_TYPE),
+                    "임대 종료는 환불하지 않습니다 (FR-021)");
+            assertEquals(afterLease, wallets.balanceOf(userId));
+            assertBalanceMatchesLedger(wallets, userId);
+        }
+
+        // ── 단계 ────────────────────────────────────────────────────────────
+
+        private void terminate(Termination cause, Long userId, String bearer, long slotId,
+                               long leaseId) throws Exception {
+            switch (cause) {
+                case EXPIRY -> {
+                    jdbc.update("UPDATE booth_leases SET starts_at = now() - interval '25 hours', "
+                            + "ends_at = now() - interval '1 hour' WHERE id = ?", leaseId);
+                    leaseService.expireStaleLeases();
+                }
+                case RETURN -> mockMvc.perform(delete("/api/v1/booth-slots/{id}/leases/mine", slotId)
+                                .header("Authorization", bearer))
+                        .andExpect(status().isNoContent());
+                case ADMIN_RELEASE -> {
+                    Long adminId = member("회수운영" + userId);
+                    jdbc.update("UPDATE users SET account_type='ADMIN' WHERE id=?", adminId);
+                    leaseService.releaseByAdmin(adminId, slotId, "횡단 검증");
+                }
+            }
+        }
+
+        /** 일일 지급을 먼저 떨어뜨린다 — {@code EconomyCycle.member} 와 같은 이유다. */
+        private Long member(String prefix) {
+            Long userId = createMemberWithWallet(users, wallets, prefix);
+            dailyGrants.grantIfDue(userId);
+            return userId;
+        }
+
+        private long activeLeaseId(Long userId) {
+            return leases.findValidByLesseeUserId(userId, Instant.now()).orElseThrow().getId();
+        }
+
+        /** 원장을 통해 비운다 — 직접 UPDATE 하면 잔액과 원장이 어긋난 채로 테스트가 시작된다. */
+        private void drainToZero(Long userId) {
+            wallets.spend(new CoinSpendCommand(userId, wallets.balanceOf(userId),
+                    CoinReason.ADMIN_ADJUSTMENT, null, null, "TEST_LEASE_DRAIN:" + userId));
         }
     }
 }
