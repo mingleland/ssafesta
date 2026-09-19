@@ -17,6 +17,7 @@ multibranchPipelineJob('festa-gitlab-develop') {
                     projectPath(gitlabProjectFullPath)
                     traits {
                         gitLabBranchDiscovery { strategyId(1) }
+                        gitlabAvatar { disableProjectAvatar(true) }
                         headWildcardFilter { includes('develop'); excludes('') }
                     }
                 }

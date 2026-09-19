@@ -212,6 +212,8 @@ grep -q 'String gitlabProjectFullPath = "${gitlabProjectOwner}/${gitlabProjectPa
   || fail "GitLab develop Job DSL must compose the full GitLab project path"
 grep -q 'projectPath(gitlabProjectFullPath)' "${develop_job}" \
   || fail "GitLab develop Job DSL must pass the full GitLab project path"
+grep -Fq 'gitlabAvatar { disableProjectAvatar(true) }' "${develop_job}" \
+  || fail "GitLab develop Job DSL must disable private project avatar retrieval"
 ! grep -q '^String projectOwner[[:space:]]*=' "${develop_job}" \
   || fail "GitLab develop Job DSL declares a projectOwner variable that shadows the method"
 ! grep -q '^String projectPath[[:space:]]*=' "${develop_job}" \
