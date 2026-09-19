@@ -16,12 +16,30 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.example.ssafesta.ai.FakeDocumentProcessingClient;
 import com.example.ssafesta.auth.AccessTokenService;
 import com.example.ssafesta.auth.MemberSessionService;
+import com.example.ssafesta.eventshop.EventPrize;
+import com.example.ssafesta.eventshop.EventPrizeRepository;
+import com.example.ssafesta.eventshop.EventPurchaseRepository;
 import com.example.ssafesta.inventory.InventoryService;
+import com.example.ssafesta.minigame.MinigameProperties;
+import com.example.ssafesta.minigame.SlotMachineProperties;
+import com.example.ssafesta.minigame.TimerStopService;
+import com.example.ssafesta.mission.DailyMission;
 import com.example.ssafesta.storage.FakeObjectStorage;
 import com.example.ssafesta.survey.SurveyResponseService;
 import com.example.ssafesta.user.UserRepository;
+import com.example.ssafesta.wallet.CoinAdminAdjustCommand;
+import com.example.ssafesta.wallet.CoinCreditCommand;
+import com.example.ssafesta.wallet.CoinReason;
+import com.example.ssafesta.wallet.DailyCoinGrantService;
+import com.example.ssafesta.wallet.LedgerEntryType;
 import com.example.ssafesta.wallet.WalletService;
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.ZoneId;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.ExecutorService;
@@ -30,6 +48,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -695,4 +714,311 @@ class BackendCrossDomainIntegrationTest {
     }
 
     private record Survey(long surveyId, long questionId) { }
+
+    // ── 코인 경제 (S15P21A604-941) ──────────────────────────────────────────
+
+    /**
+     * 캡 세 갈래가 한 지갑에서 같은 날 돌 때 서로를 잠식하지 않는다.
+     *
+     * <p>일일 캡은 세 군데에 따로 있고 <b>각자 자기 사유 코드만</b> 센다 — 타이밍스톱은
+     * {@code MINIGAME_REWARD}, 미션은 {@code DAILY_MISSION}, 슬롯은 캡이 없는 것이 확정값이다
+     * (#205, RTP 0.68 싱크). 셋 다 자기 도메인 테스트에서 초록인데, 캡 산식이 사유 필터를 잃으면
+     * — {@code grantedOnDateFor} 의 인자 하나다 — 미니게임 수입이 미션을 막고 그 세 테스트는
+     * 전부 그대로 통과한다. 여기서만 드러난다.
+     *
+     * <p><b>캡 포화는 사유 코드를 직접 적립해서 만든다.</b> 캡의 정의가 "오늘 그 사유로 지급된
+     * 합계" 이므로 적립이 곧 캡 상태다. 실제 플레이를 캡까지 반복하면 타이밍스톱 한 판이 2~4초라
+     * (yml {@code target-min/max-seconds}) 열 판에 30초가 든다. 포화는 상태이고, 검증 대상은
+     * 그 상태에서 <b>다른 도메인의 실제 행위</b>가 통과하는지다.
+     */
+    @Nested
+    @DisplayName("코인 경제 — 세 캡이 한 지갑에서 같은 날 돈다")
+    class EconomyCycle {
+
+        /** {@code application.yml} 의 {@code app.minigame.slot-machine.machine-ids} 첫 항목. */
+        private static final String SLOT_MACHINE = "plaza-slot-01";
+        /** 받는 자 정보는 모든 구매에 필수다 (GitLab #239). */
+        private static final String RECIPIENT =
+                ",\"campus\":\"구미\",\"teamName\":\"A604\",\"recipientName\":\"황덕\"";
+        private static final String SPIN = "/api/v1/minigames/slot-machines/{id}/spins";
+
+        @Autowired private TimerStopService timerStop;
+        @Autowired private MinigameProperties minigameProperties;
+        @Autowired private SlotMachineProperties slotProperties;
+        @Autowired private EventPrizeRepository prizes;
+        @Autowired private EventPurchaseRepository purchases;
+        @Autowired private DailyCoinGrantService dailyGrants;
+
+        /**
+         * 미니게임 캡이 가득 차 있어도 미션 보상은 그대로 나온다.
+         *
+         * <p>{@code earnedToday} 가 0 이라는 단언이 핵심이다 — 미니게임으로 받은 코인이 미션
+         * 화면의 오늘 수령액에 섞이면 사용자는 받은 적 없는 보상을 받은 것으로 보게 되고, 그
+         * 다음 claim 이 캡에 걸린다.
+         */
+        @Test
+        @DisplayName("미니게임 캡이 가득 차도 미션 claim 은 통과한다")
+        void aSaturatedMinigameCapDoesNotBlockTheMissionClaim() throws Exception {
+            Long userId = member("캡교차미션");
+            String bearer = bearerFor(userId);
+            seed(userId, CoinReason.MINIGAME_REWARD, minigameProperties.dailyCapCoins());
+            int balanceBefore = wallets.balanceOf(userId);
+
+            mockMvc.perform(post("/api/v1/world-sessions").header("Authorization", bearer))
+                    .andExpect(status().isOk());
+
+            mockMvc.perform(get("/api/v1/missions/daily").header("Authorization", bearer))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.dailyCap").value(DailyMission.DAILY_CAP_COIN))
+                    .andExpect(jsonPath("$.earnedToday").value(0));
+
+            mockMvc.perform(claim(bearer))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.reward").value(DailyMission.REWARD_COIN));
+
+            assertEquals(1, ledgerCount(userId, CoinReason.DAILY_MISSION),
+                    "미션 원장은 한 건이어야 합니다");
+            mockMvc.perform(claim(bearer))
+                    .andExpect(status().isConflict())
+                    .andExpect(jsonPath("$.code").value("ALREADY_CLAIMED"));
+            assertEquals(1, ledgerCount(userId, CoinReason.DAILY_MISSION),
+                    "거부된 재claim 이 원장을 늘리면 안 됩니다");
+
+            assertEquals(balanceBefore + DailyMission.REWARD_COIN, wallets.balanceOf(userId));
+            assertBalanceMatchesLedger(wallets, userId);
+        }
+
+        /**
+         * 미션 캡이 가득 차 있어도 타이밍스톱 보상은 그대로 나온다.
+         *
+         * <p>반대 방향은 같은 사람·같은 날로 만들 수 없다 — 미션은 하루에 미션당 한 번씩만
+         * claim 되므로 한 명이 두 캡을 차례로 포화시킬 수 없고, 시계를 넘기면 시간 의존이
+         * 생긴다. 그래서 사용자를 나눈다.
+         *
+         * <p><b>이 테스트만 실제로 기다린다.</b> 보상을 받으려면 신고한 정지 시각이 서버 경과
+         * 시각과 허용 오차 안에서 일치해야 하고({@code elapsed-tolerance-seconds}), 목표가
+         * 2~4초라 목표 시각에 맞춰 멈추려면 그만큼 실제로 흘러야 한다. 비동기 상태를 폴링하는
+         * 잠이 아니라 게임 규칙 자체가 요구하는 대기이고, 판은 한 번만 돈다.
+         */
+        @Test
+        @DisplayName("미션 캡이 가득 차도 타이밍스톱 보상은 지급된다")
+        void aSaturatedMissionCapDoesNotBlockTheMinigameReward() throws Exception {
+            Long userId = member("캡교차미니");
+            String bearer = bearerFor(userId);
+            seed(userId, CoinReason.DAILY_MISSION, DailyMission.DAILY_CAP_COIN);
+
+            // 진행도를 먼저 채운다 — 그래야 거부 사유가 NOT_COMPLETED 가 아니라 캡이다.
+            mockMvc.perform(post("/api/v1/world-sessions").header("Authorization", bearer))
+                    .andExpect(status().isOk());
+            mockMvc.perform(claim(bearer))
+                    .andExpect(status().isConflict())
+                    .andExpect(jsonPath("$.code").value("DAILY_CAP_REACHED"));
+
+            int balanceBefore = wallets.balanceOf(userId);
+            TimerStopService.SessionIssued issued = timerStop.issue(userId);
+            BigDecimal target = issued.targetSeconds();
+            Thread.sleep(target.multiply(new BigDecimal("1000")).longValue());
+
+            TimerStopService.SubmitResult result = timerStop.submit(userId, issued.sessionId(),
+                    new TimerStopService.SubmitCommand(target));
+
+            assertTrue(result.accepted(), "미션 캡은 미니게임 판정에 관여하지 않습니다");
+            assertTrue(result.rewardedCoins() > 0,
+                    "미션 캡이 미니게임 지급을 막았습니다 — 두 캡이 같은 합계를 세고 있습니다");
+            assertEquals(minigameProperties.dailyCapCoins() - result.rewardedCoins(),
+                    result.dailyRemainingCoins(),
+                    "미니게임 잔여 한도가 미션 수령액만큼 깎였습니다");
+            assertEquals(1, ledgerCount(userId, CoinReason.MINIGAME_REWARD));
+            assertEquals(balanceBefore + result.rewardedCoins(), wallets.balanceOf(userId));
+            assertBalanceMatchesLedger(wallets, userId);
+        }
+
+        /**
+         * 슬롯은 두 캡 어느 쪽에도 잡히지 않고, 자기 사유 두 개로만 잔액을 움직인다.
+         *
+         * <p>슬롯이 캡 밖인 것은 확정값이다 ({@code SlotMachineService} 클래스 주석, #205) —
+         * 지급 쪽에 캡을 씌우면 베팅만 나가고 돌아오는 것이 없어 이 기계가 사람을 마르게 하는
+         * 유일한 경로가 된다. 그 확정이 지켜지는지는 <b>다른 두 캡의 잔여량이 그대로인지</b>로만
+         * 드러난다.
+         */
+        @Test
+        @DisplayName("슬롯은 두 캡 밖에서 자기 사유 두 개로만 잔액을 움직인다")
+        void slotSpinsStayOutsideBothCapsAndUseOnlyTheirOwnTwoReasons() throws Exception {
+            Long userId = member("슬롯캡밖");
+            String bearer = bearerFor(userId);
+            topUp(userId, 1_000);
+            LocalDate today = LocalDate.now(ZoneId.of("Asia/Seoul"));
+            assertEquals(0, wallets.grantedOnDateFor(userId, CoinReason.MINIGAME_REWARD, today));
+            assertEquals(0, wallets.grantedOnDateFor(userId, CoinReason.DAILY_MISSION, today));
+
+            int bet = slotProperties.betCoins();
+            int rounds = 20;
+            int balanceBefore = wallets.balanceOf(userId);
+            int paidOut = 0;
+            int wins = 0;
+            for (int round = 0; round < rounds; round++) {
+                int payout = spinOnce(bearer, bet);
+                paidOut += payout;
+                if (payout > 0) {
+                    wins++;
+                }
+            }
+
+            assertEquals(0, wallets.grantedOnDateFor(userId, CoinReason.MINIGAME_REWARD, today),
+                    "슬롯 지급이 미니게임 한도를 잠식했습니다 — 사유 코드가 섞였습니다");
+            assertEquals(0, wallets.grantedOnDateFor(userId, CoinReason.DAILY_MISSION, today),
+                    "슬롯 지급이 미션 한도를 잠식했습니다");
+            assertEquals(balanceBefore + paidOut - bet * rounds, wallets.balanceOf(userId),
+                    "슬롯 기인 잔액 변화는 지급 합계에서 베팅 합계를 뺀 값이어야 합니다");
+            assertEquals(rounds, ledgerCount(userId, CoinReason.SLOT_BET),
+                    "베팅은 판마다 한 건입니다");
+            assertEquals(wins, ledgerCount(userId, CoinReason.SLOT_PAYOUT),
+                    "지급 원장은 실제로 딴 판의 수와 같아야 합니다 — 0 코인 지급 행이 남으면 어긋납니다");
+            assertBalanceMatchesLedger(wallets, userId);
+        }
+
+        /**
+         * 한 사람의 하루가 사유 코드 일곱 개를 지나고, 원장이 그 산술과 맞는다.
+         *
+         * <p>잔액만 맞춰 보면 두 사유가 서로를 상쇄해도 통과한다 — 그래서 사유별 건수와
+         * <b>등장한 사유의 집합</b>까지 본다. 집합을 보는 이유는 반대쪽이다: 아무도 부르지 않은
+         * 사유가 끼어드는 것(중복 지급, 잘못된 보상 경로)은 건수표가 예상한 사유만 세는 한
+         * 영원히 안 보인다.
+         */
+        @Test
+        @DisplayName("하루를 한 바퀴 돌면 사유별 건수와 산술이 모두 맞는다")
+        void oneDayThroughEveryReasonLeavesALedgerThatAddsUp() throws Exception {
+            Long userId = member("경제일주");
+            String bearer = bearerFor(userId);
+            Long admin = administrator("경제일주운영");
+
+            mockMvc.perform(get("/api/v1/wallets/me").header("Authorization", bearer))
+                    .andExpect(status().isOk());
+            int opening = wallets.balanceOf(userId);
+
+            mockMvc.perform(post("/api/v1/world-sessions").header("Authorization", bearer))
+                    .andExpect(status().isOk());
+            mockMvc.perform(claim(bearer)).andExpect(status().isOk());
+
+            int bet = slotProperties.betCoins();
+            int spins = 5;
+            int paidOut = 0;
+            int wins = 0;
+            for (int round = 0; round < spins; round++) {
+                int payout = spinOnce(bearer, bet);
+                paidOut += payout;
+                if (payout > 0) {
+                    wins++;
+                }
+            }
+
+            EventPrize prize = prizes.saveAndFlush(new EventPrize("일주경품", 20, 3));
+            long purchaseId = buy(bearer, userId, prize.getId());
+            assertEquals(2, prizes.findById(prize.getId()).orElseThrow().getStock());
+
+            mockMvc.perform(post("/api/v1/admin/event-shop/purchases/{id}/fulfillment", purchaseId)
+                            .header("Authorization", bearerFor(admin))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"status\":\"CANCELLED\",\"note\":\"일주 검증\"}"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.fulfillment").value("CANCELLED"));
+            assertEquals(3, prizes.findById(prize.getId()).orElseThrow().getStock(),
+                    "취소는 재고를 되돌려야 합니다");
+
+            assertEquals(1, ledgerCount(userId, CoinReason.INITIAL_GRANT));
+            assertEquals(1, ledgerCount(userId, CoinReason.DAILY_GRANT));
+            assertEquals(1, ledgerCount(userId, CoinReason.DAILY_MISSION));
+            assertEquals(spins, ledgerCount(userId, CoinReason.SLOT_BET));
+            assertEquals(wins, ledgerCount(userId, CoinReason.SLOT_PAYOUT));
+            assertEquals(1, ledgerCount(userId, CoinReason.PRIZE_PURCHASE));
+            assertEquals(1, ledgerCount(userId, CoinReason.PRIZE_REFUND),
+                    "환불은 한 건입니다 — 구매당 한 번뿐인 멱등키가 그것을 지킵니다");
+
+            Set<String> expected = new HashSet<>(List.of(CoinReason.INITIAL_GRANT,
+                    CoinReason.DAILY_GRANT, CoinReason.DAILY_MISSION, CoinReason.SLOT_BET,
+                    CoinReason.PRIZE_PURCHASE, CoinReason.PRIZE_REFUND));
+            if (wins > 0) {
+                expected.add(CoinReason.SLOT_PAYOUT);
+            }
+            assertEquals(expected, new HashSet<>(reasonsUsedBy(userId)),
+                    "아무도 부르지 않은 사유가 원장에 들어왔거나, 불렀어야 할 사유가 빠졌습니다");
+
+            // 산술: 미션 보상이 들어오고, 슬롯이 오간 만큼 움직이고, 구매와 환불이 상쇄된다.
+            assertEquals(opening + DailyMission.REWARD_COIN + paidOut - bet * spins,
+                    wallets.balanceOf(userId),
+                    "구매와 환불이 상쇄되지 않았거나 슬롯 산술이 어긋났습니다");
+            assertBalanceMatchesLedger(wallets, userId);
+        }
+
+        // ── 단계 ────────────────────────────────────────────────────────────
+
+        /**
+         * 그날 첫 인증 요청이 일일 지급을 붙인다 ({@code DailyCoinGrantInterceptor}) — 지급을
+         * 먼저 떨어뜨리지 않으면 시작 잔액이 "몇 번째 호출에서 읽었는가" 에 따라 달라지고,
+         * 이 아크의 산술은 전부 그 값에서 출발한다.
+         */
+        private Long member(String prefix) {
+            Long userId = createMemberWithWallet(users, wallets, prefix);
+            dailyGrants.grantIfDue(userId);
+            return userId;
+        }
+
+        /**
+         * 캡을 그 사유로 직접 적립해 채운다. 캡의 정의가 "오늘 그 사유로 지급된 합계" 라서
+         * 이 적립이 곧 캡 상태다 ({@code MinigameRewardIntegrationTest} 가 쓰는 것과 같은 수).
+         */
+        private void seed(Long userId, String reason, int coins) {
+            wallets.credit(new CoinCreditCommand(userId, LedgerEntryType.REWARD, coins, reason,
+                    "TEST_SEED", String.valueOf(userId), reason + ":seed:" + UUID.randomUUID()));
+        }
+
+        private void topUp(Long userId, int coins) {
+            wallets.adjustByAdmin(new CoinAdminAdjustCommand(userId, coins, "경제 아크 충전", userId,
+                    "TEST_ECONOMY_TOPUP:" + UUID.randomUUID()));
+        }
+
+        private Long administrator(String prefix) {
+            Long userId = createMemberWithWallet(users, wallets, prefix);
+            jdbc.update("UPDATE users SET account_type='ADMIN' WHERE id=?", userId);
+            return userId;
+        }
+
+        /** 목표가 1 이라 월드 입장 한 번으로 claim 가능해지는 미션이다. */
+        private RequestBuilder claim(String bearer) {
+            return post("/api/v1/missions/daily/{id}/claims", DailyMission.WORLD_ENTER.name())
+                    .header("Authorization", bearer);
+        }
+
+        /** @return 이 판의 지급액. 잔액과 원장은 호출자가 합계로 본다 */
+        private int spinOnce(String bearer, int bet) throws Exception {
+            String body = mockMvc.perform(post(SPIN, SLOT_MACHINE)
+                            .header("Authorization", bearer)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"bet\":" + bet + "}"))
+                    .andExpect(status().isOk())
+                    .andReturn().getResponse().getContentAsString();
+            return read(body).get("payout").asInt();
+        }
+
+        private long buy(String bearer, Long buyerUserId, Long prizeId) throws Exception {
+            mockMvc.perform(post("/api/v1/event-shop/purchases")
+                            .header("Authorization", bearer)
+                            .header("Idempotency-Key", UUID.randomUUID().toString())
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"prizeId\":" + prizeId + ",\"quantity\":1" + RECIPIENT + "}"))
+                    .andExpect(status().isCreated());
+            return purchases.findAll().stream()
+                    .filter(purchase -> purchase.getPrizeId().equals(prizeId)
+                            && purchase.getBuyerUserId().equals(buyerUserId))
+                    .findFirst().orElseThrow().getId();
+        }
+
+        private List<String> reasonsUsedBy(Long userId) {
+            return jdbc.queryForList("""
+                    SELECT DISTINCT e.reason_type FROM coin_ledger_entries e
+                      JOIN wallets w ON w.id = e.wallet_id
+                     WHERE w.user_id = ?
+                    """, String.class, userId);
+        }
+    }
 }
