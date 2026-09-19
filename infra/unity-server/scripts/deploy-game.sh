@@ -20,6 +20,16 @@ lock_timeout_seconds="${GAME_DEPLOY_LOCK_TIMEOUT_SECONDS:-300}"
 
 [[ -f "${RELEASE_MANIFEST_PATH}" ]] || { echo 'release manifest is missing' >&2; exit 66; }
 [[ -f "${GAME_ENV_FILE}" ]] || { echo 'game environment file is missing' >&2; exit 66; }
+
+# 자동 candidate 교체는 반드시 rollback baseline이 존재할 때만 허용한다.
+# #492에서는 baseline 없이 candidate가 실제 runtime을 교체한 뒤 readiness 실패,
+# rollback도 exit 66으로 실패하면서 CANDIDATE가 live 상태로 방치됐다.
+known_good_path="${GAME_DEPLOY_STATE_DIR}/known-good.json"
+[[ -f "${known_good_path}" ]] || {
+  echo 'game known-good baseline is missing; refusing to replace the running demo world' >&2
+  exit 66
+}
+
 set -a
 # shellcheck disable=SC1090
 source "${GAME_ENV_FILE}"

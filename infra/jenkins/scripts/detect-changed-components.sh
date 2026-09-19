@@ -57,6 +57,11 @@ component_config = {
     "infra/environments/compose/dev/back.yaml": "back",
     "infra/environments/compose/dev/front.yaml": "front",
     "infra/environments/compose/dev/game.yaml": "game",
+    # develop의 실제 통합 배포 대상은 demo다. demo component overlay 변경은
+    # shared-ci가 아니라 해당 component만 재빌드/재배포해야 한다.
+    "infra/environments/compose/demo/ai.yaml": "ai",
+    "infra/environments/compose/demo/back.yaml": "back",
+    "infra/environments/compose/demo/front.yaml": "front",
     "infra/deploy/compose/dev/ai.compose.yaml": "ai",
     "infra/deploy/compose/dev/back.compose.yaml": "back",
     "infra/deploy/compose/dev/front.compose.yaml": "front",
