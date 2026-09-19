@@ -1432,12 +1432,14 @@ class BackendCrossDomainIntegrationTest {
 
             // 설문 제출 — 응답자는 종료 전에 답한 사람과 달라야 한다. 같은 사람이면
             // SURVEY_ALREADY_RESPONDED 가 임대 거부를 가린다.
-            // surveyId 는 DB 에서 읽는다 — 종료 뒤에는 survey/run 이 이미 닫혀 있다.
-            // 본문이 비어도 된다: requireVisitorVisible 이 답 검증보다 먼저다.
-            Long surveyId = jdbc.queryForObject("SELECT id FROM surveys WHERE booth_id = ?",
-                    Long.class, booth.boothId());
-            expired(submit(bearerFor(member("종료응답" + cause.ordinal())), surveyId,
-                    "{\"answers\":[]}"));
+            // 소유자의 편집 조회로 문항을 얻어 **유효한** 답을 보낸다. 빈 답이면
+            // "임대 가드가 답 검증보다 먼저 돈다" 는 내부 순서에 기대게 되고, 그 순서가
+            // 바뀌면 테스트는 통과하면서 뜻이 사라진다. 그 조회는 종료 뒤에도 열려 있다.
+            Survey survey = readSurvey(booth.owner(), booth.boothId());
+            expired(submit(bearerFor(member("종료응답" + cause.ordinal())), survey.surveyId(),
+                    """
+                    {"answers":[{"questionId":%d,"rating":4}]}"""
+                            .formatted(survey.questionId())));
         }
 
         /** 임대가 끝나서 막혔는지 — 코드까지 본다. 다른 이유의 409 는 이 단언을 못 지나간다. */
@@ -1670,6 +1672,11 @@ class BackendCrossDomainIntegrationTest {
         @Autowired private DailyCoinGrantService dailyGrants;
 
         /** 한 쓰기 경로. {@code label} 은 실패했을 때 어느 칸인지 말해 준다. */
+        /** 한 번만 할 수 있는 경로를 역할별 새 부스로 도는 테스트들이 공유한다. */
+        private static final List<String> ROLES =
+                List.of("owner", "editor", "admin", "consultant", "demoted", "stranger");
+        private static final List<String> ALLOWED = List.of("owner", "editor", "admin");
+
         private record Write(String label, Function<String, RequestBuilder> request) { }
 
         private record Fixture(Long ownerId, String owner, long boothId, long agentId,
@@ -1849,6 +1856,39 @@ class BackendCrossDomainIntegrationTest {
         }
 
         /**
+         * 생성 경로도 역할마다 <b>새 부스</b>로 본다.
+         *
+         * <p>고정 목록에는 담을 수 없다 — 프로젝트와 AI 직원은 부스당 하나뿐이라
+         * ({@code PROJECT_ALREADY_EXISTS}·{@code AGENT_LIMIT_EXCEEDED}) 두 번째 역할부터
+         * 권한이 아니라 한도로 갈린다. 그렇다고 빼 두면 "수정이 생성을 대신한다" 가 되는데,
+         * 이 매트릭스가 존재하는 이유가 <b>호출부마다 가드를 따로 고른다</b>는 것이다.
+         */
+        @Test
+        @DisplayName("생성 경로도 같은 역할 판정과 감사 계약을 따른다")
+        void creationPathsFollowTheSameRoleJudgementOnAFreshBoothPerRole() throws Exception {
+            for (String who : ROLES) {
+                Fixture booth = bareBooth("생성" + who);
+                Long actorId = actorFor(who, booth);
+                String bearer = bearerFor(actorId);
+                boolean allowed = ALLOWED.contains(who);
+
+                mockMvc.perform(post("/api/v1/booths/{id}/projects", booth.boothId())
+                                .header("Authorization", bearer)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content("""
+                                        {"name":"생성 전시","gitUrl":"https://git.example.com/c"}"""))
+                        .andExpect(allowed ? status().isCreated() : status().isForbidden());
+                mockMvc.perform(post("/api/v1/booths/{id}/agents", booth.boothId())
+                                .header("Authorization", bearer)
+                                .contentType(MediaType.APPLICATION_JSON).content(AGENT))
+                        .andExpect(allowed ? status().isCreated() : status().isForbidden());
+
+                assertEquals(auditExpectedFor(who, 2), auditRows(actorId, booth.boothId()),
+                        who + " — 생성의 감사 계약이 어긋났습니다");
+            }
+        }
+
+        /**
          * 삭제 경로는 역할마다 <b>새 부스</b>로 본다.
          *
          * <p>고정 목록에 담을 수 없어서다 — 첫 역할이 지우면 다음 역할이 밟을 대상이 없다.
@@ -1860,27 +1900,35 @@ class BackendCrossDomainIntegrationTest {
         @Test
         @DisplayName("삭제 경로도 같은 역할 판정을 따른다")
         void deletionPathsFollowTheSameRoleJudgementOnAFreshBoothPerRole() throws Exception {
-            for (boolean allowed : List.of(true, false)) {
-                for (String who : allowed ? List.of("owner", "editor", "admin")
-                        : List.of("consultant", "demoted", "stranger")) {
-                    Fixture booth = aLeasedBooth("삭제" + who);
-                    String bearer = bearerFor(actorFor(who, booth));
+            for (String who : ROLES) {
+                Fixture booth = aLeasedBooth("삭제" + who);
+                Long actorId = actorFor(who, booth);
+                String bearer = bearerFor(actorId);
+                ResultMatcher expected = ALLOWED.contains(who)
+                        ? status().isNoContent() : status().isForbidden();
 
-                    ResultMatcher expected = allowed
-                            ? status().isNoContent() : status().isForbidden();
-                    mockMvc.perform(delete("/api/v1/documents/{id}", booth.documentId())
-                                    .header("Authorization", bearer))
-                            .andExpect(expected);
-                    mockMvc.perform(delete("/api/v1/agents/{id}", booth.agentId())
-                                    .header("Authorization", bearer))
-                            .andExpect(expected);
-                }
+                mockMvc.perform(delete("/api/v1/documents/{id}", booth.documentId())
+                                .header("Authorization", bearer))
+                        .andExpect(expected);
+                mockMvc.perform(delete("/api/v1/agents/{id}", booth.agentId())
+                                .header("Authorization", bearer))
+                        .andExpect(expected);
+
+                // 삭제도 관리자 자격으로 지나면 감사 대상이다 — 둘 다 requireModifier 를
+                // 거친다(문서는 직접, 에이전트는 requireActiveEditor 를 통해).
+                assertEquals(auditExpectedFor(who, 2), auditRows(actorId, booth.boothId()),
+                        who + " — 삭제의 감사 계약이 어긋났습니다");
             }
         }
 
         // ── 단계 ────────────────────────────────────────────────────────────
 
-        /** 역할 이름 하나로 그 역할의 회원을 만든다 — 삭제 테스트가 부스마다 새로 부른다. */
+        /** 관리자 자격으로 지난 것만 감사 대상이다 — 소유자·스태프는 0 이고 거부는 0 이다. */
+        private int auditExpectedFor(String who, int writesAttempted) {
+            return "admin".equals(who) ? writesAttempted : 0;
+        }
+
+        /** 역할 이름 하나로 그 역할의 회원을 만든다 — 부스마다 새로 부른다. */
         private Long actorFor(String who, Fixture booth) throws Exception {
             return switch (who) {
                 case "owner" -> booth.ownerId();
@@ -1973,6 +2021,18 @@ class BackendCrossDomainIntegrationTest {
                                             {"fileName":"m.pdf","contentType":"application/pdf",
                                              "size":%d,"contentSha256":"%s"}"""
                                             .formatted(DOCUMENT_SIZE, freshSha()))));
+        }
+
+        /** 프로젝트도 AI 직원도 아직 없는 부스 — 생성 경로가 밟을 자리다. */
+        private Fixture bareBooth(String prefix) throws Exception {
+            Long ownerId = member(prefix);
+            String owner = bearerFor(ownerId);
+            String json = mockMvc.perform(lease(owner, firstAvailableRentalSlot()))
+                    .andExpect(status().isCreated())
+                    .andReturn().getResponse().getContentAsString();
+            long boothId = read(json).get("boothId").asLong();
+            publishLayout(mockMvc, boothId, owner);
+            return new Fixture(ownerId, owner, boothId, 0L, 0L, 0L);
         }
 
         /** 게시할 draft 와 문서를 걸 에이전트까지 갖춘 부스. */
