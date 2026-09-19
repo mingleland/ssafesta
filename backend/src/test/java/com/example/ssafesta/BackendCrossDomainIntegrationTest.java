@@ -1876,7 +1876,7 @@ class BackendCrossDomainIntegrationTest {
         void creationPathsFollowTheSameRoleJudgementOnAFreshBoothPerRole() throws Exception {
             for (String who : ROLES) {
                 Fixture booth = bareBooth("생성" + who);
-                Long actorId = actorFor(who, booth);
+                Long actorId = actorFor(who, booth, "생성");
                 String bearer = bearerFor(actorId);
                 boolean allowed = ALLOWED.contains(who);
 
@@ -1910,7 +1910,7 @@ class BackendCrossDomainIntegrationTest {
         void deletionPathsFollowTheSameRoleJudgementOnAFreshBoothPerRole() throws Exception {
             for (String who : ROLES) {
                 Fixture booth = aLeasedBooth("삭제" + who);
-                Long actorId = actorFor(who, booth);
+                Long actorId = actorFor(who, booth, "삭제");
                 String bearer = bearerFor(actorId);
                 boolean allowed = ALLOWED.contains(who);
 
@@ -1938,13 +1938,21 @@ class BackendCrossDomainIntegrationTest {
          */
         private void judge(RequestBuilder request, boolean allowed, ResultMatcher success,
                            String label) throws Exception {
+            // 요청은 한 번만 보낸다 — 생성·삭제라 두 번 보내면 두 번째가 409·404 다.
+            MvcResult result = mockMvc.perform(request).andReturn();
+            String seen = label + " → " + result.getResponse().getStatus() + " "
+                    + result.getResponse().getContentAsString();
             if (allowed) {
-                mockMvc.perform(request).andExpect(success);
+                try {
+                    success.match(result);
+                } catch (AssertionError mismatch) {
+                    throw new AssertionError(seen, mismatch);
+                }
                 return;
             }
-            mockMvc.perform(request)
-                    .andExpect(status().isForbidden())
-                    .andExpect(jsonPath("$.code").value("BOOTH_EDITOR_FORBIDDEN"));
+            assertEquals(403, result.getResponse().getStatus(), seen);
+            assertEquals("BOOTH_EDITOR_FORBIDDEN",
+                    read(result.getResponse().getContentAsString()).get("code").asString(), seen);
         }
 
         /** 관리자 자격으로 지난 것만 감사 대상이다 — 소유자·스태프는 0 이고 거부는 0 이다. */
@@ -1953,26 +1961,26 @@ class BackendCrossDomainIntegrationTest {
         }
 
         /** 역할 이름 하나로 그 역할의 회원을 만든다 — 부스마다 새로 부른다. */
-        private Long actorFor(String who, Fixture booth) throws Exception {
+        private Long actorFor(String who, Fixture booth, String prefix) throws Exception {
             return switch (who) {
                 case "owner" -> booth.ownerId();
                 case "editor" -> {
-                    Long id = member("삭제편집" + booth.boothId());
+                    Long id = member(prefix + "편집" + booth.boothId());
                     addStaff(booth.boothId(), id, "CONTENT_EDITOR");
                     yield id;
                 }
-                case "admin" -> administrator("삭제운영" + booth.boothId());
+                case "admin" -> administrator(prefix + "운영" + booth.boothId());
                 case "consultant" -> {
-                    Long id = member("삭제상담" + booth.boothId());
+                    Long id = member(prefix + "상담" + booth.boothId());
                     addStaff(booth.boothId(), id, "CONSULTANT");
                     yield id;
                 }
                 case "demoted" -> {
-                    Long id = administrator("삭제강등" + booth.boothId());
+                    Long id = administrator(prefix + "강등" + booth.boothId());
                     jdbc.update("UPDATE users SET account_type='MEMBER' WHERE id=?", id);
                     yield id;
                 }
-                default -> member("삭제외부" + booth.boothId());
+                default -> member(prefix + "외부" + booth.boothId());
             };
         }
 
@@ -2023,6 +2031,13 @@ class BackendCrossDomainIntegrationTest {
                     // 생성이 아니라 수정이다 — 프로젝트도 부스당 하나라
                     // (PROJECT_ALREADY_EXISTS) 생성은 두 번째 역할부터 권한이 아니라
                     // 중복으로 갈린다. 같은 requireActiveEditor 게이트를 지난다.
+                    // 로고는 프로젝트와 다른 호출부다 — ProjectLogoService 가 자기 가드를
+                    // 따로 고른다. 발급은 행을 새로 만들 뿐이라 역할마다 다시 부를 수 있다.
+                    new Write("project logo", bearer -> post(
+                            "/api/v1/booths/{id}/project-logos", boothId)
+                            .header("Authorization", bearer)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"contentType\":\"image/png\",\"byteSize\":100}")),
                     new Write("project update", bearer -> patch("/api/v1/projects/{id}",
                             booth.projectId())
                             .header("Authorization", bearer)
