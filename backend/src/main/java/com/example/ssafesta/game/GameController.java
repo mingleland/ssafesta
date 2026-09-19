@@ -269,7 +269,7 @@ public class GameController {
 
     @Operation(summary = "게시(Publish) — 지금 작업본을 플레이 가능한 회차로 굳힌다",
             description = """
-                    작업본을 새 **게시 회차**로 복사한다. 요청 본문은 `{"expectedRevision": 7}` 하나이며,
+                    작업본을 새 **게시 회차**로 복사한다. 요청 본문의 `expectedRevision` 은
                     **게시하려는 작업본의 회차를 확인하는 값**이다 — 다르면 `409 GAME_REVISION_CONFLICT` 로 거부한다.
                     편집기가 화면에 들고 있는 것과 다른 내용이 게시되는 일을 막는다.
 
@@ -281,11 +281,29 @@ public class GameController {
 
                     **공개 설정과는 별개다.** 게시했더라도 게임이 `PRIVATE` 이면 남은 플레이할 수 없다
                     (`GET /{gameId}/published` 가 `403 GAME_NOT_PUBLIC`).
+
+                    ### 오락실 자리를 함께 고른다 (선택)
+
+                    요청에 `machineId` 를 실으면 그 캐비닛을 **같은 트랜잭션에서** 잡고, 응답의
+                    `arcadeMachineId` 가 잡은 자리다. 자리가 거절되면 **게시도 남지 않는다** — 게시만
+                    성공하고 자리는 못 잡은 상태를 만들지 않기 위해서다.
+
+                    ```json
+                    { "expectedRevision": 7, "machineId": "arcade-01" }
+                    ```
+
+                    `machineId` 는 선택이고, 없으면 오락실에 걸지 않고 게시만 하며 `arcadeMachineId` 는
+                    `null` 이다. **`null` 이라고 자리가 없다는 뜻은 아니다** — 이전에 잡아 둔 자리는 그대로다.
+
+                    **공개 게임만 자리를 잡는다**(`403 GAME_NOT_PUBLIC`). **1인 2대**까지이고, 같은 게임이
+                    같은 자리로 다시 게시하는 것은 멱등이다. **자리 이사는 없다** — 옮기려면 비공개로 내렸다
+                    (자리가 풀린다) 다시 올리며 고른다.
                     """)
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "게시 성공. 새 회차·게시 시각·`arcadeMachineId`·`warnings`"),
             @ApiResponse(responseCode = "400", description = "`VALIDATION_FAILED` — `expectedRevision` 이 없거나 음수, 또는 `machineId` 가 빈 문자열이다"),
-            @ApiResponse(responseCode = "403", description = "`GAME_FORBIDDEN` — 내 게임이 아니다"),
+            @ApiResponse(responseCode = "403", description = "`GAME_FORBIDDEN`(내 게임이 아니다) 또는 "
+                    + "`GAME_NOT_PUBLIC`(비공개 게임은 오락실에 걸 수 없다 — `machineId` 를 실었을 때만 난다)"),
             @ApiResponse(responseCode = "404", description = "`GAME_NOT_FOUND`(없다), `GAME_DELETED`(삭제됨), 게시할 작업본이 없다, 또는 `MACHINE_NOT_FOUND`(그런 캐비닛이 없다)"),
             @ApiResponse(responseCode = "409", description = "`GAME_REVISION_CONFLICT`(작업본 회차 불일치), `GAME_VALIDATION_FAILED`(완성 규칙 위반), `GAME_SCHEMA_UNSUPPORTED`, "
                     + "`ARCADE_MACHINE_TAKEN`(남이 잡은 자리), `ARCADE_SEAT_LIMIT`(1인 2대 초과), `ARCADE_ALREADY_SEATED`(이 게임이 이미 다른 자리에 있다)")})
