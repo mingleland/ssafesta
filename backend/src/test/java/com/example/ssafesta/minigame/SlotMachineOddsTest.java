@@ -25,6 +25,11 @@ import org.springframework.core.io.ClassPathResource;
  *
  * <p>Which is why the table is <b>read from {@code application.yml}</b> rather than retyped here.
  * A copy would let the two drift, and the drifting copy is the one that keeps passing.
+ *
+ * <p>It binds the <b>default</b> document only, not the profile overlays. That is the whole table
+ * today — no profile sets {@code app.minigame.slot-machine} — but a deployment that started
+ * overriding the odds per profile would need this to bind that profile too, or the guard would
+ * pass while production paid something else.
  */
 class SlotMachineOddsTest {
 
