@@ -86,6 +86,22 @@ class ArcadeSeatClaimIntegrationTest {
     }
 
     @Test
+    void anEmptyMachineIdIsARequestErrorRatherThanNoChoice() throws Exception {
+        Owner owner = draftedGame("빈자리값");
+
+        // 없는 것과 같이 취급하면 "자리를 고른 줄 알았는데 안 걸렸다" 가 조용히 성립하고,
+        // 사용자는 게시 성공만 보고 프라임 자리를 놓친다.
+        mockMvc.perform(post("/api/v1/games/" + owner.gameId() + "/publish")
+                        .header("Authorization", bearerFor(owner.userId()))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"expectedRevision\":1,\"machineId\":\"\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
+
+        assertNull(games.findById(owner.gameId()).orElseThrow().getPublishedVersion());
+    }
+
+    @Test
     void someoneElsesCabinetIsRefused() throws Exception {
         Owner first = draftedGame("선점자");
         publish(first, "arcade-02").andExpect(status().isOk());
