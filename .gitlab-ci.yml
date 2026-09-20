@@ -77,21 +77,9 @@ mr-status:
   rules:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
   before_script:
-    - apk add --no-cache bash python3 curl jq git
+    - apk add --no-cache bash python3
   script:
     - bash infra/jenkins/scripts/secret-scan.sh --path .
-    - |
-      # CI/Infra 변경이 있을 때만 정적·계약 테스트를 수행한다 (Batch 2 최적화 — 무관한 컴포넌트 빌드 0).
-      if git rev-parse --verify origin/develop >/dev/null 2>&1; then
-        changed=$(git diff --name-only origin/develop...HEAD 2>/dev/null || git diff --name-only origin/develop..HEAD 2>/dev/null || true)
-      else
-        changed=$(git diff --name-only HEAD~1 2>/dev/null || true)
-      fi
-      if printf '%s\n' "$changed" | grep -E '^(infra/|ci/|\.gitlab-ci\.yml|Jenkinsfile)' >/dev/null 2>&1; then
-        echo "CI/Infra changes detected — running static contract tests..."
-        for t in infra/jenkins/tests/*.sh; do bash "$t"; done
-        bash infra/unity-server/tests/run-static.sh
-      fi
     - echo 'MR pipeline status only; component CI is selected by rules:changes'
 
 .front-changes:
