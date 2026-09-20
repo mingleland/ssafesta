@@ -6,7 +6,8 @@ String repositoryUrl = "${serverUrl}/${projectOwner}/${projectPath}.git"
 
 pipelineJob('festa-world-package-publish') {
     description(
-        'Manually preserve an already Demo-approved World Docker image as an immutable GitLab Generic Package. ' +
+        'FALLBACK/HISTORICAL (Batch 2): manually preserve an already Demo-approved World Docker image as an immutable GitLab Generic Package. ' +
+        'The normal path is festa-gitlab-develop/develop, which publishes festa-world/<8sha> automatically. ' +
         'This job never builds or rebuilds Unity/Docker artifacts.'
     )
 
