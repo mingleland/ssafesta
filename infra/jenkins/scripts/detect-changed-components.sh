@@ -128,6 +128,8 @@ validation_only_prefixes = (
     "infra/environments/tests/",
     "infra/environments/compose/dev/",
     "infra/deploy/compose/dev/",
+    # 운영자가 API 로 주입하는 데이터 정본. 어떤 이미지에도 들어가지 않는다.
+    "infra/deploy/data/",
 )
 validation_only_exact = {
     "infra/environments/config/manifests/dev.json",
