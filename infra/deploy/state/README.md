@@ -51,6 +51,10 @@ production/
 - `known-good`: external 검증 뒤 사람이 승인한 `current`다. Jenkins 자동 검증만으로 갱신하지 않는다.
 - `previous`: 첫 canonical known-good 이후 다음 cutover 직전에 저장한 직전 canonical `current`다.
 
+### Demo 조합과 receipt (Batch 1)
+
+Demo `dev/batches/current/<component>.json` 은 컴포넌트마다 독립된 `releaseId`·`sourceCommit` 을 가진다 — 변경된 컴포넌트만 새 배치로 배포되고, 미변경 컴포넌트는 재발급하지 않는다(freshness override 도 없다). `approve-known-good.sh environment` 는 그 시점의 조합을 `known-good/environment.json` 으로 굳히고 `batchId`(컴포넌트 identity 로부터 결정적으로 만든 `demo-env-<hash>`)를 기록한다. Production receipt 의 `demoReleaseId` 는 이 `batchId` 를 가리키며, validator 는 `demoReleaseId == batchId` 와 컴포넌트별 exact identity(releaseId·sourceCommit·imageRef·contentId)만 검사한다. 같은 조합은 항상 같은 `batchId` 다.
+
 허용 transition은 다음과 같다.
 
 ```text
