@@ -15,6 +15,7 @@ fi
 python -c 'import sys; assert sys.version_info >= (3, 12), sys.version'
 python -m pip --version >/dev/null
 python -c 'import jsonschema; assert jsonschema.__version__ == "4.26.0", jsonschema.__version__'
+python -c 'import yaml; assert yaml.__version__ == "6.0.2", yaml.__version__'
 node -e 'const major=Number(process.versions.node.split(".")[0]); if (major < 24) process.exit(1)'
 [[ "$(javac -version 2>&1)" == javac\ 21.* ]]
 docker version --format '{{.Server.Version}}' >/dev/null
