@@ -61,7 +61,9 @@ def call(Map config = [:]) {
                     command -v git-lfs >/dev/null 2>&1 || { echo 'git-lfs is required on the unity agent' >&2; exit 69; }
                     git lfs pull
                     if git lfs ls-files | grep -q ' - '; then echo 'LFS_POINTER_UNRESOLVED: pointer files remain after git lfs pull' >&2; git lfs ls-files | grep ' - ' >&2; exit 78; fi
-                    test -z "$(git status --porcelain)" || { echo 'checkout is dirty; Unity builds must come from a clean tree' >&2; git status --porcelain >&2; exit 65; }
+                    # Unity 의 ScmStamp(FestaWebBuilder) 와 같은 기준 — 추적 파일의 변경만 dirty 다. 재사용 workspace 의 untracked
+                    # 잔재(artifacts/, Unity 가 만든 .meta, mono_crash blob)는 소스 identity 를 바꾸지 않는다 (#508 오탐).
+                    test -z "$(git status --porcelain --untracked-files=no)" || { echo 'checkout is dirty; Unity builds must come from a clean tree' >&2; git status --porcelain --untracked-files=no >&2; exit 65; }
                 '''
                 runCi()
             }
