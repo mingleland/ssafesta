@@ -5,7 +5,25 @@ build_project() {
   component_dir="$(ci_component_dir)"
   case "${CI_COMPONENT}" in
     ai) (cd "${component_dir}" && python -m compileall -q -x '\.venv' .) ;;
-    back) (cd "${component_dir}" && if [[ -x ./gradlew ]]; then ./gradlew build -x test; else ./mvnw package -DskipTests; fi) ;;
+    back) (
+      cd "${component_dir}"
+      reuse_compiled=false
+      stamp_file="target/.build-source-stamp"
+      if [[ -f "${stamp_file}" ]]; then
+        IFS=$'\t' read -r stamp_sha stamp_run_id < "${stamp_file}" || true
+        if [[ "${stamp_sha:-}" == "${CI_COMMIT_SHA:-}" && "${stamp_run_id:-}" == "${CI_RUN_ID:-}" && -d "target/classes" ]]; then
+          reuse_compiled=true
+        fi
+      fi
+      if [[ "${reuse_compiled}" == true ]]; then
+        echo "Reusing classes compiled during test phase in the same pipeline run..."
+        if [[ -x ./gradlew ]]; then ./gradlew build -x test; else ./mvnw package -DskipTests; fi
+      else
+        echo "Stale or missing build stamp — running clean package..."
+        if [[ -x ./gradlew ]]; then ./gradlew clean build -x test; else ./mvnw clean package -DskipTests; fi
+      fi
+      printf '%s\t%s\n' "${CI_COMMIT_SHA:-}" "${CI_RUN_ID:-}" > "${stamp_file}"
+    ) ;;
     front) (
       cd "${component_dir}"
       if [[ ! -d node_modules || package-lock.json -nt node_modules ]]; then npm ci; fi

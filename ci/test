@@ -10,10 +10,13 @@ test_project() {
         && .venv/bin/python -m pytest tests/unit tests/contract --junitxml="${CI_ARTIFACT_DIR}/tests.xml") ;;
     back) (
       cd "${component_dir}"
-      # Testcontainers cleanup trap: 테스트 종료/취소 시 컨테이너 무조건 정리 (Batch 2 최적화)
+      job_owner="${TESTCONTAINERS_JOB_OWNER:-${CI_RUN_ID:-local-$$-$(date +%s)}}"
+      export TESTCONTAINERS_JOB_OWNER="${job_owner}"
+
+      # Testcontainers cleanup fallback: 이 실행(owner)이 생성한 리소스만 안전하게 정리 (Batch 2 P0)
       cleanup_testcontainers() {
-        if command -v docker >/dev/null 2>&1; then
-          docker rm -f $(docker ps -a -q --filter 'label=org.testcontainers=true') 2>/dev/null || true
+        if command -v docker >/dev/null 2>&1 && [[ -n "${job_owner}" ]]; then
+          docker rm -f $(docker ps -a -q --filter "label=org.ssafy-festa.testcontainers.owner=${job_owner}") 2>/dev/null || true
         fi
       }
       trap cleanup_testcontainers EXIT HUP INT TERM
@@ -58,6 +61,12 @@ test_project() {
         else
           ./mvnw test -Dtest="${unit_pattern}" -DfailIfNoTests=false || status=$?
         fi
+      fi
+      if [[ ${status} -eq 0 ]]; then
+        mkdir -p target
+        printf '%s\t%s\n' "${CI_COMMIT_SHA:-}" "${CI_RUN_ID:-}" > target/.build-source-stamp
+      else
+        rm -f target/.build-source-stamp
       fi
       cp target/surefire-reports/TEST-*.xml "${CI_ARTIFACT_DIR}/" 2>/dev/null || true
       cp build/test-results/test/TEST-*.xml "${CI_ARTIFACT_DIR}/" 2>/dev/null || true
