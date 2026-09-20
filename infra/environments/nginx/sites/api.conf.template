@@ -33,10 +33,6 @@ server {
         # 이 값을 바꿀 때는 MAX_PROJECT_BYTES 를 함께 본다. presigned PUT(AI 문서·게임 자산)은 R2 로
         # 직행해 이 서버를 지나지 않으므로 여기 값과 무관하다.
         client_max_body_size 4m;
-        # 버퍼를 한도와 같게 둬서 허용 범위 본문은 메모리에서 끝낸다. 기본값(16k)이면 그보다 큰 본문이
-        # /var/lib/nginx/body 로 넘어가는데, 그 디렉터리는 worker 사용자 소유가 아니라 쓰기에 실패하면
-        # 413 도 아닌 500 이 나간다 (2026-09-20 실측 crit: open() ... failed (13: Permission denied)).
-        client_body_buffer_size 4m;
         proxy_pass http://127.0.0.1:18081;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;

@@ -68,7 +68,7 @@ if grep -Fq 'demo.${ROOT_DOMAIN} ${ROOT_DOMAIN}' "${demo_template}"; then fail '
 grep -Fq 'proxy_pass http://127.0.0.1:28081' "${prod_template}"
 grep -Fq 'location /oauth2/' "${prod_template}"
 # Game Studio 초안 저장(최대 2,000,000 bytes)이 nginx 기본 1m 한도에 걸려 413 이 되는 것을 막는다 (GitLab #207).
-grep -Fq 'location /api/ { client_max_body_size 4m; client_body_buffer_size 4m;' "${prod_template}"
+grep -Fq 'location /api/ { client_max_body_size 4m;' "${prod_template}"
 grep -Fq 'location /login/oauth2/' "${prod_template}"
 grep -Fq 'alias /srv/festa/webgl/prod/current/' "${prod_template}"
 grep -Fq 'proxy_pass http://127.0.0.1:27777' "${world_template}"

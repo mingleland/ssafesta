@@ -41,6 +41,10 @@ sudo nginx -t
 sudo systemctl reload nginx
 ```
 
+설치 전에 template 문법만 보고 싶다면 `bash infra/environments/scripts/validate-nginx-template.sh infra/environments/nginx/sites/demo.conf.template` 를 쓴다.
+**`nginx -t -c <렌더한 파일>` 을 직접 돌리지 않는다** — 그 명령은 설정의 `user` 로 `/var/lib/nginx` 의 temp 디렉터리를
+chown 해서 살아 있는 서버의 POST 를 500 으로 만든다 (T-174). 위 절차의 `sudo nginx -t` 는 `-c` 없이 실설정을 읽으므로 안전하다.
+
 `sudo nginx -T | grep -n 'server_name world'` 에 `world.${ROOT_DOMAIN}` 이 `world-prod.conf` 한 곳에만 있어야 하고
 `conflicting server name` 경고가 없어야 한다. 라이브 `demo.conf` 가 snippet(`festa-unityweb.conf`, `festa-ai-v1.conf`) 을
 include 하도록 손질돼 있다면 그 include 는 유지하고 `map` 두 개와 `location /` 만 template 과 같게 맞춘다.
