@@ -305,4 +305,157 @@ if run_validator >/dev/null 2>&1; then
   fail "invalid Production receipt state was accepted"
 fi
 
+cp "${work}/receipt-good.json" "${work}/receipt.json"
+
+pipeline="${repo_root}/infra/jenkins/pipelines/production-promotion.groovy"
+python3 - "${pipeline}" <<'PY'
+import pathlib,sys
+text=pathlib.Path(sys.argv[1]).read_text(encoding='utf-8')
+ordered=[
+    "stage('Validate Receipt, Bootstrap and Main Ancestry')",
+    "stage('Detect Idempotent Receipt')",
+    "stage('Cutover Readiness Gate')",
+    "stage('Maintenance Fence')",
+    "stage('Replace Legacy with Canonical Candidate')",
+    "stage('Verify Candidate')",
+    "stage('Activate Public Production')",
+    "stage('Verify Public Production')",
+    "stage('Human Verification Gate')",
+    "stage('Approve Known Good')",
+    "stage('Archive Evidence')",
+]
+positions=[text.index(item) for item in ordered]
+if positions!=sorted(positions): raise SystemExit('Production pipeline stage order mismatch')
+if text.index('Human Verification Gate') > text.index('approve-production-known-good.sh'): raise SystemExit('known-good approval precedes human gate')
+for required in ('PRODUCTION_ALREADY_APPROVED','prepare-production-cutover.sh','rollback-production-release.sh','secret-scan.sh --path artifacts'):
+    if required not in text: raise SystemExit(f'Production pipeline missing {required}')
+PY
+
+prod_state="${work}/production-state"
+prod_webgl="${work}/production-webgl"
+fake_bin="${work}/bin"
+mkdir -p "${prod_state}/production/candidates" "${prod_state}/production/receipts" "${prod_webgl}/releases/${short}" "${prod_webgl}/prod" "${fake_bin}"
+cp "${webgl_root}/releases/${short}/manifest.json" "${prod_webgl}/releases/${short}/manifest.json"
+printf '%s\n' "$(python3 -c 'print("e"*64)')" >"${prod_webgl}/releases/${short}/.artifact-sha256"
+ln -s "../releases/${short}" "${prod_webgl}/prod/candidate"
+python3 - "${work}/receipt.json" "${prod_state}/production/candidates/production-fixture-1.verification.json" <<'PY'
+import hashlib,json,pathlib,sys
+r=pathlib.Path(sys.argv[1]); p=pathlib.Path(sys.argv[2])
+p.write_text(json.dumps({'schemaVersion':'1.0.0','state':'VERIFIED','receiptId':'production-fixture-1','receiptSha256':hashlib.sha256(r.read_bytes()).hexdigest()})+'\n')
+PY
+cat >"${work}/active-prod.conf" <<'EOF_ACTIVE'
+server { listen 443 ssl; server_name legacy.example.invalid; }
+EOF_ACTIVE
+cat >"${fake_bin}/nginx" <<'EOF_FAKE_NGINX'
+#!/usr/bin/env bash
+exit 0
+EOF_FAKE_NGINX
+cat >"${fake_bin}/reload" <<'EOF_FAKE_RELOAD'
+#!/usr/bin/env bash
+exit 0
+EOF_FAKE_RELOAD
+cat >"${fake_bin}/docker" <<'EOF_FAKE_DOCKER'
+#!/usr/bin/env bash
+if [[ "${1:-}" == inspect || "${1:-}" == container ]]; then exit 1; fi
+if [[ "${1:-}" == image && "${2:-}" == inspect ]]; then
+  ref="${@: -1}"
+  case "${ref}" in
+    festa-ai:*) printf 'sha256:%064s\n' a | tr ' ' a ;;
+    festa-back:*) printf 'sha256:%064s\n' b | tr ' ' b ;;
+    festa-front:*) printf 'sha256:%064s\n' c | tr ' ' c ;;
+    festa-game:*) printf 'sha256:%064s\n' d | tr ' ' d ;;
+    *) exit 1 ;;
+  esac
+  exit 0
+fi
+exit 0
+EOF_FAKE_DOCKER
+chmod +x "${fake_bin}/nginx" "${fake_bin}/reload" "${fake_bin}/docker"
+
+common_env=(
+  ENVIRONMENT_STATE_DIR="${prod_state}"
+  WEBGL_RELEASE_ROOT="${prod_webgl}"
+  ROOT_DOMAIN='example.invalid'
+  PRODUCTION_WORLD_HOST='world-prod.example.invalid'
+  NGINX_ORIGIN_CERTIFICATE_FILE='/fixture/origin.crt'
+  NGINX_ORIGIN_PRIVATE_KEY_FILE='/fixture/origin.key'
+  PRODUCTION_NGINX_CONFIG_PATH="${work}/active-prod.conf"
+  PRODUCTION_WORLD_NGINX_CONFIG_PATH="${work}/active-world.conf"
+  PRODUCTION_USE_SUDO=0
+  NGINX_BIN="${fake_bin}/nginx"
+  NGINX_RELOAD_BIN="${fake_bin}/reload"
+  DOCKER_BIN="${fake_bin}/docker"
+)
+
+env "${common_env[@]}" "${repo_root}/infra/deploy/scripts/prepare-production-cutover.sh" "${work}/receipt.json" >/dev/null
+[[ ! -e "${prod_state}/production/previous.json" ]] || fail 'first migration unexpectedly created previous state'
+python3 - "${prod_state}/production/cutovers/production-fixture-1.prepare.json" <<'PY'
+import json,pathlib,sys
+d=json.loads(pathlib.Path(sys.argv[1]).read_text())
+assert d['state']=='MAINTENANCE_ACTIVE' and d['previous'] is None and d['legacyRollbackAllowed'] is False
+PY
+
+cp "${prod_state}/production/candidates/production-fixture-1.verification.json" "${work}/verification-good.json"
+python3 - "${prod_state}/production/candidates/production-fixture-1.verification.json" <<'PY'
+import json,pathlib,sys
+p=pathlib.Path(sys.argv[1]); d=json.loads(p.read_text()); d['state']='RUNNING_UNVERIFIED'; p.write_text(json.dumps(d)+'\n')
+PY
+if env "${common_env[@]}" "${repo_root}/infra/deploy/scripts/activate-production-release.sh" "${work}/receipt.json" >/dev/null 2>&1; then
+  fail 'unverified Production candidate was activated'
+fi
+cp "${work}/verification-good.json" "${prod_state}/production/candidates/production-fixture-1.verification.json"
+env "${common_env[@]}" "${repo_root}/infra/deploy/scripts/activate-production-release.sh" "${work}/receipt.json" >/dev/null
+[[ -f "${prod_state}/production/current.json" && ! -e "${prod_state}/production/known-good.json" ]] || fail 'CURRENT and KNOWN-GOOD were not separated'
+
+if APPROVED_BY=fixture env "${common_env[@]}" "${repo_root}/infra/deploy/scripts/approve-production-known-good.sh" production-fixture-1 >/dev/null 2>&1; then
+  fail 'Production known-good was approved without external verification'
+fi
+python3 - "${prod_state}/production/current.json" "${prod_state}/production/receipts/production-fixture-1.external-verification.json" <<'PY'
+import hashlib,json,pathlib,sys
+c=pathlib.Path(sys.argv[1]); p=pathlib.Path(sys.argv[2])
+p.write_text(json.dumps({'schemaVersion':'1.0.0','state':'EXTERNAL_VERIFIED','receiptId':'production-fixture-1','currentSha256':hashlib.sha256(c.read_bytes()).hexdigest()})+'\n')
+PY
+cp "${prod_state}/production/current.json" "${work}/production-current-good.json"
+python3 - "${prod_state}/production/current.json" <<'PY'
+import json,pathlib,sys
+p=pathlib.Path(sys.argv[1]); d=json.loads(p.read_text()); d['publicActivatedAt']='changed-after-external-verification'; p.write_text(json.dumps(d)+'\n')
+PY
+if env APPROVED_BY=fixture-approver "${common_env[@]}" "${repo_root}/infra/deploy/scripts/approve-production-known-good.sh" production-fixture-1 >/dev/null 2>&1; then
+  fail 'Production known-good accepted CURRENT changed after external verification'
+fi
+cp "${work}/production-current-good.json" "${prod_state}/production/current.json"
+env APPROVED_BY=fixture-approver "${common_env[@]}" "${repo_root}/infra/deploy/scripts/approve-production-known-good.sh" production-fixture-1 >/dev/null
+python3 - "${prod_state}/production/current.json" "${prod_state}/production/known-good.json" <<'PY'
+import json,pathlib,sys
+c,k=[json.loads(pathlib.Path(x).read_text()) for x in sys.argv[1:]]
+assert c['state']=='CURRENT' and k['state']=='KNOWN_GOOD' and c['receiptId']==k['receiptId']
+PY
+
+# Once a canonical known-good exists, the next cutover captures it as previous.
+env "${common_env[@]}" "${repo_root}/infra/deploy/scripts/prepare-production-cutover.sh" "${work}/receipt.json" >/dev/null
+[[ -f "${prod_state}/production/previous.json" ]] || fail 'canonical previous state was not captured'
+
+touch "${work}/back.env" "${work}/ai.env" "${work}/world.secret"
+env "${common_env[@]}" \
+  BACK_ENV_FILE="${work}/back.env" AI_ENV_FILE="${work}/ai.env" CONNECTION_TOKEN_SECRET_FILE="${work}/world.secret" \
+  INTERNAL_SPRING_TO_AI_TOKENS=fixture-a INTERNAL_AI_TO_SPRING_TOKENS=fixture-b INTERNAL_INFRA_TO_SPRING_TOKENS=fixture-c \
+  "${repo_root}/infra/deploy/scripts/rollback-production-release.sh" "${work}/receipt.json" canonical-fixture-failure >/dev/null
+python3 - "${prod_state}/production/receipts/production-fixture-1.rollback.json" <<'PY'
+import json,pathlib,sys
+d=json.loads(pathlib.Path(sys.argv[1]).read_text())
+assert d['result']=='ROLLED_BACK' and d['legacyRestored'] is False and d['previous']['state']=='CURRENT'
+PY
+
+# A first-migration failure has no previous and remains in maintenance; it never recreates legacy.
+first_failure="${work}/first-failure-state"
+mkdir -p "${first_failure}/production/receipts"
+cp "${prod_state}/production/current.json" "${first_failure}/production/current.json"
+env "${common_env[@]}" ENVIRONMENT_STATE_DIR="${first_failure}" "${repo_root}/infra/deploy/scripts/rollback-production-release.sh" "${work}/receipt.json" fixture-failure >/dev/null
+[[ ! -e "${prod_webgl}/prod/current" ]] || fail 'first migration failure left a Production current WebGL pointer'
+python3 - "${first_failure}/production/receipts/production-fixture-1.rollback.json" <<'PY'
+import json,pathlib,sys
+d=json.loads(pathlib.Path(sys.argv[1]).read_text())
+assert d['previous'] is None and d['result']=='MAINTENANCE_REQUIRED' and d['legacyRestored'] is False
+PY
+
 echo "PASS: Production promotion receipt binds human-approved Demo app, WebGL, World and prefab identity"

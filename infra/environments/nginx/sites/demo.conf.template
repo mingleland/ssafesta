@@ -1,12 +1,12 @@
 server {
     listen 80;
-    server_name demo.${ROOT_DOMAIN} ${ROOT_DOMAIN};
+    server_name demo.${ROOT_DOMAIN};
     return 301 https://$host$request_uri;
 }
 
 server {
     listen 443 ssl;
-    server_name demo.${ROOT_DOMAIN} ${ROOT_DOMAIN};
+    server_name demo.${ROOT_DOMAIN};
 
     ssl_certificate ${NGINX_ORIGIN_CERTIFICATE_FILE};
     ssl_certificate_key ${NGINX_ORIGIN_PRIVATE_KEY_FILE};
@@ -85,4 +85,3 @@ server {
         proxy_set_header X-Forwarded-Proto https;
     }
 }
-

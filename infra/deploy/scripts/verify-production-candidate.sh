@@ -32,12 +32,14 @@ candidate_state="${state_root}/production/candidates/${receipt_id}.json"
 verification="${state_root}/production/candidates/${receipt_id}.verification.json"
 [[ -f "${candidate_state}" ]]
 RECEIPT="${receipt}" CANDIDATE_STATE="${candidate_state}" VERIFICATION="${verification}" python3 - <<'PY'
-import datetime,json,os,pathlib
+import datetime,hashlib,json,os,pathlib
 r=json.loads(pathlib.Path(os.environ['RECEIPT']).read_text(encoding='utf-8'))
 c=json.loads(pathlib.Path(os.environ['CANDIDATE_STATE']).read_text(encoding='utf-8'))
-if c.get('receiptId')!=r['receiptId']: raise SystemExit('candidate receipt identity mismatch')
+receipt_path=pathlib.Path(os.environ['RECEIPT'])
+receipt_sha=hashlib.sha256(receipt_path.read_bytes()).hexdigest()
+if c.get('receiptId')!=r['receiptId'] or c.get('receiptSha256')!=receipt_sha: raise SystemExit('candidate receipt identity mismatch')
 p=pathlib.Path(os.environ['VERIFICATION'])
-d={'schemaVersion':'1.0.0','state':'VERIFIED','receiptId':r['receiptId'],'checks':{'frontLoopback':'PASS','backLoopback':'PASS','aiLoopback':'PASS','worldLoopback':'PASS','applicationIdentity':'PASS','worldIdentity':'PASS','webglIdentity':'PASS'},'publicCutoverPerformed':False,'verifiedAt':datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0).isoformat().replace('+00:00','Z')}
+d={'schemaVersion':'1.0.0','state':'VERIFIED','receiptId':r['receiptId'],'receiptSha256':receipt_sha,'applications':r['applications'],'webgl':r['webgl'],'world':r['world'],'checks':{'frontLoopback':'PASS','backLoopback':'PASS','aiLoopback':'PASS','worldLoopback':'PASS','applicationIdentity':'PASS','worldIdentity':'PASS','webglIdentity':'PASS'},'publicCutoverPerformed':False,'verifiedAt':datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0).isoformat().replace('+00:00','Z')}
 t=p.with_suffix('.tmp'); t.write_text(json.dumps(d,indent=2)+'\n',encoding='utf-8'); t.replace(p)
 PY
 printf 'PRODUCTION_VERIFICATION=%s\n' "${verification}"
