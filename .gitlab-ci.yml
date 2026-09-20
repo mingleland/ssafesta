@@ -24,17 +24,15 @@ workflow:
     # 각 파트가 자기 브랜치에 모아 둔 뒤 한 번에 develop 으로 올리기로 했다.
     #
     # 설정으로는 못 푼다 — "Pipelines must succeed" 는 프로젝트 전체 스위치라 target 별로 끌 수
-    # 없고, 끄면 develop·main 까지 같이 풀린다. 그래서 파트 브랜치 MR 에는 mr-status 하나만 도는
-    # 가벼운 파이프라인을 띄워 머지 체크를 만족시킨다. 컴포넌트 CI 와 Unity 검증은 아래
-    # .{ai,back,front,game}-changes 가 develop 대상일 때만 돌리므로 이 구간에 남는 검사는
-    # secret-scan 하나다.
+    # 없고, 끄면 develop·main 까지 같이 풀린다. 그래서 파트 브랜치 MR 에도 파이프라인을 띄운다.
     #
-    # 대가를 적어 둔다: 파트 브랜치 구간은 코드 검증이 0회다. 그 파트의 develop MR 이 첫 검증이
-    # 되고, 거기서 터지면 어느 작업이 원인인지 좁히기 어렵다. 오래 끌수록 그 비용이 커진다.
+    # 2026-09-20 — 위 해제 조건 1(러너 동시 실행 한도 2 → 4)이 성립해 "파트 브랜치 구간 코드 검증 0회"
+    # 부분만 해제했다. 실제로 그 대가를 치른 사례가 나왔다: front 의 일괄 반입 커밋이 분기 이전 동작을
+    # 되돌려 테스트 3건이 red 였는데, 파트 브랜치 MR 3건(!1207·!1208·!1209)을 지나는 동안 한 번도
+    # 드러나지 않았다(T-175). 그래서 ai·back·front 는 파트 브랜치 대상 MR 에서도 *-test 를 돌린다.
+    # build/package/deploy 와 Unity dispatch 는 그대로 develop 대상에서만 돈다 — 아래 각 anchor 참고.
     #
-    # 해제 조건 — 둘 중 하나라도 성립하면 이 rule 과 .*-changes 의 target 가드를 함께 지운다.
-    #   1. 러너 동시 실행 한도가 늘어 develop 직행이 다시 감당된다
-    #   2. 파트 브랜치 배칭을 끝내고 develop 직행으로 돌아간다
+    # 남은 해제 조건: 파트 브랜치 배칭을 끝내고 develop 직행으로 돌아가면 이 rule 자체를 지운다.
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_SOURCE_PROJECT_ID == $CI_PROJECT_ID && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME =~ /^(?:ai|back|front|frontend.*|game)$/'
 
     # 위 둘에 해당하지 않으면 파이프라인을 만들지 않는다. 브랜치 push 도 여기서 멈춘다 — MR
@@ -86,13 +84,21 @@ mr-status:
 
 .front-changes:
   rules:
-    # 긴급 규약 — 파트 브랜치 대상 MR 에서는 컴포넌트 CI 를 돌리지 않는다 (workflow rules 주석).
-    - if: '$CI_MERGE_REQUEST_TARGET_BRANCH_NAME != "develop"'
+    # test 는 develop 과 파트 브랜치 대상 MR 모두에서 돈다 (workflow rules 주석, T-175). main 승격 MR 은 제외한다.
+    - if: '$CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "main"'
       when: never
-    - changes:
+    - &front-source-changed
+      changes:
         compare_to: 'refs/heads/develop'
         paths:
           - festa-frontend/**/*
+
+# build/package 는 develop 대상 MR 에서만 돈다 — 파트 브랜치 구간에 늘린 것은 test 뿐이다.
+.front-changes-develop-only:
+  rules:
+    - if: '$CI_MERGE_REQUEST_TARGET_BRANCH_NAME != "develop"'
+      when: never
+    - *front-source-changed
 
 .front-npm-cache:
   cache:
@@ -104,13 +110,21 @@ mr-status:
 
 .back-changes:
   rules:
-    # 긴급 규약 — develop 대상 MR 에서만 (workflow rules 주석).
-    - if: '$CI_MERGE_REQUEST_TARGET_BRANCH_NAME != "develop"'
+    # test 는 develop 과 파트 브랜치 대상 MR 모두에서 돈다 (workflow rules 주석, T-175). main 승격 MR 은 제외한다.
+    - if: '$CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "main"'
       when: never
-    - changes:
+    - &back-source-changed
+      changes:
         compare_to: 'refs/heads/develop'
         paths:
           - backend/**/*
+
+# build/package 는 develop 대상 MR 에서만 돈다 — 파트 브랜치 구간에 늘린 것은 test 뿐이다.
+.back-changes-develop-only:
+  rules:
+    - if: '$CI_MERGE_REQUEST_TARGET_BRANCH_NAME != "develop"'
+      when: never
+    - *back-source-changed
 
 .back-maven-cache:
   variables:
@@ -125,13 +139,21 @@ mr-status:
 
 .ai-changes:
   rules:
-    # 긴급 규약 — develop 대상 MR 에서만 (workflow rules 주석).
-    - if: '$CI_MERGE_REQUEST_TARGET_BRANCH_NAME != "develop"'
+    # test 는 develop 과 파트 브랜치 대상 MR 모두에서 돈다 (workflow rules 주석, T-175). main 승격 MR 은 제외한다.
+    - if: '$CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "main"'
       when: never
-    - changes:
+    - &ai-source-changed
+      changes:
         compare_to: 'refs/heads/develop'
         paths:
           - festa-ai/**/*
+
+# build/package 는 develop 대상 MR 에서만 돈다 — 파트 브랜치 구간에 늘린 것은 test 뿐이다.
+.ai-changes-develop-only:
+  rules:
+    - if: '$CI_MERGE_REQUEST_TARGET_BRANCH_NAME != "develop"'
+      when: never
+    - *ai-source-changed
 
 .ai-pip-cache:
   cache:
@@ -143,8 +165,10 @@ mr-status:
 
 .game-changes:
   rules:
-    # 긴급 규약 — develop 대상 MR 에서만 (workflow rules 주석). Unity dispatch 가 Jenkins 를 최대
-    # 45분 붙잡으므로 파트 브랜치 구간에서 가장 먼저 빠져야 할 잡이다.
+    # develop 대상 MR 에서만 돈다. Unity dispatch 는 Jenkins 를 최대 45분 붙잡고, 2026-09-20 기준
+    # festa-unity-mr-validation 자체가 라이선스(No valid Unity Editor license found)로 #100~#104
+    # 연속 실패 중이다. 그 둘이 해소되기 전에는 파트 브랜치 구간으로 넓히지 않는다 — 넓히는 순간
+    # game 파트 MR 이 전부 red 로 막힌다.
     - if: '$CI_MERGE_REQUEST_TARGET_BRANCH_NAME != "develop"'
       when: never
     - changes:
@@ -195,7 +219,7 @@ ai-test:
 ai-build:
   extends:
     - .component-ci
-    - .ai-changes
+    - .ai-changes-develop-only
     - .ai-pip-cache
   stage: build
   image: python:3.13-slim
@@ -221,7 +245,7 @@ front-test:
 front-build:
   extends:
     - .component-ci
-    - .front-changes
+    - .front-changes-develop-only
     - .front-npm-cache
   stage: build
   image: node:24-bookworm-slim
@@ -248,7 +272,7 @@ back-test:
 back-build:
   extends:
     - .component-ci
-    - .back-changes
+    - .back-changes-develop-only
     - .back-maven-cache
   stage: build
   image: maven:3.9-eclipse-temurin-21
