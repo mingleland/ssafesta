@@ -18,9 +18,8 @@ server {
     location ^~ /ws { proxy_pass http://127.0.0.1:28081; proxy_http_version 1.1; proxy_set_header Upgrade $http_upgrade; proxy_set_header Connection "upgrade"; proxy_set_header Host $host; proxy_set_header X-Forwarded-Proto https; proxy_read_timeout 180s; proxy_send_timeout 180s; proxy_buffering off; }
     # Game Studio 초안 저장은 2,000,000 bytes(GameProjectJson.MAX_PROJECT_BYTES)까지 허용하는데 nginx 기본 한도는
     # 1m 이라 앱에 닿기 전에 날것 413 이 된다 (GitLab #207). Production Front 의 PUBLIC_API_BASE_URL 은 루트 도메인이라
-    # 이 location 이 그 경로다 — api.conf.template 과 같은 값을 쓴다. 버퍼도 한도와 같게 둔다: 기본값(16k)을
-    # 넘는 본문은 /var/lib/nginx/body 로 넘어가는데 그 디렉터리 쓰기에 실패하면 500 이 나간다 (2026-09-20 실측).
-    location /api/ { client_max_body_size 4m; client_body_buffer_size 4m; proxy_pass http://127.0.0.1:28081; proxy_set_header Host $host; proxy_set_header X-Forwarded-Proto https; }
+    # 이 location 이 그 경로다 — api.conf.template 과 같은 값을 쓴다.
+    location /api/ { client_max_body_size 4m; proxy_pass http://127.0.0.1:28081; proxy_set_header Host $host; proxy_set_header X-Forwarded-Proto https; }
     location /oauth2/ { proxy_pass http://127.0.0.1:28081; proxy_set_header Host $host; proxy_set_header X-Forwarded-Proto https; }
     location /login/oauth2/ { proxy_pass http://127.0.0.1:28081; proxy_set_header Host $host; proxy_set_header X-Forwarded-Proto https; }
     location /ai/v1/ { proxy_pass http://127.0.0.1:28082; proxy_buffering off; proxy_set_header Host $host; proxy_set_header X-Forwarded-Proto https; }
