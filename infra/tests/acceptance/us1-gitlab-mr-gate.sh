@@ -39,8 +39,11 @@ status_section="$(job 'mr-status')"
 [[ -n "$status_section" ]] || fail 'missing MR status job'
 grep -Fq 'stage: validate' <<<"$status_section" || fail 'MR status stage'
 grep -Fq 'CI_PIPELINE_SOURCE == "merge_request_event"' <<<"$status_section" || fail 'MR status rule'
-[[ "$(grep -Fc 'bash infra/jenkins/scripts/secret-scan.sh --path .' "$pipeline")" == 1 ]] \
+[[ "$(grep -Fc 'infra/jenkins/scripts/secret-scan.sh' "$pipeline")" == 1 ]] \
   || fail 'secret scan must run once in mr-status'
+grep -Fq 'CI_MERGE_REQUEST_DIFF_BASE_SHA:+--changed-since' "$pipeline" \
+  || fail 'mr-status secret scan must narrow to the MR diff when the base is known'
+grep -Fq -e '--path .' "$pipeline" || fail 'mr-status secret scan must keep the full-repo fallback path'
 grep -Fq 'MR pipeline status only' <<<"$status_section" || fail 'MR status no-op command'
 echo 'PASS: infra/docs-only MR receives a successful pipeline status'
 
