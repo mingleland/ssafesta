@@ -29,8 +29,16 @@ done
 
 ## 2. Jenkins 가 하는 일 (consumer, `festa-gitlab-develop/develop`, deploy agent)
 
+세 identity 가 분리된다:
+- `pipelineCommit` = develop HEAD (`CI_COMMIT_SHA` 는 불변).
+- `artifactSourceCommit` = Unity 번들의 빌드 커밋 `S`. `releaseId` 는 `S[:8]`.
+- `unityInputId` = sha256(`tree=${tree}|unityVersion=${v}|unityRevision=${r}|buildProfile=release|apiEnvironment=Prod|artifactContract=manifest-1.0.0`). 두 ID 가 같을 때 content-equivalent 재사용.
+
 ```text
-Resolve  resolve-game-artifacts.sh --source-commit <sha40>
+Resolve  resolve-game-artifacts.sh --pipeline-commit <sha40> [--candidate <sha>]
+           1. exact: unitySourceSha(HEAD 기준 festa-unity 마지막 변경 커밋) 조회
+           2. candidate: --candidate SHA 조회 (558d6624 등 명시 지정 시)
+           3. recent: 최근 5개 registry 패키지 중 unityInputId 동일분 조회
            festa-webgl/<8sha> + festa-world/<8sha> 둘 다 있음 → REGISTRY_COMPLETE (재사용)
            둘 다 없음 + unity-release-bundle/<8sha> 있음   → BUNDLE_AVAILABLE
            한쪽만 있음 + bundle 있음                        → PUBLISH_WEBGL / PUBLISH_WORLD (없는 쪽만)
@@ -38,7 +46,7 @@ Resolve  resolve-game-artifacts.sh --source-commit <sha40>
            한쪽만 있음 + bundle 없음                        → exit 65 PARTIAL_REGISTRY (사람이 본다)
 Intake   intake-unity-release-bundle.sh: 4 파일 download → zip(validate-webgl-archive) · tar(validate-game-image-archive, load 없이) ·
            metadata 교차검증 → docker image load → 로드된 image .Id/label 재확인
-Gate     check-game-source-identity.sh: git fetch origin develop → cat-file → merge-base --is-ancestor → zip dirty=false → image label
+Gate     check-game-source-identity.sh: git fetch origin develop → cat-file → unityInputId 일치 확인 → zip dirty=false → image label
 Publish  publish-webgl-release.sh --no-trigger / publish-world-release.sh (같은 version 같은 SHA → *_RELEASE_EXISTS, 다른 SHA → 65)
 Verify   validate-game-release-set.sh (zip sha · image contentId · 같은 commit)
 Deploy   deploy-game.sh(candidate World) → game-readiness.sh(wss://demo.<root>/) → deploy-webgl-release.sh(current flip) → promote-game.sh
