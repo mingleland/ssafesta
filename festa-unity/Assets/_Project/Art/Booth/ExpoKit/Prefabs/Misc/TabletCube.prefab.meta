@@ -1,0 +1,16 @@
+fileFormatVersion: 2
+guid: b3fd0efcd32b02143a2d1c9ac6cafcab
+timeCreated: 1507846133
+licenseType: Store
+NativeFormatImporter:
+  mainObjectFileID: 100100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 114974
+  packageName: Stand Expo Pack
+  packageVersion: 1.0
+  assetPath: Assets/_Project/Art/Booth/ExpoKit/Prefabs/Misc/TabletCube.prefab
+  uploadId: 237227

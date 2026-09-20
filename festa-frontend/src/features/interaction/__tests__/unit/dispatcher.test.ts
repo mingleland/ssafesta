@@ -1,0 +1,165 @@
+import { beforeEach, describe, expect, it } from 'vitest';
+import { initInteractionDispatcher } from '../../dispatcher.ts';
+import { closeOverlay, getCurrentOverlay } from '../../../../shared/types/overlay.ts';
+import {
+  __resetGameClientUiForTests,
+  getGameClientUiSnapshot,
+} from '../../../world/model/gameClientUi.ts';
+import {
+  __resetWorldContextForTests,
+  getWorldContext,
+} from '../../../world/model/worldContext.ts';
+
+// vitest 환경이 'node'라 jsdom 없이는 window가 없다 — 실 DOM은 필요 없고 initUnityBridge가
+// FestaUnity 콜백을 걸 대상 객체 하나만 있으면 되므로 최소 폴리필로 대체한다(jsdom 의존성 추가 없음).
+(globalThis as unknown as { window: typeof globalThis }).window ??= globalThis;
+
+// events.ts의 onBoothInteract는 JSON.parse만 하고 type을 검증하지 않는다 — 브릿지 자체를
+// 재구현하지 않고, window.FestaUnity.onBoothInteract가 실제로 하는 것과 같은 방식(initUnityBridge
+// 호출 후 그 함수로 JSON 문자열을 흘려보냄)으로 이벤트를 주입한다.
+import { initUnityBridge } from '../../../../unity/bridge/events.ts';
+
+function emit(json: string) {
+  initUnityBridge();
+  window.FestaUnity!.onBoothInteract!(json);
+}
+
+describe('initInteractionDispatcher', () => {
+  beforeEach(() => {
+    closeOverlay();
+    __resetGameClientUiForTests();
+    __resetWorldContextForTests();
+  });
+
+  it('BOOTH_LAPTOP_INTERACT를 LAPTOP 오버레이로 연다 — url 필드는 계약에서 제거됐다(-297, 정본은 booth 조회)', () => {
+    const unsubscribe = initInteractionDispatcher();
+    emit(JSON.stringify({ type: 'BOOTH_LAPTOP_INTERACT', boothId: 7, objectId: 'laptop-1' }));
+
+    expect(getCurrentOverlay()).toEqual({ type: 'LAPTOP', payload: { boothId: 7, objectId: 'laptop-1' } });
+    unsubscribe();
+  });
+
+  it('구버전 Unity가 url을 보내도 payload로 전달하지 않는다 — URL 정본은 GET /booths/{id}(016 C-01)', () => {
+    const unsubscribe = initInteractionDispatcher();
+    emit(JSON.stringify({ type: 'BOOTH_LAPTOP_INTERACT', boothId: 7, objectId: 'laptop-1', url: 'https://stale.example.com' }));
+
+    expect(getCurrentOverlay()).toEqual({ type: 'LAPTOP', payload: { boothId: 7, objectId: 'laptop-1' } });
+    unsubscribe();
+  });
+
+  it('BOOTH_PROJECT_INTERACT를 PROJECT 오버레이로 연다 — 계약 #110 note 2754197 (boothId·objectId, configId 없음)', () => {
+    const unsubscribe = initInteractionDispatcher();
+    emit(JSON.stringify({ type: 'BOOTH_PROJECT_INTERACT', boothId: 7, objectId: 'project-panel-1' }));
+
+    expect(getCurrentOverlay()).toEqual({ type: 'PROJECT', payload: { boothId: 7, objectId: 'project-panel-1' } });
+    unsubscribe();
+  });
+
+  it('AI_AGENT_INTERACT의 configId를 agentId로 바꿔 AI_CHAT을 연다', () => {
+    const unsubscribe = initInteractionDispatcher();
+    emit(JSON.stringify({ type: 'AI_AGENT_INTERACT', boothId: 7, objectId: 'ai-1', configId: 42 }));
+
+    expect(getCurrentOverlay()).toEqual({ type: 'AI_CHAT', payload: { boothId: 7, agentId: 42 } });
+    unsubscribe();
+  });
+
+  it('BOOTH_GAME_INTERACT는 configId를 그대로 실어 GAME 오버레이를 연다(#20 — 이름 변환 없음)', () => {
+    const unsubscribe = initInteractionDispatcher();
+    emit(JSON.stringify({ type: 'BOOTH_GAME_INTERACT', boothId: 7, objectId: 'game-npc-01', configId: 42 }));
+
+    expect(getCurrentOverlay()).toEqual({
+      type: 'GAME',
+      payload: { boothId: 7, objectId: 'game-npc-01', configId: 42 },
+    });
+    unsubscribe();
+  });
+
+  it('WORLD_ARCADE_INTERACT도 같은 GAME 오버레이를 열되 machineId만 싣는다(S15P21A604-712, #135)', () => {
+    const unsubscribe = initInteractionDispatcher();
+    emit(JSON.stringify({ type: 'WORLD_ARCADE_INTERACT', machineId: 'plaza-arcade-02' }));
+
+    // 부스 필드를 만들어 넣지 않는다 — 오락기는 월드 고정물이라 boothId 가 없다.
+    expect(getCurrentOverlay()).toEqual({
+      type: 'GAME',
+      payload: { machineId: 'plaza-arcade-02' },
+    });
+    unsubscribe();
+  });
+
+  it('미지 type은 무시한다 — 서버가 신설한 이벤트에도 크래시하지 않는다(전방 호환)', () => {
+    const unsubscribe = initInteractionDispatcher();
+    emit(JSON.stringify({ type: 'UNKNOWN_FUTURE_EVENT', boothId: 7 }));
+
+    expect(getCurrentOverlay()).toBeNull();
+    unsubscribe();
+  });
+
+  it('unsubscribe 후에는 이벤트가 와도 오버레이를 열지 않는다', () => {
+    const unsubscribe = initInteractionDispatcher();
+    unsubscribe();
+    emit(JSON.stringify({ type: 'BOOTH_LAPTOP_INTERACT', boothId: 7, objectId: 'laptop-1', url: 'https://example.com' }));
+
+    expect(getCurrentOverlay()).toBeNull();
+  });
+
+  it('BOOTH_SURVEY_INTERACT를 SURVEY 오버레이로 연다 — surveyId 없이 boothId·objectId 만 (S15P21A604-415)', () => {
+    const unsubscribe = initInteractionDispatcher();
+    emit(JSON.stringify({ type: 'BOOTH_SURVEY_INTERACT', boothId: 3, objectId: 'kiosk-1' }));
+
+    // boothId 는 설문 ID 가 아니라 resolve context 다 — payload 에 surveyId 를 만들지 않는다
+    expect(getCurrentOverlay()).toEqual({
+      type: 'SURVEY',
+      payload: { kind: 'booth', boothId: 3, objectId: 'kiosk-1' },
+    });
+    unsubscribe();
+  });
+
+  it('WORLD_MANAGEMENT_INTERACT는 Overlay Bus가 아니라 관리 레이어를 연다 (S15P21A604-414)', () => {
+    const unsubscribe = initInteractionDispatcher();
+    emit(JSON.stringify({ type: 'WORLD_MANAGEMENT_INTERACT' }));
+
+    // 관리 화면은 Visitor Overlay 가 아니다 — Bus 는 비어 있어야 한다
+    expect(getCurrentOverlay()).toBeNull();
+    expect(getGameClientUiSnapshot().managementOverlay).toBe(true);
+    unsubscribe();
+  });
+
+  it('관리 이벤트는 boothId를 싣지 않는다 — 대상 부스는 FE가 GET /booths/mine 으로 resolve 한다', () => {
+    const unsubscribe = initInteractionDispatcher();
+    // Unity 가 실수로 boothId 를 보내도 관리 화면은 그 값을 쓰지 않는다
+    emit(JSON.stringify({ type: 'WORLD_MANAGEMENT_INTERACT', boothId: 99 }));
+
+    expect(getGameClientUiSnapshot().managementOverlay).toBe(true);
+    expect(getCurrentOverlay()).toBeNull();
+    unsubscribe();
+  });
+
+  // 위치 알림 — 화면을 열지 않는 유일한 이벤트다 (S15P21A604-627, GitLab #174)
+  it('WORLD_BOOTH_CONTEXT 는 오버레이를 열지 않고 월드 컨텍스트만 갱신한다', () => {
+    const unsubscribe = initInteractionDispatcher();
+    emit(JSON.stringify({ type: 'WORLD_BOOTH_CONTEXT', insideBooth: true, boothId: 3 }));
+
+    expect(getWorldContext()).toEqual({ insideBooth: true, boothId: 3 });
+    expect(getCurrentOverlay()).toBeNull(); // 상호작용이 아니다 — 여는 화면이 없다
+    unsubscribe();
+  });
+
+  it('부스 밖 payload 에는 boothId 키가 없다 — Unity 가 0 을 보내지 않는 계약 그대로 받는다', () => {
+    const unsubscribe = initInteractionDispatcher();
+    emit(JSON.stringify({ type: 'WORLD_BOOTH_CONTEXT', insideBooth: true, boothId: 3 }));
+    emit(JSON.stringify({ type: 'WORLD_BOOTH_CONTEXT', insideBooth: false }));
+
+    expect(getWorldContext()).toEqual({ insideBooth: false, boothId: null });
+    unsubscribe();
+  });
+
+  // 안내데스크 NPC — 새 화면이 아니라 이미 있는 이용 안내 오버레이를 다시 연다
+  // (S15P21A604-688, GitLab #184). payload 는 없다 — 화면이 읽을 값이 없다
+  it('WORLD_GUIDE_INTERACT 는 이용 안내 오버레이를 payload 없이 연다', () => {
+    const unsubscribe = initInteractionDispatcher();
+    emit(JSON.stringify({ type: 'WORLD_GUIDE_INTERACT' }));
+
+    expect(getCurrentOverlay()).toEqual({ type: 'WORLD_GUIDE', payload: {} });
+    unsubscribe();
+  });
+});

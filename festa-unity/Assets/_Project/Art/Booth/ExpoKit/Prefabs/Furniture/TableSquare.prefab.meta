@@ -1,0 +1,16 @@
+fileFormatVersion: 2
+guid: 9ec95d692bb834445b652e2b5254ab12
+timeCreated: 1507769296
+licenseType: Store
+NativeFormatImporter:
+  mainObjectFileID: 100100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 114974
+  packageName: Stand Expo Pack
+  packageVersion: 1.0
+  assetPath: Assets/_Project/Art/Booth/ExpoKit/Prefabs/Furniture/TableSquare.prefab
+  uploadId: 237227

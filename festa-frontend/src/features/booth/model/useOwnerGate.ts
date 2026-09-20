@@ -1,0 +1,45 @@
+// G-1 Owner 가드(spec 004) — /app/studio/:boothId가 전 member에 열리는 것을 UX 수준에서 막는다.
+// 서버 FR-012(403)가 최종 차단이고 이 훅은 안내용이다. Owner 판정이 세션이 아니라 부스별 서버
+// 데이터(GET /booths/mine)에 의존하므로 라우트 가드(guard.ts — 순수 세션 함수)에 넣지 않는다.
+import { useQuery } from '@tanstack/react-query';
+import { leaseApi } from '../../../entities/booth/leaseApi.select';
+import { useSession } from '../../auth/model/session';
+import type { MyBooth } from '../../../entities/booth/types';
+
+export type OwnerGateStatus = 'loading' | 'owner' | 'not-owner' | 'error';
+
+// 순수 판정 — 네트워크 오류는 차단이 아니라 재시도 안내로 구분한다(무단 차단 방지)
+export function judgeOwner(
+  myBooth: MyBooth | null | undefined,
+  isLoading: boolean,
+  isError: boolean,
+  boothId: number,
+): OwnerGateStatus {
+  if (isLoading) return 'loading';
+  if (isError) return 'error';
+  if (!myBooth || myBooth.boothId !== boothId) return 'not-owner';
+  return 'owner';
+}
+
+export function useOwnerGate(boothId: number): { status: OwnerGateStatus; retry: () => void } {
+  const { kind } = useSession();
+  const isMember = kind === 'member';
+  const myBoothQuery = useQuery({
+    queryKey: ['my-booth'], // SlotListPage와 키 공유 — 캐시 재사용
+    queryFn: leaseApi.getMyBooth,
+    // 게스트는 403 — 요청 자체를 만들지 않는다. 이 라우트는 member-only 라 지금은 도달하지
+    // 않지만, 훅이 그 가정에 기대면 라우트 등급이 바뀔 때 조용히 깨진다(S15P21A604-458).
+    enabled: isMember && Number.isFinite(boothId),
+  });
+  // 'error'는 네트워크 실패라 되물으면 풀릴 수 있다 — 화면이 재시도를 줄 수 있게 훅이 제 쿼리를
+  // 다시 부르는 길을 연다. 화면이 queryClient를 직접 만지면 같은 키를 아는 곳이 둘로 늘어난다.
+  const retry = () => {
+    void myBoothQuery.refetch();
+  };
+  // 회원이 아니면 소유자가 아니다 — 서버에 묻지 않고도 판정이 선다
+  if (!isMember) return { status: 'not-owner', retry };
+  return {
+    status: judgeOwner(myBoothQuery.data, myBoothQuery.isLoading, myBoothQuery.isError, boothId),
+    retry,
+  };
+}

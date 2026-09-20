@@ -1,0 +1,353 @@
+openapi: 3.1.0
+info:
+  title: Spring Document Result API for AI
+  version: 1.1.0
+  description: |
+    FastAPI 워커가 만든 결과를 Spring 이 받는 계약이다 (S15P21A604-400, GitLab #119 §3).
+    의미 경계는 `document-result-contract.md` 가 정본이고, 이 파일은 그 표의 경로·DTO 를 고정한다.
+
+    `document-result-contract.md` 표의 네 operation 을 전부 담는다.
+    cancel 은 Spring → FastAPI 방향이라 여기 없다 (#119 §4, S15P21A604-175).
+
+    모든 요청은 두 관문을 먼저 지난다.
+
+    - `attemptNo` 가 Job 의 현재 값과 다르면 **`409`** — lease 를 잃은 이전 워커의 늦은 결과다.
+    - Job 이 `SUCCEEDED`·`DEAD`·`CANCELLED` 이거나 사라졌으면 **`410`**. 문서 삭제로 Job 이
+      CASCADE 된 경우도 같다 — 없는 Job 과 끝난 Job 을 구분해 알려주지 않는다.
+
+    **finalize 재전송은 예외다.** 같은 attempt 가 같은 `sourceHash`·`totalChunkCount` 로 이미
+    끝낸 Job 이면 **`204`** 로 답하고 아무것도 하지 않는다. 마지막 호출의 응답이 유실되는 것은
+    흔한 경우이고, 여기서 `410` 을 주면 워커가 **성공한 작업을 실패로 보고한다**. 숫자가 다르면
+    그 Job 이 한 일과 다른 주장이므로 `410` 이다.
+servers:
+  - url: /internal/ai
+security:
+  - serviceToken: []
+paths:
+  /document-jobs/{jobId}/chunk-batches:
+    post:
+      operationId: stageAiDocumentChunkBatch
+      summary: Chunk batch 적재 (멱등)
+      description: |
+        staging PK 가 `(job_id, batch_seq, chunk_no)` 라 같은 batch 재전송은 아무것도 바꾸지 않는다.
+        `QUEUED` Job 은 첫 batch 에서 `RUNNING` 이 된다 — 워커가 시작했다는 증거가 이것뿐이다.
+      parameters:
+        - { name: jobId, in: path, required: true, schema: { type: integer, format: int64 } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChunkBatchRequest'
+      responses:
+        '204': { description: 적재됨 }
+        '400':
+          description: 검증 실패 (`VALIDATION_FAILED`)
+          content:
+            application/json: { schema: { $ref: '#/components/schemas/ApiErrorResponse' } }
+        '401': { description: Service Token 실패 }
+        '409':
+          description: 지난 attempt (`JOB_ATTEMPT_STALE`)
+          content:
+            application/json: { schema: { $ref: '#/components/schemas/ApiErrorResponse' } }
+        '410':
+          description: 끝났거나 없는 Job (`JOB_GONE`)
+          content:
+            application/json: { schema: { $ref: '#/components/schemas/ApiErrorResponse' } }
+  /document-jobs/{jobId}/finalize:
+    post:
+      operationId: finalizeAiDocumentJob
+      summary: 적재된 Chunk 를 검증하고 공개
+      description: |
+        staging 개수·`chunkNo` 유일성·임베딩 모델 단일성·`sourceHash` 를 검증한 뒤
+        선택 `projectFacts`가 있으면 대상 사용자·사용 기술도 함께 반영하고,
+        **기존 Chunk 삭제 → staging 반영(`searchable = TRUE`) → staging 정리 →
+        Job `SUCCEEDED` → Document `READY`** 를 한 트랜잭션으로 확정한다.
+
+        검증에서 걸리면 아무것도 바뀌지 않는다 — 기존 Chunk 도 문서 상태도 그대로이고
+        staging 도 남아 있어 같은 attempt 로 다시 finalize 할 수 있다.
+      parameters:
+        - { name: jobId, in: path, required: true, schema: { type: integer, format: int64 } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FinalizeRequest'
+      responses:
+        '204':
+          description: |
+            공개됨. 같은 attempt 의 같은 finalize 재전송도 `204` 다 (멱등) —
+            이미 끝난 Job 이면 아무것도 하지 않고 답한다.
+        '400':
+          description: |
+            검증 실패 (`VALIDATION_FAILED`). `errors[].field` 가 어긋난 지점을 가리킨다 —
+            `totalChunkCount`(적재 개수 불일치) · `chunks`(batch 간 chunkNo 중복) ·
+            `embeddingModelId`(모델 혼합) · `sourceHash`(Job 의 원본과 다름).
+          content:
+            application/json: { schema: { $ref: '#/components/schemas/ApiErrorResponse' } }
+        '401': { description: Service Token 실패 }
+        '409':
+          description: 지난 attempt (`JOB_ATTEMPT_STALE`)
+          content:
+            application/json: { schema: { $ref: '#/components/schemas/ApiErrorResponse' } }
+        '410':
+          description: 끝났거나 없는 Job (`JOB_GONE`)
+          content:
+            application/json: { schema: { $ref: '#/components/schemas/ApiErrorResponse' } }
+  /document-jobs/{jobId}/heartbeat:
+    post:
+      operationId: heartbeatAiDocumentJob
+      summary: lease 연장
+      description: |
+        워커가 30 초마다 보내고 lease 는 90 초다 — 두 번까지 유실돼도 Job 을 뺏기지 않는다.
+        `QUEUED` Job 은 heartbeat 로도 `RUNNING` 이 된다.
+
+        lease 가 만료되면 Spring 의 sweeper 가 Job 을 회수한다: `attempt_no` 가 오르고
+        `RETRY_WAIT`(재시도 여지가 있으면) 또는 `DEAD` 가 되며, 그 attempt 의 staging 은 지워진다.
+        회수 뒤 깨어난 워커의 결과는 `409` 다.
+      parameters:
+        - { name: jobId, in: path, required: true, schema: { type: integer, format: int64 } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/HeartbeatRequest'
+      responses:
+        '204': { description: 연장됨 }
+        '400':
+          description: 검증 실패 (`VALIDATION_FAILED`)
+          content:
+            application/json: { schema: { $ref: '#/components/schemas/ApiErrorResponse' } }
+        '401': { description: Service Token 실패 }
+        '409':
+          description: 지난 attempt (`JOB_ATTEMPT_STALE`)
+          content:
+            application/json: { schema: { $ref: '#/components/schemas/ApiErrorResponse' } }
+        '410':
+          description: 끝났거나 없는 Job (`JOB_GONE`)
+          content:
+            application/json: { schema: { $ref: '#/components/schemas/ApiErrorResponse' } }
+  /document-jobs/{jobId}/failed:
+    post:
+      operationId: failAiDocumentJobAttempt
+      summary: attempt 실패 보고
+      description: |
+        **다음에 무엇을 할지는 Spring 이 정한다.** 워커는 무엇이 깨졌는지(`failureCode`)와 다시
+        해 볼 만한지(`retryable`)만 보고하고, 재시도 예산은 Job 이 들고 있다.
+
+        - `retryable: false` → 바로 `DEAD`. 손상된 파일은 세 번 더 해도 똑같이 깨진다.
+        - 재시도 여지가 있으면 `RETRY_WAIT` + `next_retry_at` (backoff 1 · 5 · 15 분)
+        - `attempt_no + 1 > max_retries`(기본 3) → `DEAD`
+
+        어느 쪽이든 **`attempt_no` 는 오른다** — 방금 실패한 워커의 늦은 결과를 `409` 로 막는 것이
+        그 값이다. 그 attempt 의 staging 도 함께 지운다: 남기면 다음 attempt 의 batch 와 섞여
+        finalize 개수 검증이 엉뚱한 곳에서 걸린다.
+      parameters:
+        - { name: jobId, in: path, required: true, schema: { type: integer, format: int64 } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FailedRequest'
+      responses:
+        '204': { description: 접수됨 }
+        '400':
+          description: 검증 실패 (`VALIDATION_FAILED`). `failureCode` 는 50자 이하다.
+          content:
+            application/json: { schema: { $ref: '#/components/schemas/ApiErrorResponse' } }
+        '401': { description: Service Token 실패 }
+        '409':
+          description: 지난 attempt (`JOB_ATTEMPT_STALE`)
+          content:
+            application/json: { schema: { $ref: '#/components/schemas/ApiErrorResponse' } }
+        '410':
+          description: 끝났거나 없는 Job (`JOB_GONE`)
+          content:
+            application/json: { schema: { $ref: '#/components/schemas/ApiErrorResponse' } }
+  /document-jobs/{jobId}/project-facts:
+    post:
+      operationId: reportAiProjectFacts
+      summary: 문서에서 뽑은 프로젝트 정형 정보 보고
+      description: |
+        AI 가 문서 임베딩을 끝낸 뒤 추출한 대상 사용자·사용 기술을 보낸다
+        (spec 009, S15P21A604-597 / GitLab #169, 소비자는 `-396` 의 rule-based 단축 응답).
+
+        **이 경로만 `SUCCEEDED` Job 을 받는다.** 추출은 임베딩이 *끝난 뒤*에 오기 때문이다. 다른
+        네 경로처럼 성공한 Job 을 끝난 Job 으로 막으면 이 경로는 한 번도 동작하지 않는다. 버려진
+        Job(`DEAD`·`CANCELLED`)만 `410` 이다 — 취소는 "이 처리 결과를 쓰지 말라" 는 뜻이다.
+
+        **최신성은 `jobId` 로만 판정한다.** `jobId` 는 단조 증가하므로 그 자체가 순서다. 도착
+        순서로 판정하면 재시도·재전송이 오래된 추출을 최신 값 위에 덮는다.
+
+        `204` 로 끝나지만 아무것도 쓰지 않는 경우가 둘 있다. 둘 다 보낸 쪽이 고칠 수 있는 잘못이
+        아니라 실패로 답하지 않는다.
+
+        - 지금 값보다 **오래되거나 같은** `jobId` — 재전송 포함
+        - 그 부스에 **프로젝트가 없다** — 정형 정보를 담을 곳이 없다
+
+        두 값은 **함께** 갈아끼운다. 한 문서에서 나온 한 번의 추출이라, 한쪽만 보내 나머지를 남겨
+        두면 서로 다른 문서에서 온 두 값이 한 프로젝트에 섞인다. 그래서 둘 다 비어 있는 요청은
+        `400` 이다 — 정말 둘 다 없는 문서라면 보내지 않으면 된다.
+      parameters:
+        - { name: jobId, in: path, required: true, schema: { type: integer, format: int64 } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProjectFactsRequest'
+      responses:
+        '204': { description: 접수됨 (반영했거나, 오래되어 무시했거나, 담을 프로젝트가 없다) }
+        '400':
+          description: |
+            검증 실패 (`VALIDATION_FAILED`). `sourceHash` 가 Job 과 다름 · `documentId` 가 Job 의
+            문서와 다름 · 두 값 모두 비어 있음 · 2000자 초과.
+          content:
+            application/json: { schema: { $ref: '#/components/schemas/ApiErrorResponse' } }
+        '401': { description: Service Token 실패 }
+        '409':
+          description: 지난 attempt (`JOB_ATTEMPT_STALE`)
+          content:
+            application/json: { schema: { $ref: '#/components/schemas/ApiErrorResponse' } }
+        '410':
+          description: 버려졌거나 없는 Job (`JOB_GONE`). **`SUCCEEDED` 는 여기 해당하지 않는다.**
+          content:
+            application/json: { schema: { $ref: '#/components/schemas/ApiErrorResponse' } }
+components:
+  securitySchemes:
+    serviceToken:
+      type: http
+      scheme: bearer
+      bearerFormat: opaque-service-token
+      description: |
+        FastAPI → Spring 방향이므로 `INTERNAL_AI_TO_SPRING_TOKENS` 를 쓴다 —
+        `spring-chunk-search-api.yaml`·`spring-agent-config-api.yaml` 과 같은 체인.
+  schemas:
+    ChunkBatchRequest:
+      type: object
+      additionalProperties: false
+      required: [attemptNo, batchSeq, chunks]
+      properties:
+        attemptNo: { type: integer, minimum: 0 }
+        batchSeq: { type: integer, minimum: 0 }
+        chunks:
+          type: array
+          minItems: 1
+          maxItems: 200
+          items: { $ref: '#/components/schemas/ChunkPayload' }
+    ChunkPayload:
+      type: object
+      additionalProperties: false
+      required: [chunkNo, content, embedding, embeddingModelId]
+      properties:
+        chunkNo:
+          type: integer
+          minimum: 0
+          description: 문서 안에서 유일해야 한다. 한 batch 안에서도, batch 사이에서도 겹칠 수 없다.
+        content: { type: string, minLength: 1 }
+        embedding:
+          type: array
+          minItems: 1536
+          maxItems: 1536
+          items: { type: number, format: float }
+          description: |
+            `float32` 로 담기고 노름이 `float32` 안에 있어야 한다 — 비유한 값, `float4` 초과,
+            노름 overflow·underflow 는 전부 `400` 이다. 저장된 벡터의 노름이 0 이면 그 문서의
+            모든 검색 거리가 `NaN` 이 된다.
+        embeddingModelId:
+          type: string
+          minLength: 1
+          description: 한 Job 의 모든 chunk 가 같아야 한다. 섞이면 거리 비교가 뜻을 잃는다.
+        pageNumber: { type: [integer, 'null'] }
+        section: { type: [string, 'null'] }
+    FinalizeRequest:
+      type: object
+      additionalProperties: false
+      required: [attemptNo, sourceHash, totalChunkCount, embeddingModelId]
+      properties:
+        attemptNo: { type: integer, minimum: 0 }
+        sourceHash: { type: string, pattern: '^[a-f0-9]{64}$' }
+        totalChunkCount: { type: integer, minimum: 1 }
+        embeddingModelId: { type: string, minLength: 1 }
+        projectFacts:
+          $ref: '#/components/schemas/ExtractedProjectFacts'
+    ExtractedProjectFacts:
+      type: object
+      additionalProperties: false
+      required: [targetAudience, techStack]
+      properties:
+        targetAudience: { type: [string, 'null'], maxLength: 1000 }
+        techStack: { type: [string, 'null'], maxLength: 1000 }
+    HeartbeatRequest:
+      type: object
+      additionalProperties: false
+      required: [attemptNo]
+      properties:
+        attemptNo: { type: integer, minimum: 0 }
+    FailedRequest:
+      type: object
+      additionalProperties: false
+      required: [attemptNo, failureCode, retryable]
+      properties:
+        attemptNo: { type: integer, minimum: 0 }
+        failureCode:
+          type: string
+          minLength: 1
+          maxLength: 50
+          description: 분기의 근거다. 컬럼이 `VARCHAR(50)` 이라 넘기면 `400` 이다.
+        retryable:
+          type: boolean
+          description: 다시 해 볼 만한지에 대한 워커의 판단. 최종 결정은 Spring 이 한다.
+        message: { type: [string, 'null'], description: 사람이 읽을 설명. 분기에 쓰지 않는다. }
+    ProjectFactsRequest:
+      type: object
+      additionalProperties: false
+      required: [attemptNo, sourceHash]
+      description: |
+        `targetAudience` 와 `techStack` 은 각각 선택이지만 **둘 다 없으면 `400`** 이다.
+      properties:
+        attemptNo: { type: integer, minimum: 0 }
+        documentId:
+          type: [integer, 'null']
+          format: int64
+          description: |
+            선택이다 — Job 이 이미 문서를 가리키므로 서버가 쓰는 값은 Job 쪽이다. 보내면
+            교차 검증에 쓰고, Job 의 문서와 다르면 `400` 이다.
+        sourceHash:
+          type: string
+          description: |
+            추출한 원본의 해시. Job 의 `source_hash` 와 같아야 한다 — 다르면 같은 `jobId` 인데
+            다른 파일에서 뽑았다는 뜻이라 `400` 이다 (finalize 와 같은 판단).
+
+            **티켓(#169)은 이것을 `sourceRevision` 이라 부른다.** 이 컨트롤러의 다른 네 경로가
+            모두 `sourceHash` 라 이름을 맞췄다 — AI 파트가 `sourceRevision` 을 원하면 한 줄이다.
+        targetAudience:
+          type: [string, 'null']
+          minLength: 1
+          maxLength: 2000
+          description: 이 프로젝트가 누구를 위한 것인가. 빈 문자열은 `400` 이다.
+        techStack:
+          type: [string, 'null']
+          minLength: 1
+          maxLength: 2000
+          description: 무엇으로 만들었는가. 빈 문자열은 `400` 이다.
+    ApiErrorResponse:
+      description: 프로젝트 전역 오류 봉투(docs/08 §1.3) — 이 API 전용 봉투를 따로 두지 않는다.
+      type: object
+      required: [code, message, requestId, errors, warnings]
+      properties:
+        code: { type: string }
+        message: { type: string }
+        requestId: { type: string }
+        errors: { type: array, items: { $ref: '#/components/schemas/ApiErrorDetail' } }
+        warnings: { type: array, items: { $ref: '#/components/schemas/ApiErrorDetail' } }
+    ApiErrorDetail:
+      type: object
+      required: [rule, message]
+      properties:
+        rule: { type: string }
+        field: { type: string }
+        message: { type: string }

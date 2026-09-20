@@ -1,0 +1,9 @@
+.git
+.mvn
+bruno
+src
+.env
+.env.*
+!.env.example
+target/*
+!target/SSAFESTA-0.0.1-SNAPSHOT.jar

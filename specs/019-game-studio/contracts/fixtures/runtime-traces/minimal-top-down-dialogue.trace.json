@@ -1,0 +1,74 @@
+{
+  "name": "minimal-top-down-dialogue-runtime",
+  "project": "../minimal-top-down-dialogue.json",
+  "steps": [
+    {
+      "input": { "type": "START" },
+      "expect": {
+        "status": "PLAYING",
+        "currentSceneId": "room",
+        "activeDialogueSceneId": null,
+        "currentDialogueNodeId": null,
+        "variables": { "doorOpened": false },
+        "inventory": [],
+        "objectVisibility": { "roomKey": true }
+      }
+    },
+    {
+      "input": { "type": "ENTER", "targetId": "roomKey" },
+      "expect": {
+        "status": "PLAYING",
+        "currentSceneId": "room",
+        "activeDialogueSceneId": null,
+        "variables": { "doorOpened": false },
+        "inventory": ["key"],
+        "objectVisibility": { "roomKey": false }
+      }
+    },
+    {
+      "input": { "type": "INTERACT", "targetId": "exitDoor" },
+      "expect": {
+        "status": "PLAYING",
+        "currentSceneId": "room",
+        "activeDialogueSceneId": "doorHint",
+        "currentDialogueNodeId": "opened",
+        "variables": { "doorOpened": true },
+        "inventory": ["key"]
+      }
+    },
+    {
+      "input": { "type": "CHOOSE", "choiceId": "continue" },
+      "expect": {
+        "status": "PLAYING",
+        "currentSceneId": "room",
+        "activeDialogueSceneId": null,
+        "currentDialogueNodeId": null,
+        "variables": { "doorOpened": true },
+        "inventory": ["key"],
+        "objectVisibility": { "roomKey": false }
+      }
+    },
+    {
+      "input": { "type": "INTERACT", "targetId": "exitDoor" },
+      "expect": {
+        "status": "PLAYING",
+        "currentSceneId": "ending",
+        "activeDialogueSceneId": null,
+        "currentDialogueNodeId": "success",
+        "variables": { "doorOpened": true },
+        "inventory": ["key"]
+      }
+    },
+    {
+      "input": { "type": "CHOOSE", "choiceId": "finish" },
+      "expect": {
+        "status": "COMPLETED",
+        "currentSceneId": "ending",
+        "activeDialogueSceneId": null,
+        "currentDialogueNodeId": "success",
+        "variables": { "doorOpened": true },
+        "inventory": ["key"]
+      }
+    }
+  ]
+}

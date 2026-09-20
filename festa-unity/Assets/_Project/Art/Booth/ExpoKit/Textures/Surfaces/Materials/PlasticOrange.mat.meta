@@ -1,0 +1,16 @@
+fileFormatVersion: 2
+guid: 3829fca129dc8b24ea66a8bb2f13ca7a
+timeCreated: 1507781506
+licenseType: Store
+NativeFormatImporter:
+  mainObjectFileID: -1
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 114974
+  packageName: Stand Expo Pack
+  packageVersion: 1.0
+  assetPath: Assets/_Project/Art/Booth/ExpoKit/Textures/Surfaces/Materials/PlasticOrange.mat
+  uploadId: 237227

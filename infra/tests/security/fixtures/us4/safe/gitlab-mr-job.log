@@ -1,0 +1,2 @@
+Masking supported pattern matches of $CI_RUNTIME_SECRET
+MR pipeline status only; component CI is selected by rules:changes

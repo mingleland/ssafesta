@@ -1,0 +1,23 @@
+heavyBuildMaxConcurrency: 1
+demoPriority: true
+ec2CapacityRefs:
+  - EC2_VCPU
+  - EC2_RAM_MB
+  - EC2_DISK_GB
+  - EC2_OS
+demoServiceLimitRefs:
+  aiCpu: DEMO_AI_CPU_LIMIT
+  aiMemory: DEMO_AI_MEMORY_LIMIT
+  backCpu: DEMO_BACK_CPU_LIMIT
+  backMemory: DEMO_BACK_MEMORY_LIMIT
+  frontCpu: DEMO_FRONT_CPU_LIMIT
+  frontMemory: DEMO_FRONT_MEMORY_LIMIT
+  gameCpu: DEMO_GAME_CPU_LIMIT
+  gameMemory: DEMO_GAME_MEMORY_LIMIT
+buildAgentLimitRefs:
+  cpu: BUILD_AGENT_CPU_LIMIT
+  memory: BUILD_AGENT_MEMORY_LIMIT
+admissionHealthRefs:
+  - DEMO_WEB_HEALTH_URL
+  - DEMO_API_HEALTH_URL
+  - DEMO_WORLD_HEALTH_URL

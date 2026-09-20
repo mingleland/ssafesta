@@ -1,0 +1,83 @@
+/* Project 전시 Overlay — OverlayFrame 위의 콘텐츠 스타일 (S15P21A604-406).
+   프레임 토큰(--ov-*)을 그대로 쓴다. 여기서 새 색을 만들지 않는다. */
+.proj-list { display: flex; flex-direction: column; gap: 14px; }
+
+.proj-card {
+  display: grid;
+  grid-template-columns: minmax(0, 300px) minmax(0, 1fr);
+  gap: 14px;
+  padding: 12px;
+  border-radius: 14px;
+  background: var(--ov-surface-sunken);
+  border: 1px solid var(--ov-border);
+}
+
+.proj-media {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  border-radius: 10px;
+  overflow: hidden;
+  background: #0d1226;
+  border: 1px solid var(--ov-border);
+}
+.proj-embed, .proj-thumb { width: 100%; height: 100%; border: 0; display: block; object-fit: cover; }
+.proj-media-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: var(--ov-text-muted);
+  font-size: 12.5px;
+}
+
+.proj-body { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.proj-titlerow { display: flex; align-items: center; gap: 10px; }
+.proj-name { margin: 0; font-size: 16px; font-weight: 700; flex-grow: 1; min-width: 0; }
+.proj-desc {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--ov-text-muted);
+  white-space: pre-wrap;
+}
+
+.proj-like {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 12px;
+  flex-shrink: 0;
+  border: 1px solid var(--ov-border-strong);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--ov-text);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.proj-like:hover:not(:disabled) { filter: brightness(1.2); }
+.proj-like:disabled { opacity: 0.55; cursor: default; }
+.proj-like:focus-visible { outline: 2px solid var(--ov-accent); outline-offset: 2px; }
+.proj-like-on { background: rgba(255, 92, 138, 0.18); border-color: rgba(255, 92, 138, 0.55); color: #ff8fb2; }
+
+.proj-links { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 2px; }
+.proj-link {
+  display: inline-flex;
+  align-items: center;
+  height: 28px;
+  padding: 0 11px;
+  border-radius: 8px;
+  border: 1px solid var(--ov-border);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--ov-text);
+  font-size: 12.5px;
+  text-decoration: none;
+}
+.proj-link:hover { background: rgba(255, 255, 255, 0.11); }
+.proj-linkbtn { align-self: flex-start; text-decoration: none; }
+
+@media (max-width: 900px) {
+  .proj-card { grid-template-columns: minmax(0, 1fr); }
+}

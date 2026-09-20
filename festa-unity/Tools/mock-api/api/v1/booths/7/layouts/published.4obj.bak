@@ -1,0 +1,51 @@
+{
+  "boothId": 7,
+  "template": "PROJECT_EXHIBITION",
+  "version": 2,
+  "objects": [
+    {
+      "objectId": "board-1",
+      "type": "RECRUITMENT_BOARD",
+      "position": {
+        "x": 0,
+        "y": 0,
+        "z": -2.85
+      },
+      "rotationY": 0,
+      "configId": 1
+    },
+    {
+      "objectId": "desk-1",
+      "type": "CONSULTATION_DESK",
+      "position": {
+        "x": 1.75,
+        "y": 0,
+        "z": 1.5
+      },
+      "rotationY": 0,
+      "configId": 2
+    },
+    {
+      "objectId": "ai-1",
+      "type": "AI_AGENT",
+      "position": {
+        "x": -1.9,
+        "y": 0,
+        "z": 2.0
+      },
+      "rotationY": 0,
+      "configId": 3
+    },
+    {
+      "objectId": "table-1",
+      "type": "FURNITURE",
+      "position": {
+        "x": -1.3,
+        "y": 0,
+        "z": -0.6
+      },
+      "rotationY": 0,
+      "configId": 4
+    }
+  ]
+}

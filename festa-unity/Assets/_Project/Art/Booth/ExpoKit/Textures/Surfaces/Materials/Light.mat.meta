@@ -1,0 +1,16 @@
+fileFormatVersion: 2
+guid: 151dc164e00b2a647b48336d4a737a21
+timeCreated: 1507767108
+licenseType: Store
+NativeFormatImporter:
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 114974
+  packageName: Stand Expo Pack
+  packageVersion: 1.0
+  assetPath: Assets/_Project/Art/Booth/ExpoKit/Textures/Surfaces/Materials/Light.mat
+  uploadId: 237227

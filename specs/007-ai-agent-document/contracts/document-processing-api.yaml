@@ -1,0 +1,96 @@
+openapi: 3.1.0
+info:
+  title: SSAFY FESTA AI Document Processing API
+  version: 0.7.0
+  description: Spring이 영속 Job을 만든 뒤 DB 권한이 없는 FastAPI에 문서 처리를 시작·취소시키는 계약이다.
+servers:
+  - url: /ai/v1
+security:
+  - serviceToken: []
+paths:
+  /documents/process:
+    post:
+      operationId: startDocumentProcessing
+      summary: 영속 Job의 문서 처리 시작
+      description: FastAPI는 비동기 처리를 시작하고 DB에 Job을 만들지 않는다. 같은 jobId+attemptNo 재전송은 중복 Worker 없이 멱등하게 수락한다.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProcessDocumentRequest'
+      responses:
+        '202':
+          description: 비동기 처리 수락
+        '422':
+          description: 요청 형식·크기 검증 실패
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Spring→FastAPI Service Token 누락·오류
+  /documents/cancel:
+    post:
+      operationId: cancelDocumentProcessing
+      summary: 실행 중인 문서 처리 attempt 취소
+      description: 같은 jobId+attemptNo가 이미 없거나 끝났어도 성공으로 응답한다(멱등). attemptNo가 현재 실행 중인 것과 다르면 아무것도 하지 않고 성공으로 응답한다. 취소 대상 조회는 FastAPI 프로세스 하나의 in-memory 상태만 본다 — replica가 2개 이상이면 이 API는 요청을 받은 프로세스가 아닌 다른 프로세스의 attempt를 취소하지 못한다.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CancelDocumentProcessingRequest'
+      responses:
+        '204':
+          description: 취소 요청 수락(실제 취소 여부 무관 — 멱등)
+        '422':
+          description: 요청 형식 검증 실패
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Spring→FastAPI Service Token 누락·오류
+components:
+  securitySchemes:
+    serviceToken:
+      type: http
+      scheme: bearer
+      bearerFormat: opaque-service-token
+  schemas:
+    ProcessDocumentRequest:
+      type: object
+      additionalProperties: false
+      required: [jobId, attemptNo, documentId, boothId, agentId, originalFilename, contentType, fileSizeBytes, storageProvider, storageBucket, objectKey, sourceHash]
+      properties:
+        jobId: {type: integer, format: int64, minimum: 1}
+        attemptNo: {type: integer, minimum: 0}
+        documentId: {type: integer, format: int64, minimum: 1}
+        boothId: {type: integer, format: int64, minimum: 1}
+        agentId: {type: integer, format: int64, minimum: 1}
+        originalFilename: {type: string, minLength: 1, maxLength: 255}
+        contentType:
+          type: string
+          enum: [application/pdf, text/markdown, text/plain]
+        fileSizeBytes: {type: integer, minimum: 1, maximum: 20971520}
+        storageProvider:
+          type: string
+          enum: [R2, MINIO_LOCAL]
+        storageBucket: {type: string, minLength: 1}
+        objectKey: {type: string, minLength: 1}
+        sourceHash: {type: string, pattern: '^[a-f0-9]{64}$'}
+    CancelDocumentProcessingRequest:
+      type: object
+      additionalProperties: false
+      required: [jobId, attemptNo]
+      properties:
+        jobId: {type: integer, format: int64, minimum: 1}
+        attemptNo: {type: integer, minimum: 0}
+    ErrorResponse:
+      type: object
+      additionalProperties: false
+      required: [code, message]
+      properties:
+        code: {type: string}
+        message: {type: string}

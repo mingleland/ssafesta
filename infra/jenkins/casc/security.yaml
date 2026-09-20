@@ -1,0 +1,58 @@
+# Credentials are entered through the Jenkins UI and encrypted in JENKINS_HOME.
+# Do not declare empty credential lists here: JCasC reloads would erase UI entries.
+
+jenkins:
+  globalNodeProperties:
+    - envVars:
+        env:
+          - key: GITHUB_CREDENTIALS_ID
+            value: "${GITHUB_CREDENTIALS_ID}"
+          - key: GITLAB_CREDENTIALS_ID
+            value: "${GITLAB_CREDENTIALS_ID}"
+          - key: GITLAB_API_CREDENTIALS_ID
+            value: "${GITLAB_API_CREDENTIALS_ID}"
+          - key: GITLAB_CHECKOUT_CREDENTIALS_ID
+            value: "${GITLAB_CHECKOUT_CREDENTIALS_ID}"
+          - key: GITLAB_PACKAGE_READ_CREDENTIAL_ID
+            value: "${GITLAB_PACKAGE_READ_CREDENTIAL_ID}"
+          - key: GITLAB_PACKAGE_WRITE_CREDENTIAL_ID
+            value: "${GITLAB_PACKAGE_WRITE_CREDENTIAL_ID}"
+          - key: GITLAB_API_V4_URL
+            value: "${GITLAB_API_V4_URL}"
+          - key: GITLAB_PROJECT_ID
+            value: "${GITLAB_PROJECT_ID}"
+          - key: DEPLOY_CREDENTIALS_ID
+            value: "${DEPLOY_CREDENTIALS_ID}"
+          - key: MATTERMOST_CREDENTIALS_ID
+            value: "${MATTERMOST_CREDENTIALS_ID}"
+          - key: DEV_BACK_ENV_CREDENTIAL_ID
+            value: "${DEV_BACK_ENV_CREDENTIAL_ID}"
+          - key: DEV_AI_ENV_CREDENTIAL_ID
+            value: "${DEV_AI_ENV_CREDENTIAL_ID}"
+          - key: DEV_INTERNAL_SPRING_TO_AI_TOKENS_CREDENTIAL_ID
+            value: "${DEV_INTERNAL_SPRING_TO_AI_TOKENS_CREDENTIAL_ID}"
+          - key: DEV_INTERNAL_AI_TO_SPRING_TOKENS_CREDENTIAL_ID
+            value: "${DEV_INTERNAL_AI_TO_SPRING_TOKENS_CREDENTIAL_ID}"
+          - key: DEV_INTERNAL_INFRA_TO_SPRING_TOKENS_CREDENTIAL_ID
+            value: "${DEV_INTERNAL_INFRA_TO_SPRING_TOKENS_CREDENTIAL_ID}"
+          - key: DEMO_BACK_ENV_CREDENTIAL_ID
+            value: "${DEMO_BACK_ENV_CREDENTIAL_ID}"
+          - key: DEMO_AI_ENV_CREDENTIAL_ID
+            value: "${DEMO_AI_ENV_CREDENTIAL_ID}"
+          - key: DEMO_INTERNAL_SPRING_TO_AI_TOKENS_CREDENTIAL_ID
+            value: "${DEMO_INTERNAL_SPRING_TO_AI_TOKENS_CREDENTIAL_ID}"
+          - key: DEMO_INTERNAL_AI_TO_SPRING_TOKENS_CREDENTIAL_ID
+            value: "${DEMO_INTERNAL_AI_TO_SPRING_TOKENS_CREDENTIAL_ID}"
+          - key: DEMO_INTERNAL_INFRA_TO_SPRING_TOKENS_CREDENTIAL_ID
+            value: "${DEMO_INTERNAL_INFRA_TO_SPRING_TOKENS_CREDENTIAL_ID}"
+          - key: CI_CONSOLE_MASKING_REQUIRED
+            value: "true"
+          - key: CI_SANITIZED_SUMMARY_REQUIRED
+            value: "true"
+          - key: CI_SECRET_SCAN_REQUIRED
+            value: "true"
+          - key: CI_ARTIFACT_RETENTION_BUILDS
+            value: "30"
+
+# Console masking is provided by credentials-binding and with-credentials.sh.
+# Artifact retention and sanitized summaries are enforced by Jenkinsfile and secret-scan.sh.

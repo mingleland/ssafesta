@@ -1,0 +1,79 @@
+/* Toast — 기본은 우상단, 월드에서는 상단 중앙 일시 알림(S15P21A604-465, -740).
+   계층은 visual-dna z 계층(overlay < toast < system)을 따른다. */
+.toast-host {
+  position: fixed;
+  /* 화면마다 우상단의 주민이 달라 시작 높이가 다르다 — 각 화면이 이 변수를 덮어쓴다 */
+  top: var(--festa-toast-top, 3vh);
+  right: 2vw;
+  z-index: var(--festa-z-toast);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  /* HUD 는 월드를 가리지 않는 것이 1원칙이다 — 폭을 제한해 화면을 덮지 않는다 */
+  width: min(360px, 84vw);
+  pointer-events: none;
+}
+
+/* 월드는 우상단을 상담·전체화면에 비워 둔다. ToastHost 가 라우터 밖이므로 WorldPage가 body 상태로
+   이 예약 영역을 선택한다. */
+.world-active .toast-host {
+  top: var(--festa-hud-margin-y);
+  right: auto;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(360px, calc(100vw - 2 * var(--festa-hud-margin-x)));
+}
+
+.toast {
+  pointer-events: auto;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 12px 12px 14px;
+  border-radius: var(--festa-r-card);
+  border: 1px solid var(--festa-line);
+  border-left-width: 3px;
+  background: var(--festa-surface);
+  backdrop-filter: blur(8px);
+  color: var(--festa-ink);
+  font-family: var(--festa-font);
+  font-size: 14px;
+  line-height: 1.45;
+  box-shadow: 0 10px 30px rgba(6, 9, 40, 0.35);
+  animation: toast-in 0.18s ease-out;
+}
+
+.toast-error { border-left-color: var(--festa-danger); }
+.toast-success { border-left-color: var(--festa-ok); }
+.toast-info { border-left-color: var(--festa-accent); }
+
+.toast-message { flex: 1; word-break: keep-all; }
+
+.toast-close {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--festa-ink-dim);
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.toast-close:hover { background: var(--festa-fill); color: var(--festa-ink); }
+.toast-close:focus-visible { outline: 2px solid rgba(255, 255, 255, 0.9); outline-offset: 2px; }
+
+@keyframes toast-in {
+  from { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: none; }
+}
+
+/* 산발 효과 금지 · prefers-reduced-motion 존중 (visual-dna 모션 원칙) */
+@media (prefers-reduced-motion: reduce) {
+  .toast { animation: none; }
+}

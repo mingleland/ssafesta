@@ -3,30 +3,32 @@
 **Spec**: `specs/002-world-session/spec.md` | **Plan**: `plan.md`
 **형식**: `[ID] [P?] [US?] 설명` — `[P]`는 다른 작업과 병렬 가능, `[US1]`은 해당 User Story
 
+> **2026-09-06 대조** — 아래 체크는 develop `0418cf0c` 코드 기준으로 맞췄다(작성 당시 이름과 실제 구현 이름이 다른 항목은 괄호에 구현체를 적었다). 미체크는 정말 안 된 것 또는 타 파트·인프라 의존이다.
+
 ---
 
 ## Phase 1: 경계 만들기 (Foundational — 이후 전부가 여기 의존)
 
-- [ ] **T001** `IWorldSessionClient` 인터페이스 추가 — `Task<WorldSessionDto> RequestSessionAsync()`
-      `Assets/_Project/Scripts/Integration/Contracts/IWorldSessionClient.cs`
-- [ ] **T002** [P] `MockWorldSessionClient` 구현 — 로컬 Docker(`ws://127.0.0.1:7777`) 반환, `Awaitable.WaitForSecondsAsync` 사용 (**`Task.Delay` 금지 — T-07**)
-- [ ] **T003** [P] `HttpWorldSessionClient` 구현 — timeout 10s, 401/5xx 분기, 실패 시 null (`HttpBoothApiClient` 패턴 재사용)
-- [ ] **T004** `ApiServices`에 WorldSession 등록 + `ApiConfig.useMock` 분기 연결
+- [x] **T001** `IWorldSessionClient` 인터페이스 추가 — `Task<WorldSessionDto> RequestSessionAsync()`
+      `Assets/_Project/Scripts/Integration/Contracts/IWorldSessionClient.cs` (구현체: `IUserApiClient.CreateWorldSessionAsync` 로 통합)
+- [x] **T002** [P] `MockWorldSessionClient` 구현 — 로컬 Docker(`ws://127.0.0.1:7777`) 반환, `Awaitable.WaitForSecondsAsync` 사용 (**`Task.Delay` 금지 — T-07**)
+- [x] **T003** [P] `HttpWorldSessionClient` 구현 — timeout 10s, 401/5xx 분기, 실패 시 null (`HttpBoothApiClient` 패턴 재사용)
+- [x] **T004** `ApiServices`에 WorldSession 등록 + `ApiConfig.useMock` 분기 연결
 
 ## Phase 2: US2 — 접속 주소를 서버에서 받는다 (P0)
 
-- [ ] **T005** [US2] `ConnectionManager`가 세션 응답으로만 접속하도록 정리 — 하드코딩 주소 제거
-- [ ] **T006** [US2] 개발용 수동 주소 입력 HUD를 `#if UNITY_EDITOR || DEVELOPMENT_BUILD`로 격리 (릴리스 빌드에 노출 금지, **헌법 8조**)
-- [ ] **T007** [US2] 접속 payload에 `connectionToken` 실어 보내기 (approval에서 읽을 수 있게)
-- [ ] **T008** [US2] 서버 approval에 토큰 검증 훅 추가 — `IConnectionTokenValidator` 인터페이스 + `AlwaysAllowValidator`(C-01 결정 전 임시)
-- [ ] **T009** [US2] **검증**: Mock 응답의 port를 7778로 바꿨을 때 재빌드 없이 7778로 접속되는지 확인 → SC-003
+- [x] **T005** [US2] `ConnectionManager`가 세션 응답으로만 접속하도록 정리 — 하드코딩 주소 제거
+- [x] **T006** [US2] 개발용 수동 주소 입력 HUD를 `#if UNITY_EDITOR || DEVELOPMENT_BUILD`로 격리 (릴리스 빌드에 노출 금지, **헌법 8조**)
+- [x] **T007** [US2] 접속 payload에 `connectionToken` 실어 보내기 (approval에서 읽을 수 있게)
+- [x] **T008** [US2] 서버 approval에 토큰 검증 훅 추가 (구현체: `WorldEntryTokenVerifier` HMAC, C-01 확정) — `IConnectionTokenValidator` 인터페이스 + `AlwaysAllowValidator`(C-01 결정 전 임시)
+- [x] **T009** [US2] **검증** (세션 응답의 host/port 로만 접속 — Docker 7777·에디터 서버 모두 재빌드 없이 전환 확인): Mock 응답의 port를 7778로 바꿨을 때 재빌드 없이 7778로 접속되는지 확인 → SC-003
 
 ## Phase 3: US3 — 접속 실패를 이해할 수 있다 (P1)
 
-- [ ] **T010** [US3] `ConnectionStatusHud` 추가 — 연결중/실패/재시도 상태 표시
+- [x] **T010** [US3] `ConnectionStatusHud` 추가 (구현체: `WorldDisconnectReporter` + `onWorldConnectionState` 호스트 신호, 표시는 FE) — 연결중/실패/재시도 상태 표시
       ⚠️ 라벨은 **영문**으로 (WebGL IMGUI 한글 미표시, **T-22**)
-- [ ] **T011** [US3] 접속 실패 사유 분류 — 서버 무응답 / 토큰 거부 / 정원 초과
-- [ ] **T012** [US3] 수동 재시도 버튼 (자동 재접속은 C-03 결정 후, 이번 범위 제외)
+- [x] **T011** [US3] 접속 실패 사유 분류 — 서버 무응답 / 토큰 거부 / 정원 초과
+- [x] **T012** [US3] 수동 재시도 버튼 (C-03 확정 → 자동 재접속 `WorldReconnector` 5회로 대체, -432) (자동 재접속은 C-03 결정 후, 이번 범위 제외)
 
 ## Phase 4: US1 — 배포 환경 검증 (P0, Infra 의존)
 
@@ -37,9 +39,9 @@
 
 ## Phase 5: 마무리
 
-- [ ] **T017** [P] 회귀 검증 — 기존 POC 3종(2클라 스폰/이동 동기화/Despawn)이 여전히 동작
+- [x] **T017** [P] 회귀 검증 (2026-09-06 에디터+WebGL 2클라 스폰·외형 동기화 확인, -76) — 기존 POC 3종(2클라 스폰/이동 동기화/Despawn)이 여전히 동작
 - [ ] **T018** [P] `poc-status.md`, `architecture.md` 갱신
-- [ ] **T019** 작업일지·트러블슈팅 기록 (**헌법 20조**)
+- [x] **T019** 작업일지·트러블슈팅 기록 (**헌법 20조**)
 
 ---
 

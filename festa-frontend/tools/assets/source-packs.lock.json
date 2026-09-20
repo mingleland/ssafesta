@@ -1,0 +1,79 @@
+{
+  "version": 1,
+  "note": "Source package 단위 라이선스 정책. 개별 에셋이 아니라 취득한 팩에 정책이 붙는다. 선언되지 않은 팩은 compile 되지 않는다.",
+  "reviewGuidance": "runtimeCompilePolicy 를 ALLOW_RUNTIME_COMPILE 로 올리려면 acquisitionSource 와 licenseClass 를 사람이 확인해 evidence 를 채워야 한다. AI 가 임의로 올리지 않는다.",
+  "packages": {
+    "ExpoKit": {
+      "vendor": "AndragorInc",
+      "acquisitionSource": "Unity Asset Store — Stand Expo Pack (productId 114974). 유료 상품. 폴더명 'ExpoKit' 은 로컬 정리 이름이고 원본 상품명은 Stand Expo Pack 이다.",
+      "licenseClass": "Unity Asset Store Standard EULA",
+      "evidence": {
+        "productId": 114974,
+        "storeUrl": "https://assetstore.unity.com/packages/3d/props/interior/stand-expo-pack-114974",
+        "repoEvidence": "mesh .meta 22/22 의 AssetOrigin 이 productId 114974 · packageName 'Stand Expo Pack' 으로 단일 매핑 (혼재·누락 0). 예: Assets/_Project/Art/Booth/ExpoKit/Models/Furniture/Counter01.FBX.meta",
+        "reportedBy": "게임 파트(강형순) — GitLab #148 회신, 2026-09-08",
+        "decision": "runtime 변환·웹 사용·production emission 을 사용자 판단으로 PASS 처리 (2026-09-08). 게임 파트 회신은 출처·약관 종류 확인까지이고 배포 허용 판정은 하지 않았다 — 그 판정은 사용자가 내렸다.",
+        "notVerified": "구매 계정·주문번호·취득일·seat 범위는 이 근거에 포함되지 않는다."
+      },
+      "runtimeCompilePolicy": "ALLOW_RUNTIME_COMPILE",
+      "assetRoots": [
+        "Assets/_Project/Art/Booth/ExpoKit"
+      ],
+      "comment": "Booth 오브젝트 10종과 BoothShell 의 mesh 대부분이 여기서 온다."
+    },
+    "ithappy/Casino_Free": {
+      "vendor": "ithappy",
+      "acquisitionSource": "Unity Asset Store — Casino FREE - Low Poly Asset Pack (productId 393074). 무료 상품.",
+      "licenseClass": "Unity Asset Store Standard EULA",
+      "evidence": {
+        "productId": 393074,
+        "storeUrl": "https://assetstore.unity.com/packages/3d/environments/casino-free-low-poly-asset-pack-393074",
+        "repoEvidence": "mesh .meta 95/95 의 AssetOrigin 이 productId 393074 로 단일 매핑 (혼재·누락 0).",
+        "reportedBy": "게임 파트(강형순) — GitLab #148 회신, 2026-09-08",
+        "decision": "runtime 변환·웹 사용·production emission 을 사용자 판단으로 PASS 처리 (2026-09-08).",
+        "notVerified": "무료 상품이라 구매 증빙 쟁점은 없다."
+      },
+      "runtimeCompilePolicy": "ALLOW_RUNTIME_COMPILE",
+      "assetRoots": [
+        "Assets/ithappy/Casino_Free"
+      ],
+      "comment": "AI_AGENT 캐릭터와 여러 ExpoKit prefab 이 참조하는 Frame.fbx 가 여기 있다."
+    },
+    "_Project/Models/Laptop": {
+      "vendor": "미확인",
+      "acquisitionSource": "Unity Asset Store — Laptop Free (productId 90315). 상품명은 Free.",
+      "licenseClass": "Unity Asset Store Standard EULA",
+      "evidence": {
+        "productId": 90315,
+        "storeUrl": "https://assetstore.unity.com/packages/package/90315",
+        "repoEvidence": "Assets/_Project/Models/Laptop/laptop.FBX.meta 의 AssetOrigin 이 productId 90315 · packageName 'Laptop Free'.",
+        "reportedBy": "게임 파트(강형순) — GitLab #148 회신, 2026-09-08",
+        "decision": "runtime 변환·웹 사용·production emission 을 사용자 판단으로 PASS 처리 (2026-09-08).",
+        "notVerified": "퍼블리셔와 상품별 약관 표기는 회신 시점에 확인되지 않았다(공개 링크가 로그인으로 이동)."
+      },
+      "runtimeCompilePolicy": "ALLOW_RUNTIME_COMPILE",
+      "assetRoots": [
+        "Assets/_Project/Models/Laptop"
+      ],
+      "comment": "LAPTOP 타입 prefab 이 쓴다. 현재 TARGET_ASSET_CODES 에는 없으나 선언해 두지 않으면 compile 자체가 막힌다."
+    },
+    "CarnivalKit": {
+      "vendor": "3S 3DreaMax Studio",
+      "acquisitionSource": "Unity Asset Store — Carnival & Funfair Stalls: Game Booths, Food Carts, Circus & Festival Props (productId 398112). 유료 상품(확인 시점 $40).",
+      "licenseClass": "Unity Asset Store Standard EULA",
+      "evidence": {
+        "productId": 398112,
+        "storeUrl": "https://assetstore.unity.com/packages/3d/props/exterior/carnival-funfair-stalls-game-booths-food-carts-circus-festival-p-398112",
+        "repoEvidence": "Assets/_Project/Art/Booth/CarnivalKit — prefab 42 · FBX 42 · 텍스처 48.",
+        "reportedBy": "게임 파트(강형순) — GitLab #148 회신, 2026-09-08. 공개 페이지 확인일 2026-09-08.",
+        "decision": "runtime 변환·웹 사용·production emission 을 사용자 판단으로 PASS 처리 (2026-09-08).",
+        "notVerified": "구매 계정·주문번호·취득일·seat 범위는 확인 범위 밖이다."
+      },
+      "runtimeCompilePolicy": "ALLOW_RUNTIME_COMPILE",
+      "assetRoots": [
+        "Assets/_Project/Art/Booth/CarnivalKit"
+      ],
+      "comment": "Facade(부스 외관) 전용. 내부 Booth 자산에는 쓰이지 않는다 — 소비처가 갈린다."
+    }
+  }
+}

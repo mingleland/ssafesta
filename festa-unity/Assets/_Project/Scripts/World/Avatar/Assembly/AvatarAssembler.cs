@@ -1,0 +1,820 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using UnityEngine;
+
+namespace Festa.Avatar
+{
+    public sealed class AvatarAssembler : MonoBehaviour
+    {
+        [SerializeField] AvatarCatalog _catalog;
+        readonly Dictionary<AvatarPartCategory, List<GameObject>> _spawned = new();
+        readonly Dictionary<int, GameObject> _bodyParts = new();
+        // 변환된 런타임 재질은 (원본 재질 + 카테고리)의 순수 함수다 — 아바타별 색은
+        // MaterialPropertyBlock 으로 나가므로 재질 자체에 개인 상태가 없다. 그래서
+        // **모든 아바타가 공유**한다. 인스턴스마다 만들면 40명 기준 480개가 생기고
+        // SRP Batcher 가 배칭할 수 없어 SetPass 가 인원수에 비례해 늘어난다 (실측 18.2/기).
+        // ⚠ 키는 **재질 오브젝트 참조**여야 한다. `GetInstanceID()` 를 쓰면 안 된다 —
+        // 씬 전환 시 Resources.UnloadUnusedAssets 로 원본이 해제되면 그 인스턴스 ID가
+        // **다른 에셋에 재사용**돼, 새 원본이 엉뚱한 캐시 항목을 집어간다(T-204).
+        // 로비→월드 전환 후 머리카락이 사라진 원인이 이것이다. 참조를 키로 쓰면
+        // 딕셔너리가 원본을 살려 두므로 ID 재사용 자체가 일어나지 않는다.
+        static readonly Dictionary<(Material source, int category), Material> SharedMaterials = new();
+        readonly Dictionary<Renderer, AvatarPartCategory> _rendererCategories = new();
+
+        /// <summary>
+        /// 패딩을 더하기 <b>전</b>의 실제 형상 bounds — 렌더러 자신의 transform 공간이다.
+        ///
+        /// <para>런타임 렌더러의 <c>localBounds</c> 는 화면 가장자리 컬링을 막으려고 일부러
+        /// 부풀려 둔다(S15P21A604-749). 그런데 아바타 키 정규화는 렌더러 bounds 높이로
+        /// 배율을 정하므로, 부푼 값을 그대로 읽으면 <b>패딩만큼 아바타가 작아진다</b>
+        /// (S15P21A604-801 / T-222). 컬링용 값과 형상 측정용 값을 갈라 둔다 —
+        /// 컬링은 부푼 쪽을, 측정은 이쪽을 쓴다.</para>
+        /// </summary>
+        readonly Dictionary<Renderer, Bounds> _geometryLocalBounds = new();
+
+        /// <summary>
+        /// 이번 프레임에 <c>Destroy</c> 를 건 오브젝트 (S15P21A604-334).
+        ///
+        /// <para>플레이 모드의 <c>Destroy</c> 는 <b>프레임 끝까지 미뤄진다.</b> 그래서 같은
+        /// <see cref="Apply"/> 안에서 나중에 도는 <see cref="CombineSameMaterialParts"/> 가
+        /// <b>죽는 중인 렌더러를 아직 살아 있는 것으로 보고 병합에 구워 넣었다.</b>
+        /// 원본은 다음 프레임에 사라지지만 <b>병합 메시에는 그 형상이 영구히 남는다</b> —
+        /// 옷을 갈아입으면 가려져야 할 속옷이 셔츠를 뚫고 나오는 검은 얼룩이 그것이다.</para>
+        ///
+        /// <para>그래서 파괴를 건 대상을 여기 모아 두고 병합에서 제외한다. T-228 과 같은 뿌리
+        /// (지연 파괴)이지만 증상과 지점이 다르다.</para>
+        /// </summary>
+        readonly HashSet<GameObject> _dying = new();
+        MaterialPropertyBlock _block;
+        Animator _animator;
+        SkinnedMeshRenderer _reference;
+        AvatarConfig _config;
+        // 의상 원본과 런타임 렌더러는 Transform 계층이 다르다. localBounds를 그대로
+        // 복사하면 중심이 어긋나 화면 가장자리에서 의상만 먼저 컬링된다.
+        const float SkinnedBoundsPaddingRatio = 0.1f;
+        const float SkinnedBoundsMinimumPadding = 0.08f;
+        public AvatarConfig Config => _config;
+        public string LastError { get; private set; }
+        public AvatarCatalog Catalog { get => _catalog; set => _catalog = value; }
+
+        void Awake() => _block = new MaterialPropertyBlock();
+
+        public void Apply(AvatarConfig config)
+        {
+            LastError = null;
+            if (!_catalog) { Fail("AvatarCatalog이 지정되지 않았습니다."); return; }
+            _catalog.EnsureRequiredClothing(ref config);
+            // **비우지 말고, 실제로 파괴가 끝난 것만 지운다** (S15P21A604-334).
+            // 한 프레임 안에서 Apply 가 두 번 이상 불리면(연속 클릭·프로그램 호출) 앞선 호출이
+            // 파괴를 건 대상이 아직 살아 있다. 그때 통째로 비우면 뒤 호출이 그것을 다시 후보로
+            // 삼아 병합에 삼킨다 — 실제로 10회 연속 호출에서 병합 정점이 2,573 → 247,164 로 터졌다.
+            // Unity 의 파괴된 오브젝트는 `!go` 로 판별되므로 그것만 걷어낸다.
+            _dying.RemoveWhere(go => !go);
+            bool rebuild = !_animator || _config.gender != config.gender;
+            _config = config;
+            if (rebuild) BuildBody();
+            if (!_animator) return;
+            // 이번 Apply 에서 의상·병합 렌더러가 전부 새로 만들어진다. 앞선 Apply 의 항목은
+            // 대상이 파괴돼 의미가 없으므로 여기서 버린다.
+            _geometryLocalBounds.Clear();
+            foreach (AvatarPartCategory c in Enum.GetValues(typeof(AvatarPartCategory))) Equip(c);
+            UpdateHairVisibilityForHat();
+            UpdateBodyVisibility();
+            CombineSameMaterialParts();   // 가시성 확정 뒤에 합쳐야 옷에 가려지는 신체가 반영된다
+            ApplyColors();
+            ValidateAnimator();
+        }
+
+        public void ApplyColorsOnly(AvatarConfig config)
+        {
+            _config = config;
+            if (_animator) ApplyColors();
+        }
+
+        void BuildBody()
+        {
+            foreach (Transform child in transform) Destroy(child.gameObject);
+            _spawned.Clear(); _bodyParts.Clear(); _rendererCategories.Clear();
+            var prefab = _config.gender == AvatarGender.Female ? _catalog.femaleBody : _catalog.maleBody;
+            if (!prefab) { Fail($"{_config.gender} 기본 신체 프리팹이 없습니다."); return; }
+            var body = Instantiate(prefab, transform);
+            body.name = $"Preview_{_config.gender}";
+            _animator = body.GetComponent<Animator>();
+            _reference = body.GetComponentsInChildren<SkinnedMeshRenderer>(true).FirstOrDefault();
+            foreach (var node in body.GetComponentsInChildren<Transform>(true))
+            {
+                int tag = BodyPartCode(node.name);
+                if (tag >= 0) _bodyParts[tag] = node.gameObject;
+            }
+            foreach (var renderer in body.GetComponentsInChildren<Renderer>(true)) PrepareMaterials(renderer);
+        }
+
+        void Equip(AvatarPartCategory category)
+        {
+            if (_spawned.TryGetValue(category, out var old)) foreach (var go in old) if (go)
+            {
+                foreach (var renderer in go.GetComponentsInChildren<Renderer>(true)) _rendererCategories.Remove(renderer);
+                _dying.Add(go);   // 이번 프레임 병합에서 제외한다 (S15P21A604-334)
+                Destroy(go);
+            }
+            var spawned = new List<GameObject>(); _spawned[category] = spawned;
+            AvatarItemDefinition def;
+            if (category == AvatarPartCategory.Hat)
+            {
+                var hair = _catalog.Get(_config.hairId);
+                def = _catalog.ResolveHat(_config.hatId, hair ? hair.hairGroup : HairGroup.None);
+                if (_config.hatId != 0 && !def) { Fail("선택한 모자는 현재 헤어 그룹과 호환되지 않습니다."); return; }
+            }
+            else def = _catalog.Get(_config.GetItem(category));
+            if (!def) return;
+            foreach (var source in def.meshes)
+            {
+                var go = new GameObject(source.name);
+                go.transform.SetParent(_animator.transform, false);
+                var r = go.AddComponent<SkinnedMeshRenderer>();
+                r.rootBone = _reference.rootBone; r.bones = _reference.bones;
+                r.sharedMesh = source.sharedMesh; r.sharedMaterials = source.sharedMaterials;
+                var garmentGeometry = RuntimeGarmentBounds(source, _reference, r.transform);
+                _geometryLocalBounds[r] = garmentGeometry;
+                r.localBounds = WithBoundsPadding(ToRootBoneSpace(garmentGeometry, r));
+                _rendererCategories[r] = category;
+                PrepareMaterials(r, category);
+                spawned.Add(go);
+            }
+            for (int i = 0; i < def.objectPrefabs.Length; i++)
+            {
+                var targetBone = i < def.targetBones.Length ? def.targetBones[i] : HumanBodyBones.Head;
+                var bone = _animator.GetBoneTransform(targetBone);
+                if (!bone) { Fail($"{def.displayName}: 부착 본 {targetBone}을 찾지 못했습니다."); continue; }
+                var attached = Instantiate(def.objectPrefabs[i], bone); spawned.Add(attached);
+                foreach (var renderer in attached.GetComponentsInChildren<Renderer>(true))
+                {
+                    _rendererCategories[renderer] = category;
+                    PrepareMaterials(renderer, category);
+                }
+            }
+        }
+
+        void UpdateBodyVisibility()
+        {
+            var hidden = new HashSet<int>();
+            var forcedVisible = new HashSet<int>();
+            if (_config.headId != 0 && _spawned.TryGetValue(AvatarPartCategory.Head, out var heads) && heads.Any(x => x)) hidden.Add(4);
+            foreach (AvatarPartCategory c in Enum.GetValues(typeof(AvatarPartCategory)))
+            {
+                var d = c == AvatarPartCategory.Hat ? null : _catalog.Get(_config.GetItem(c));
+                if (!_spawned.TryGetValue(c, out var visibleParts) || !visibleParts.Any(x => x)) continue;
+                if (d == null) continue;
+                if (d.hiddenBodyParts != null)
+                    foreach (var p in d.hiddenBodyParts) hidden.Add(p);
+                if (d.forcedVisibleBodyParts != null)
+                    foreach (var p in d.forcedVisibleBodyParts) forcedVisible.Add(p);
+            }
+            hidden.ExceptWith(forcedVisible);
+            foreach (var pair in _bodyParts) pair.Value.SetActive(!hidden.Contains(pair.Key));
+        }
+
+        void UpdateHairVisibilityForHat()
+        {
+            // Cap and beanie prefabs already contain a fitted hair mesh for each
+            // hair group. Keeping the regular hair active at the same time makes
+            // it poke through and visually bury the hat.
+            bool wearingHat = _config.hatId != 0
+                && _spawned.TryGetValue(AvatarPartCategory.Hat, out var hats)
+                && hats.Any(x => x);
+            if (_spawned.TryGetValue(AvatarPartCategory.Hair, out var hairParts))
+                foreach (var hair in hairParts) if (hair) hair.SetActive(!wearingHat);
+
+            // When Hair is set to None, ResolveHat deliberately falls back to one
+            // fitted variant so the cap/beanie body can still be instantiated.
+            // Hide only that variant's embedded hair renderers, never the hat root.
+            bool showFittedHair = _config.hairId != 0;
+            if (!_spawned.TryGetValue(AvatarPartCategory.Hat, out var hatParts)) return;
+            foreach (var hat in hatParts)
+            {
+                if (!hat) continue;
+                foreach (var renderer in hat.GetComponentsInChildren<Renderer>(true))
+                    if (IsEmbeddedHatHair(renderer)) renderer.enabled = showFittedHair;
+            }
+        }
+
+        static bool IsEmbeddedHatHair(Renderer renderer)
+        {
+            if (!renderer) return false;
+            if (renderer.name.ToLowerInvariant().Contains("hair")) return true;
+            return renderer.sharedMaterials.Any(x => x && x.name.ToLowerInvariant().Contains("hair"));
+        }
+
+
+        // ── 같은 재질 파츠 결합 (드로우콜 감축) ──────────────────────────
+        // WebGL 40기 실측에서 드로우콜 990 · 25.7 FPS 였고, 캔버스 픽셀을 9분의 1로 줄여도
+        // 12% 개선뿐이라 **CPU/드로우콜 병목**이 확정됐다(docs/KHS/28 §10).
+        // 아바타 1기가 SkinnedMeshRenderer 11개를 쓰는데, 그중 신체 파츠 5개
+        // (팔 상/하·손·다리·몸통)는 **같은 재질·같은 골격**이라 손실 없이 하나로 합칠 수 있다.
+        //
+        // 합칠 수 있는 조건 — 하나라도 어긋나면 건너뛴다:
+        //   · 재질 동일 · rootBone 동일 · 뼈 배열 길이·순서 동일 · bindpose 동일
+        //   · 서브메시 1개 · 블렌드셰이프 없음
+        // 정점은 이미 같은 스킨 공간에 있으므로 좌표 변환 없이 이어 붙이면 된다.
+        readonly List<GameObject> _merged = new();
+
+        void CombineSameMaterialParts()
+        {
+            // 병합은 이제 모든 플랫폼에서 켜져 있다 (S15P21A604-258).
+            // 2026-08-26 부터 WebGL 에서만 꺼져 있었는데(T-214), 그 근거였던 "WebGL 에서만
+            // 안 그려진다" 가 2026-08-30 실측으로 틀렸음이 확인됐다. 경위는 AvatarMeshMerge 주석.
+            // 스위치는 A/B 계측용으로 남긴다(F10) — 값을 다시 재려면 조건을 바꿀 수 있어야 한다.
+            // **정리는 병합을 꺼도 해야 한다** (S15P21A604-334). 전에는 여기서 바로 return 해
+            // 옛 병합체가 살아남고 원본은 꺼진 채로 남았다 — 토글을 끈 순간 화면이 옛 상태로 굳는다.
+            // 이전 병합에서 꺼둔 원본을 **먼저 되살린다** (T-228).
+            //
+            // 아래에서 병합 대상을 고를 때 `r.enabled` 로 거른다. 그런데 원본은 병합될 때
+            // `enabled = false` 로 꺼지고 아무도 다시 켜지 않았다. 그래서 옷을 바꿔 두 번째
+            // 호출이 들어오면 — 이미 꺼진 원본이 후보에서 빠져 새 병합체가 만들어지지 않는데
+            // 옛 병합체는 바로 아래에서 파괴된다. **그리는 것이 아무것도 남지 않아 몸이 통째로
+            // 사라진다.** 처음 조립할 때는 멀쩡하고 옷을 갈아입는 순간 없어지는 형태다.
+            //
+            // 파괴보다 먼저 켜야 한다 — 플레이 모드의 `Destroy` 는 프레임 끝에 처리되므로
+            // 파괴 후에 훑으면 아직 살아 있는 병합체까지 다시 켜서 원본과 겹쳐 그린다.
+            foreach (var renderer in GetComponentsInChildren<SkinnedMeshRenderer>(true))
+                if (renderer && !_merged.Contains(renderer.gameObject) && !_dying.Contains(renderer.gameObject))
+                    renderer.enabled = true;
+
+            // **옛 병합체도 파괴 대기로 등록한다** (S15P21A604-334). DestroySafe 역시 플레이
+            // 모드에서는 프레임 끝까지 미뤄지므로, 아래 후보 선정 시점에 옛 병합체가 아직
+            // 살아 있고 enabled 다. `_merged` 는 방금 비웠으니 걸러지지도 않는다 —
+            // 그래서 **새 병합이 옛 병합체를 통째로 다시 삼켰다.** 정점이 회차마다 배로
+            // 늘고(3962 → 8508), 그때 보이던 속옷 형상이 병합 메시에 영구히 남아
+            // 옷을 갈아입으면 셔츠를 뚫고 검은 얼룩으로 나타났다.
+            foreach (var go in _merged) if (go) { _dying.Add(go); DestroySafe(go); }
+            _merged.Clear();
+
+            // 정리를 마친 뒤에 빠진다 — 위 주석 참조.
+            if (!AvatarMeshMerge.Enabled) return;
+
+            var actives = GetComponentsInChildren<SkinnedMeshRenderer>(false)
+                .Where(r => r && r.enabled && r.sharedMesh && !_dying.Contains(r.gameObject) &&
+                            r.sharedMaterials.Length == 1 && r.sharedMaterials[0] &&
+                            r.sharedMesh.subMeshCount == 1 && r.sharedMesh.blendShapeCount == 0 &&
+                            r.bones != null && r.bones.Length > 0)
+                .ToList();
+
+            foreach (var group in actives.GroupBy(r => (r.sharedMaterials[0], r.rootBone, r.bones.Length)))
+            {
+                var parts = group.ToList();
+                if (parts.Count < 2) continue;
+                // 빌드에서는 메시가 읽기 불가다 — Read/Write Enabled 가 꺼져 있으면
+                // vertices/triangles 접근이 예외를 던진다. 에디터에서는 통과하고
+                // **빌드에서만 아바타가 깨지는** 형태라 반드시 먼저 확인한다 (T-203).
+                if (parts.Any(p => !p.sharedMesh.isReadable)) continue;
+                if (!BonesAndBindposesMatch(parts)) continue;
+                var mergedGo = BuildMergedRenderer(parts);
+                if (mergedGo == null) continue;
+                foreach (var p in parts) p.enabled = false;   // 원본은 끄기만 한다 (파괴 금지 — 가시성 로직이 참조)
+                _merged.Add(mergedGo);
+
+                // **병합체에도 카테고리를 물려준다.** ApplyColors 는 _rendererCategories 로 의상 여부를
+                // 가리는데, 병합으로 새로 만든 렌더러는 그 사전에 없어 ApplyGarmentColors 가 통째로
+                // 건너뛰어졌다 — 사용자가 고른 옷 색이 적용되지 않고 카탈로그 기본색으로 남는다.
+                //
+                // 병합이 일어날지는 어떤 옷을 입었는지에 따라 갈리고 병합 자체가 **클라이언트마다 로컬로**
+                // 수행되므로, 같은 사람이 화면마다 다른 옷 색으로 보인다 (사용자 지적 2026-09-16).
+                //
+                // 묶음은 (재질, 루트본, 본 수) 로 나뉘고 런타임 재질 캐시 키에 카테고리가 들어가 있어
+                // 한 묶음의 파츠는 카테고리가 같다 — 첫 값을 그대로 쓴다.
+                var mergedRenderer = mergedGo.GetComponent<SkinnedMeshRenderer>();
+                if (mergedRenderer != null)
+                    foreach (var p in parts)
+                        if (_rendererCategories.TryGetValue(p, out var mergedCategory))
+                        {
+                            _rendererCategories[mergedRenderer] = mergedCategory;
+                            break;
+                        }
+
+                // 병합 결과를 남긴다 (S15P21A604-258). WebGL 빌드에는 HUD 가 닿지 않는 화면이
+                // 있어서, 화면을 못 봐도 로그만으로 "병합체가 만들어졌는지" 를 판정할 수 있어야 한다.
+                if (Debug.isDebugBuild || Application.isEditor)
+                    Debug.Log($"[AvatarMeshMerge] 병합 생성 {mergedGo.name} " +
+                              $"— 원본 {parts.Count}개 → 1개");
+            }
+        }
+
+        static bool BonesAndBindposesMatch(List<SkinnedMeshRenderer> parts)
+        {
+            var first = parts[0];
+            var bp0 = first.sharedMesh.bindposes;
+            for (int k = 1; k < parts.Count; k++)
+            {
+                var s = parts[k];
+                for (int i = 0; i < s.bones.Length; i++)
+                    if (s.bones[i] != first.bones[i]) return false;
+                var bp = s.sharedMesh.bindposes;
+                if (bp.Length != bp0.Length) return false;
+                for (int i = 0; i < bp.Length; i++)
+                    if (bp[i] != bp0[i]) return false;
+            }
+            return true;
+        }
+
+        GameObject BuildMergedRenderer(List<SkinnedMeshRenderer> parts)
+        {
+            var first = parts[0];
+            var verts = new List<Vector3>();
+            var norms = new List<Vector3>();
+            var tans = new List<Vector4>();
+            var uvs = new List<Vector2>();
+            var cols = new List<Color32>();
+            var weights = new List<BoneWeight>();
+            var tris = new List<int>();
+
+            bool hasNormals = true, hasTangents = true, hasUv = true, hasColors = true;
+            foreach (var p in parts)
+            {
+                var m = p.sharedMesh;
+                if (m.normals.Length != m.vertexCount) hasNormals = false;
+                if (m.tangents.Length != m.vertexCount) hasTangents = false;
+                if (m.uv.Length != m.vertexCount) hasUv = false;
+                if (m.colors32.Length != m.vertexCount) hasColors = false;
+            }
+
+            foreach (var p in parts)
+            {
+                var m = p.sharedMesh;
+                int offset = verts.Count;
+                verts.AddRange(m.vertices);
+                if (hasNormals) norms.AddRange(m.normals);
+                if (hasTangents) tans.AddRange(m.tangents);
+                if (hasUv) uvs.AddRange(m.uv);
+                if (hasColors) cols.AddRange(m.colors32);
+                // 뼈 인덱스는 같은 bones 배열을 가리키므로 재매핑이 필요 없다.
+                weights.AddRange(m.boneWeights);
+                foreach (var t in m.triangles) tris.Add(t + offset);
+            }
+
+            var mesh = new Mesh { name = first.sharedMaterials[0].name + "_Merged" };
+            mesh.indexFormat = verts.Count > 65000
+                ? UnityEngine.Rendering.IndexFormat.UInt32
+                : UnityEngine.Rendering.IndexFormat.UInt16;
+            mesh.SetVertices(verts);
+            if (hasNormals) mesh.SetNormals(norms);
+            if (hasTangents) mesh.SetTangents(tans);
+            if (hasUv) mesh.SetUVs(0, uvs);
+            if (hasColors) mesh.SetColors(cols);
+            mesh.SetTriangles(tris, 0);
+            mesh.boneWeights = weights.ToArray();
+            mesh.bindposes = first.sharedMesh.bindposes;
+            if (!hasNormals) mesh.RecalculateNormals();
+            mesh.RecalculateBounds();
+
+            var go = new GameObject("Merged_" + first.sharedMaterials[0].name);
+            go.transform.SetParent(first.transform.parent, false);
+            var smr = go.AddComponent<SkinnedMeshRenderer>();
+            smr.sharedMesh = mesh;
+            smr.bones = first.bones;
+            smr.rootBone = first.rootBone;
+            smr.sharedMaterial = first.sharedMaterials[0];
+            var mergedGeometry = CombinedRuntimeBounds(parts, smr.transform);
+            _geometryLocalBounds[smr] = mergedGeometry;
+            smr.localBounds = WithBoundsPadding(ToRootBoneSpace(mergedGeometry, smr));
+            smr.shadowCastingMode = first.shadowCastingMode;
+            smr.updateWhenOffscreen = first.updateWhenOffscreen;
+            smr.quality = first.quality;
+            return go;
+        }
+
+        static Bounds RuntimeGarmentBounds(
+            SkinnedMeshRenderer source,
+            SkinnedMeshRenderer reference,
+            Transform target)
+        {
+            bool initialized = false;
+            var bounds = default(Bounds);
+
+            // 카탈로그의 원본 렌더러는 프리팹 루트 기준으로 런타임 Animator 아래에 붙는다.
+            // 에셋의 월드 위치와 플레이 중인 아바타의 월드 위치를 직접 섞지 않는다.
+            if (source)
+            {
+                var sourceRoot = source.transform.root;
+                var sourceToRoot = sourceRoot.worldToLocalMatrix * source.transform.localToWorldMatrix;
+                EncapsulateTransformed(ref bounds, ref initialized, source.localBounds, sourceToRoot);
+                if (source.sharedMesh)
+                    EncapsulateTransformed(ref bounds, ref initialized, source.sharedMesh.bounds, sourceToRoot);
+            }
+
+            // 신체 bounds는 같은 런타임 인스턴스이므로 target 로컬 공간으로 정확히 변환한다.
+            if (reference)
+            {
+                var referenceToTarget = target.worldToLocalMatrix * reference.transform.localToWorldMatrix;
+                EncapsulateTransformed(ref bounds, ref initialized, reference.localBounds, referenceToTarget);
+            }
+
+            // 패딩은 호출부에서 더한다 — 여기서는 형상 그대로를 돌려준다.
+            return initialized ? bounds : new Bounds(Vector3.up, new Vector3(2f, 3f, 2f));
+        }
+
+        Bounds CombinedRuntimeBounds(List<SkinnedMeshRenderer> parts, Transform target)
+        {
+            bool initialized = false;
+            var bounds = default(Bounds);
+            foreach (var part in parts)
+            {
+                if (!part) continue;
+                var partToTarget = target.worldToLocalMatrix * part.transform.localToWorldMatrix;
+                // 파츠가 이미 컬링 패딩을 달고 있으면 그 값을 쓰지 않는다 — 패딩이 병합체에
+                // 누적돼 키 정규화가 더 크게 어긋난다. 기록해 둔 형상 bounds 를 우선한다.
+                var partBounds = _geometryLocalBounds.TryGetValue(part, out var partGeometry)
+                    ? partGeometry
+                    : part.localBounds;
+                EncapsulateTransformed(ref bounds, ref initialized, partBounds, partToTarget);
+                if (part.sharedMesh)
+                    EncapsulateTransformed(ref bounds, ref initialized, part.sharedMesh.bounds, partToTarget);
+            }
+            // 패딩은 호출부에서 더한다 — 여기서는 형상 그대로를 돌려준다.
+            return initialized ? bounds : new Bounds(Vector3.up, new Vector3(2f, 3f, 2f));
+        }
+
+        static void EncapsulateTransformed(
+            ref Bounds destination,
+            ref bool initialized,
+            Bounds source,
+            Matrix4x4 matrix)
+        {
+            var center = source.center;
+            var extents = source.extents;
+            for (int x = -1; x <= 1; x += 2)
+            for (int y = -1; y <= 1; y += 2)
+            for (int z = -1; z <= 1; z += 2)
+            {
+                var corner = matrix.MultiplyPoint3x4(center + Vector3.Scale(extents, new Vector3(x, y, z)));
+                if (!initialized)
+                {
+                    destination = new Bounds(corner, Vector3.zero);
+                    initialized = true;
+                }
+                else destination.Encapsulate(corner);
+            }
+        }
+
+        static Bounds WithBoundsPadding(Bounds bounds)
+        {
+            float padding = Mathf.Max(bounds.size.magnitude * SkinnedBoundsPaddingRatio,
+                                      SkinnedBoundsMinimumPadding);
+            bounds.Expand(padding * 2f);
+            return bounds;
+        }
+
+        /// <summary>
+        /// 렌더러 transform 공간의 형상 bounds를 <b>루트 본 공간</b>으로 옮긴다.
+        ///
+        /// <para><b>왜 필요한가 — 실측으로 확인했다(2026-09-16).</b> <c>SkinnedMeshRenderer.localBounds</c> 는
+        /// 렌더러 자신의 transform 이 아니라 <c>rootBone</c> 기준으로 해석된다. 루트 본을 +X 100 에 두고
+        /// 렌더러를 원점에 둔 채 <c>localBounds</c> 중심을 0 으로 주면 <c>renderer.bounds.center</c> 가
+        /// (100, 0, 0) 으로 나온다.</para>
+        ///
+        /// <para>런타임 조립 아바타는 의상 렌더러를 Animator 아래(항등 로컬)에 만들고 본만 신체에서
+        /// 빌려 쓴다. 그래서 렌더러 transform 과 rootBone(Hips) 이 서로 떨어져 있고, 렌더러 공간으로 잰
+        /// 값을 그대로 넣으면 <b>컬링 상자가 그 차이만큼 밀린다.</b> 몸은 화면 안에 있는데 상자가 밖으로
+        /// 나가면 통째로 잘린다 — 이름표와 접지 그림자는 별도 렌더러라 그대로 보이고, 판정이 카메라마다
+        /// 달라 <b>접속자별로 누가 안 보이는지가 달라진다</b>(사용자 보고 2026-09-16).</para>
+        ///
+        /// <para>측정용 <c>_geometryLocalBounds</c> 는 렌더러 공간 그대로 둔다 — 키 정규화가 같은 공간의
+        /// 행렬로 되돌리므로 건드리면 T-222 가 재발한다. 여기서 바꾸는 것은 컬링용 값 하나다.</para>
+        /// </summary>
+        static Bounds ToRootBoneSpace(Bounds rendererLocal, SkinnedMeshRenderer smr)
+        {
+            if (!smr) return rendererLocal;
+            var rootBone = smr.rootBone;
+            if (!rootBone || rootBone == smr.transform) return rendererLocal;
+
+            var toRootBone = rootBone.worldToLocalMatrix * smr.transform.localToWorldMatrix;
+            bool initialized = false;
+            var converted = default(Bounds);
+            EncapsulateTransformed(ref converted, ref initialized, rendererLocal, toRootBone);
+            return initialized ? converted : rendererLocal;
+        }
+
+        /// <summary>
+        /// 컬링 패딩을 뺀 실제 형상 bounds를 월드 공간으로 돌려준다 — 키 정규화가 쓴다.
+        /// 기록이 없는 렌더러(신체 프리팹 원본 등)는 패딩이 없으므로 <see cref="Renderer.bounds"/>를 그대로 쓴다.
+        /// </summary>
+        public bool TryGetGeometryWorldBounds(Renderer renderer, out Bounds worldBounds)
+        {
+            worldBounds = default;
+            if (!renderer) return false;
+
+            if (!_geometryLocalBounds.TryGetValue(renderer, out var local))
+            {
+                worldBounds = renderer.bounds;
+                return true;
+            }
+
+            // 기록은 렌더러 자신의 transform 공간이다 (RuntimeGarmentBounds·CombinedRuntimeBounds 의 target).
+            var toWorld = renderer.transform.localToWorldMatrix;
+            bool initialized = false;
+            var accumulated = default(Bounds);
+            EncapsulateTransformed(ref accumulated, ref initialized, local, toWorld);
+            if (!initialized) return false;
+            worldBounds = accumulated;
+            return true;
+        }
+
+        static void DestroySafe(UnityEngine.Object o)
+        {
+            if (Application.isPlaying) Destroy(o); else DestroyImmediate(o);
+        }
+
+        void ApplyColors()
+        {
+            _block ??= new MaterialPropertyBlock();
+            foreach (var renderer in GetComponentsInChildren<Renderer>(true))
+            for (int i = 0; i < renderer.sharedMaterials.Length; i++)
+            {
+                var mat = renderer.sharedMaterials[i]; if (!mat) continue;
+                string n = mat.name.ToLowerInvariant(); renderer.GetPropertyBlock(_block, i);
+                bool hasCategory = _rendererCategories.TryGetValue(renderer, out var garmentCategory);
+                bool embeddedHatHair = hasCategory && garmentCategory == AvatarPartCategory.Hat && n.Contains("hair");
+                bool hatVisor = hasCategory && garmentCategory == AvatarPartCategory.Hat && n.Contains("visor");
+                bool glassesLens = hasCategory && garmentCategory == AvatarPartCategory.Glasses && IsGlassesLens(mat);
+                if (embeddedHatHair)
+                {
+                    Set("_BaseColor", AvatarColorSlot.Hair);
+                }
+                else if (hatVisor)
+                {
+                    var visorColor = _config.GetGarmentColor(AvatarPartCategory.Hat, AvatarGarmentColorSlot.B2);
+                    if (visorColor.a == 0) visorColor = new Color32(105, 125, 145, 210);
+                    if (mat.HasProperty("_BaseColor")) _block.SetColor("_BaseColor", visorColor);
+                    if (mat.HasProperty("_Color")) _block.SetColor("_Color", visorColor);
+                }
+                else if (glassesLens)
+                {
+                    var lensColor = _config.GetGarmentColor(AvatarPartCategory.Glasses, AvatarGarmentColorSlot.B2);
+                    if (lensColor.a > 0)
+                    {
+                        var sourceColor = mat.HasProperty("_BaseColor") ? mat.GetColor("_BaseColor") : mat.HasProperty("_Color") ? mat.GetColor("_Color") : new Color(1f, 1f, 1f, .32f);
+                        var tinted = (Color)lensColor;
+                        tinted.a = sourceColor.a > .02f ? sourceColor.a : .32f;
+                        if (mat.HasProperty("_BaseColor")) _block.SetColor("_BaseColor", tinted);
+                        if (mat.HasProperty("_Color")) _block.SetColor("_Color", tinted);
+                    }
+                }
+                else if (hasCategory && IsGarment(garmentCategory))
+                {
+                    ApplyGarmentColors(mat, garmentCategory);
+                }
+                // The vendor eye texture already contains sclera, pupil and iris detail.
+                // Tinting its whole base color made the sclera black and erased the iris.
+                else if (n.Contains("eye") && !n.Contains("brow") && !n.Contains("lash") && !n.Contains("highlight"))
+                {
+                    _block.SetColor("_IrisColor", _config.GetColor(AvatarColorSlot.Iris, _catalog));
+                    _block.SetColor("_ScleraColor", _config.GetColor(AvatarColorSlot.Sclera, _catalog));
+                    _block.SetColor("_PupilColor", _config.GetColor(AvatarColorSlot.Pupil, _catalog));
+                }
+                else if (n.Contains("eyebrow")) Set("_BaseColor", AvatarColorSlot.Eyebrow);
+                else if (n.Contains("hair")) Set("_BaseColor", AvatarColorSlot.Hair);
+                else if (n.Contains("face"))
+                {
+                    _block.SetColor("_SkinColor", _config.GetColor(AvatarColorSlot.Skin, _catalog));
+                    _block.SetColor("_LipColor", _config.GetColor(AvatarColorSlot.Lips, _catalog));
+                    _block.SetColor("_EyebrowColor", _config.GetColor(AvatarColorSlot.Eyebrow, _catalog));
+                }
+                else if (n.Contains("body"))
+                {
+                    _block.SetColor("_SkinColor", _config.GetColor(AvatarColorSlot.Skin, _catalog));
+                    // 속옷은 Body RGB 마스크의 별도 영역이다. 피부색 변경과
+                    // 독립된 고정색으로 유지해 전신이 피부색으로 덮이지 않게 한다.
+                    if (mat.HasProperty("_UnderwearColor"))
+                        _block.SetColor("_UnderwearColor", new Color(.015f, .015f, .02f, 1f));
+                }
+                renderer.SetPropertyBlock(_block, i);
+                void Set(string property, AvatarColorSlot slot)
+                {
+                    var color = _config.GetColor(slot, _catalog);
+                    foreach (var candidate in new[] { property, "_Color", "_Color_A", "_Color_B", "_Color_C" })
+                        if (mat.HasProperty(candidate)) _block.SetColor(candidate, color);
+                }
+            }
+        }
+
+        void ApplyGarmentColors(Material material, AvatarPartCategory category)
+        {
+            string[] properties = { "_Color_A_1", "_Color_A_2", "_Color_B_1", "_Color_B_2", "_Color_C_1", "_Color_C_2" };
+            for (int i = 0; i < properties.Length; i++)
+            {
+                if (!material.HasProperty(properties[i])) continue;
+                var custom = _config.GetGarmentColor(category, (AvatarGarmentColorSlot)i);
+                if (custom.a > 0)
+                {
+                    _block.SetColor(properties[i], custom);
+                    continue;
+                }
+
+                // v0 외형 문자열은 상·하의 전체색만 저장했다. 해당 데이터만 여섯
+                // 영역에 같은 색을 적용해 이전 저장 외형을 유지한다.
+                if (_config.garmentColorVersion == 0 && category != AvatarPartCategory.Shoes && category != AvatarPartCategory.Glasses)
+                {
+                    var legacySlot = category == AvatarPartCategory.Bottom ? AvatarColorSlot.Bottom : AvatarColorSlot.Top;
+                    _block.SetColor(properties[i], _config.GetColor(legacySlot, _catalog));
+                }
+            }
+        }
+
+        void ValidateAnimator()
+        {
+            if (!_animator) return;
+            if (!_animator.avatar) Fail("조립된 캐릭터 Animator의 Avatar가 비어 있습니다.");
+            if (!_animator.runtimeAnimatorController && _catalog.animatorController) _animator.runtimeAnimatorController = _catalog.animatorController;
+            if (!_animator.runtimeAnimatorController) Fail("조립된 캐릭터 Animator Controller가 비어 있습니다 (T-27).");
+            else _animator.Rebind();
+        }
+
+        void Fail(string message) { LastError = message; Debug.LogError($"[AvatarAssembler] {message}", this); }
+
+        void PrepareMaterials(Renderer renderer, AvatarPartCategory? category = null)
+        {
+            var originals = renderer.sharedMaterials; var converted = new Material[originals.Length];
+            var shader = Shader.Find("Universal Render Pipeline/Lit");
+            for (int i = 0; i < originals.Length; i++)
+            {
+                var source = originals[i]; if (!source) continue;
+                // 캐시 키에 카테고리를 넣는다 — 같은 원본이 의상/모자 헤어/바이저로 다르게
+                // 변환되기 때문이다. Play 종료 시 파괴된 재질이 남을 수 있어 유효성도 본다.
+                var cacheKey = (source, category.HasValue ? (int)category.Value : -1);
+                if (!SharedMaterials.TryGetValue(cacheKey, out var material) || !material)
+                {
+                    string lowerName = source.name.ToLowerInvariant();
+                    bool isEyeHighlight = lowerName.Contains("eye") && lowerName.Contains("highlight");
+                    bool isEye = lowerName.Contains("eye") && !lowerName.Contains("eyebrow") && !lowerName.Contains("eyelash") && !isEyeHighlight;
+                    bool isMouth = lowerName.Contains("mouth");
+                    bool isFace = lowerName.Contains("face");
+                    bool isBody = lowerName.Contains("body");
+                    bool embeddedHatHair = category == AvatarPartCategory.Hat && lowerName.Contains("hair");
+                    bool hatVisor = category == AvatarPartCategory.Hat && lowerName.Contains("visor");
+                    bool glassesLens = category == AvatarPartCategory.Glasses && IsGlassesLens(source);
+                    bool isGarment = category.HasValue && IsGarment(category.Value) && !embeddedHatHair && !hatVisor && !glassesLens;
+                    if (isGarment)
+                    {
+                        var garmentShader = Shader.Find("Festa/Avatar/GarmentTint");
+                        material = new Material(garmentShader ? garmentShader : shader) { name = source.name + "_RuntimeGarment" };
+                        Texture garmentMask = source.HasProperty("_BaseMap") ? source.GetTexture("_BaseMap")
+                            : source.HasProperty("_BaseColorMap") ? source.GetTexture("_BaseColorMap")
+                            : MainTextureOrNull(source);
+                        if (!garmentMask)
+                            foreach (var property in source.GetTexturePropertyNames())
+                                if (source.GetTexture(property)) { garmentMask = source.GetTexture(property); break; }
+                        if (garmentMask && material.HasProperty("_BaseMap"))
+                            material.SetTexture("_BaseMap", garmentMask);
+                        if (source.HasProperty("_BaseMap") && material.HasProperty("_BaseMap"))
+                        {
+                            material.SetTextureScale("_BaseMap", source.GetTextureScale("_BaseMap"));
+                            material.SetTextureOffset("_BaseMap", source.GetTextureOffset("_BaseMap"));
+                        }
+                        if (source.HasProperty("_BumpMap") && material.HasProperty("_BumpMap")) material.SetTexture("_BumpMap", source.GetTexture("_BumpMap"));
+                        foreach (var property in new[] { "_Color_A_1", "_Color_A_2", "_Color_B_1", "_Color_B_2", "_Color_C_1", "_Color_C_2" })
+                            if (source.HasProperty(property) && material.HasProperty(property))
+                            {
+                                var sourceColor = source.GetColor(property); sourceColor.a = 1f;
+                                material.SetColor(property, sourceColor);
+                            }
+                        if (source.HasProperty("_MaskRemap") && material.HasProperty("_MaskRemap")) material.SetVector("_MaskRemap", source.GetVector("_MaskRemap"));
+                        if (source.HasProperty("_Mask_Factor") && material.HasProperty("_Mask_Factor")) material.SetFloat("_Mask_Factor", source.GetFloat("_Mask_Factor"));
+                        SharedMaterials[cacheKey] = material;
+                        converted[i] = material;
+                        continue;
+                    }
+                    // URP Lit 을 런타임 Shader.Find 로 만들면 안 된다 — 빌드 셰이더 스트리핑이
+                    // 배리언트를 잘라내면 "존재하지만 안 그려지는" 재질이 된다 (T-213).
+                    //
+                    // 헤어는 **전용 HairTint 셰이더**로 간다. Skin/Face/Garment 틴트와 같은
+                    // Always Included Shaders 패턴이라 빌드 포함이 보장된다 — 이것이 실제로
+                    // 헤어를 되살린 해법이다.
+                    //
+                    // 나머지 액세서리는 카탈로그의 URP Lit 템플릿 재질을 복제한다. 다만
+                    // **템플릿 참조만으로는 헤어가 살아나지 않았다** — Lit 의 패스 구성까지
+                    // 복원되지는 않는다. 템플릿은 어디까지나 차선책이고, 안 그려지는 파츠가
+                    // 또 나오면 그 파츠도 전용 셰이더로 옮기는 것이 정답이다.
+                    bool isHair = category == AvatarPartCategory.Hair || lowerName.Contains("hair");
+                    var hairShader = isHair ? Shader.Find("Festa/Avatar/HairTint") : null;
+
+                    bool useLitFallback = !isEye && !isFace && !isBody && !isMouth && !isEyeHighlight && !isHair;
+                    bool sourceHasNormal = source.HasProperty("_Normal") && source.GetTexture("_Normal")
+                        || source.HasProperty("_BumpMap") && source.GetTexture("_BumpMap");
+                    Material litTemplate = _catalog
+                        ? (sourceHasNormal && _catalog.litOpaqueNormalTemplate ? _catalog.litOpaqueNormalTemplate : _catalog.litOpaqueTemplate)
+                        : null;
+                    if (isHair && hairShader)
+                        material = new Material(hairShader) { name = source.name + "_RuntimeURP" };
+                    else if (useLitFallback && litTemplate)
+                        material = new Material(litTemplate) { name = source.name + "_RuntimeURP" };
+                    else
+                    {
+                        var targetShader = isEye ? Shader.Find("Festa/Avatar/IrisTint") : isFace ? Shader.Find("Festa/Avatar/FaceTint") : isBody ? Shader.Find("Festa/Avatar/SkinTint") : isMouth ? Shader.Find("Festa/Avatar/MouthTint") : isEyeHighlight ? Shader.Find("Universal Render Pipeline/Unlit") : shader;
+                        material = new Material(targetShader) { name = source.name + "_RuntimeURP" };
+                    }
+                    // Body의 BaseMap은 단순 Albedo가 아니라 피부/속옷 영역을
+                    // 구분하는 RGB 마스크이므로 SkinTint에도 반드시 전달한다.
+                    bool preserveAlbedo = isFace || isBody || embeddedHatHair || hatVisor || lowerName.Contains("eye") || lowerName.Contains("mouth") || lowerName.Contains("eyebrow") || lowerName.Contains("lash") || lowerName.Contains("glasses");
+                    Texture texture = preserveAlbedo ? (source.HasProperty("_BaseMap") ? source.GetTexture("_BaseMap") : source.HasProperty("_BaseColorMap") ? source.GetTexture("_BaseColorMap") : MainTextureOrNull(source)) : null;
+                    // The vendor materials do not all expose their visible map
+                    // as _BaseMap.  WebGL then used a newly-created material
+                    // with no source map, which made some assembled parts look
+                    // uniformly black.  Fall back to the first texture on every
+                    // material, including generic garment materials.
+                    if (!texture)
+                        foreach(var property in source.GetTexturePropertyNames())
+                            if(source.GetTexture(property)){texture=source.GetTexture(property);break;}
+                    if(isEye && !texture)texture=Resources.Load<Texture2D>("Avatar/EyeTexture");
+                    if (texture)
+                    {
+                        material.SetTexture("_BaseMap", texture);
+                        if (source.HasProperty("_BaseMap"))
+                        {
+                            material.SetTextureScale("_BaseMap", source.GetTextureScale("_BaseMap"));
+                            material.SetTextureOffset("_BaseMap", source.GetTextureOffset("_BaseMap"));
+                        }
+                    }
+                    // Eyelashes and other vendor materials carry their visible tint
+                    // in the material base color. A newly-created URP material defaults
+                    // to white, which made the upper eyelid/eyelash mesh look white.
+                    // Preserve the source tint whenever the replacement shader exposes it.
+                    Color sourceTint = Color.white;
+                    bool hasSourceTint = false;
+                    if (source.HasProperty("_BaseColor")) { sourceTint = source.GetColor("_BaseColor"); hasSourceTint = true; }
+                    else if (source.HasProperty("_Color")) { sourceTint = source.GetColor("_Color"); hasSourceTint = true; }
+                    if (hasSourceTint)
+                    {
+                        if (material.HasProperty("_BaseColor")) material.SetColor("_BaseColor", sourceTint);
+                        if (material.HasProperty("_Color")) material.SetColor("_Color", sourceTint);
+                    }
+                    if (isEyeHighlight)
+                    {
+                        if (material.HasProperty("_BaseColor")) material.SetColor("_BaseColor", Color.clear);
+                        if (material.HasProperty("_Color")) material.SetColor("_Color", Color.clear);
+                        if (material.HasProperty("_Surface")) material.SetFloat("_Surface", 1f);
+                        if (material.HasProperty("_SrcBlend")) material.SetFloat("_SrcBlend", (float)UnityEngine.Rendering.BlendMode.SrcAlpha);
+                        if (material.HasProperty("_DstBlend")) material.SetFloat("_DstBlend", (float)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
+                        if (material.HasProperty("_ZWrite")) material.SetFloat("_ZWrite", 0f);
+                        material.EnableKeyword("_SURFACE_TYPE_TRANSPARENT");
+                        material.renderQueue = (int)UnityEngine.Rendering.RenderQueue.Transparent;
+                    }
+                    if (hatVisor || glassesLens)
+                    {
+                        if (material.HasProperty("_Surface")) material.SetFloat("_Surface", 1f);
+                        if (material.HasProperty("_SrcBlend")) material.SetFloat("_SrcBlend", (float)UnityEngine.Rendering.BlendMode.SrcAlpha);
+                        if (material.HasProperty("_DstBlend")) material.SetFloat("_DstBlend", (float)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
+                        if (material.HasProperty("_ZWrite")) material.SetFloat("_ZWrite", 0f);
+                        material.EnableKeyword("_SURFACE_TYPE_TRANSPARENT");
+                        material.renderQueue = (int)UnityEngine.Rendering.RenderQueue.Transparent;
+                    }
+                    Texture normal = source.HasProperty("_Normal") ? source.GetTexture("_Normal") : source.HasProperty("_BumpMap") ? source.GetTexture("_BumpMap") : null;
+                    if (normal) { material.SetTexture("_BumpMap", normal); material.EnableKeyword("_NORMALMAP"); }
+                    float smoothness = lowerName.Contains("eye") ? .72f : lowerName.Contains("face") || lowerName.Contains("body") ? .42f : .3f;
+                    if(material.HasProperty("_Smoothness"))material.SetFloat("_Smoothness", smoothness); SharedMaterials[cacheKey] = material;
+                }
+                converted[i] = material;
+            }
+            renderer.sharedMaterials = converted;
+        }
+
+        /// <summary>
+        /// <c>Material.mainTexture</c> 는 셰이더에 <c>_MainTex</c> 가 없으면 **읽기만 해도 에러 로그**를 남긴다
+        /// (벤더 눈썹 <c>Unlit/Color</c>, 눈 하이라이트 ToonBasic). 아바타 한 기당 4줄이 WebGL 콘솔과 Development 빌드
+        /// 화면 콘솔을 채워 로비 입장 버튼까지 가렸다(2026-09-06). 속성이 있을 때만 읽고, 없으면 null.
+        /// </summary>
+        static Texture MainTextureOrNull(Material source) =>
+            source != null && source.HasProperty("_MainTex") ? source.GetTexture("_MainTex") : null;
+
+        static bool IsGarment(AvatarPartCategory category) => category == AvatarPartCategory.Top || category == AvatarPartCategory.Bottom || category == AvatarPartCategory.Outfit || category == AvatarPartCategory.Shoes || category == AvatarPartCategory.Hat || category == AvatarPartCategory.Glasses;
+
+        static bool IsGlassesLens(Material material)
+        {
+            if (!material) return false;
+            string name = material.name.ToLowerInvariant();
+            // PrepareMaterials에서 생성한 런타임 복제본은
+            // `glasses_RuntimeURP` 이름을 가지므로 원본과 복제본을 모두 판별한다.
+            // 프레임 머티리얼은 `mat_glasses...`로 시작해 이 조건에 포함되지 않는다.
+            return name == "glasses" || name.StartsWith("glasses_") || name.Contains("lens") || name.Contains("glass_lens");
+        }
+
+        // 공유 재질은 아바타 하나가 사라졌다고 파괴하면 안 된다 — 다른 아바타가 쓰고 있다.
+        // 프로세스 수명 동안 유지하고 도메인 리로드 때 함께 정리된다.
+
+        static int BodyPartCode(string name)
+        {
+            name = name.ToLowerInvariant();
+            if (name.Contains("body_hips")) return 0;
+            if (name.Contains("body_torso") && name.EndsWith(".001")) return 1;
+            // Vendor BodyPartType maps the unnumbered torso to Spine02 (chest)
+            // and torso.002 to Spine03 (upper neck bridge). Reversing these leaves
+            // chest skin visible through tops while hiding the bridge creates a neck gap.
+            if (name == "m_body_torso" || name == "f_body_torso") return 2;
+            if (name.Contains("body_shoulders")) return 3;
+            if (name.Contains("headslot")) return 4;
+            if (name.Contains("body_torso") && name.EndsWith(".002")) return 5;
+            if (name.Contains("arms_lower")) return 20; if (name.Contains("arms_upper")) return 21; if (name.Contains("hands")) return 22;
+            if (name.Contains("legs_upper")) return 30; if (name.Contains("legs_knee")) return 31; if (name.Contains("legs_lower")) return 32; if (name.Contains("feet")) return 33;
+            return -1;
+        }
+    }
+}

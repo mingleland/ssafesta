@@ -1,0 +1,77 @@
+openapi: 3.1.0
+info:
+  title: SSAFY FESTA AI Handoff Summary API
+  version: 0.1.0
+  description: >-
+    사람 상담 인계 시 Spring이 FastAPI를 호출해 AI 대화 요약을 받는 계약이다
+    (spec 011 FR-008/FR-012, D11). 같은 conversations 라우터 파일의 다른 3개
+    라우트(createConversation·streamConversationMessage·closeConversation)는
+    spec 008 `conversation-api.yaml`이 정본이며, 이 계약은 spec 011 소관인
+    이 라우트 하나만 다룬다.
+servers:
+  - url: /ai/v1
+security:
+  - serviceToken: []
+paths:
+  /conversations/{conversationId}/handoff-summary:
+    post:
+      operationId: createHandoffSummary
+      summary: AI 대화 요약을 생성해 Spring에 전달(사람 상담 인계)
+      description: >-
+        FastAPI는 Summary만 생성한다. Staff 선택·상담방 생성은 Spring이 담당한다.
+        응답에는 summary/topics/lastUserIntent만 담고 대화 원문(question/answer)은
+        절대 담지 않는다(D11).
+      parameters:
+        - $ref: '#/components/parameters/ConversationId'
+      responses:
+        '200':
+          description: 요약 생성 완료
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HandoffSummaryResponse'
+        '401':
+          description: Spring→FastAPI Service Token 누락·오류
+        '404':
+          description: Conversation 없음/TTL 만료
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          description: LLM 요약 생성 실패(timeout·provider 오류·JSON 파싱 실패)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+components:
+  securitySchemes:
+    serviceToken:
+      type: http
+      scheme: bearer
+      bearerFormat: opaque-service-token
+  parameters:
+    ConversationId:
+      name: conversationId
+      in: path
+      required: true
+      schema: { type: string, minLength: 1 }
+  schemas:
+    HandoffSummaryResponse:
+      type: object
+      additionalProperties: false
+      required: [conversationId, summary, topics, lastUserIntent]
+      properties:
+        conversationId: { type: string }
+        summary: { type: string }
+        topics:
+          type: array
+          items: { type: string }
+        lastUserIntent: { type: string }
+    ErrorResponse:
+      type: object
+      additionalProperties: false
+      required: [code, message]
+      properties:
+        code: { type: string }
+        message: { type: string }

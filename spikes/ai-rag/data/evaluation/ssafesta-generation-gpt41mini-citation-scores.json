@@ -1,0 +1,122 @@
+{
+  "ssafesta-q01": {
+    "gpt-4.1-mini": {
+      "gold_sim": 0.8375722502069436,
+      "evidence_sim": 0.857257413719064,
+      "refusal_ok": true,
+      "refusal_reason": "거절 문구 없이 답변 시도 — 정상"
+    }
+  },
+  "ssafesta-q02": {
+    "gpt-4.1-mini": {
+      "gold_sim": 0.73748801382693,
+      "evidence_sim": 0.5277131971222447,
+      "refusal_ok": true,
+      "refusal_reason": "거절 문구 없이 답변 시도 — 정상"
+    }
+  },
+  "ssafesta-q03": {
+    "gpt-4.1-mini": {
+      "gold_sim": 0.7253586687761893,
+      "evidence_sim": 0.7402469968647952,
+      "refusal_ok": true,
+      "refusal_reason": "거절 문구 없이 답변 시도 — 정상"
+    }
+  },
+  "ssafesta-q04": {
+    "gpt-4.1-mini": {
+      "gold_sim": 0.7117209381315407,
+      "evidence_sim": 0.6612512613500892,
+      "refusal_ok": true,
+      "refusal_reason": "거절 문구 없이 답변 시도 — 정상"
+    }
+  },
+  "ssafesta-q05": {
+    "gpt-4.1-mini": {
+      "gold_sim": 0.6192985814199894,
+      "evidence_sim": null,
+      "refusal_ok": true,
+      "refusal_reason": "NO_ANSWER 문항에서 거절 문구 확인"
+    }
+  },
+  "ssafesta-q06": {
+    "gpt-4.1-mini": {
+      "gold_sim": 0.8026964197002542,
+      "evidence_sim": 0.7851311151517586,
+      "refusal_ok": true,
+      "refusal_reason": "거절 문구 없이 답변 시도 — 정상"
+    }
+  },
+  "ssafesta-q07": {
+    "gpt-4.1-mini": {
+      "gold_sim": 0.7263657453316411,
+      "evidence_sim": 0.7305310438956528,
+      "refusal_ok": true,
+      "refusal_reason": "거절 문구 없이 답변 시도 — 정상"
+    }
+  },
+  "ssafesta-q08": {
+    "gpt-4.1-mini": {
+      "gold_sim": 0.5506174365556279,
+      "evidence_sim": 0.7448155110127185,
+      "refusal_ok": true,
+      "refusal_reason": "거절 문구 없이 답변 시도 — 정상"
+    }
+  },
+  "ssafesta-q09": {
+    "gpt-4.1-mini": {
+      "gold_sim": 0.7019492465140235,
+      "evidence_sim": 0.7054513030488293,
+      "refusal_ok": true,
+      "refusal_reason": "거절 문구 없이 답변 시도 — 정상"
+    }
+  },
+  "ssafesta-q10": {
+    "gpt-4.1-mini": {
+      "gold_sim": 0.605818626599444,
+      "evidence_sim": null,
+      "refusal_ok": false,
+      "refusal_reason": "NO_ANSWER 문항인데 거절 없이 답변 — 근거 없는 단정 위험"
+    }
+  },
+  "ssafesta-q11": {
+    "gpt-4.1-mini": {
+      "gold_sim": 0.3220954935705533,
+      "evidence_sim": null,
+      "refusal_ok": true,
+      "refusal_reason": "NO_ANSWER 문항에서 거절 문구 확인"
+    }
+  },
+  "ssafesta-q12": {
+    "gpt-4.1-mini": {
+      "gold_sim": 0.7942831330926741,
+      "evidence_sim": 0.723228177139044,
+      "refusal_ok": true,
+      "refusal_reason": "거절 문구 없이 답변 시도 — 정상"
+    }
+  },
+  "ssafesta-q13": {
+    "gpt-4.1-mini": {
+      "gold_sim": 0.746558402964127,
+      "evidence_sim": 0.7460789603333278,
+      "refusal_ok": true,
+      "refusal_reason": "거절 문구 없이 답변 시도 — 정상"
+    }
+  },
+  "ssafesta-q14": {
+    "gpt-4.1-mini": {
+      "gold_sim": 0.8211668418477831,
+      "evidence_sim": 0.7668228400177762,
+      "refusal_ok": true,
+      "refusal_reason": "거절 문구 없이 답변 시도 — 정상"
+    }
+  },
+  "ssafesta-q15": {
+    "gpt-4.1-mini": {
+      "gold_sim": 0.6440066567257663,
+      "evidence_sim": 0.7978536481579097,
+      "refusal_ok": true,
+      "refusal_reason": "거절 문구 없이 답변 시도 — 정상"
+    }
+  }
+}

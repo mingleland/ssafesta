@@ -1,0 +1,16 @@
+fileFormatVersion: 2
+guid: 975613071f97890439eb9dca404f57a1
+timeCreated: 1507766273
+licenseType: Store
+NativeFormatImporter:
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 114974
+  packageName: Stand Expo Pack
+  packageVersion: 1.0
+  assetPath: Assets/_Project/Art/Booth/ExpoKit/Textures/Surfaces/Materials/Aluminium.mat
+  uploadId: 237227

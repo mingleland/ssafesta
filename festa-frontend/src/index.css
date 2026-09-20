@@ -1,0 +1,215 @@
+/* 앱 전역 최소 기반 + **Foundation 후보** 토큰.
+ *
+ * 주의: 이것은 Foundation Freeze 가 아니다(README 우선순위 · visual-dna.md 는 여전히 PROPOSAL).
+ * 여러 화면에서 실제로 반복되는 값만 관찰해 이름을 붙여 둔 것이고, 기존 화면을 일괄 마이그레이션
+ * 하지 않는다. Booth Studio(gss/grp·studio-*)의 시각 규칙은 보호 대상이라 여기로 끌어오지 않는다.
+ * 값 확정은 Visual Direction 선택 후 별도 단계에서 한다.
+ */
+:root {
+  /* 실측: 16개 CSS 파일이 같은 스택을 각자 적어 두고 있었다 — 후보 토큰 1순위 */
+  --festa-font: 'Pretendard', 'Noto Sans KR', 'Malgun Gothic', system-ui, sans-serif;
+
+  /* World 위 어두운 표면 계열 — Overlay·HUD·Game Menu 가 공유하는 값 */
+  --festa-ink: #eaeefb;
+  --festa-ink-dim: rgba(234, 238, 251, 0.66);
+  --festa-surface: rgba(12, 16, 34, 0.72);
+  --festa-surface-solid: #10142a;
+  --festa-line: rgba(255, 255, 255, 0.14);
+  --festa-fill: rgba(255, 255, 255, 0.06);
+  --festa-fill-strong: rgba(255, 255, 255, 0.14);
+
+  --festa-accent: #4d6bff;
+  --festa-accent-2: #7b4dff;
+  --festa-ok: #5fd39b;
+  --festa-warn: #ffd66b;
+  --festa-danger: #ff8f8f;
+
+  /* z-index 계층 (visual-dna §3) — world < screen-ui < overlay-dim < overlay < toast < system.
+     World HUD 소유 범위만 토큰으로 통일한다. 외부 dialog·기존 화면은 이 작업에서 건드리지 않는다. */
+  /* 토스트 시작 높이. 우상단에는 화면마다 다른 주민이 있다 —
+     Landing·Login 은 ScreenControls(top 3vh + clamp(48px,4vh,72px)),
+     World 는 Consultation Quick Access(top 20px + 40px). 둘 다 피하는 하나의 값을 쓴다.
+     ToastHost 는 라우터 밖(#root 직속)이라 화면 요소가 정의한 변수는 상속되지 않는다 —
+     화면별로 갈라야 할 이유가 생기면 그때 body 속성 등으로 나눈다. */
+  /* 화면 모서리 컨트롤의 공통 치수. 우상단 사용자 액션(사운드·향후 그래픽)과
+     좌상단 개발 진입구가 같은 크기를 쓴다 — 두 모서리가 한 벌로 보이게 (S15P21A604-467) */
+  --festa-control-size: clamp(48px, 4vh, 72px);
+  --festa-control-radius: clamp(12px, 1.3vh, 20px);
+
+  --festa-toast-top: calc(3vh + clamp(48px, 4vh, 72px) + 10px);
+
+  --festa-z-screen-ui: 40;
+  --festa-z-world-hud: 20;
+  --festa-z-world-dev: 30;
+  --festa-z-overlay: 100;
+  --festa-z-toast: 200;
+  --festa-z-system: 10000;
+
+  /* 월드 화면 고정 HUD의 공통 안전 여백·스택 간격. 좌하단은 채팅 높이를 WorldPage가 실측해
+     --festa-world-chat-height 로 전달한다. */
+  --festa-hud-margin-x: max(16px, 2vw);
+  --festa-hud-margin-y: max(16px, 3vh);
+  --festa-hud-stack-gap: max(8px, 1vh);
+  --festa-hud-context-height: 44px;
+  --festa-hud-context-bottom: max(72px, calc(var(--festa-hud-margin-y) + var(--festa-world-chat-height, 0px) + var(--festa-hud-stack-gap)));
+
+  --festa-r-chip: 999px;
+  --festa-r-input: 11px;
+  --festa-r-card: 14px;
+  --festa-r-panel: 18px;
+
+  font-family: system-ui, 'Segoe UI', Roboto, sans-serif;
+  color-scheme: light dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  /* 브랜드 포인터. 32px 기준이라 hotspot 은 화살촉 끝(7 2)이고, 고밀도 화면은 아래 image-set 이
+     @2x 를 집는다 — image-set 을 모르는 브라우저는 위 줄에 머문다. 원본은 docs/LJH/assets. */
+  cursor: url('/cursors/festa-pointer.png') 7 2, auto;
+  cursor: image-set(url('/cursors/festa-pointer.png') 1x, url('/cursors/festa-pointer@2x.png') 2x) 7 2, auto;
+  /* 게임 클라이언트의 바닥색. `.world-scene` 이 배경을 칠하지 않게 된 뒤(worldPage.css) 월드
+     진입 첫 프레임 — `PersistentWorld` 가 아직 마운트되기 전 — 에 흰 화면이 비치는 것을 막는다.
+     화면들은 각자 전면 배경을 그리므로 이 값이 보이는 구간은 그 한 프레임뿐이다. */
+  background: #0e1430;
+  /* 게임 화면이다. 드래그하면 배경 이미지가 유령처럼 따라오고 라벨이 파랗게 잡히는 것은
+     웹 문서의 기본값일 뿐 여기서 원하는 동작이 아니다 — 끄고, 필요한 곳만 아래에서 연다. */
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* 브랜드 포인터는 예외 없이 화면 전체에 깐다 (2026-09-17).
+ *
+ * body 상속만으로는 부족하다 — 화면마다 `cursor: pointer | default | not-allowed` 를 따로 적어
+ * 두고 있어서 그 규칙을 타는 자리(비활성 상담 버튼 등)에서만 시스템 커서로 돌아갔다. 대상 목록을
+ * 늘려 가며 쫓으면 새 화면이 생길 때마다 같은 구멍이 다시 난다. 여기서 한 번 못 박는다.
+ *
+ * 되돌리는 것은 **모양 자체가 사용법인 자리**뿐이다: 글자를 넣는 칸(I빔)과 끌어 쓰는 손잡이. */
+:where(*) {
+  cursor: url('/cursors/festa-pointer.png') 7 2, auto !important;
+  cursor: image-set(url('/cursors/festa-pointer.png') 1x, url('/cursors/festa-pointer@2x.png') 2x) 7 2, auto !important;
+}
+
+input:not([type='button']):not([type='submit']):not([type='reset']):not([type='checkbox']):not([type='radio']):not([type='range']):not([type='color']):not([type='file']),
+textarea,
+[contenteditable='true'] {
+  cursor: text !important;
+}
+/* Game Studio 는 저작 도구라 커서가 곧 사용법이다 — 끌 수 있는지, 지금 끌고 있는지, 크기를 바꿀 수
+ * 있는지, 어디를 찍는지를 알려 주는 신호가 이것뿐이다. 위 전역 규칙이 `!important` 라 여기서
+ * 되돌리지 않으면 전부 브랜드 포인터로 덮인다(S15P21A604-854).
+ *
+ * 비활성(`not-allowed`)은 되돌리지 않는다 — 그쪽은 `disabled` 속성이 이미 뜻을 갖고 있고,
+ * 브랜드 포인터로 통일하는 것이 -835 의 판단이다. */
+.gss-panel-divider { cursor: col-resize !important; }
+.gss-floating-panel-resize-handle { cursor: nwse-resize !important; }
+
+.gss-canvas-minimap,
+.gss-map-canvas.is-placing {
+  cursor: crosshair !important;
+}
+
+.gss-object-palette button,
+.gss-map-object,
+.gss-map-canvas.is-pan-tool,
+.gss-drag-handle,
+.gss-floating-panel-titlebar,
+.gss-flow-graph-viewport {
+  cursor: grab !important;
+}
+
+.gss-canvas-scroll.is-panning,
+.gss-canvas-scroll.is-panning .gss-map-canvas.is-pan-tool,
+.gss-drag-handle:active,
+.gss-floating-panel-titlebar:active,
+.gss-flow-graph-viewport.is-panning {
+  cursor: grabbing !important;
+}
+
+/* Unity WebGL 캔버스만 브랜드 포인터가 사라지던 자리.
+ *
+ * 런타임이 `Cursor.visible` 이 바뀔 때마다 캔버스에 직접 쓴다 —
+ * `_JS_Cursor_SetShow(show){ Module.canvas.style.cursor = show ? "default" : "none" }`
+ * (`Cursor.SetCursor` 는 같은 자리에 `url(data:image/cur;...)` 를 쓴다). 인라인 선언이라
+ * body 에서 내려오던 포인터를 덮어쓴다. author `!important` 는 인라인 normal 선언을 이기므로
+ * 여기서 되돌린다. 바꾸는 것은 커서 그림 하나뿐이다 — 입력·포커스·포인터 락은 그대로이고,
+ * 락이 걸린 동안에는 어차피 브라우저가 커서를 감춘다. */
+#unity-canvas {
+  cursor: url('/cursors/festa-pointer.png') 7 2, auto !important;
+  cursor: image-set(url('/cursors/festa-pointer.png') 1x, url('/cursors/festa-pointer@2x.png') 2x) 7 2, auto !important;
+}
+
+/* 어두운 표면의 기본 스크롤바 (2026-09-17).
+ *
+ * 손대지 않으면 Windows 기본 막대가 그대로 나온다 — 흰 트랙에 위아래 화살표까지 붙어서, 어두운
+ * 월드 채팅·ESC 메뉴 위에 혼자 밝은 띠로 뜬다. 오버레이 본문(`overlayFrame.css`)과 Booth Studio
+ * 패널은 이미 각자 `scrollbar-width: thin` 을 적어 두었는데, 그 둘 밖의 스크롤러가 빠져 있었다.
+ *
+ * 파일마다 같은 두 줄을 복사하는 대신 어두운 뿌리 셋 아래의 스크롤러에 한 번에 준다.
+ * `:where()` 는 특이도가 0 이라 이미 값을 정해 둔 곳(오버레이·스튜디오)은 그대로 이긴다.
+ * Booth Studio 편집기·Game Studio 의 밝은 패널은 이 뿌리 밖이라 영향을 받지 않는다 —
+ * 밝은 배경에 반투명 흰 thumb 을 주면 막대가 보이지 않는다. */
+:where(.world-scene, .festa-overlay, .festa-screen) :where(*) {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.16) transparent;
+}
+
+/* 표준 속성을 모르는 엔진(구형 Chromium 계열)도 같은 그림이 되게 한다. 올려 준 화면의 막대에
+   위아래 화살표가 붙어 있었는데, 표준 `thin` 막대에는 화살표가 없다 — 그쪽 경로로 그려졌다는
+   뜻이라 webkit 규칙을 함께 둔다. 표준을 아는 엔진에서는 위 선언이 이긴다. */
+:where(.world-scene, .festa-overlay, .festa-screen) :where(*)::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+:where(.world-scene, .festa-overlay, .festa-screen) :where(*)::-webkit-scrollbar-track {
+  background: transparent;
+}
+:where(.world-scene, .festa-overlay, .festa-screen) :where(*)::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.16);
+}
+:where(.world-scene, .festa-overlay, .festa-screen) :where(*)::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.28);
+}
+/* 화살표 버튼은 만들지 않는다 — 기본 막대가 밝은 띠로 보이던 원인의 절반이 이것이다 */
+:where(.world-scene, .festa-overlay, .festa-screen) :where(*)::-webkit-scrollbar-button {
+  display: none;
+}
+
+/* 오버레이·메뉴의 포커스 링 (2026-09-18).
+ *
+ * ESC 메뉴·오버레이의 컨트롤은 자기 포커스 스타일이 없는 것이 많아 **UA 기본 링**이 나온다 —
+ * `color-scheme: light dark` 환경에서 그 링은 다크 위에 흰 테두리로 그려져(스크린샷 실측)
+ * 오버레이 어휘와 어울리지 않는다. 어두운 표면 계열에서는 라벤더 링으로 바꾼다.
+ *
+ * :where 는 특이도가 0 이라 각 컴포넌트가 정의한 포커스 스타일(`.ov-btn:focus-visible`·
+ * `.sc-btn:focus-visible` 등)은 그대로 이긴다. 링을 없애지 않고 색을 바꾸는 이유는
+ * 키보드 사용자가 지금 어디에 있는가가 필요하기 때문이다 — 대신 흰 테두리는 사라진다. */
+:where(.festa-overlay, .gm-root, .festa-screen, .world-scene) :where(*:focus-visible) {
+  outline: 2px solid rgba(125, 150, 255, 0.45);
+  outline-offset: 1px;
+}
+
+/* 이미지는 기본이 draggable=true 라 CSS 로 따로 꺼야 한다.
+   Firefox 는 이 속성을 모르므로 dragstart 가드(app/providers)가 함께 막는다. */
+img {
+  -webkit-user-drag: none;
+}
+
+/* 여는 곳 — 사용자가 실제로 글자를 다뤄야 하는 자리.
+   설문 응답·닉네임 같은 입력은 물론, 오류 안내는 문의할 때 복사해야 한다.
+   그 밖에 본문을 선택하게 하고 싶으면 요소에 `selectable` 클래스를 준다. */
+input,
+textarea,
+select,
+[contenteditable]:not([contenteditable='false']),
+[role='alert'],
+.selectable {
+  -webkit-user-select: text;
+  user-select: text;
+}

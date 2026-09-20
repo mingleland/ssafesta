@@ -1,0 +1,177 @@
+# SSAFESTA Backend Bruno 사용법
+
+이 폴더를 Bruno에서 **Open Collection**으로 열고, 좌측 상단 Environment를 `local`로 선택한다.
+
+`baseUrl`은 백엔드 API 주소(`http://localhost:8080`), `frontendOrigin`은 Vite 프론트 주소(`http://localhost:5173`)다. 다른 서버를 쓸 때만 값을 바꾼다. 실제 Access Token, Refresh Token, OAuth handoff, OAuth key는 이 파일이나 환경 파일에 커밋하지 않는다.
+
+## 폴더 구성
+
+| 폴더 | 용도 | 실행 전 필요한 값 |
+|---|---|---|
+| `01-auth` | 게스트·소셜 OAuth·refresh·logout | OAuth 완료는 임시 handoff 필요 |
+| `02-users` | 내 정보·닉네임·아바타 외형·탈퇴 | 회원 Access Token |
+| `03-wallet` | 코인 잔액·거래 내역 조회 | 회원 Access Token |
+| `04-booth-lease` | 슬롯 목록·부스 임대·내 부스·부스 상세 | 회원 Access Token, `slotId` 환경변수 |
+| `05-booth-layout` | 템플릿 카탈로그·배치 작업본·공개·외관·홈페이지 | 회원 Access Token, `boothId` |
+| `06-world-session` | 월드 접속 주소·1회용 입장 토큰 발급 | 회원 **또는 게스트** Access Token, 서버에 `CONNECTION_TOKEN_SECRET` |
+| `07-projects` | 프로젝트 카드 생성·수정·공개·방문자 조회 | 회원 Access Token, `boothId`. `projectId`는 생성 요청이 자동 저장 |
+| `08-ai-agent` | AI 직원 인격 설정 (부스당 1명) | 회원 Access Token, `boothId`. `agentId`는 생성 요청이 자동 저장 |
+| `09-ai-document` | AI 직원 문서 업로드 2단계 | `agentId`, 실제 파일과 그 SHA-256. `documentId`는 1단계가 자동 저장 |
+| `10-game-studio` | 게임 생성·작업본·게시·공개 설정·삭제·복원 | 회원 Access Token. `gameId`는 생성 요청이 자동 저장 |
+| `11-inventory` | 아바타 파츠 상점·구매 | 회원 Access Token, `itemId` |
+| `12-internal` | 내부 서비스(FastAPI) 전용 판정 API | **서비스 토큰을 헤더에 손으로** 넣는다. 환경 파일에 커밋하지 않는다 |
+| `13-admin` | 관리자 role·권한 모델 확정 후 추가 | 현재 추후 작업 |
+
+컬렉션은 **endpoint 47개를 전부 덮는다.** 요청마다 `docs` 블록에 무엇을 하는 API인지, 선행 요청과 필요한 환경변수, 응답 코드별 사유, 주의할 부수효과가 적혀 있다 — 실행 전에 그 문서를 먼저 읽는 것이 이 컬렉션을 쓰는 방법이다.
+
+`local` 환경의 `projectId`·`agentId`·`documentId`·`gameId`는 비워 두면 된다. 각 도메인의 **생성 요청이 성공하면 response script가 자동으로 채운다.**
+
+## 회원 API 테스트 순서
+
+### 1. OAuth 로그인을 브라우저에서 시작
+
+`구글 로그인`, `카카오 로그인` 요청은 URL 확인용이다. Google/Kakao 화면을 거치는 OAuth는 **일반 브라우저**에서 원하는 제공자의 주소를 열어 진행한다.
+
+```text
+http://localhost:8080/api/v1/auth/oauth/google
+http://localhost:8080/api/v1/auth/oauth/kakao
+```
+
+로그인 뒤 Vite 프론트의 `http://localhost:5173/auth/callback`으로 이동한다. callback 화면은 `POST /api/v1/auth/oauth/complete`를 `credentials: 'include'`로 호출해 기존/신규 회원을 분기한다.
+
+프론트 로그인 버튼은 OAuth 시작 API를 fetch/axios로 호출하지 않고 다음처럼 페이지를 이동해야 한다.
+
+```javascript
+window.location.href = `${API_BASE_URL}/api/v1/auth/oauth/google`;
+// Kakao: `${API_BASE_URL}/api/v1/auth/oauth/kakao`
+```
+
+### 2. OAuth handoff를 Bruno에 임시 입력
+
+브라우저 개발자 도구의 Cookies에서 `oauth_handoff` 값을 복사해 Bruno `local` 환경의 `oauthHandoff`에 넣는다.
+
+- 5분 후 만료된다.
+- 완료 요청을 한 번 실행하면 즉시 폐기된다.
+- 실제 프론트에서는 HttpOnly cookie가 자동 전송되므로 값을 읽거나 저장하지 않는다. 이것은 Bruno 로컬 검증 전용 절차다.
+
+### 3. 기존/신규 회원 판별
+
+`03-oauth-complete-existing-member`를 body 그대로 `{}`로 실행한다.
+
+| 응답 | 다음 행동 |
+|---|---|
+| `200`, `status: AUTHENTICATED` | 기존 회원 로그인 성공. request script가 `accessToken` 환경변수에 Access Token을 자동 저장한다. |
+| `200`, `status: NICKNAME_REQUIRED` | 신규 회원이다. 아래 4단계로 진행한다. |
+| `400` | `oauthHandoff`가 없거나 Bruno header에 넣지 않은 상태다. |
+| `410` | handoff가 만료·소비됐다. OAuth를 브라우저에서 다시 시작한다. |
+
+### 4. 신규 회원 닉네임 완료
+
+`local` 환경의 `nickname`을 원하는 닉네임으로 바꾼 뒤 `04-oauth-complete-new-member`를 실행한다.
+
+성공하면 `AUTHENTICATED` 응답이 오고 Access Token이 자동 저장된다. 첫 `{}` 요청에서 `NICKNAME_REQUIRED`가 나온 경우에만 이 요청을 실행한다.
+
+### 5. 보호 API 실행
+
+`02-users/01-get-my-account`를 실행한다. 이 요청과 이후 회원 보호 API는 `{{accessToken}}`을 `Authorization: Bearer` 헤더로 자동 전송한다.
+
+```text
+02-users/내 정보 조회
+→ 03-wallet/내 지갑 조회
+→ 03-wallet/내 거래 내역 조회
+→ 04-booth-lease/슬롯 목록 조회
+→ 04-booth-lease/부스 임대
+→ 02-users/닉네임 변경
+→ 01-auth/액세스 토큰 재발급
+→ 01-auth/로그아웃
+```
+
+`03-wallet/내 지갑 조회`는 신규 가입 계정에서 **250**을 반환한다 — 가입 초기 200 + 당일 일일 50.
+같은 요청을 여러 번 반복해도 값이 변하지 않아야 한다. 변한다면 일일 지급이 하루에 두 번 일어난 것이다.
+
+`05-refresh`는 Bruno cookie jar에 저장된 `refresh_token`을 자동 전송하고, 새 Access Token을 `accessToken` 환경변수에 덮어쓴다. Refresh Token을 body나 환경변수에 수동으로 넣지 않는다.
+
+## dev 배포 서버로 돌리기 (S15P21A604-423)
+
+좌측 상단 Environment 를 `dev` 로 바꾼다. 요청은 그대로다 — 바뀌는 것은 주소뿐이다.
+
+### 실행 전 확인할 값 2개
+
+| 값 | 확인할 것 |
+|---|---|
+| `baseUrl` | `https://api.ssafesta.world`. **OAuth 콘솔에 등록된 redirect URI 와 짝이 되는 호스트다** (GitLab #117). 다른 호스트로 겨누면 앞의 요청은 다 되는데 OAuth 마지막 단계만 `redirect_uri_mismatch` 로 깨진다. EC2 경로 진입(`/__dev/api/`)은 allowlist 뒤에 있고 그 호스트로는 콜백이 등록돼 있지 않다 |
+| `frontendOrigin` | **비어 있다. 직접 채운다.** 서버에 주입된 `FRONTEND_BASE_URL` 과 **같은 값**이어야 한다 — refresh 요청의 Origin 검증에 쓰이므로 다르면 토큰 재발급이 거부된다 |
+
+Access Token · Refresh Token · handoff · 서비스 토큰은 환경 파일에 넣지 않는다. 로컬과 같은 규칙이다.
+
+### E2E happy path 실행 순서
+
+배포 직후 이 순서로 누른다. 앞 단계가 뒤 단계의 선행이라 **순서를 바꾸면 실패가 원인을 가린다.**
+
+```text
+1.  04-booth-lease/슬롯 목록 조회      ← 토큰 없이. 서버 도달 + DB 연결 확인
+2.  01-auth/게스트 로그인               ← 토큰 발급 경로 확인 (JWT_SECRET 주입 확인)
+3.  브라우저에서 OAuth → oauthHandoff 복사
+4.  01-auth/OAuth 완료 - 기존 유저      ← Redis 첫 접촉 (handoff 소비 + 세션 생성)
+5.  02-users/내 정보 조회               ← 회원 보호 API. 매 요청 Redis 세션 조회를 지난다
+6.  03-wallet/내 지갑 조회              ← 신규 계정이면 250. 두 번 눌러도 안 변해야 한다
+7.  11-inventory/상점 목록 조회 → 아이템 구매
+8.  02-users/아바타 외형 저장           ← 미보유 파츠면 409 AVATAR_ITEM_NOT_OWNED
+9.  04-booth-lease/부스 임대 → 내 부스 조회
+10. 05-booth-layout/템플릿 카탈로그 조회 → 작업본 저장 → 공개 → 외관 수정 → 홈페이지 주소 등록
+11. 07-projects/프로젝트 생성 → 수정 → 공개 프로젝트 조회(토큰 없이) → 좋아요 누르기 → 좋아요 취소
+12. 06-world-session/월드 세션 발급     ← endpoint 가 wss / world.<도메인> / 443 으로 나오는지
+13. 01-auth/액세스 토큰 재발급 → 로그아웃
+```
+
+### 로컬과 달라지는 지점
+
+- **Redis 는 4번에서 처음 닿는다.** handoff 를 소비하고 세션을 만드는 자리이고, 5번부터는 `SessionRevocationFilter` 가 요청마다 세션을 조회한다. 이 구간이 `WRONGPASS`·`NOAUTH` 계열로 실패하면 `REDIS_USERNAME`·`REDIS_PASSWORD` 미주입이다. 다만 `S15P21A604-422` 이후로는 그 상태면 애초에 기동이 실패하므로, 서버가 떠 있는데 여기서 죽으면 **값이 틀린 것**이지 빠진 것이 아니다.
+- **6번의 250 은 그 계정의 당일 첫 조회일 때다.** 같은 계정으로 다음날 다시 돌리면 300 이 정상이다.
+- **12번은 `application-infra.yml` 이 덮은 값이 나와야 한다.** `ws` / `127.0.0.1` / `7777` 이 나오면 `infra` 프로파일이 아니라 로컬 기본값으로 뜬 것이다 — `SPRING_PROFILES_ACTIVE=infra` 를 확인한다.
+- Refresh 쿠키는 HTTPS 배포에서 `Secure` 가 붙는다(`AUTH_COOKIE_SECURE=true`). Bruno cookie jar 는 그대로 동작하지만, `http://` 로 겨누면 13번의 재발급이 쿠키를 못 받아 실패한다.
+
+## 각 요청 설명
+
+| 요청 | 하는 일 | 성공 시 |
+|---|---|---|
+| `게스트 로그인` | 비회원 관람용 토큰 발급 | Access Token 저장. `02-users` API는 이용 불가. |
+| `구글 로그인` | Google OAuth 시작 주소 확인 | 브라우저에서 사용. |
+| `카카오 로그인` | Kakao OAuth 시작 주소 확인 | 브라우저에서 사용. |
+| `OAuth complete - existing member` | 기존 회원 로그인 또는 신규 회원 판별 | `AUTHENTICATED` 또는 `NICKNAME_REQUIRED` |
+| `OAuth complete - new member nickname` | 신규 회원 닉네임 가입 완료 | `AUTHENTICATED`, Access Token 저장 |
+| `Refresh access token` | Refresh cookie로 Access Token 교체 | 새 Access Token 저장, Refresh Token rotation |
+| `Logout` | 현재 회원 세션·Refresh cookie 폐기 | `204 No Content`, Access Token 환경값 삭제 |
+| `Get my account` | 내 닉네임·상태·연결 제공자 조회 | 회원 정보 JSON |
+| `Change nickname` | 환경의 `nickname` 값으로 변경 | 변경된 회원 정보 JSON |
+| `Withdraw account - confirm manually` | 즉시 hard delete 탈퇴 | 기본값은 안전하게 `confirmed: false` |
+| `내 지갑 조회` | 현재 코인 잔액 조회 | `{ userId, balance, updatedAt }`. 당일 첫 요청이면 일일 50코인이 함께 지급된다 |
+| `내 거래 내역 조회` | 지급·차감 내역 페이지 조회 | 최신순 `content` + 페이지 정보. `amount`는 지급 양수·차감 음수 |
+| `슬롯 목록 조회` | 전체 슬롯 점유 상태 | 인증 불필요. `status`는 만료를 반영한 값 |
+| `부스 임대` | 빈 슬롯을 50코인으로 임대 | `201` + 차감액·잔액. 코인 차감과 임대는 한 트랜잭션 |
+| `내 부스 조회` | 내 부스와 남은 시간 | 임대 이력이 없으면 `204` |
+| `부스 상세 조회` | 방문자 관점 부스 정보 | 만료 시 `409 BOOTH_LEASE_EXPIRED` |
+| `월드 세션 발급` | 접속 주소 + 120초 1회용 입장 토큰 | `endpoint`는 객체(`scheme`/`host`/`port`). 매 호출 새 토큰 — 멱등이 아니다 |
+| `아바타 외형 저장` | Unity 인코딩 문자열 저장 | 보낸 값을 **글자 그대로** echo. 미보유 파츠는 `409` |
+| `템플릿 카탈로그 조회` | 바닥 크기·오브젝트 상한 | 편집기가 가장 먼저 읽는다. 값을 하드코딩하지 않는다 |
+| `홈페이지 주소 등록` | 부스 노트북이 열 외부 주소 | 해제는 **명시적 `null`**. `{}`는 거부 |
+| `프로젝트 생성`·`수정` | 전시 프로젝트 카드 | 공개는 수정에서 켠다. URL 필드는 원문 그대로 저장 |
+| `공개 프로젝트 조회` | 방문자가 보는 목록 | **토큰 없이 200.** 편집용과 경로가 다르다 |
+| `AI 직원 생성`·`수정`·`삭제` | 부스당 1명인 AI 직원 | 두 번째 생성은 `409`. 참조 중이면 삭제 거부 |
+| `업로드 URL 발급` → `업로드 완료` | 문서 업로드 2단계 | 파일은 서버를 거치지 않는다. 중복은 오류가 아니다 |
+| `게임 생성` → `작업본 저장` → `게시` | Game Studio 기본 흐름 | `expectedRevision` 필수, 첫 저장은 0 |
+| `게시본 조회` | 플레이할 프로젝트 | `ETag` + `If-None-Match`로 `304`. 게스트도 가능 |
+| `공개 설정 변경` | `PRIVATE` ↔ `PUBLIC` | 게시와 **별개 축**이다 |
+| `게임 삭제`·`복원` | 소프트 삭제와 되살리기 | 두 번 삭제하면 `404 GAME_DELETED`(= 이미 완료) |
+| `상점 목록 조회` | 아이템 + 보유 여부 | `type=AVATAR_PART` 필수 |
+| `아이템 구매` | 코인 차감 + 보유 기록 | 한 트랜잭션. 중복 구매·잔액 부족은 차감 없음 |
+| `AI 부스 접근 판정` | FastAPI가 부르는 내부 API | 서비스 토큰을 헤더에 손으로 넣는다. Swagger에는 없다 |
+
+## 주의
+
+- 탈퇴 테스트는 폐기 가능한 소셜 계정으로만 한다. 실제 실행하려면 request body의 `confirmed`를 `true`로 바꿔야 하며, 계정과 연결 데이터가 즉시 삭제된다.
+- 게스트 Access Token은 공개 관람 전용이다. 내 정보·닉네임·탈퇴·지갑 API에는 사용할 수 없다. 게스트에게는 지갑도 코인도 없다.
+- 임대는 **1인 1부스**다. 이미 활성 임대가 있으면 `409 ACTIVE_LEASE_LIMIT`이며, 만료돼야 다시 임대할 수 있다.
+- 만료를 월드에 실시간 전파하지 않는다. 슬롯 목록이 `AVAILABLE`이어도 3D 월드에는 부스가 남아 있을 수 있다 — **API 응답이 권위다.**
+- 코인을 충전하거나 차감하는 API는 **없다.** 차감은 임대·AI 이용 같은 기능의 서버 로직에서만 일어난다 (헌법 2·16조).
+- 새 OAuth 로그인이나 Refresh 성공 뒤에는 이전 Access Token이 무효화될 수 있으므로, Bruno 환경변수에 저장된 최신 `accessToken`을 사용한다.

@@ -1,0 +1,11 @@
+{
+  "description": "프로젝트 전체에서 Object ID가 중복되면 거부한다.",
+  "base": "../minimal-top-down-dialogue.json",
+  "mutations": [
+    {
+      "op": "copy",
+      "from": "/scenes/0/objects/0",
+      "path": "/scenes/0/objects/-"
+    }
+  ]
+}

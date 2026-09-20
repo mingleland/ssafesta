@@ -1,0 +1,162 @@
+/* ESC Game Menu — 작고 정적. 게임 일시정지 메뉴 문법이지 대시보드가 아니다. */
+.gm-root {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: grid;
+  place-items: center;
+  font-family: var(--festa-font);
+}
+.gm-dim {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  padding: 0;
+  background: rgba(5, 7, 20, 0.52);
+  cursor: default;
+}
+.gm-panel {
+  position: relative;
+  width: min(360px, calc(100vw - 40px));
+  max-height: calc(100dvh - 40px);
+  border-radius: 18px;
+  background: rgba(14, 18, 40, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.13);
+  box-shadow: 0 28px 70px rgba(3, 5, 18, 0.6);
+  color: var(--festa-ink);
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+.gm-panel:focus,
+.gm-panel:focus-visible {
+  /* 포커스는 이 컨테이너가 받는다(위 GameMenu 효과) — UA 기본 링을 끊는 자리다.
+     항목들의 키보드 링(:focus-visible 라벤더)은 그대로 둔다 */
+  outline: none;
+}
+@media (prefers-reduced-transparency: reduce) {
+  .gm-panel { background: #0e1228; }
+  .gm-dim { background: rgba(5, 7, 20, 0.78); }
+}
+.gm-close {
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  border-radius: 9px;
+  border: 1px solid var(--festa-line);
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(234, 238, 251, 0.8);
+  cursor: pointer;
+}
+.gm-close:hover { background: var(--festa-fill-strong); }
+
+.gm-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+.gm-title { font-size: 14.5px; font-weight: 700; }
+
+.gm-summary {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 16px 18px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  border-top: 0;
+  border-left: 0;
+  border-right: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+}
+/* 회원은 행 전체가 내 정보 진입이라 chevron 한 칸이 더 붙는다 */
+.gm-summary-link { grid-template-columns: auto 1fr auto; cursor: pointer; }
+.gm-summary-link:hover { background: rgba(255, 255, 255, 0.06); }
+.gm-summary-link > svg { color: rgba(234, 238, 251, 0.55); }
+.gm-avatar {
+  width: 46px;
+  height: 46px;
+  display: grid;
+  place-items: center;
+  border-radius: 14px;
+  background: linear-gradient(160deg, #4d6bff, #7b4dff);
+  font-size: 19px;
+  font-weight: 700;
+}
+.gm-who { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.gm-nick {
+  font-size: 15.5px;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.gm-sub { font-size: 12px; color: rgba(234, 238, 251, 0.6); }
+.gm-coin { font-size: 12.5px; color: #ffd66b; font-weight: 600; }
+.gm-body { padding: 10px 10px 12px; }
+.gm-section { padding: 2px 4px 8px; }
+.gm-section + .gm-section { border-top: 1px solid rgba(255, 255, 255, 0.06); }
+.gm-section-title {
+  margin: 8px 4px 10px;
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: rgba(234, 238, 251, 0.5);
+}
+.gm-shortcut-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+.gm-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--festa-line);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--festa-ink);
+  font: inherit;
+  font-size: 13.5px;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+.gm-card:hover { background: rgba(255, 255, 255, 0.08); }
+.gm-card > svg { color: rgba(234, 238, 251, 0.72); }
+.gm-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 42px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 11px;
+  background: transparent;
+  color: var(--festa-ink);
+  font: inherit;
+  font-size: 14px;
+  text-align: left;
+  cursor: pointer;
+}
+.gm-item:hover:not(:disabled) { background: rgba(255, 255, 255, 0.08); }
+.gm-item:disabled { color: rgba(234, 238, 251, 0.38); cursor: not-allowed; }
+.gm-item > svg { color: rgba(234, 238, 251, 0.45); }
+.gm-item-out { color: #ff8f8f; }
+.gm-item-out:hover { background: rgba(255, 96, 96, 0.14); }
+.gm-badge {
+  font-size: 11px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(234, 238, 251, 0.5);
+}

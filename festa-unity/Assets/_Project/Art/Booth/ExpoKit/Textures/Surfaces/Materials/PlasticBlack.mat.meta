@@ -1,0 +1,16 @@
+fileFormatVersion: 2
+guid: 61ea1cf66126ea8408e2fe518df4b764
+timeCreated: 1507767370
+licenseType: Store
+NativeFormatImporter:
+  mainObjectFileID: -1
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 114974
+  packageName: Stand Expo Pack
+  packageVersion: 1.0
+  assetPath: Assets/_Project/Art/Booth/ExpoKit/Textures/Surfaces/Materials/PlasticBlack.mat
+  uploadId: 237227

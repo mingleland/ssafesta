@@ -7,29 +7,36 @@
 
 ## 1. 지금 상태
 
-**18개 spec 전부 초안이 있고, Unity 파트 6종(002·006·013·014·017·018)은 확정 완료다.**
-나머지 12종은 팀 결정(2026-08-12)이 반영되어 있으며, 각 spec 하단의 **리뷰 3칸**을 담당 파트가 채우면 확정된다.
+**목록의 spec 20종 중 001~018은 전부 초안이 있다** (019는 feature 브랜치에서 작성 중, 020은 완료).
+팀 결정(2026-08-12)이 반영되어 있으며, 각 spec 하단의 **리뷰 3칸**을 담당 파트가 채우면 확정된다.
 
 | Spec | 이름 | 우선순위 | 담당 | spec | plan | tasks |
 |---|---|---|---|:---:|:---:|:---:|
-| 001 | auth-user | P0 | BE + FE | ✅ | — | — |
-| 002 | world-session | P0 | Unity + BE | ✅ **확정** | ✅ | ✅ |
-| 003 | wallet-coin | P0 | BE | ✅ | — | — |
-| 004 | booth-slot-lease | P0 | BE + FE | ✅ | — | — |
-| 005 | booth-studio-layout | P0 | FE + BE | ✅ | — | — |
-| 006 | booth-runtime | P0 | Unity | ✅ **확정** | ✅ | ✅ |
+| 001 | auth-user | P0 | BE + FE | ✅ | ✅ | ✅ |
+| 002 | world-session | P0 | Unity + BE | ✅ | ✅ | ✅ |
+| 003 | wallet-coin | P0 | BE | ✅ **확정** | ✅ +research/data-model/contracts/quickstart | ✅ |
+| 004 | booth-slot-lease | P0 | BE + FE | ✅ **확정** | ✅ +research/data-model/contracts/quickstart | ✅ |
+| 005 | booth-studio-layout | P0 | FE + BE | ✅ **BE 검토 완료** (FE 대기) | ✅ +research/data-model/contracts/quickstart | ✅ |
+| 006 | booth-runtime | P0 | Unity | ✅ | ✅ | ✅ |
 | 007 | ai-agent-document | P0 | AI | ✅ | — | — |
-| 008 | ai-conversation-rag | P0 | AI + FE | ✅ | — | — |
+| 008 | ai-conversation-rag | P0 | AI + FE | ✅ **확정** | ✅ +research/data-model/contracts/quickstart | ✅ |
 | 009 | project-exhibition | P0 | BE + FE | ✅ | — | — |
 | 013 | avatar-customization | **P0** | Unity + FE + BE | ✅ **확정** | ✅ +research/data-model/contracts/quickstart | ✅ |
 | 016 | booth-laptop-homepage | **P0** | FE + Unity + BE | ✅ | — | — |
-| 010 | survey | P1 | FE + BE | ✅ | — | — |
+| 010 | survey | P1 | FE + BE | ✅ | ✅ **BE분** +research/data-model/contracts/quickstart | ✅ **BE분** |
 | 011 | staff-consultation | P1 | BE + FE | ✅ | — | — |
 | 012 | economy-inventory | P1 | BE | ✅ | — | — |
 | 014 | minigame | P1 | Unity + BE | ✅ **확정** | ✅ | ✅ |
 | 015 | dashboard | P1 | BE + FE | ✅ | — | — |
-| 017 | proximity-voice | P1 | **FE + Infra** | ✅ **확정** | ✅ | ✅ |
-| 018 | world-floors | P1 | Unity | ✅ **확정** | ✅ | ✅ |
+| 017 | proximity-voice | P1 | **FE + Infra** | ✅ | ✅ | ✅ |
+| ~~018~~ | ~~world-floors~~ | ⛔ 폐기 | — | — | — | — |
+| 019 | game-studio | **P2** | Game Studio FE + BE / Unity 선택 연동 | ✅ Draft | ✅ | ✅ |
+| 020 | erd-schema | — | BE | ✅ (V1 스키마 구현 완료, 구 019에서 개명) | ✅ | ✅ |
+| 021 | slot-machine | P1 | BE + Unity | ✅ **확정** (2026-09-16, GitLab #205) | — | — |
+
+> **018 폐기** (2026-08-21, [#31](https://github.com/kanghyunsoon/ssafesta/issues/31)) — 1층을 폐기하고 월드를 11층 단일로 확정해 전제가 소멸했다.
+> 엘리베이터는 11층에 붙여 **입장 게이트**(접속 로딩 대기실)로 재활용한다. 살아남은 FR 2개(진행 표시·갇힘 방지)는
+> **spec 002 FR-013·FR-014** 로 이전했다. 파일은 폐기 근거 추적용으로 남겨 뒀다.
 
 **plan / tasks가 비어 있는 것은 각 파트가 직접 생성한다.** 그게 SDD의 정상 흐름이고,
 `.specify/` 골격이 설치돼 있어서 명령만 실행하면 된다 (아래 §3).
@@ -52,7 +59,7 @@
 **Codex와 Claude Code 둘 다 설치 없이 바로 동작한다.**
 
 ```text
-.specify/memory/constitution.md   ← 헌법 v1.2 (모든 명령이 참조)
+.specify/memory/constitution.md   ← 헌법 v1.3 (모든 명령이 참조)
 .specify/templates/               ← spec / plan / tasks 템플릿
 .specify/scripts/bash/            ← 명령이 호출하는 스크립트
 .agents/skills/speckit-*/         ← Codex 용
@@ -61,7 +68,7 @@ specs/                            ← 이 폴더
 ```
 
 > ❌ **`pip install specify-cli` / `specify init`을 실행하지 마라.**
-> 재설치하면 위 `constitution.md`(우리 헌법 v1.2)가 **빈 템플릿으로 덮인다.**
+> 재설치하면 위 `constitution.md`(우리 헌법 v1.3)가 **빈 템플릿으로 덮인다.**
 
 **필요한 것**: Codex CLI 또는 Claude Code를 **저장소 루트에서** 실행 +
 **bash**(Windows는 Git Bash / WSL — 스크립트가 `.sh`다).
@@ -107,22 +114,38 @@ bash .specify/scripts/bash/check-prerequisites.sh --json --paths-only
 **각 파트의 시작점**: 위처럼 자기 spec을 지정한 뒤 `$speckit-plan`(Claude Code는 `/speckit-plan`) 실행.
 plan은 "어떤 기술로 어떻게"라서 그 파트만 제대로 쓸 수 있다 — 그래서 리드가 미리 쓰지 않았다.
 
+### 다중 파트 spec 산출물 소유권 (#43, 2026-08-21 채택)
+
+실행 산출물(plan·research·data-model·quickstart·tasks)은 파트별 디렉터리에 둔다.
+`spec.md` 와 최상위 `contracts/` 만 공동 정본. 규칙 상세: `docs/00_SDD_가이드.md` §2.
+
+| Spec | 공동 정본 | FE | BE | Unity | AI |
+|---|---|---|---|---|---|
+| 001 auth-user | `spec.md` | `FE/*` | `BE/*` (루트에서 이관 예정) | — | — |
+| 004 booth-slot-lease | `spec.md`, `contracts/` | `FE/*` | `BE/*` (루트에서 이관 예정) | — | — |
+| 005 booth-studio-layout | `spec.md`, `contracts/` | `FE/*` | `BE/*` ✅ 이관 완료 | — | — |
+| 008 ai-conversation-rag | `spec.md`, `contracts/` | `FE/*` | — | — | `AI/*` (착수 전 적용) |
+| 013 avatar-customization | `spec.md`, `contracts/` | `FE/*` (필요 시) | `BE/*` (필요 시) | `Unity/*` ✅ 이관 완료 | — |
+| 019 game-studio | `spec.md`, `contracts/` | `FE/*` (착수 전 적용) | `BE/*` | `Unity/*` | `AI/*` |
+
+단일 파트 spec 은 루트 산출물 유지. 두 번째 파트 착수 시점에 담당 파트가 이관한다.
+
 ## 4. 2026-08-12 확정 사항 (전 spec 반영 완료)
 
 | 항목 | 확정값 |
 |---|---|
-| 로그인 | **Google + Kakao 소셜만.** 자체 가입 없음. 게스트는 둘러보기 전용(비영속) |
+| 로그인 | **Google + Kakao + SSAFY 소셜만.** 자체 가입 없음. 게스트는 둘러보기 전용(비영속) |
 | 접속 토큰 검증 | **서명 자체 검증** + 사용 토큰 식별자 기록으로 재사용 차단 |
 | Layout 좌표 | **미터 / 부스 바닥 중앙 원점 / +Z 정면 / rotationY 0=+Z, 시계방향 +** |
 | 부스 오브젝트 상한 | **12개** |
 | 아바타 외형 | **ID 집합.** 네트워크는 고정 크기 struct, 저장은 TEXT (기존 "32자"는 무효) |
 | 미니게임 | **타이머 정지 게임** (목표 5~10초 무작위, 단독 플레이) |
 | 월드 세션 | **1차부터 목적 층 파라미터 포함** |
-| 층 구조 | **층 = 별도 씬 + 별도 세션.** 엘리베이터가 전환을 가린다 |
+| 층 구조 | **11층 단일 확정** (2026-08-21, #31). 1층 폐기. 엘리베이터는 11층에 붙여 **입장 게이트**(접속 로딩 대기실)로 재활용 |
 | 임대 정책 | D01~D11 **권장안 전부 채택** (spec 004 상단 표 참조) |
 | SSE 스키마 | `start / token / source / done / error` |
 | Embedding | 1536차원 고정 |
-| 1층 | **뼈대만** (부스 자리 + 포토존 위치). 상세 기획은 추후 |
+| ~~1층~~ | ⛔ **폐기** (2026-08-21, #31). 축제 부스·포토존 계획도 함께 폐기 |
 
 ## 5. 합동 확정이 남은 것
 
@@ -131,7 +154,7 @@ plan은 "어떤 기술로 어떻게"라서 그 파트만 제대로 쓸 수 있�
 | Layout **왕복 검증 1회** (규칙은 확정, 실제 일치 확인 필요) | 005, 006 | FE + Unity |
 | Unity → React 상호작용 payload | 006, 008, 016 | FE + Unity |
 | SSE payload 상세 필드 | 008 | AI + FE |
-| 층별 서버 인스턴스 구성 | 018 | Unity + Infra |
+| ~~층별 서버 인스턴스 구성~~ | ⛔ 폐기 (#31·#30) — 층이 하나이므로 불필요 |
 
 ## 6. 주의 — 무효가 된 기존 문서
 

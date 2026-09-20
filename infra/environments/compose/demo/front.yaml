@@ -1,0 +1,32 @@
+# demo Front. PUBLIC_API_BASE_URL 은 기본값을 두지 않는다 — 비어 있으면 구글 로그인이
+# 404 로 죽는데 화면만 보고는 원인을 알 수 없다(2026-09-17 실측). 여기서 기동을 막는 편이 싸다.
+services:
+  front:
+    image: ${COMPONENT_IMAGE_REF:?COMPONENT_IMAGE_REF is required}
+    restart: unless-stopped
+    profiles: [front]
+    labels:
+      com.ssafy-festa.environment: demo
+      com.ssafy-festa.owner: infra-002
+      com.ssafy-festa.release-id: ${RELEASE_ID:?RELEASE_ID is required}
+      com.ssafy-festa.source-commit: ${SOURCE_COMMIT:?SOURCE_COMMIT is required}
+      com.ssafy-festa.mock-components: ${DEV_MOCK_COMPONENTS:-}
+    ports:
+      - "127.0.0.1:${DEMO_FRONT_HOST_PORT:-18080}:80"
+    environment:
+      FESTA_ENVIRONMENT: demo
+      PUBLIC_API_BASE_URL: ${PUBLIC_API_BASE_URL:?PUBLIC_API_BASE_URL is required}
+      PUBLIC_AI_API_BASE_URL: ${PUBLIC_AI_API_BASE_URL:-}
+      PUBLIC_AUTH_BASE_URL: ${PUBLIC_AUTH_BASE_URL:-https://api.${ROOT_DOMAIN:?ROOT_DOMAIN is required}}
+      PUBLIC_UNITY_BUILD_BASE: ${PUBLIC_UNITY_BUILD_BASE:?PUBLIC_UNITY_BUILD_BASE is required}
+      DEV_MOCK_COMPONENTS: ${DEV_MOCK_COMPONENTS:-}
+    networks:
+      front-private:
+        aliases: [front]
+    mem_limit: ${DEMO_FRONT_MEMORY_LIMIT:-512m}
+    cpus: ${DEMO_FRONT_CPU_LIMIT:-0.75}
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1/ >/dev/null"]
+      interval: 15s
+      timeout: 5s
+      retries: 5

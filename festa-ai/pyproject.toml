@@ -1,0 +1,43 @@
+[build-system]
+requires = ["setuptools>=75"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ssafy-festa-ai"
+version = "0.1.0"
+description = "FastAPI document processing service for SSAFY FESTA AI agents"
+requires-python = ">=3.12"
+dependencies = [
+  "boto3>=1.35,<2",
+  "fastapi>=0.115,<1",
+  "httpx>=0.28,<1",
+  "pdfplumber>=0.11,<1",
+  "pydantic>=2.10,<3",
+  "pydantic-settings>=2.7,<3",
+  "pyjwt>=2.9,<3",
+  "redis>=5,<6",
+  "tiktoken>=0.8,<1",
+  "uvicorn[standard]>=0.34,<1",
+]
+
+[project.optional-dependencies]
+test = [
+  "fakeredis>=2.23,<3",
+  "fpdf2>=2.8,<3",
+  "moto[s3]>=5.0,<6",
+  "pytest>=8,<10",
+  "pytest-asyncio>=0.24,<1",
+  "pyyaml>=6,<7",
+]
+
+[tool.setuptools.packages.find]
+include = ["app*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+markers = [
+  "failure_injection: tests that simulate process, storage, provider, or callback failure",
+  "isolation: tests that verify booth and agent scoped vector isolation",
+  "live_provider: opt-in tests that consume real GMS credits",
+]

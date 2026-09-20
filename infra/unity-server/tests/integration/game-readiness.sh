@@ -1,0 +1,105 @@
+#!/usr/bin/env bash
+# Verifies that readiness requires the running process, listener, public WSS and approved admission.
+set -euo pipefail
+
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+unity_server_dir="$(cd "${script_dir}/../.." && pwd)"
+source "${unity_server_dir}/tests/lib/assert.sh"
+
+fixture="$(mktemp -d)"
+trap 'rm -rf "${fixture}"' EXIT
+
+content_id='sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef'
+# deploy-game.sh 가 쓰는 영수증에는 imageRef 가 항상 들어간다. 픽스처에서 이걸 빼 두는 바람에
+# readiness 가 GAME_IMAGE_REF 없이 compose 를 부르는 결함이 테스트를 그냥 통과했다.
+image_ref='festa-game:0123456789abcdef0123456789abcdef01234567'
+mkdir -p "${fixture}/bin" "${fixture}/state/releases" "${fixture}/artifacts"
+mkdir -p "${fixture}/env/dev/batches/current"
+: >"${fixture}/game.env"
+printf 'PASS\n' >"${fixture}/approval.txt"
+cat >"${fixture}/state/candidate.json" <<JSON
+{"targetId":"demo/game","releaseId":"game-ready","imageRef":"${image_ref}","contentId":"${content_id}","state":"CANDIDATE"}
+JSON
+printf 'demo-back|back-container|sha256:back|0\n' >"${fixture}/artifacts/non-game-restarts-before.tsv"
+cp "${fixture}/artifacts/non-game-restarts-before.tsv" "${fixture}/artifacts/non-game-restarts-after.tsv"
+
+cat >"${fixture}/bin/docker" <<'SH'
+#!/usr/bin/env bash
+set -euo pipefail
+case "${1:-}" in
+  compose)
+    # 실제 compose.yaml 은 `image: ${GAME_IMAGE_REF:?...}` 라 값이 없으면 보간 단계에서 죽는다.
+    # 스텁도 같은 조건을 확인해야 회귀가 여기서 잡힌다.
+    [[ -n "${GAME_IMAGE_REF:-}" ]] || { echo 'required variable GAME_IMAGE_REF is missing a value' >&2; exit 1; }
+    if [[ " $* " == *' ps -q demo-game '* ]]; then printf 'game-container\n'; else exit 64; fi ;;
+  inspect)
+    case "${3:-}" in
+      '{{.State.Running}}') printf 'true\n' ;;
+      '{{range (index .NetworkSettings.Ports "7777/tcp")}}{{.HostIp}}:{{.HostPort}}{{end}}') printf '127.0.0.1:17777\n' ;;
+      *) exit 64 ;;
+    esac ;;
+  *) exit 64 ;;
+esac
+SH
+cat >"${fixture}/verify-public-wss.sh" <<'SH'
+#!/usr/bin/env bash
+set -euo pipefail
+if [[ $# -eq 4 && "$1" == '--approval-evidence' && "$3" == '--output' ]]; then
+  printf 'websocketUpgrade=PASS\napprovedAdmission=PASS\n' >"$4"
+elif [[ $# -eq 2 && "$1" == '--output' ]]; then
+  printf 'websocketUpgrade=PASS\napprovedAdmission=SKIPPED\n' >"$2"
+else
+  exit 64
+fi
+SH
+if ! command -v flock >/dev/null 2>&1; then
+  cat >"${fixture}/bin/flock" <<'SH'
+#!/usr/bin/env bash
+exit 0
+SH
+  chmod +x "${fixture}/bin/flock"
+fi
+chmod +x "${fixture}/bin/docker" "${fixture}/verify-public-wss.sh"
+
+export PATH="${fixture}/bin:${PATH}"
+export DOCKER_BIN=docker
+export GAME_ENV_FILE="${fixture}/game.env"
+export GAME_DEPLOY_STATE_DIR="${fixture}/state"
+export CI_ARTIFACT_DIR="${fixture}/artifacts"
+export APPROVAL_EVIDENCE_FILE="${fixture}/approval.txt"
+export PUBLIC_WSS_VERIFY_SCRIPT="${fixture}/verify-public-wss.sh"
+export GAME_COMPOSE_FILE="${unity_server_dir}/compose.yaml"
+export GAME_READINESS_SKIP_LISTENER_CONNECT=1
+export ENVIRONMENT_STATE_DIR="${fixture}/env"
+
+bash "${unity_server_dir}/scripts/game-readiness.sh" >/dev/null
+
+assert_contains "${fixture}/artifacts/game-readiness.json" '"processRunning": "PASS"' 'readiness must record process state'
+assert_contains "${fixture}/artifacts/game-readiness.json" '"internalListener": "PASS"' 'readiness must record listener state'
+assert_contains "${fixture}/artifacts/game-readiness.json" '"externalWebSocket": "PASS"' 'readiness must record WSS state'
+assert_contains "${fixture}/artifacts/game-readiness.json" '"approvedAdmission": "PASS"' 'readiness must record admission state'
+printf '{}' >"${fixture}/state/releases/game-ready.json"
+bash "${unity_server_dir}/scripts/promote-game.sh"
+assert_contains "${fixture}/state/current.json" '"state": "CURRENT"' 'promotion must update current only after readiness gates pass'
+[[ ! -e "${fixture}/state/known-good.json" ]] || fail 'promotion must not touch known-good (사람이 approve-known-good.sh 로 수행)'
+assert_file "${fixture}/env/dev/batches/current/game.json"
+
+# Test transport-only readiness when approval evidence is omitted
+unset APPROVAL_EVIDENCE_FILE
+cat >"${fixture}/state/candidate.json" <<JSON
+{"targetId":"demo/game","releaseId":"game-ready","imageRef":"${image_ref}","contentId":"${content_id}","state":"CANDIDATE"}
+JSON
+transport_output="${fixture}/artifacts/transport-readiness.json"
+GAME_READINESS_PATH="${transport_output}" bash "${unity_server_dir}/scripts/game-readiness.sh" >/dev/null
+assert_contains "${transport_output}" '"approvedAdmission": "SKIPPED"' 'readiness must record skipped admission when approval evidence is omitted'
+GAME_READINESS_PATH="${transport_output}" bash "${unity_server_dir}/scripts/promote-game.sh"
+
+mkdir -p "${fixture}/failed-state/releases"
+cp "${fixture}/state/releases/game-ready.json" "${fixture}/failed-state/releases/game-ready.json"
+sed 's/"state": "CURRENT"/"state": "CANDIDATE"/' "${fixture}/state/candidate.json" >"${fixture}/failed-state/candidate.json"
+sed 's/"externalWebSocket": "PASS"/"externalWebSocket": "FAIL"/' "${fixture}/artifacts/game-readiness.json" >"${fixture}/failed-readiness.json"
+if GAME_DEPLOY_STATE_DIR="${fixture}/failed-state" GAME_READINESS_PATH="${fixture}/failed-readiness.json" bash "${unity_server_dir}/scripts/promote-game.sh" >/dev/null 2>&1; then
+  fail 'promotion must reject a candidate with a failed external WSS gate'
+fi
+[[ ! -e "${fixture}/failed-state/current.json" ]] || fail 'failed readiness must not update current'
+pass 'game readiness requires all promotion gates'

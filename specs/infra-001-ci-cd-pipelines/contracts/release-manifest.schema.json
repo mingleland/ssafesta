@@ -1,0 +1,64 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ssafy-festa.local/contracts/release-manifest.schema.json",
+  "title": "SSAFY FESTA Release Manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "releaseId", "scm", "jenkins", "components", "rollbackSafety", "createdAt"],
+  "properties": {
+    "schemaVersion": { "const": "1.0.0" },
+    "releaseId": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "scm": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["provider", "repository", "branch", "commit"],
+      "properties": {
+        "provider": { "enum": ["github", "gitlab"] },
+        "repository": { "type": "string", "minLength": 1 },
+        "branch": { "type": "string", "minLength": 1 },
+        "commit": { "type": "string", "pattern": "^[0-9a-f]{40}$" }
+      }
+    },
+    "jenkins": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["job", "buildNumber"],
+      "properties": {
+        "job": { "type": "string", "minLength": 1 },
+        "buildNumber": { "type": "integer", "minimum": 1 },
+        "buildUrl": { "type": "string", "format": "uri" }
+      }
+    },
+    "components": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "storageMode", "imageRef", "contentId", "sourceCommit"],
+        "properties": {
+          "name": { "enum": ["ai", "back", "front", "game"] },
+          "storageMode": { "enum": ["local-docker", "registry"] },
+          "imageRef": { "type": "string", "minLength": 1 },
+          "contentId": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+          "sourceCommit": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+          "webglArtifactUri": { "type": "string" }
+        }
+      }
+    },
+    "rollbackSafety": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["classification", "dataChange", "dbSchemaChanged", "secretOrConfigChanged"],
+      "properties": {
+        "classification": { "enum": ["SAFE", "UNSAFE", "UNASSESSED"] },
+        "dataChange": { "enum": ["none", "reversible", "irreversible"] },
+        "dbSchemaChanged": { "type": "boolean" },
+        "secretOrConfigChanged": { "type": "boolean" },
+        "evidenceRef": { "type": "string" }
+      }
+    },
+    "createdAt": { "type": "string", "format": "date-time" }
+  }
+}

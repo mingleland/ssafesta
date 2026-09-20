@@ -1,0 +1,212 @@
+{
+  "sudal-q01": {
+    "gemini-2.5-flash-lite": {
+      "gold_sim": 0.7304016579442264,
+      "evidence_sim": 0.7628274667395156,
+      "refusal_ok": true,
+      "refusal_reason": "거절 문구 없이 답변 시도 — 정상"
+    },
+    "gpt-4.1-mini": {
+      "gold_sim": 0.7745225193224918,
+      "evidence_sim": 0.8041140722104042,
+      "refusal_ok": true,
+      "refusal_reason": "거절 문구 없이 답변 시도 — 정상"
+    }
+  },
+  "sudal-q02": {
+    "gemini-2.5-flash-lite": {
+      "gold_sim": 0.7644766278027398,
+      "evidence_sim": 0.5684667886364854,
+      "refusal_ok": true,
+      "refusal_reason": "거절 문구 없이 답변 시도 — 정상"
+    },
+    "gpt-4.1-mini": {
+      "gold_sim": 0.8184340337625047,
+      "evidence_sim": 0.5445024359106493,
+      "refusal_ok": true,
+      "refusal_reason": "거절 문구 없이 답변 시도 — 정상"
+    }
+  },
+  "sudal-q03": {
+    "gemini-2.5-flash-lite": {
+      "gold_sim": 0.1872865858840524,
+      "evidence_sim": 0.22998111536932017,
+      "refusal_ok": false,
+      "refusal_reason": "ANSWERABLE 문항인데 사실상 전면 거절만 함"
+    },
+    "gpt-4.1-mini": {
+      "gold_sim": 0.4542759999495891,
+      "evidence_sim": 0.3938700815985715,
+      "refusal_ok": true,
+      "refusal_reason": "ANSWERABLE 문항 — 거절 문구 동반하되 실질 답변도 포함"
+    }
+  },
+  "sudal-q04": {
+    "gemini-2.5-flash-lite": {
+      "gold_sim": 0.8208718541199619,
+      "evidence_sim": 0.8463376998553656,
+      "refusal_ok": true,
+      "refusal_reason": "거절 문구 없이 답변 시도 — 정상"
+    },
+    "gpt-4.1-mini": {
+      "gold_sim": 0.7867627309086834,
+      "evidence_sim": 0.7699164290510162,
+      "refusal_ok": true,
+      "refusal_reason": "거절 문구 없이 답변 시도 — 정상"
+    }
+  },
+  "sudal-q05": {
+    "gemini-2.5-flash-lite": {
+      "gold_sim": 0.6678465024141075,
+      "evidence_sim": 0.520400769194262,
+      "refusal_ok": true,
+      "refusal_reason": "거절 문구 없이 답변 시도 — 정상"
+    },
+    "gpt-4.1-mini": {
+      "gold_sim": 0.7717963318058538,
+      "evidence_sim": 0.5694028246127756,
+      "refusal_ok": true,
+      "refusal_reason": "거절 문구 없이 답변 시도 — 정상"
+    }
+  },
+  "sudal-q06": {
+    "gemini-2.5-flash-lite": {
+      "gold_sim": 0.7226368853447728,
+      "evidence_sim": 0.5485109127234972,
+      "refusal_ok": true,
+      "refusal_reason": "거절 문구 없이 답변 시도 — 정상"
+    },
+    "gpt-4.1-mini": {
+      "gold_sim": 0.7814746476005913,
+      "evidence_sim": 0.6476682218313449,
+      "refusal_ok": true,
+      "refusal_reason": "거절 문구 없이 답변 시도 — 정상"
+    }
+  },
+  "sudal-q07": {
+    "gemini-2.5-flash-lite": {
+      "gold_sim": 0.8124133844028817,
+      "evidence_sim": 0.801573667816042,
+      "refusal_ok": true,
+      "refusal_reason": "거절 문구 없이 답변 시도 — 정상"
+    },
+    "gpt-4.1-mini": {
+      "gold_sim": 0.7711419349730829,
+      "evidence_sim": 0.7329320352004355,
+      "refusal_ok": true,
+      "refusal_reason": "거절 문구 없이 답변 시도 — 정상"
+    }
+  },
+  "sudal-q08": {
+    "gemini-2.5-flash-lite": {
+      "gold_sim": 0.5498905308239997,
+      "evidence_sim": 0.4734679122090802,
+      "refusal_ok": true,
+      "refusal_reason": "거절 문구 없이 답변 시도 — 정상"
+    },
+    "gpt-4.1-mini": {
+      "gold_sim": 0.5940880473260555,
+      "evidence_sim": 0.5504911470902267,
+      "refusal_ok": true,
+      "refusal_reason": "거절 문구 없이 답변 시도 — 정상"
+    }
+  },
+  "sudal-q09": {
+    "gemini-2.5-flash-lite": {
+      "gold_sim": 0.352119495813388,
+      "evidence_sim": null,
+      "refusal_ok": false,
+      "refusal_reason": "NO_ANSWER 문항인데 거절 없이 답변 — 근거 없는 단정 위험"
+    },
+    "gpt-4.1-mini": {
+      "gold_sim": 0.5640192981865048,
+      "evidence_sim": null,
+      "refusal_ok": false,
+      "refusal_reason": "NO_ANSWER 문항인데 거절 없이 답변 — 근거 없는 단정 위험"
+    }
+  },
+  "sudal-q10": {
+    "gemini-2.5-flash-lite": {
+      "gold_sim": 0.8078099852457497,
+      "evidence_sim": 0.7376038623969059,
+      "refusal_ok": true,
+      "refusal_reason": "거절 문구 없이 답변 시도 — 정상"
+    },
+    "gpt-4.1-mini": {
+      "gold_sim": 0.722117016272389,
+      "evidence_sim": 0.6371214514379123,
+      "refusal_ok": true,
+      "refusal_reason": "거절 문구 없이 답변 시도 — 정상"
+    }
+  },
+  "sudal-q11": {
+    "gemini-2.5-flash-lite": {
+      "gold_sim": 0.5412442262516242,
+      "evidence_sim": 0.4083734214365229,
+      "refusal_ok": true,
+      "refusal_reason": "PARTIAL 문항 — 거절 문구 동반하되 실질 답변도 포함"
+    },
+    "gpt-4.1-mini": {
+      "gold_sim": 0.5429772816495464,
+      "evidence_sim": 0.4696086140142313,
+      "refusal_ok": true,
+      "refusal_reason": "PARTIAL 문항 — 거절 문구 동반하되 실질 답변도 포함"
+    }
+  },
+  "sudal-q12": {
+    "gemini-2.5-flash-lite": {
+      "gold_sim": 0.5771033862035592,
+      "evidence_sim": 0.4342159437759572,
+      "refusal_ok": true,
+      "refusal_reason": "거절 문구 없이 답변 시도 — 정상"
+    },
+    "gpt-4.1-mini": {
+      "gold_sim": 0.4848110650864176,
+      "evidence_sim": 0.41578666174509293,
+      "refusal_ok": true,
+      "refusal_reason": "거절 문구 없이 답변 시도 — 정상"
+    }
+  },
+  "sudal-q13": {
+    "gemini-2.5-flash-lite": {
+      "gold_sim": 0.615125663604507,
+      "evidence_sim": 0.6401645179008062,
+      "refusal_ok": true,
+      "refusal_reason": "거절 문구 없이 답변 시도 — 정상"
+    },
+    "gpt-4.1-mini": {
+      "gold_sim": 0.5961197483163935,
+      "evidence_sim": 0.5683620817601117,
+      "refusal_ok": true,
+      "refusal_reason": "거절 문구 없이 답변 시도 — 정상"
+    }
+  },
+  "sudal-q14": {
+    "gemini-2.5-flash-lite": {
+      "gold_sim": 0.6968215756059056,
+      "evidence_sim": 0.579169530060452,
+      "refusal_ok": true,
+      "refusal_reason": "거절 문구 없이 답변 시도 — 정상"
+    },
+    "gpt-4.1-mini": {
+      "gold_sim": 0.663275048598961,
+      "evidence_sim": 0.5543424272672166,
+      "refusal_ok": true,
+      "refusal_reason": "거절 문구 없이 답변 시도 — 정상"
+    }
+  },
+  "sudal-q15": {
+    "gemini-2.5-flash-lite": {
+      "gold_sim": 0.6448442660554745,
+      "evidence_sim": 0.5656401418177377,
+      "refusal_ok": true,
+      "refusal_reason": "거절 문구 없이 답변 시도 — 정상"
+    },
+    "gpt-4.1-mini": {
+      "gold_sim": 0.6537324397383817,
+      "evidence_sim": 0.5773746853474663,
+      "refusal_ok": true,
+      "refusal_reason": "거절 문구 없이 답변 시도 — 정상"
+    }
+  }
+}

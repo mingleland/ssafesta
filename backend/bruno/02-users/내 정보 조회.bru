@@ -1,0 +1,43 @@
+meta {
+  name: 내 정보 조회
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/api/v1/users/me
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+docs {
+  ## 내 계정 조회
+
+  로그인한 회원의 닉네임·상태·연결된 소셜 제공자·아바타 외형을 돌려준다.
+
+  - 인증: **회원 필수.** 게스트는 `403 MEMBER_ONLY`
+  - 성공: `200 OK`, `{ userId, nickname, status, providers, avatarCode }`
+
+  ### 여기에 없는 것
+
+  | 찾는 값 | 실제 위치 |
+  |---|---|
+  | 코인 잔액 | `03-wallet/내 지갑 조회` |
+  | 내 부스 | `04-booth-lease/내 부스 조회` |
+
+  한 화면에 함께 보이더라도 응답은 합치지 않는다 (docs/08 §2 예시 정정, 2026-08-24).
+
+  ### `avatarCode`는 `null`일 수 있다
+
+  한 번도 저장하지 않은 사용자는 `null`이고 **키는 존재한다.** 서버가 기본 프리셋을 만들어 넣지 않는다 — 폴백은 클라이언트 몫이고(spec 013 FR-010), 서버가 지어낸 값은 다음 조회에서 사용자의 선택과 구별되지 않는다.
+
+  | 코드 | 상황 |
+  |---|---|
+  | `200` | 조회 성공 |
+  | `401 USER_NOT_FOUND` | 토큰은 유효하지만 그 회원의 행이 없다(탈퇴 등). 다시 로그인해야 한다 |
+  | `403 MEMBER_ONLY` | 게스트 토큰이다 |
+}

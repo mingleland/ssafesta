@@ -1,0 +1,16 @@
+fileFormatVersion: 2
+guid: 6f5240c8a496d9643beb76f454956c11
+timeCreated: 1521950207
+licenseType: Store
+NativeFormatImporter:
+  mainObjectFileID: 100100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 114974
+  packageName: Stand Expo Pack
+  packageVersion: 1.0
+  assetPath: Assets/_Project/Art/Booth/ExpoKit/Prefabs/Furniture/Chair01_orange.prefab
+  uploadId: 237227

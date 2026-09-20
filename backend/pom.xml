@@ -1,0 +1,230 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-parent</artifactId>
+        <version>4.1.0</version>
+        <relativePath/> <!-- lookup parent from repository -->
+    </parent>
+    <groupId>com.example</groupId>
+    <artifactId>SSAFESTA</artifactId>
+    <version>0.0.1-SNAPSHOT</version>
+    <name>SSAFESTA</name>
+    <description>SSAFESTA</description>
+    <url/>
+    <licenses>
+        <license/>
+    </licenses>
+    <developers>
+        <developer/>
+    </developers>
+    <scm>
+        <connection/>
+        <developerConnection/>
+        <tag/>
+        <url/>
+    </scm>
+    <properties>
+        <java.version>21</java.version>
+        <!-- 기본 빌드에서 뺄 JUnit 태그. 위 surefire 주석 참조 (S15P21A604-571) -->
+        <test.excludedGroups>stress</test.excludedGroups>
+        <aws.sdk.version>2.32.14</aws.sdk.version>
+    </properties>
+    <dependencies>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-actuator</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-jpa</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-redis</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-flyway</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-security</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-security-oauth2-client</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-security-oauth2-resource-server</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-validation</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-webmvc</artifactId>
+        </dependency>
+        <!--
+          상담 실시간 알림 (spec 011 C-05, S15P21A604-137). native WebSocket 위에 STOMP 를 얹고
+          SockJS 는 쓰지 않는다. P1 에서 이 채널은 서버에서 클라이언트로 가는 알림 전용이고
+          행동은 전부 REST 다 — 정본이 REST 라서 이 의존성이 빠져도 기능이 멈추지는 않는다.
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-websocket</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springdoc</groupId>
+            <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+            <version>3.0.3</version>
+        </dependency>
+        <!--
+            WebP reader. 계약(game-asset-upload.md §5)이 image/webp 를 허용 MIME 에 넣었지만
+            Java 21 ImageIO 에는 WebP reader 가 없다 (JPEG·PNG·GIF·BMP·WBMP·TIFF 뿐) —
+            없으면 정상 WebP 가 전부 GAME_ASSET_CORRUPTED 로 거부된다.
+            ServiceLoader 로 등록되므로 호출부 코드는 없다. 그래서 등록 실패가 조용하고,
+            증상이 "정상 파일이 손상으로 거부"라 원인이 보이지 않는다 —
+            GameAssetImageValidatorTest 가 reader 존재를 직접 단언한다.
+            애니메이션 WebP 는 이 라이브러리가 읽지 못한다. 그래서 RIFF 헤더에서 걸러 거부한다.
+        -->
+        <dependency>
+            <groupId>com.twelvemonkeys.imageio</groupId>
+            <artifactId>imageio-webp</artifactId>
+            <version>3.12.0</version>
+        </dependency>
+        <dependency>
+            <groupId>org.flywaydb</groupId>
+            <artifactId>flyway-database-postgresql</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.postgresql</groupId>
+            <artifactId>postgresql</artifactId>
+            <scope>runtime</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-actuator-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-jpa-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-redis-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-flyway-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-security-oauth2-client-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-security-oauth2-resource-server-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-security-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-validation-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-webmvc-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-testcontainers</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>testcontainers-junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>testcontainers-postgresql</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <!--
+          spec 019 GameProject 검증. 계약이 상한·형식·enum을 JSON Schema 2020-12로 정의하고
+          (contracts/game-project-v1.schema.json) quickstart가 fixture manifest 재현을 요구하므로,
+          같은 스키마를 서버가 그대로 읽는 것이 규칙을 손으로 옮겨 적는 것보다 어긋날 여지가 적다.
+          손 순회 층은 스키마가 표현할 수 없는 의미 규칙(참조 무결성·Dialogue)만 담당한다.
+        -->
+        <dependency>
+            <groupId>com.networknt</groupId>
+            <artifactId>json-schema-validator</artifactId>
+            <version>1.5.6</version>
+        </dependency>
+        <!--
+          spec 007 US2 문서 원본 저장. Cloudflare R2 는 S3 호환이므로 전용 SDK 가 없고 AWS SDK v2 로
+          붙는다 (C-07). S3Presigner 는 s3 아티팩트 안에 있어 모듈이 하나면 된다.
+          MinIO fallback(C-10)도 같은 SDK 로 붙으므로 어댑터가 하나로 끝난다.
+        -->
+        <dependency>
+            <groupId>software.amazon.awssdk</groupId>
+            <artifactId>s3</artifactId>
+        </dependency>
+    </dependencies>
+
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>software.amazon.awssdk</groupId>
+                <artifactId>bom</artifactId>
+                <version>${aws.sdk.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+            </plugin>
+            <plugin>
+                <!--
+                    stress 로 표시한 테스트는 기본 빌드에서 뺀다. BoothLeaseStressIntegrationTest
+                    가 자기 주석에 "excluded from the fast build" 라고 적어 두었으나 surefire 설정이
+                    아예 없어 실제로는 매번 돌고 있었다 (S15P21A604-571).
+
+                    값을 property 로 여는 이유: 여기에 직접 적으면 plugin configuration 이 이겨서
+                    -DexcludedGroups= 로 못 푼다. 실측했다 — 그 상태에서 -Dgroups=stress 를 줘도
+                    0건이 돈다. 실제로 돌릴 때는 제외를 비운다:
+                    ./mvnw test -Dtest.excludedGroups= -Dgroups=stress
+                -->
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <configuration>
+                    <excludedGroups>${test.excludedGroups}</excludedGroups>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+
+</project>

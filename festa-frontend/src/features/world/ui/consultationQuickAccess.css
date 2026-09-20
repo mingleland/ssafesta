@@ -1,0 +1,53 @@
+/* World HUD 우상단 — 상담 즉시 접근. 숫자 badge 를 쓰지 않는다(실제 데이터에 없다). */
+.cqa {
+  position: absolute;
+  /* 우상단 한 줄에서 왼쪽 칸이다 — 전체화면(worldHud.css)이 오른쪽 끝을 쓴다 (2026-09-16). */
+  right: calc(var(--festa-hud-margin-x) + var(--festa-control-size) + var(--festa-hud-stack-gap));
+  top: var(--festa-hud-margin-y);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-direction: row-reverse;
+}
+.cqa-btn {
+  position: relative;
+  width: var(--festa-control-size);
+  height: var(--festa-control-size);
+  display: grid;
+  place-items: center;
+  border-radius: var(--festa-control-radius);
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  background: rgba(20, 22, 46, 0.42);
+  backdrop-filter: blur(6px);
+  color: #f4f6ff;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+/* 아이콘은 버튼과 함께 자란다 — 고정 20px 이면 커진 버튼 안에서 점처럼 보인다(screenControls 와 같은 규칙) */
+.cqa-btn svg { width: 52%; height: 52%; }
+.cqa-btn:focus-visible { outline: 2px solid rgba(255, 255, 255, 0.9); outline-offset: 3px; }
+@media (prefers-reduced-transparency: reduce) {
+  .cqa-btn { background: #14162e; backdrop-filter: none; }
+}
+.cqa-btn:disabled { cursor: default; color: rgba(244, 246, 255, 0.55); }
+.cqa-btn:hover:not(:disabled) { background: rgba(20, 22, 46, 0.66); border-color: rgba(255, 255, 255, 0.42); }
+.cqa-btn-on { border-color: rgba(120, 170, 255, 0.5); color: var(--festa-ink); }
+.cqa-dot {
+  position: absolute;
+  top: 7px;
+  right: 7px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #56d364;
+  box-shadow: 0 0 0 2px rgba(12, 16, 34, 0.9);
+}
+.cqa-label {
+  padding: 5px 10px;
+  border-radius: 999px;
+  background: var(--festa-surface);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  font-size: 12px;
+  color: rgba(234, 238, 251, 0.82);
+  white-space: nowrap;
+}

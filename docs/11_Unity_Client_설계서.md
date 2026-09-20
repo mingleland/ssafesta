@@ -303,7 +303,7 @@ ExteriorSlot(slotNo)
 → 해당 Anchor 아래 Local Prefab Spawn
 ```
 
-내부 앵커는 사용자 수가 아니라 물리 임대 슬롯 수만큼만 둔다. 사용자 임대 슬롯이 7개면 내부 앵커도 7개다. 각 Client는 자신이 입장한 내부 Layout만 로드하고, 다른 내부의 정적 오브젝트는 생성하지 않는다.
+내부 앵커는 사용자 수가 아니라 물리 임대 슬롯 수만큼만 둔다. 사용자 임대 슬롯이 12개면 내부 앵커도 12개다 (#62, 2026-08-23 — 축제 존 12부스·내부 홀 12실과 대응). 각 Client는 자신이 입장한 내부 Layout만 로드하고, 다른 내부의 정적 오브젝트는 생성하지 않는다.
 
 ```text
 Exit
@@ -418,6 +418,31 @@ Client 책임:
 - 서버에서 승인된 결과 표시
 
 보상 Coin을 Client가 직접 증가시키지 않는다.
+
+---
+
+## 19A. Game Studio Portal — P2 선택 연동
+
+Game Studio의 제작과 2D 플레이는 React Web Runtime이 담당한다. Unity Client는 필요할 때만 부스
+NPC/오브젝트 상호작용을 React Host에 전달하는 진입점이다.
+
+Unity 책임:
+
+- 기존 Booth 상호작용에서 `boothId`, `objectId`, `configId`를 Host에 전달
+- Host가 게임 오버레이를 여는 동안 입력 잠금·복귀 UX 제공
+- Host의 `OnOverlayStateChanged` 단일 lifecycle payload에서 `OPENED/CLOSED/FAILED`를 받아 입력을 복구
+
+Unity가 하지 않는 일:
+
+- GameProject JSON 조회·역직렬화·검증
+- TOP_DOWN/PLATFORMER/DIALOGUE/PUZZLE 실행
+- 게임 Draft/Publish 또는 플레이 결과 저장
+- Game Studio를 위한 별도 WebGL Scene/Build 생성
+
+현재 동결 기준선 코드는 변경하지 않는다. `BoothLayoutDto.configId`와 `BoothRuntimeObject.ConfigId`는 기존
+`int`를 유지하고 0은 미연결로 해석한다. `GAME_PORTAL` prefab catalog 등록은 BE whitelist 배포 뒤 별도
+Unity 작업으로 진행하며 GameProject 실행 코드는 추가하지 않는다. 메시지 계약은
+[`specs/019-game-studio/contracts/game-portal-bridge.md`](../specs/019-game-studio/contracts/game-portal-bridge.md)를 따른다.
 
 ---
 

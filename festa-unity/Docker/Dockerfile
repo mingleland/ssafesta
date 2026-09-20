@@ -16,7 +16,8 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 # 비루트 실행 (보안 기본기)
-RUN useradd -m -d /app unity
+RUN useradd -m -d /app unity \
+    && install -d -o unity -g unity /var/lib/festa-world
 WORKDIR /app
 
 COPY --chown=unity:unity . /app
@@ -29,8 +30,11 @@ USER unity
 # NGO WebSocket 포트 (ALB → 컨테이너)
 EXPOSE 7777
 
-# 향후 ECS Task 환경변수와 연동되는 지점:
-#   INSTANCE_ID / WORLD_ID / CHANNEL_ID / MAX_PLAYERS (doc 15 §8)
-# 현재는 CLI 인자만 사용 (NetworkBootstrap이 -port / -maxPlayers 파싱)
+# 정원은 **CLI 인자 > WORLD_MAX_PLAYERS 환경변수 > 빌드 기본값** 순으로 정해진다
+# (NetworkBootstrap.ResolveMaxPlayers). 인프라 compose 는 예전부터 WORLD_MAX_PLAYERS 를 컨테이너에
+# 넣고 있었지만 예전 코드가 CLI 인자만 읽어서 그 값이 아무 데도 쓰이지 않았다 — 이제 읽는다.
+# 아래 CMD 가 인자를 주므로 지금은 이 값이 이긴다. 인프라가 WORLD_MAX_PLAYERS 를 맞춘 뒤에는
+# 이 인자를 빼서 env 하나로 정하게 할 수 있다 (S15P21A604-935).
+#   INSTANCE_ID / WORLD_ID / CHANNEL_ID (doc 15 §8) 는 아직 연동 전이다.
 ENTRYPOINT ["/app/festa-unity.x86_64", "-batchmode", "-nographics"]
-CMD ["-port", "7777", "-maxPlayers", "40"]
+CMD ["-port", "7777", "-maxPlayers", "100"]

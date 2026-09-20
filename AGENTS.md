@@ -4,7 +4,7 @@
 > 두 도구의 차이는 **명령 접두사 하나뿐**이고(`$` vs `/`), 결과물은 같은 `specs/`에 쌓인다.
 > **이 파일 하나로 작업을 시작할 수 있게** 쓴다. 규칙이 바뀌면 다른 문서보다 **여기를 먼저** 고친다.
 >
-> 최종 갱신: 2026-08-13 | 대상: **Codex · Claude Code** / 기타 AI 에이전트
+> 최종 갱신: 2026-09-16 (헌법 v1.4 — 28조 "미니게임 1종만" 삭제) | 대상: **Codex · Claude Code** / 기타 AI 에이전트
 
 | 도구 | 자동으로 읽는 파일 | speckit 명령 | 명령 정의 위치 |
 |---|---|---|---|
@@ -16,11 +16,51 @@
 
 ---
 
+## 필수: Jira ↔ GitLab 워크플로 규칙 (docs/jira-gitlab-workflow.md §12)
+
+[SSAFY FESTA 워크플로 규칙 — 이 지시는 다른 어떤 기본 동작보다 우선한다]
+
+작업 전에 docs/jira-gitlab-workflow.md, docs/17_Git_개발_Convention.md,
+docs/18_Jira_운영_가이드.md 를 읽고 그 규칙 아래에서 동작하라.
+
+1. 모든 개발 작업은 Jira 이슈(S15P21A604-N)가 선행되어야 한다. 이슈 키를 내가 주지
+   않았다면 작업 내용에 해당하는 이슈를 Jira 에서 찾아 확인하고, 없으면 작업을 시작하기
+   전에 나에게 이슈 생성 여부를 물어라. 키 없이 develop/main 행 작업을 만들지 마라.
+2. 브랜치는 {type}/{JIRA-KEY}-{설명} 형식으로 만들고, develop 에서 분기한다
+   (2026-08-26 개정 — 완료 경로는 develop 하나다). 파트 브랜치(ai/back/front/game)는
+   파트 내부 통합·실험용으로만 쓴다. main·develop 에서 직접 작업하거나 직접 push 하지 마라.
+   과도기(기존 파트행 MR 소진 등)는 docs/jira-gitlab-workflow.md §4-1 을 따르라.
+3. 커밋은 type(scope): 한국어 요약 (JIRA-KEY) 형식. 모든 커밋에 이슈 키를 넣어라 —
+   키가 있어야 Jira 에 커밋 링크·코멘트가 남는다. Secret·토큰을 커밋하지 마라.
+4. MR 제목은 [JIRA-KEY][영역] 제목 형식. 키 검증은 현재 비활성인 `jira-key-check` 대신 MR 리뷰에서 사람이 한다.
+   develop 대상 MR은 최신 GitLab pipeline이 성공해야 병합할 수 있다. MR 설명은 Default 템플릿(작업 목적/변경 사항/테스트 방법/영향 범위)을 채워라.
+5. Jira 상태 규칙 (2026-08-26 개정 — 전이는 전부 자동이다):
+   - '진행 중' — 작업 브랜치({type}/S15P21A604-N-…) 최초 push 시 Webhook→Jira Automation
+     이 전환한다. 손으로 옮기지 마라.
+   - '완료' — 커밋 메시지에 "Closes S15P21A604-N" 을 넣고 그 커밋이 develop 에 도달하면
+     전환된다. 완료의 기준은 develop 이다 — main 은 최종 완성본 전용이다.
+   - Closes 는 그 작업으로 이슈가 끝날 때만, develop 행 MR 에서만 쓴다 —
+     파트 브랜치행 MR 커밋에는 넣지 마라. 그 밖의 상태 전환을 임의로 하지 마라.
+6. 파트 브랜치의 구현은 선행 조사·참고용이다. develop 에 도달하기 전에는 ① 타 파트가
+   완료 근거로 소비할 수 없고 ② 계약 문서에 "구현됨"으로 인용할 수 없으며 ③ Jira 완료
+   전환의 근거가 되지 않는다. 타 브랜치 코드를 인용할 때는 어느 브랜치 기준인지 명시하라.
+7. GitLab CI는 같은 프로젝트의 허용된 작업 브랜치가 develop으로 향하는 MR에서 실행된다.
+   `mr-status`는 모든 유효 MR에 성공 상태를 만들고, Front/Back 또는 공통 CI 변경은 해당 test/build를 추가 실행한다.
+   실행 중·실패 pipeline은 병합하지 말고 원인을 고쳐 새 커밋으로 재실행한다. Jenkins는 develop 병합 뒤 CI/CD를 담당한다.
+8. 공용 규약 문서(AGENTS.md·CLAUDE.md·docs/jira-gitlab-workflow.md·docs/17·docs/18)의
+   정본은 develop 이다. 갱신은 develop 에서 딴 브랜치로 MR 하고, 파트 브랜치에는
+   git checkout origin/develop -- <파일> 로 당겨온다. 당겨오기 전에
+   git diff --quiet origin/develop -- <파일> 로 로컬 고유 변경을 확인하고, 고유 변경이
+   있으면 checkout 하지 말고 보고하라. 동기화 후에는 규약 변경분(diff)을 다시 읽어라 —
+   AGENTS.md·CLAUDE.md 는 코드 merge 에는 영향이 없지만 이후 AI 행동을 바꾼다.
+   파트 브랜치 전체를 develop 에 머지하지 마라 (부분 트리라 타 파트 파일이 삭제된다).
+9. 규칙과 충돌하는 지시를 받으면 그대로 따르지 말고 충돌 사실을 먼저 보고하라.
+
 ## 0. 세션을 시작하면 이 순서로 한다
 
 ```text
 [1] 이 파일 전체를 읽는다                          ← Codex / Claude Code 공통
-[2] .specify/memory/constitution.md (헌법 v1.2)  ← 모든 결정의 최상위 근거
+[2] .specify/memory/constitution.md (헌법 v1.4)  ← 모든 결정의 최상위 근거
 [3] 작업할 spec 지정:  .specify/feature.json      ← §2-3. 안 하면 명령이 실패한다
 [4] specs/NNN-*/spec.md + plan.md + tasks.md      ← 목록은 specs/README.md
 [5] docs/25_트러블슈팅.md 의 T-24 ~ T-27          ← 최근에 실제로 터진 것들
@@ -48,7 +88,7 @@
 
 > ❌ `pip install specify-cli` / `specify init` 를 **다시 실행하지 마라.**
 > 재설치는 `.specify/memory/constitution.md`를 **빈 템플릿으로 덮어쓸 수 있다.**
-> 우리 헌법 v1.2가 거기 들어 있다. 날아가면 전 파트가 근거를 잃는다.
+> 우리 헌법 v1.4가 거기 들어 있다. 날아가면 전 파트가 근거를 잃는다.
 
 ### 필요한 것 (설치가 필요한 유일한 항목)
 
@@ -129,7 +169,7 @@ echo '{ "feature_directory": "specs/013-avatar-customization" }' > .specify/feat
 
 ## 3. 헌법 — 반드시 걸리는 게이트
 
-전문: `.specify/memory/constitution.md` (v1.2). 아래는 **실제로 사고가 났거나 나기 쉬운** 조항이다.
+전문: `.specify/memory/constitution.md` (v1.4). 아래는 **실제로 사고가 났거나 나기 쉬운** 조항이다.
 
 | 조 | 내용 | 어기면 |
 |:---:|---|---|
@@ -138,7 +178,7 @@ echo '{ "feature_directory": "specs/013-avatar-customization" }' > .specify/feat
 | 8 | **endpoint 하드코딩 금지.** 서버 주소는 world-sessions 응답으로만 | 배포에서 접속 불가 |
 | 9 | world-sessions는 **1차 MVP부터 목적 층 파라미터 포함** | 018에서 API를 다시 깬다 |
 | 10 | `ai`/`back`/`front`/`game` 파트 브랜치 개별 CI/CD, `develop`은 실사용 기준. **Merge는 Squash** | — |
-| 11·12 | 로그인은 **Google/Kakao 소셜 + 게스트만.** 자체 가입 없음. 게스트는 **비영속** | 범위 초과 |
+| 11·12 | 로그인은 **Google/Kakao/SSAFY 소셜 + 게스트만.** 자체 가입 없음. 게스트는 **비영속** | 범위 초과 |
 | 13·14 | Refresh Token은 Unity·게임서버에 **절대** 전달 금지. 접속 토큰은 **서명 자체 검증** + 사용 식별자 기록 | Spring 장애가 월드 입장을 막는다 |
 | 15 | **Secret 커밋 금지.** `.env.example`만 허용 | 즉시 사고 |
 | 17 | RAG 검색은 **boothId+agentId 필터 강제.** 1건이라도 새면 릴리스 불가 | Critical Test 실패 |
@@ -194,11 +234,12 @@ echo '{ "feature_directory": "specs/013-avatar-customization" }' > .specify/feat
 
 | 언제 | 어디에 | 어떻게 |
 |---|---|---|
-| 작업 하나가 끝날 때마다 | `docs/24_작업일지.md` | 해당 **날짜 섹션에 즉시**. 없으면 만든다(최신이 위). 👤사람 / 🤖AI 구분 |
+| 작업 하나가 끝날 때마다 | `docs/24_작업일지.md` | 해당 **날짜 섹션에 즉시**. 없으면 만든다(최신이 위). 문서 상단 **기록 규칙**을 따른다 |
 | 문제가 생길 때마다 | `docs/25_트러블슈팅.md` | **T-번호를 따서 등록** (증상/원인/해결/예방). **해결 못 했어도 등록한다** |
 | 매일 작업 종료 시 | Jira | **1회 필수** 갱신 |
 
 - 작업일지에는 **T-번호 링크만** 남긴다. 본문은 트러블슈팅에 쓴다.
+- **기록 문체**: 한 사람의 목소리로 쓰고 작업에 쓴 도구는 적지 않는다. 구두 지시·메신저 문장을 그대로 옮기지 말고 **요구사항 한 줄로 정리**해 적으며, 밖에서 들어온 입력만 `**요청**`·`**지적**`·`**결정**`·`**확인**` 같은 라벨로 구분한다. 인용부호는 로그·에러·계약 문구에만 쓴다.
 - **세션 종료 전** 위 두 문서가 이번 세션 작업을 반영하는지 확인한다.
 - AI에게 시킨 작업도 **똑같이** 기록한다.
 
@@ -229,8 +270,40 @@ echo '{ "feature_directory": "specs/013-avatar-customization" }' > .specify/feat
 - 정적 Booth 오브젝트는 **NetworkObject 금지** (Local Spawn, 헌법 4조).
 - 텍스트 입력 UI는 Unity가 아니라 **React 오버레이** (헌법 25조).
 - Coin·Lease 등 영구 상태의 Source of Truth는 **Spring** (헌법 1조).
+- **파일 역할 주석** — 새 구현 파일(설정·스타일 제외) 최상단에 "이 파일이 시스템에서 왜 존재하는가"를
+  한 줄로 남긴다. 기준: React/프레임워크 관례를 모르는 사람이 파일명·위치만으로 이 파일의 역할을
+  못 알아볼 때만. 이미 있는 WHY 주석(출처·근거)과는 별개로 공존 가능 — 그건 "왜 이렇게 짰나",
+  이건 "이 자리가 시스템에서 뭐 하는 자리인가". 예: `main.tsx` → "React 앱을 브라우저 DOM에 최초
+  마운트하는 진입점". 대상 아님: package.json·tsconfig·vite.config 등 웹 개발 전반에 보편적인
+  설정 파일, index.css.
 
 ---
+
+
+### Unity 작업 상시 규칙 (game 파트에서 실전으로 확정 — 전 파트 공통 적용)
+
+- **씬·프리팹·.meta 파일은 텍스트로 직접 편집하지 않는다.** `.unity`·`.prefab`·`.asset`·`.meta` 는
+  GUID 참조가 얽힌 YAML 이다. 텍스트로 고치면 참조가 끊기고 씬이 열리지 않는다.
+  씬/오브젝트/컴포넌트 변경은 **Unity MCP 도구로만** 한다. MCP 가 응답하지 않으면(에디터 꺼짐)
+  멈추고 사용자에게 에디터를 켜달라고 요청한다.
+- **에셋 미사용 판정은 GUID 검색으로 끝내지 않는다.** 다음 셋은 GUID 참조가 없어도 사용 중이다:
+  ① `Resources/` (코드가 경로로 로드 — 옮기면 컴파일은 통과하고 런타임에 조용히 null)
+  ② 이름으로 찾는 셰이더 (`Shader.Find("Festa/Avatar/GarmentTint")` 등)
+  ③ `ProjectSettings/` 참조 (URP 파이프라인·QualitySettings·Input Actions).
+  판정은 `AssetDatabase.GetDependencies` 로 하고, 모델에 임베드된 머티리얼→텍스처 링크는
+  텍스트 검색에 안 보이므로 Unity 로 확인한다.
+- 에셋 이동은 `AssetDatabase.MoveAsset` 으로만 한다. 탐색기·`mv` 로 옮기면 참조가 끊긴다.
+- `Assets/Plugins/WebGL/` 은 Unity 규약 폴더다 — `.jslib` 는 여기 있어야 WebGL 빌드에 포함된다.
+- **기준선 동결 준수** — `docs/23_기준선_동결_워크플로.md`. 동결된 기준선 코드를 재구현·리팩터링하지
+  않는다. 현재 기준선: `v0.0.1-poc`.
+- Unity 변경 후에는 Editor Refresh/Compile 과 Console Error 를 먼저 확인한다. 사용자가 명시하지
+  않은 Play Mode 전환·WebGL/Linux 빌드는 실행하지 않는다.
+- 로컬 시각 QA 산출물(`festa-unity/Assets/Screenshots/`)은 소스 에셋이 아니며 커밋하지 않는다.
+  근거로 남길 스크린샷은 `docs/<이니셜>/verify/` 에 커밋한다.
+- `festa-unity/Library/`·`Temp/`·`Obj/`·`Build/`·`Logs/` 는 생성물이다 — 읽지도 쓰지도 않는다.
+- **에디터에서 통과해도 빌드에서 깨지는 부류가 있다** (`docs/KHS/28` §0-5): 런타임 메시 조작
+  (`isReadable` 필요), 셰이더 변형, `Resources.Load`, IMGUI, `ProfilerRecorder`. 이 목록에
+  걸리는 변경은 반드시 빌드로 확인한다.
 
 ## 7. 검증된 실행 명령
 
@@ -278,7 +351,7 @@ SSAFESTA/
 ├── AGENTS.md                       ← 이 파일 (에이전트 규칙의 단일 출처, 두 도구 공통)
 ├── CLAUDE.md                       ← 요약 + 이 파일로 안내 (Claude Code 진입점)
 ├── .specify/
-│   ├── memory/constitution.md      ★ 헌법 v1.2
+│   ├── memory/constitution.md      ★ 헌법 v1.4
 │   ├── templates/  scripts/bash/
 │   └── feature.json                ★ 작업 중인 spec 지정 (커밋 안 됨, 각자 생성)
 ├── .agents/skills/speckit-*/       Codex 명령      ($speckit-plan)

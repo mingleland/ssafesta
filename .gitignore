@@ -11,10 +11,30 @@ Reference/
 *.pem
 *.p12
 *.key
+infra/environments/**/secrets/
 
 # OS
 .DS_Store
 Thumbs.db
 
+# 개인 에디터 설정 — 사람마다 다르고 문서 서식을 임의로 바꾼다 (Obsidian이 표를 자동 정렬해 확정 spec에 diff를 낸 적 있음)
+.obsidian/
+
 # 원격 세션이 파일을 지울 수 없을 때 임시로 옮겨두는 폴더 (수동 삭제 대상)
 _to_delete/
+
+# RAG 스파이크 평가용 원본 기획서·PDF — 결과 JSON에 원문을 넣지 않는 정책과 동일하게
+# 소스 자체도 커밋하지 않는다 (spikes/ai-rag/README.md 안전 조건)
+기획서 문서/
+festa-ai/*.pdf
+
+# GitLab PAT 로컬 파일 — 절대 커밋하지 않는다 (2026-09-08)
+.gltok
+
+# 오클루전 A/B 원본 스크린샷 — 8MB, 에디터 메뉴로 재생성 가능 (2026-09-08)
+docs/KHS/verify/occlusion-ab/occlusion-off__*.png
+docs/KHS/verify/occlusion-ab/occlusion-on*__*.png
+
+# Claude Code 로컬 워크트리 — 저장소 안에 다른 체크아웃이 통째로 들어 있다 (2026-09-10)
+# .claude/skills·.specify 는 커밋 대상이라 .claude/ 전체를 무시하지 않는다
+.claude/worktrees/

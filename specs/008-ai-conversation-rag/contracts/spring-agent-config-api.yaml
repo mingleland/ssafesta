@@ -1,0 +1,100 @@
+openapi: 3.1.0
+info:
+  title: Spring Agent Config API for AI
+  version: 1.1.0
+  description: |
+    FastAPI의 프롬프트 빌더가 질문마다 호출하는 Agent 설정 조회 경로다 (spec 008, S15P21A604-399,
+    GitLab #119 §5). Spring이 `ai_agents`를 소유하고, FastAPI는 이 값을 프롬프트로 해석할 뿐
+    Business DB를 직접 조회하지 않는다(C-12, #119).
+
+    거부는 오류가 아니라 `200 + found:false + denialCode`다 — `spring-booth-access-api.yaml`과
+    같은 관례다. Booth 소속이 아닌 agentId 와 존재하지 않는 agentId 를 구분해 알려주지 않는다.
+
+    캐싱은 하지 않는다 — 매 질문 이 값 그대로 다시 부른다(2026-09-07 확정, GitLab #119).
+servers:
+  - url: /internal/ai
+security:
+  - serviceToken: []
+paths:
+  /agent-config:
+    get:
+      operationId: getAiAgentConfig
+      summary: Agent 추론 설정 조회
+      parameters:
+        - { name: boothId, in: query, required: true, schema: { type: integer, format: int64 } }
+        - { name: agentId, in: query, required: true, schema: { type: integer, format: int64 } }
+      responses:
+        '200':
+          description: 조회 결과
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentConfigResponse'
+        '401': { description: Service Token 실패 }
+components:
+  securitySchemes:
+    serviceToken:
+      type: http
+      scheme: bearer
+      bearerFormat: opaque-service-token
+      description: |
+        FastAPI → Spring 방향이므로 `INTERNAL_AI_TO_SPRING_TOKENS`를 쓴다 — `spring-chunk-search-api.yaml`·
+        `spring-booth-access-api.yaml`과 동일 체인(`AiInternalSecurityConfiguration`).
+  schemas:
+    AgentConfigResponse:
+      oneOf:
+        - $ref: '#/components/schemas/AgentConfigFound'
+        - $ref: '#/components/schemas/AgentConfigAgentNotInBooth'
+        - $ref: '#/components/schemas/AgentConfigAgentInactive'
+
+    AgentConfigFound:
+      type: object
+      additionalProperties: false
+      required: [found, role, tone, responseLength, systemPrompt, forbiddenTopics]
+      properties:
+        found: { const: true }
+        role: { type: string, enum: [PROJECT_DOCENT, GUIDE] }
+        tone: { type: string, enum: [FRIENDLY, PROFESSIONAL, ENTHUSIASTIC] }
+        responseLength: { type: string, enum: [SHORT, MEDIUM, LONG] }
+        systemPrompt: { type: string }
+        forbiddenTopics: { type: array, items: { type: string } }
+        projectFacts:
+          $ref: '#/components/schemas/ProjectFacts'
+          description: |
+            rule-based 단축 응답이 쓰는 프로젝트 정형 정보 (S15P21A604-597·-396).
+
+            **부스에 프로젝트가 없으면 이 필드 자체가 없다.** 안의 세 값도 각각 없을 수 있다 —
+            소개는 운영자가 안 썼을 수 있고, 나머지 둘은 아직 추출되지 않았을 수 있다. 없는 것을
+            빈 문자열로 채우지 않는 이유는 "소개가 없는 부스"와 "소개가 빈 문자열인 부스"를
+            받는 쪽이 구분할 수 있어야 하기 때문이다.
+
+    ProjectFacts:
+      type: object
+      additionalProperties: false
+      description: 모든 필드가 선택이다. 없으면 키가 없다(`null`이 아니라 부재).
+      properties:
+        introduction:
+          type: string
+          description: 운영자가 직접 쓴 프로젝트 소개 (`projects.description`)
+        targetAudience:
+          type: string
+          description: AI가 문서에서 추출한 대상 사용자. 최대 2000자
+        techStack:
+          type: string
+          description: AI가 문서에서 추출한 사용 기술. 최대 2000자
+
+    AgentConfigAgentNotInBooth:
+      type: object
+      additionalProperties: false
+      required: [found, denialCode]
+      properties:
+        found: { const: false }
+        denialCode: { const: AGENT_NOT_IN_BOOTH }
+
+    AgentConfigAgentInactive:
+      type: object
+      additionalProperties: false
+      required: [found, denialCode]
+      properties:
+        found: { const: false }
+        denialCode: { const: AGENT_INACTIVE }

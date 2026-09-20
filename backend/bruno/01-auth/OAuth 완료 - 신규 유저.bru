@@ -1,0 +1,52 @@
+meta {
+  name: OAuth 완료 - 신규 유저
+  type: http
+  seq: 5
+}
+
+post {
+  url: {{baseUrl}}/api/v1/auth/oauth/complete
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Cookie: oauth_handoff={{oauthHandoff}}
+}
+
+body:json {
+  {
+    "nickname": "{{nickname}}"
+  }
+}
+
+script:post-response {
+  if (res.status === 200 && res.body.status === "AUTHENTICATED") {
+    bru.setEnvVar("accessToken", res.body.accessToken);
+  }
+}
+
+docs {
+  ## OAuth 완료 (신규 회원) — 닉네임을 실어 다시 호출한다
+
+  `OAuth 완료 - 기존 유저`를 `{}`로 실행해 **`status: NICKNAME_REQUIRED`**를 받은 경우에만 이 요청을 실행한다. 같은 endpoint이고 본문만 다르다.
+
+  - 인증: Access Token이 아니라 **1회용 `oauth_handoff` 쿠키**(HttpOnly, 5분)
+  - 실행 전: `local` 환경의 `nickname`을 원하는 값으로 바꾼다
+  - 성공: `200 OK`, `status: AUTHENTICATED` + Access Token 자동 저장 + refresh 쿠키 심김
+
+  ### 닉네임이 거부되면 handoff는 살아 있다
+
+  중복(`409`)이나 형식 위반(`400`)을 받아도 **다른 닉네임으로 다시 시도할 수 있다.** handoff를 먼저 소비해 버리면 모든 거부가 막다른 길이 된다 (FR-021c).
+
+  반대로 세션 발급까지 성공하면 handoff는 즉시 폐기되고, 재사용은 `410`이다.
+
+  | 코드 | 상황 |
+  |---|---|
+  | `200 AUTHENTICATED` | 가입 완료. Access Token 발급 |
+  | `400 VALIDATION_FAILED` | 닉네임 형식 위반. handoff는 유지된다 |
+  | `400 OAUTH_HANDOFF_MISSING` | `oauth_handoff` 쿠키가 없다 |
+  | `409 NICKNAME_DUPLICATED` | 이미 쓰는 닉네임. handoff는 유지된다 |
+  | `410 OAUTH_HANDOFF_EXPIRED` | 5분 초과 또는 이미 소비됨. 브라우저에서 OAuth를 다시 시작한다 |
+}

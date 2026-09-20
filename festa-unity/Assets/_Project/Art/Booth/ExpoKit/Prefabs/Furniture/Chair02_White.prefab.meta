@@ -1,0 +1,16 @@
+fileFormatVersion: 2
+guid: 7ef512c819fd380428f6e5ce97149680
+timeCreated: 1507850457
+licenseType: Store
+NativeFormatImporter:
+  mainObjectFileID: 100100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 114974
+  packageName: Stand Expo Pack
+  packageVersion: 1.0
+  assetPath: Assets/_Project/Art/Booth/ExpoKit/Prefabs/Furniture/Chair02_White.prefab
+  uploadId: 237227

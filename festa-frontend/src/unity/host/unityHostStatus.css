@@ -1,0 +1,143 @@
+.uh-root {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+/* UnityHost 상태 층 (S15P21A604-429) — Overlay Bus 밖이다. World Overlay 와 같은 어휘를 쓰되
+   role="dialog" 도 focus trap 도 두지 않는다: 사용자가 닫을 것이 아니라 진행 중인 작업의 표시다. */
+.uh-status {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  background: rgba(10, 14, 28, 0.72);
+  color: #f4f6ff;
+  font-size: 14px;
+  /* 진행 표시는 월드 클릭을 가로채지 않는다. 다만 안에 조작 요소가 있으면 그것만 되살린다
+     — 아래 .uh-status-action 이 pointer-events 를 다시 켠다(-432 로비 복귀 버튼이 죽어 있었다). */
+  pointer-events: none;
+}
+
+.uh-status--boot {
+  overflow: hidden;
+  background: #0b0f28;
+}
+
+.uh-boot-bg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  filter: blur(3px) brightness(0.55);
+  transform: scale(1.04);
+}
+
+.uh-boot-panel {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  box-sizing: border-box;
+  width: min(400px, calc(100vw - 40px));
+  padding: 34px 40px 36px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 20px;
+  background: var(--festa-surface);
+  backdrop-filter: blur(10px);
+  text-align: center;
+}
+
+.uh-boot-logo {
+  width: 178px;
+  height: auto;
+  margin-bottom: 4px;
+}
+
+.uh-status-title {
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.uh-status-hint {
+  opacity: 0.72;
+  font-variant-numeric: tabular-nums;
+}
+
+.uh-loading-bar {
+  width: min(190px, 48vw);
+  height: 4px;
+  margin-top: 6px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(244, 246, 255, 0.16);
+}
+
+.uh-loading-bar-fill {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #4d6bff, #7b4dff);
+  transition: width 0.3s ease-out;
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .uh-boot-panel {
+    background: #10142a;
+    backdrop-filter: none;
+  }
+}
+
+.uh-status-spinner {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 2.5px solid rgba(244, 246, 255, 0.25);
+  border-top-color: #f4f6ff;
+  animation: uh-spin 0.9s linear infinite;
+}
+
+@keyframes uh-spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .uh-status-spinner { animation-duration: 2.4s; }
+  .uh-loading-bar-fill { transition: none; }
+}
+
+/* 상태 층 안의 유일한 조작 요소 — 복구 동선 버튼(-432 failed / boot 재시도).
+   부모가 pointer-events:none 이라 여기서 auto 로 되돌리지 않으면 눌리지 않는다. */
+.uh-status-action {
+  pointer-events: auto;
+  margin-top: 4px;
+  padding: 9px 18px;
+  border: 1px solid rgba(244, 246, 255, 0.28);
+  border-radius: 999px;
+  background: rgba(244, 246, 255, 0.1);
+  color: #f4f6ff;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.uh-status-action:hover {
+  background: rgba(244, 246, 255, 0.18);
+  border-color: rgba(244, 246, 255, 0.45);
+}
+
+.uh-status-action:focus-visible {
+  outline: 2px solid #f4f6ff;
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .uh-status-action { transition: none; }
+}

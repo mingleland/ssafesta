@@ -1,0 +1,138 @@
+name: festa-production
+
+services:
+  ai:
+    image: ${AI_IMAGE_REF:?AI_IMAGE_REF is required}
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${PROD_AI_HOST_PORT:-28082}:8000"
+    env_file:
+      - ${AI_ENV_FILE:?AI_ENV_FILE is required}
+    environment:
+      FESTA_ENVIRONMENT: prod
+      SPRING_INTERNAL_BASE_URL: http://back:8080
+      INTERNAL_SPRING_TO_AI_TOKENS: ${INTERNAL_SPRING_TO_AI_TOKENS:?INTERNAL_SPRING_TO_AI_TOKENS is required}
+      INTERNAL_AI_TO_SPRING_TOKENS: ${INTERNAL_AI_TO_SPRING_TOKENS:?INTERNAL_AI_TO_SPRING_TOKENS is required}
+    networks:
+      app-private:
+        aliases: [ai]
+      data-private: {}
+    volumes:
+      - ai-data:/app/data
+    mem_limit: ${PROD_AI_MEMORY_LIMIT:-1g}
+    cpus: ${PROD_AI_CPU_LIMIT:-1.0}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/ai/v1/health/live', timeout=3)"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  back:
+    image: ${BACK_IMAGE_REF:?BACK_IMAGE_REF is required}
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${PROD_BACK_HOST_PORT:-28081}:8080"
+    env_file:
+      - ${BACK_ENV_FILE:?BACK_ENV_FILE is required}
+    environment:
+      FESTA_ENVIRONMENT: prod
+      SPRING_PROFILES_ACTIVE: infra
+      AI_INTERNAL_BASE_URL: http://ai:8000
+      WORLD_SCHEME: wss
+      WORLD_HOST: ${PRODUCTION_WORLD_HOST:?PRODUCTION_WORLD_HOST is required}
+      WORLD_PORT: "443"
+      INTERNAL_SPRING_TO_AI_TOKENS: ${INTERNAL_SPRING_TO_AI_TOKENS:?INTERNAL_SPRING_TO_AI_TOKENS is required}
+      INTERNAL_AI_TO_SPRING_TOKENS: ${INTERNAL_AI_TO_SPRING_TOKENS:?INTERNAL_AI_TO_SPRING_TOKENS is required}
+      INTERNAL_INFRA_TO_SPRING_TOKENS: ${INTERNAL_INFRA_TO_SPRING_TOKENS:?INTERNAL_INFRA_TO_SPRING_TOKENS is required}
+    networks:
+      app-private:
+        aliases: [back]
+      data-private: {}
+    volumes:
+      - back-data:/app/data
+    mem_limit: ${PROD_BACK_MEMORY_LIMIT:-1g}
+    cpus: ${PROD_BACK_CPU_LIMIT:-1.0}
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/actuator/health >/dev/null"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  front:
+    image: ${FRONT_IMAGE_REF:?FRONT_IMAGE_REF is required}
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${PROD_FRONT_HOST_PORT:-28080}:80"
+    environment:
+      FESTA_ENVIRONMENT: prod
+      PUBLIC_API_BASE_URL: https://${ROOT_DOMAIN:?ROOT_DOMAIN is required}
+      PUBLIC_AUTH_BASE_URL: https://${ROOT_DOMAIN}
+      PUBLIC_AI_API_BASE_URL: https://${ROOT_DOMAIN}
+      PUBLIC_UNITY_BUILD_BASE: https://${ROOT_DOMAIN}/unity/
+    networks:
+      app-private:
+        aliases: [front]
+    mem_limit: ${PROD_FRONT_MEMORY_LIMIT:-512m}
+    cpus: ${PROD_FRONT_CPU_LIMIT:-0.75}
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1/ >/dev/null"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  world:
+    image: ${WORLD_IMAGE_REF:?WORLD_IMAGE_REF is required}
+    restart: unless-stopped
+    user: "${GAME_CONTAINER_UID:-1000}:${GAME_CONTAINER_GID:-1000}"
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=64m
+    ports:
+      - "127.0.0.1:${PROD_WORLD_HOST_PORT:-27777}:7777"
+    environment:
+      FESTA_ENVIRONMENT: prod
+      WORLD_TRANSPORT: websocket
+      WORLD_LISTEN_PORT: "7777"
+      WORLD_ID: ${WORLD_ID:-11F}
+      WORLD_CHANNEL_ID: ${WORLD_CHANNEL_ID:-11F-01}
+      WORLD_MAX_PLAYERS: ${WORLD_MAX_PLAYERS:-40}
+      WORLD_ENTRY_TOKEN_ISSUER: ${WORLD_ENTRY_TOKEN_ISSUER:-ssafesta-backend}
+      WORLD_ENTRY_TOKEN_AUDIENCE: ${WORLD_ENTRY_TOKEN_AUDIENCE:-ssafesta-world}
+      CONNECTION_TOKEN_SECRET_FILE: /run/secrets/connection_token_secret
+      WORLD_LEDGER_PATH: /var/lib/festa-world/used-grants.log
+    secrets:
+      - source: connection_token_secret
+        target: connection_token_secret
+        mode: 0400
+    volumes:
+      - world-replay:/var/lib/festa-world
+    networks:
+      app-private:
+        aliases: [world]
+    healthcheck:
+      test: ["CMD-SHELL", "test -x /app/festa-unity.x86_64 && pgrep -f festa-unity.x86_64 >/dev/null"]
+      interval: 15s
+      timeout: 5s
+      retries: 8
+      start_period: 30s
+
+networks:
+  app-private:
+    name: festa-production-private
+  data-private:
+    external: true
+    name: festa-data-private
+
+volumes:
+  ai-data:
+    name: festa-production-ai-data
+  back-data:
+    name: festa-production-back-data
+  world-replay:
+    name: festa-production-world-replay
+
+secrets:
+  connection_token_secret:
+    file: ${CONNECTION_TOKEN_SECRET_FILE:?CONNECTION_TOKEN_SECRET_FILE is required}

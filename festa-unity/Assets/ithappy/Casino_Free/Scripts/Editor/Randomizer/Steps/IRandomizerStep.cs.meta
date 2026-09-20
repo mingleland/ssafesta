@@ -1,0 +1,18 @@
+fileFormatVersion: 2
+guid: 357c406ae3484f4c986988c0ffc7deea
+MonoImporter:
+  externalObjects: {}
+  serializedVersion: 2
+  defaultReferences: []
+  executionOrder: 0
+  icon: {instanceID: 0}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 393074
+  packageName: Casino FREE - Low Poly Asset Pack
+  packageVersion: 1.0
+  assetPath: Assets/ithappy/Casino_Free/Scripts/Editor/Randomizer/Steps/IRandomizerStep.cs
+  uploadId: 963832

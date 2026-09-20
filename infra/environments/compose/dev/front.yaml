@@ -1,0 +1,30 @@
+services:
+  front:
+    image: ${COMPONENT_IMAGE_REF:?COMPONENT_IMAGE_REF is required}
+    restart: unless-stopped
+    profiles: [front]
+    labels:
+      com.ssafy-festa.environment: dev
+      com.ssafy-festa.owner: infra-002
+      com.ssafy-festa.release-id: ${RELEASE_ID:?RELEASE_ID is required}
+      com.ssafy-festa.source-commit: ${SOURCE_COMMIT:?SOURCE_COMMIT is required}
+      com.ssafy-festa.mock-components: ${DEV_MOCK_COMPONENTS:-}
+    ports:
+      - "127.0.0.1:${FRONT_HOST_PORT:-3001}:80"
+    environment:
+      FESTA_ENVIRONMENT: dev
+      PUBLIC_API_BASE_URL: ${PUBLIC_API_BASE_URL:-}
+      PUBLIC_AI_API_BASE_URL: ${PUBLIC_AI_API_BASE_URL:-}
+      PUBLIC_AUTH_BASE_URL: ${PUBLIC_AUTH_BASE_URL:-https://api.${ROOT_DOMAIN:?ROOT_DOMAIN is required}}
+      PUBLIC_UNITY_BUILD_BASE: ${PUBLIC_UNITY_BUILD_BASE:-/unity/}
+      DEV_MOCK_COMPONENTS: ${DEV_MOCK_COMPONENTS:-}
+    networks:
+      front-private:
+        aliases: [front]
+    mem_limit: ${DEV_FRONT_MEMORY_LIMIT:-512m}
+    cpus: ${DEV_FRONT_CPU_LIMIT:-0.75}
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1/ >/dev/null"]
+      interval: 15s
+      timeout: 5s
+      retries: 5

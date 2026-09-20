@@ -1,0 +1,11 @@
+# 실제 비밀번호는 이 예시를 복사한 비추적 ACL 파일에 주입한다.
+# +@scripting 이 없으면 EVALSHA 가 거절된다 — 채팅 rate limit·세션 refresh 가 Lua 로 원자 처리되므로
+# 그 순간 채팅이 막히고 월드 입장 직후 연결이 끊긴다 (2026-09-18 실측).
+user default off
+user health on >CHANGE_ME_HEALTH ~* +ping
+user dev_back on >CHANGE_ME_DEV_BACK ~dev:* +@read +@write +@keyspace +@connection +@scripting -@dangerous +info
+user dev_ai on >CHANGE_ME_DEV_AI ~dev:ai:* +@read +@write +@scripting -@dangerous
+user demo_back on >CHANGE_ME_DEMO_BACK ~demo:* +@read +@write +@keyspace +@connection +@scripting -@dangerous +info
+user demo_ai on >CHANGE_ME_DEMO_AI ~demo:ai:* +@read +@write +@scripting -@dangerous
+user prod_back on >CHANGE_ME_PROD_BACK ~prod:* +@read +@write +@keyspace +@connection +@scripting -@dangerous +info
+user prod_ai on >CHANGE_ME_PROD_AI ~prod:ai:* ~conversation:* +@read +@write +@scripting -@dangerous

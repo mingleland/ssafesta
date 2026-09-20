@@ -1,0 +1,33 @@
+apiVersion: 1
+policies:
+  - orgId: 1
+    receiver: grafana-default-email
+    group_by: [alertname]
+    routes:
+      - receiver: mattermost-approved-anomalies
+        object_matchers:
+          - [managed_by, "=", infra]
+          - [approval_status, "=", approved]
+          - [notify, "=", mattermost]
+          - [domain, "!=", ci]
+        group_by: [alertname, environment, service, severity]
+        group_wait: 30s
+        group_interval: 5m
+        repeat_interval: 4h
+        mute_time_intervals: [festa-maintenance]
+muteTimes:
+  - orgId: 1
+    name: festa-maintenance
+    time_intervals: []
+templates:
+  - orgId: 1
+    name: festa-alert-message
+    template: |
+      {{ define "festa.alert.title" }}[{{ .Status | toUpper }}] {{ .CommonLabels.severity }} · {{ .CommonLabels.service }}{{ end }}
+      {{ define "festa.alert.body" }}환경: {{ .CommonLabels.environment }}
+      {{ range .Alerts }}{{ .Annotations.summary }}
+      {{ .Annotations.description }}
+      Dashboard: {{ .DashboardURL }}
+      Runbook: {{ .Annotations.runbook_url }}
+      Silence: {{ .SilenceURL }}
+      {{ end }}{{ end }}
