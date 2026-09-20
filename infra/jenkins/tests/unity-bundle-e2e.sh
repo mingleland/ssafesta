@@ -13,6 +13,8 @@ for path in "${publisher}" "${pipeline}" "${job}"; do [[ -f "${path}" ]] || fail
 
 # ── job/pipeline 계약
 grep -q "pipelineJob('festa-unity-bundle-e2e')" "${job}" || fail 'E2E job name is the trigger contract'
+# 등록되지 않은 Job DSL 파일은 reload 해도 job 이 생기지 않는다 — 실제로 한 번 겪었다.
+grep -q 'gitlab-unity-bundle-e2e.groovy' "${repo_root}/infra/jenkins/casc/jobs.yaml" || fail 'E2E job must be registered in CasC jobs.yaml'
 grep -q "booleanParam('FIXTURE_MODE'" "${job}" || fail 'fixture mode must be an explicit parameter'
 grep -q "choiceParam('TARGET', \['demo'\]" "${job}" || fail 'only demo may be targeted'
 grep -q "only the demo target is supported" "${pipeline}" || fail 'pipeline must refuse non-demo targets'
