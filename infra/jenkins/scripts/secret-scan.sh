@@ -2,12 +2,29 @@
 set -euo pipefail
 paths=()
 tracked_only=false
+changed_since=''
 while [[ $# -gt 0 ]]; do case "$1" in
   --path) paths+=("$2"); shift 2;;
   --tracked) tracked_only=true; shift;;
+  --changed-since) changed_since="$2"; shift 2;;
   *) echo "unknown argument: $1" >&2; exit 64;;
 esac; done
 [[ ${#paths[@]} -gt 0 ]] || paths=(.)
+
+# MR 검사는 그 MR 이 건드린 파일만 본다 — 나머지는 develop 의 Jenkins 전체 스캔(--tracked)이 덮는다.
+# base 커밋을 못 찾으면(얕은 클론 등) 줄이지 않고 전체를 본다 — 조용히 덜 보는 것보다 느린 편이 낫다.
+if [[ -n "${changed_since}" ]]; then
+  if git rev-parse -q --verify "${changed_since}^{commit}" >/dev/null 2>&1; then
+    mapfile -d '' changed_paths < <(git diff -z --name-only --diff-filter=ACMR "${changed_since}" HEAD -- "${paths[@]}")
+    if [[ ${#changed_paths[@]} -eq 0 ]]; then
+      echo 'SECRET_SCAN_OK files_under=0'
+      exit 0
+    fi
+    paths=("${changed_paths[@]}")
+  else
+    echo "secret-scan: ${changed_since} is not in this clone; scanning every requested path" >&2
+  fi
+fi
 python_bin="${PYTHON_BIN:-}"
 if [[ -z "${python_bin}" ]]; then
   if command -v python3 >/dev/null 2>&1 && python3 -c 'import sys; assert sys.version_info.major == 3' >/dev/null 2>&1; then

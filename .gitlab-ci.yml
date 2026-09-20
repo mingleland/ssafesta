@@ -77,9 +77,11 @@ mr-status:
   rules:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
   before_script:
-    - apk add --no-cache bash python3
+    - apk add --no-cache bash python3 git
   script:
-    - bash infra/jenkins/scripts/secret-scan.sh --path .
+    # MR 이 건드린 파일만 본다 — 저장소 전체(7,000여 파일) 스캔이 이 job 시간의 대부분이었다.
+    # base 가 없으면 스크립트가 알아서 전체로 되돌아간다. develop 은 Jenkins 가 --tracked 로 전체를 본다.
+    - bash infra/jenkins/scripts/secret-scan.sh ${CI_MERGE_REQUEST_DIFF_BASE_SHA:+--changed-since "$CI_MERGE_REQUEST_DIFF_BASE_SHA"} --path .
     - echo 'MR pipeline status only; component CI is selected by rules:changes'
 
 .front-changes:

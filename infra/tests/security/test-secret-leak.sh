@@ -24,4 +24,12 @@ untracked="$(mktemp "${safe}/.secret-scan-untracked.XXXXXX")"
 trap 'rm -f "${untracked}"' EXIT
 printf '%s\n' "${canary}" >"${untracked}"
 SECRET_CANARY="${canary}" bash "${scanner}" --tracked --path "${safe}"
+
+# --changed-since: 없는 base 는 축소하지 않고 전체를 본다(조용히 덜 보지 않는다).
+if SECRET_CANARY="${canary}" bash "${scanner}" --changed-since 0000000000000000000000000000000000000000 --path "${us4_leaked}/gitlab-mr-job.log" >/dev/null 2>&1; then
+  echo 'unknown base must fall back to scanning the requested path' >&2; exit 1
+fi
+# 바뀐 파일이 없으면 통과한다
+SECRET_CANARY="${canary}" bash "${scanner}" --changed-since HEAD --path "${us4_leaked}" >/dev/null
+
 echo "PASS: secret leak fixtures cover GitLab MR and Jenkins dev-batch evidence"
