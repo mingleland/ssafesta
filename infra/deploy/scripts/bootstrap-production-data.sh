@@ -4,15 +4,12 @@ set +x
 
 : "${PROD_POSTGRES_BACK_PASSWORD:?PROD_POSTGRES_BACK_PASSWORD is required}"
 : "${PROD_POSTGRES_AI_PASSWORD:?PROD_POSTGRES_AI_PASSWORD is required}"
-: "${REDIS_ADMIN_USER:?REDIS_ADMIN_USER is required}"
-: "${REDIS_ADMIN_PASSWORD:?REDIS_ADMIN_PASSWORD is required}"
 : "${PROD_REDIS_BACK_PASSWORD:?PROD_REDIS_BACK_PASSWORD is required}"
 : "${PROD_REDIS_AI_PASSWORD:?PROD_REDIS_AI_PASSWORD is required}"
 
 for secret in \
   "${PROD_POSTGRES_BACK_PASSWORD}" \
   "${PROD_POSTGRES_AI_PASSWORD}" \
-  "${REDIS_ADMIN_PASSWORD}" \
   "${PROD_REDIS_BACK_PASSWORD}" \
   "${PROD_REDIS_AI_PASSWORD}"
 do
@@ -91,61 +88,75 @@ done
 echo 'PRODUCTION_POSTGRESQL=PASS'
 
 redis_image="$("${docker_bin}" inspect --format '{{.Config.Image}}' "${redis_container}")"
+
 acl_source="$(
   "${docker_bin}" inspect "${redis_container}" |
   python3 -c '
-import json,sys
-doc=json.load(sys.stdin)[0]
-items=[x for x in doc.get("Mounts",[]) if x.get("Destination")=="/usr/local/etc/redis/users.acl"]
-if len(items)!=1: raise SystemExit("Redis users.acl mount is not unique")
-item=items[0]
-if item.get("Type")!="bind": raise SystemExit("Redis users.acl is not a host bind mount")
+import json
+import sys
+
+doc = json.load(sys.stdin)[0]
+
+items = [
+    item
+    for item in doc.get("Mounts", [])
+    if item.get("Destination")
+       == "/usr/local/etc/redis/users.acl"
+]
+
+if len(items) != 1:
+    raise SystemExit(
+        "Redis users.acl mount is not unique"
+    )
+
+item = items[0]
+
+if item.get("Type") != "bind":
+    raise SystemExit(
+        "Redis users.acl is not a host bind mount"
+    )
+
 print(item["Source"])
 '
 )"
+
 acl_dir="$(dirname "${acl_source}")"
 acl_name="$(basename "${acl_source}")"
-back_hash="$(printf '%s' "${PROD_REDIS_BACK_PASSWORD}" | sha256sum | awk '{print $1}')"
-ai_hash="$(printf '%s' "${PROD_REDIS_AI_PASSWORD}" | sha256sum | awk '{print $1}')"
+
+back_hash="$(
+  printf '%s' "${PROD_REDIS_BACK_PASSWORD}" |
+  sha256sum |
+  awk '{print $1}'
+)"
+
+ai_hash="$(
+  printf '%s' "${PROD_REDIS_AI_PASSWORD}" |
+  sha256sum |
+  awk '{print $1}'
+)"
 
 helper() {
-  "${docker_bin}" run --rm -i --network none \
+  "${docker_bin}" run \
+    --rm \
+    -i \
+    --network none \
     --mount "type=bind,src=${acl_dir},dst=/acl" \
-    --entrypoint /bin/sh "${redis_image}" "$@"
-}
-
-printf '%s\n%s\n%s\n' "${acl_name}" "${back_hash}" "${ai_hash}" |
-helper -eu -c '
-  IFS= read -r acl_name
-  IFS= read -r back_hash
-  IFS= read -r ai_hash
-  file="/acl/${acl_name}"
-  backup="/acl/.${acl_name}.pre-production-bootstrap"
-  temp="/acl/.${acl_name}.tmp.$$"
-  content="${temp}.content"
-  [ -f "${file}" ]
-  [ ! -e "${backup}" ] || { echo "stale Redis ACL bootstrap backup exists" >&2; exit 66; }
-  cp -p "${file}" "${backup}"
-  awk "!/^user prod_back / && !/^user prod_ai /" "${file}" >"${content}"
-  printf "%s\n" "user prod_back on #${back_hash} ~prod:* +@read +@write +@keyspace +@connection +@scripting -@dangerous +info" >>"${content}"
-  printf "%s\n" "user prod_ai on #${ai_hash} ~prod:ai:* +@read +@write +@scripting -@dangerous" >>"${content}"
-  cat "${content}" >"${temp}"
-  rm -f "${content}"
-  mv "${temp}" "${file}"
-'
-
-redis_admin() {
-  "${docker_bin}" exec -e REDISCLI_AUTH="${REDIS_ADMIN_PASSWORD}" "${redis_container}" \
-    redis-cli --user "${REDIS_ADMIN_USER}" --no-auth-warning "$@"
+    --entrypoint /bin/sh \
+    "${redis_image}" \
+    "$@"
 }
 
 restore_acl() {
   printf '%s\n' "${acl_name}" |
   helper -eu -c '
     IFS= read -r acl_name
+
     file="/acl/${acl_name}"
     backup="/acl/.${acl_name}.pre-production-bootstrap"
-    [ ! -f "${backup}" ] || mv "${backup}" "${file}"
+
+    if [ -f "${backup}" ]; then
+      mv "${backup}" "${file}"
+    fi
   '
 }
 
@@ -153,54 +164,233 @@ cleanup_backup() {
   printf '%s\n' "${acl_name}" |
   helper -eu -c '
     IFS= read -r acl_name
-    rm -f "/acl/.${acl_name}.pre-production-bootstrap"
+
+    rm -f \
+      "/acl/.${acl_name}.pre-production-bootstrap"
   '
 }
 
-committed=0
-on_error() {
-  local rc=$?
-  trap - ERR INT TERM
-  if [[ "${committed}" != 1 ]]; then
-    restore_acl >/dev/null 2>&1 || true
-    redis_admin ACL LOAD >/dev/null 2>&1 || true
-  fi
-  exit "${rc}"
+wait_redis_healthy() {
+  local deadline
+  local state
+
+  deadline=$((SECONDS + 90))
+
+  while (( SECONDS < deadline )); do
+    state="$(
+      "${docker_bin}" inspect \
+        --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' \
+        "${redis_container}" \
+        2>/dev/null || true
+    )"
+
+    case "${state}" in
+      healthy)
+        return 0
+        ;;
+      unhealthy|exited|dead)
+        echo \
+          "Redis failed after ACL reload: state=${state}" \
+          >&2
+        return 1
+        ;;
+    esac
+
+    sleep 2
+  done
+
+  echo \
+    'Redis did not become healthy within 90 seconds' \
+    >&2
+
+  return 1
 }
-on_signal() {
-  trap - ERR INT TERM
-  if [[ "${committed}" != 1 ]]; then
-    restore_acl >/dev/null 2>&1 || true
-    redis_admin ACL LOAD >/dev/null 2>&1 || true
-  fi
-  exit 130
+
+restart_redis() {
+  "${docker_bin}" restart "${redis_container}" >/dev/null
+  wait_redis_healthy
 }
-trap on_error ERR
-trap on_signal INT TERM
 
-redis_admin ACL LOAD >/dev/null
-
-[[ "$("${docker_bin}" exec -e REDISCLI_AUTH="${PROD_REDIS_BACK_PASSWORD}" "${redis_container}" redis-cli --user prod_back --no-auth-warning --raw SET prod:bootstrap:probe ok)" == OK ]]
-back_denied="$("${docker_bin}" exec -e REDISCLI_AUTH="${PROD_REDIS_BACK_PASSWORD}" "${redis_container}" redis-cli --user prod_back --no-auth-warning --raw SET demo:bootstrap:forbidden nope 2>&1 || true)"
-grep -Fq NOPERM <<<"${back_denied}"
-[[ "$("${docker_bin}" exec -e REDISCLI_AUTH="${PROD_REDIS_AI_PASSWORD}" "${redis_container}" redis-cli --user prod_ai --no-auth-warning --raw SET prod:ai:bootstrap:probe ok)" == OK ]]
-ai_denied="$("${docker_bin}" exec -e REDISCLI_AUTH="${PROD_REDIS_AI_PASSWORD}" "${redis_container}" redis-cli --user prod_ai --no-auth-warning --raw SET prod:backend:forbidden nope 2>&1 || true)"
-grep -Fq NOPERM <<<"${ai_denied}"
-
-printf '%s\n%s\n%s\n' "${acl_name}" "${back_hash}" "${ai_hash}" |
+printf '%s\n%s\n%s\n' \
+  "${acl_name}" \
+  "${back_hash}" \
+  "${ai_hash}" |
 helper -eu -c '
   IFS= read -r acl_name
   IFS= read -r back_hash
   IFS= read -r ai_hash
+
   file="/acl/${acl_name}"
-  grep -Eq "^user prod_back on #${back_hash} ~prod:\\* " "${file}"
-  grep -Eq "^user prod_ai on #${ai_hash} ~prod:ai:\\* " "${file}"
+  backup="/acl/.${acl_name}.pre-production-bootstrap"
+  temp="/acl/.${acl_name}.tmp.$$"
+  content="${temp}.content"
+
+  [ -f "${file}" ]
+
+  [ ! -e "${backup}" ] || {
+    echo \
+      "stale Redis ACL bootstrap backup exists: ${backup}" \
+      >&2
+    exit 66
+  }
+
+  cp -p "${file}" "${backup}"
+
+  awk \
+    "!/^user prod_back / && !/^user prod_ai /" \
+    "${file}" \
+    >"${content}"
+
+  printf "%s\n" \
+    "user prod_back on #${back_hash} ~prod:* +@read +@write +@keyspace +@connection +@scripting -@dangerous +info" \
+    >>"${content}"
+
+  printf "%s\n" \
+    "user prod_ai on #${ai_hash} ~prod:ai:* +@read +@write +@scripting -@dangerous" \
+    >>"${content}"
+
+  cat "${content}" >"${temp}"
+
+  rm -f "${content}"
+
+  mv "${temp}" "${file}"
 '
 
-"${docker_bin}" exec -e REDISCLI_AUTH="${PROD_REDIS_BACK_PASSWORD}" "${redis_container}" redis-cli --user prod_back --no-auth-warning DEL prod:bootstrap:probe >/dev/null
-"${docker_bin}" exec -e REDISCLI_AUTH="${PROD_REDIS_AI_PASSWORD}" "${redis_container}" redis-cli --user prod_ai --no-auth-warning DEL prod:ai:bootstrap:probe >/dev/null
+committed=0
+
+on_error() {
+  local rc=$?
+
+  trap - ERR INT TERM
+
+  if [[ "${committed}" != 1 ]]; then
+    restore_acl >/dev/null 2>&1 || true
+    restart_redis >/dev/null 2>&1 || true
+  fi
+
+  exit "${rc}"
+}
+
+on_signal() {
+  trap - ERR INT TERM
+
+  if [[ "${committed}" != 1 ]]; then
+    restore_acl >/dev/null 2>&1 || true
+    restart_redis >/dev/null 2>&1 || true
+  fi
+
+  exit 130
+}
+
+trap on_error ERR
+trap on_signal INT TERM
+
+# users.acl is mounted read-only into Redis.
+# There is no privileged Redis ACL admin user in the live contract.
+# Persist the new hashed users in the host ACL file, then perform one
+# controlled Redis restart so Redis reloads that file.
+restart_redis
+
+back_allowed="$(
+  "${docker_bin}" exec \
+    -e REDISCLI_AUTH="${PROD_REDIS_BACK_PASSWORD}" \
+    "${redis_container}" \
+    redis-cli \
+    --user prod_back \
+    --no-auth-warning \
+    --raw \
+    SET prod:bootstrap:probe ok
+)"
+
+[[ "${back_allowed}" == OK ]]
+
+back_denied="$(
+  "${docker_bin}" exec \
+    -e REDISCLI_AUTH="${PROD_REDIS_BACK_PASSWORD}" \
+    "${redis_container}" \
+    redis-cli \
+    --user prod_back \
+    --no-auth-warning \
+    --raw \
+    SET demo:bootstrap:forbidden nope \
+    2>&1 || true
+)"
+
+grep -Fq \
+  NOPERM \
+  <<<"${back_denied}"
+
+ai_allowed="$(
+  "${docker_bin}" exec \
+    -e REDISCLI_AUTH="${PROD_REDIS_AI_PASSWORD}" \
+    "${redis_container}" \
+    redis-cli \
+    --user prod_ai \
+    --no-auth-warning \
+    --raw \
+    SET prod:ai:bootstrap:probe ok
+)"
+
+[[ "${ai_allowed}" == OK ]]
+
+ai_denied="$(
+  "${docker_bin}" exec \
+    -e REDISCLI_AUTH="${PROD_REDIS_AI_PASSWORD}" \
+    "${redis_container}" \
+    redis-cli \
+    --user prod_ai \
+    --no-auth-warning \
+    --raw \
+    SET prod:backend:forbidden nope \
+    2>&1 || true
+)"
+
+grep -Fq \
+  NOPERM \
+  <<<"${ai_denied}"
+
+printf '%s\n%s\n%s\n' \
+  "${acl_name}" \
+  "${back_hash}" \
+  "${ai_hash}" |
+helper -eu -c '
+  IFS= read -r acl_name
+  IFS= read -r back_hash
+  IFS= read -r ai_hash
+
+  file="/acl/${acl_name}"
+
+  grep -Eq \
+    "^user prod_back on #${back_hash} ~prod:\\* " \
+    "${file}"
+
+  grep -Eq \
+    "^user prod_ai on #${ai_hash} ~prod:ai:\\* " \
+    "${file}"
+'
+
+"${docker_bin}" exec \
+  -e REDISCLI_AUTH="${PROD_REDIS_BACK_PASSWORD}" \
+  "${redis_container}" \
+  redis-cli \
+  --user prod_back \
+  --no-auth-warning \
+  DEL prod:bootstrap:probe \
+  >/dev/null
+
+"${docker_bin}" exec \
+  -e REDISCLI_AUTH="${PROD_REDIS_AI_PASSWORD}" \
+  "${redis_container}" \
+  redis-cli \
+  --user prod_ai \
+  --no-auth-warning \
+  DEL prod:ai:bootstrap:probe \
+  >/dev/null
+
 cleanup_backup
+
 committed=1
+
 trap - ERR INT TERM
 
 echo 'PRODUCTION_REDIS_ACL_PERSISTENCE=PASS'
