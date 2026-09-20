@@ -24,6 +24,14 @@ grep -Fq 'festa_prod_ai' "${bootstrap}"
 grep -Fq 'host-acl-file-hashed' "${bootstrap}"
 grep -Fq '~prod:*' "${bootstrap}"
 grep -Fq '~prod:ai:*' "${bootstrap}"
+
+if grep -Fq 'REDIS_ADMIN_' "${bootstrap}"; then
+  fail 'Production bootstrap must not require a nonexistent Redis ACL admin user'
+fi
+
+grep -Fq 'restart_redis' "${bootstrap}"
+grep -Fq 'wait_redis_healthy' "${bootstrap}"
+grep -Fq '"${docker_bin}" restart "${redis_container}"' "${bootstrap}"
 grep -Fq "branches('*/main')" "${job}"
 grep -Fq 'validate-production-main-ancestry.sh' "${pipeline}"
 grep -Fq 'deploy-production-candidate.sh' "${pipeline}"
@@ -59,7 +67,6 @@ after="$(readlink "${webgl_root}/current")"; [[ "${before}" == "${after}" ]] || 
 acl="${work}/users.acl"
 cat >"${acl}" <<'EOF_ACL'
 user default off
-user admin on #aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa ~* +@all
 user demo_back on #bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb ~demo:* +@read
 user prod_back on #cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc ~prod:* +@read
 EOF_ACL
@@ -70,7 +77,7 @@ printf '%s\n' "user prod_back on #${back_hash} ~prod:* +@read +@write +@keyspace
 printf '%s\n' "user prod_ai on #${ai_hash} ~prod:ai:* +@read +@write +@scripting -@dangerous" >>"${acl}.tmp"
 mv "${acl}.tmp" "${acl}"
 [[ "$(grep -c '^user prod_back ' "${acl}")" -eq 1 && "$(grep -c '^user prod_ai ' "${acl}")" -eq 1 ]]
-grep -Fq 'user admin on' "${acl}"; grep -Fq 'user demo_back on' "${acl}"
+grep -Fq 'user demo_back on' "${acl}"
 grep -Eq '^user prod_back on #[0-9a-f]{64} ~prod:\* ' "${acl}"
 grep -Eq '^user prod_ai on #[0-9a-f]{64} ~prod:ai:\* ' "${acl}"
 ! grep -Fq fixture-back-password "${acl}"; ! grep -Fq fixture-ai-password "${acl}"
