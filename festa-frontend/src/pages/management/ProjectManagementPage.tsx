@@ -40,7 +40,7 @@ const BASIC_FIELDS: Field[] = [
   { key: 'description', label: '소개', kind: 'area' },
 ];
 
-const GROUPS: { title: string; note?: string; fields: Field[] }[] = [
+const GROUPS: { title: string; note?: string; fields: Field[]; extraFields?: Field[]; extraLabel?: string }[] = [
   {
     title: '대표 · 미디어',
     note: '월드의 전시 패널에 그려지는 값입니다.',
@@ -53,9 +53,13 @@ const GROUPS: { title: string; note?: string; fields: Field[] }[] = [
     note: '방문자가 더 알아보고 싶을 때 따라가는 주소입니다.',
     fields: [
       { key: 'deployUrl', label: '서비스 주소', kind: 'url', hint: 'https://' },
+    ],
+    // 저장소·포트폴리오는 부가 링크다 — 상시 노출 대신 접어 두고, 값이 있으면 자연스럽게 펼친다.
+    extraFields: [
       { key: 'gitUrl', label: '저장소 주소', kind: 'url', hint: 'https://' },
       { key: 'portfolioUrl', label: '포트폴리오 주소', kind: 'url', hint: 'https://' },
     ],
+    extraLabel: '저장소 · 포트폴리오 주소',
   },
 ];
 
@@ -182,6 +186,12 @@ export function ProjectManagementPage() {
   const boothIdNum = useManagementBoothId();
   const state = useProjectEdit();
   const [uploadingLogo, setUploadingLogo] = useState(false);
+  // 부가 링크(저장소·포트폴리오) 펼침 — 값 유무가 초기값이고, 사용자 토글이 덮어쓴다.
+  // 값 유무를 노출 조건에 OR 로 걸면 값이 있는 한 토글이 죽는다(펼침·접힘 둘 다 변화 없음).
+  const hasExtraValues =
+    (state.draft.gitUrl ?? '') !== '' || (state.draft.portfolioUrl ?? '') !== '';
+  const [extraForced, setExtraForced] = useState<boolean | null>(null);
+  const extraOpen = extraForced ?? hasExtraValues;
   // 저장 성공이 내 부스 관리창의 프로젝트 조회를 무효화하게 한다 (edit.ts saveProject 주석)
   const queryClient = useQueryClient();
 
@@ -294,11 +304,32 @@ export function ProjectManagementPage() {
         </section>
         {GROUPS.map((group) => (
           <section key={group.title} className="sc-card mg-group">
-            <div className="mg-group-head">
-              <span className="sc-section-title">{group.title}</span>
-              {group.note !== undefined && <span className="sc-note">{group.note}</span>}
+            {/* 부가 링크 토글은 섹션 머리 우측에선다 — 본문 아래에 있으면 서비스 주소와 무관한 버튼으로 읽힌다 */}
+            <div className={group.extraFields !== undefined ? 'mg-group-head mg-group-head-split' : 'mg-group-head'}>
+              <div className="mg-group-titles">
+                <span className="sc-section-title">{group.title}</span>
+                {group.note !== undefined && <span className="sc-note">{group.note}</span>}
+              </div>
+              {group.extraFields !== undefined && (
+                <button
+                  type="button"
+                  className="mg-extra-toggle"
+                  aria-expanded={extraOpen}
+                  onClick={() => setExtraForced(!extraOpen)}
+                >
+                  {group.extraLabel}
+                  <span className="mg-extra-chevron" aria-hidden="true">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M6 9l6 6 6-6" />
+                    </svg>
+                  </span>
+                </button>
+              )}
             </div>
             {group.fields.map(renderField)}
+            {group.extraFields !== undefined
+              && extraOpen
+              && group.extraFields.map(renderField)}
           </section>
         ))}
       </form>
