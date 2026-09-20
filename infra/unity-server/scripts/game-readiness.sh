@@ -68,7 +68,18 @@ if [[ -z "${GAME_READINESS_SKIP_LISTENER_CONNECT:-}" ]]; then
   listener_ready=
   while (( SECONDS <= listener_deadline )); do
     listener_attempts=$(( listener_attempts + 1 ))
-    if timeout 5 bash -c "</dev/tcp/${host}/${port}" >/dev/null 2>&1; then listener_ready=1; break; fi
+    if timeout 5 bash -c "</dev/tcp/${host}/${port}" >/dev/null 2>&1; then
+      listener_ready=1
+      break
+    fi
+    # deploy agent 등 컨테이너 내부에서 실행되는 경우 호스트의 loopback 은 컨테이너와 격리되어 있다.
+    # docker socket 이 있으면 호스트 네트워크 네임스페이스를 빌려 루프백 바인딩을 확인한다.
+    if [[ "${host}" == '127.0.0.1' ]] && command -v "${docker_bin}" >/dev/null 2>&1; then
+      if "${docker_bin}" run --rm --net=host --entrypoint /bin/sh festa/jenkins-agent:local -c "timeout 5 bash -c '</dev/tcp/${host}/${port}'" >/dev/null 2>&1; then
+        listener_ready=1
+        break
+      fi
+    fi
     sleep 3
   done
   if [[ -z "${listener_ready}" ]]; then
