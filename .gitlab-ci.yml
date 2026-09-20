@@ -87,7 +87,7 @@ mr-status:
       else
         changed=$(git diff --name-only HEAD~1 2>/dev/null || true)
       fi
-      if grep -E '^(infra/|ci/|\.gitlab-ci\.yml|Jenkinsfile)' <<<"$changed" >/dev/null 2>&1; then
+      if printf '%s\n' "$changed" | grep -E '^(infra/|ci/|\.gitlab-ci\.yml|Jenkinsfile)' >/dev/null 2>&1; then
         echo "CI/Infra changes detected — running static contract tests..."
         for t in infra/jenkins/tests/*.sh; do bash "$t"; done
         bash infra/unity-server/tests/run-static.sh
