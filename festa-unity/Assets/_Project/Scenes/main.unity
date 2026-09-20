@@ -104589,8 +104589,10 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   _morning: {fileID: 8300000, guid: 22912cb7d46fe4541a9aaf49cfc0a63f, type: 3}
   _circus: {fileID: 8300000, guid: 9e6f9fd7b248e4f42a97d4fc4c2d8464, type: 3}
+  _arcade: {fileID: 8300000, guid: 96c583d340ac8a14593d014a93d6a39f, type: 3}
   _morningVolume: 0.38
   _circusVolume: 0.41
+  _arcadeVolume: 0.4
   _fadeSpeed: 1.4
 --- !u!4 &1066131235
 Transform:
