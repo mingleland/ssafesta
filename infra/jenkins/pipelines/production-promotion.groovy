@@ -161,8 +161,8 @@ PY
                     cp "$PRODUCTION_RECEIPT_PATH" artifacts/production-promotion/receipt.json
                     cp "$PRODUCTION_DATA_EVIDENCE_PATH" artifacts/production-promotion/data-bootstrap.json
                     find "$ENVIRONMENT_STATE_DIR/production" -type f \
-                      \( -name "$PRODUCTION_RECEIPT_ID*.json" -o -name 'current.json' -o -name 'known-good.json' -o -name 'previous.json' \) \
-                      -exec cp {} artifacts/production-promotion/ \;
+                      \\( -name "$PRODUCTION_RECEIPT_ID*.json" -o -name 'current.json' -o -name 'known-good.json' -o -name 'previous.json' \\) \
+                      -exec cp {} artifacts/production-promotion/ \\;
                 '''
             }
         }
