@@ -158,6 +158,8 @@ grep -q 'exit 79' "${repo_root}/festa-unity/ci/preflight-license" \
   || fail "license preflight must fail fast with exit 79"
 grep -q 'git lfs pull' "${component_pipeline}" && grep -q 'exit 78' "${component_pipeline}" \
   || fail "game component CI must resolve LFS pointers before Unity and stop on leftovers"
+! grep -q -E '^[[:space:]]*git lfs install' "${component_pipeline}" \
+  || fail "game component CI must not install LFS hooks/filters (core.hooksPath=/dev/null on Jenkins checkouts, #507)"
 grep -q 'hostname: festa-unity-agent' "${agent_compose}" && grep -q 'mac_address:' "${agent_compose}" \
   || fail "unity agent identity must be pinned so the Unity entitlement survives recreates"
 python3 - "${agent_compose}" <<'PY' || fail "unity agent must mount the image transfer volume for WebGL zips"
