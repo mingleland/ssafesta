@@ -231,13 +231,19 @@ describe('관리창 게시 흐름 (-898)', () => {
     await waitFor(() => expect(actionButton()).toBeNull());
   });
 
-  it('⑩ 플래그 OFF — 빈 게시본 + 직원 123 → AI_AGENT 를 새로 싣지 않고 운영 중 유지', async () => {
+  it('⑩ 플래그 ON 전이 — 빈 게시본 + 직원 123 → 변경사항 적용 → AI_AGENT(123) 이 실린다', async () => {
     server.version = 2;
     server.published = { ...emptyLayout };
     server.draft = { ...emptyLayout, revision: 4 };
     getAiAgent.mockResolvedValue({ agentId: 123, boothId: 42 });
     await renderOverlay();
-    await waitFor(() => expect(status()).toBe('운영 중'));
-    expect(actionButton()).toBeNull();
+    await waitFor(() => expect(actionButton()?.textContent).toBe('변경사항 적용'));
+    fireEvent.click(actionButton()!);
+    await waitFor(() => expect(publishLayout).toHaveBeenCalled());
+    const body = putDraft.mock.calls[0][1] as { expectedRevision: number; objects: Array<{ type: string; configId?: number }> };
+    expect(body.expectedRevision).toBe(4);
+    expect(body.objects).toEqual([expect.objectContaining({ type: 'AI_AGENT', configId: 123 })]);
+    await waitFor(() => expect(actionButton()).toBeNull());
+    expect(status()).toBe('운영 중');
   });
 });
