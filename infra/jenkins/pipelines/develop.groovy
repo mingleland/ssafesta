@@ -28,6 +28,12 @@ def call() {
     if (buildComponents.contains('game') && !gameBuildRequired) { error('detector selected a game build without gameBuildRequired') }
 
     if (validationComponents.isEmpty()) {
+        if (selection.sharedCiChanged) {
+            stage('CI Static & Contract Tests') {
+                sh 'for t in infra/jenkins/tests/*.sh; do bash "$t"; done'
+                sh 'bash infra/unity-server/tests/run-static.sh'
+            }
+        }
         echo "NO_OP: ${selection.reasons.join(', ')}"
         return
     }

@@ -77,9 +77,21 @@ mr-status:
   rules:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
   before_script:
-    - apk add --no-cache bash python3
+    - apk add --no-cache bash python3 curl jq git
   script:
     - bash infra/jenkins/scripts/secret-scan.sh --path .
+    - |
+      # CI/Infra 변경이 있을 때만 정적·계약 테스트를 수행한다 (Batch 2 최적화 — 무관한 컴포넌트 빌드 0).
+      if git rev-parse --verify origin/develop >/dev/null 2>&1; then
+        changed=$(git diff --name-only origin/develop...HEAD 2>/dev/null || git diff --name-only origin/develop..HEAD 2>/dev/null || true)
+      else
+        changed=$(git diff --name-only HEAD~1 2>/dev/null || true)
+      fi
+      if grep -E '^(infra/|ci/|\.gitlab-ci\.yml|Jenkinsfile)' <<<"$changed" >/dev/null 2>&1; then
+        echo "CI/Infra changes detected — running static contract tests..."
+        for t in infra/jenkins/tests/*.sh; do bash "$t"; done
+        bash infra/unity-server/tests/run-static.sh
+      fi
     - echo 'MR pipeline status only; component CI is selected by rules:changes'
 
 .front-changes:
@@ -91,8 +103,14 @@ mr-status:
         compare_to: 'refs/heads/develop'
         paths:
           - festa-frontend/**/*
-          - ci/**/*
-          - .gitlab-ci.yml
+
+.front-npm-cache:
+  cache:
+    key:
+      files:
+        - festa-frontend/package-lock.json
+    paths:
+      - festa-frontend/node_modules/
 
 .back-changes:
   rules:
@@ -103,8 +121,6 @@ mr-status:
         compare_to: 'refs/heads/develop'
         paths:
           - backend/**/*
-          - ci/**/*
-          - .gitlab-ci.yml
 
 .back-maven-cache:
   variables:
@@ -126,8 +142,14 @@ mr-status:
         compare_to: 'refs/heads/develop'
         paths:
           - festa-ai/**/*
-          - ci/**/*
-          - .gitlab-ci.yml
+
+.ai-pip-cache:
+  cache:
+    key:
+      files:
+        - festa-ai/pyproject.toml
+    paths:
+      - festa-ai/.venv/
 
 .game-changes:
   rules:
@@ -172,6 +194,7 @@ ai-test:
   extends:
     - .component-ci
     - .ai-changes
+    - .ai-pip-cache
   stage: test
   image: python:3.13-slim
   variables:
@@ -183,6 +206,7 @@ ai-build:
   extends:
     - .component-ci
     - .ai-changes
+    - .ai-pip-cache
   stage: build
   image: python:3.13-slim
   variables:
@@ -196,6 +220,7 @@ front-test:
   extends:
     - .component-ci
     - .front-changes
+    - .front-npm-cache
   stage: test
   image: node:24-bookworm-slim
   variables:
@@ -207,6 +232,7 @@ front-build:
   extends:
     - .component-ci
     - .front-changes
+    - .front-npm-cache
   stage: build
   image: node:24-bookworm-slim
   variables:

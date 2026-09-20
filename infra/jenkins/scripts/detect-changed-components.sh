@@ -204,7 +204,9 @@ game_build_required = any(
 )
 
 shared = ci_shared or runtime_shared
-validation = set(order) if shared else set(touched)
+# runtime_shared 는 demo 런타임 공유 파일(demo/base.yaml 등)이라 app 3종 검증/빌드/배포를 수반한다.
+# ci_only_shared 는 파이프라인/스크립트/설정 변경이므로 무관한 app 전체 검증으로 넓히지 않는다 (Batch 2 최적화).
+validation = (set(apps) if runtime_shared else set()) | set(touched) | ({"game"} if game_build_required else set())
 build = (touched & apps) | (apps if runtime_shared else set()) | ({"game"} if game_build_required else set())
 deploy = (touched & apps) | (apps if runtime_shared else set()) | ({"game"} if ("game" in touched and game_build_required) else set())
 
