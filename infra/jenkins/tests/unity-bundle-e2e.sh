@@ -24,6 +24,10 @@ grep -q 'festa-webgl-e2e' "${pipeline}" || fail 'E2E WebGL must go to its own pa
 grep -q 'publish-world-release.sh' "${pipeline}" && fail 'E2E must not create canonical world packages'
 grep -E "publish-webgl-release.sh '\$\{webglZip\}'" "${pipeline}" | grep -q 'WEBGL_PACKAGE_NAME' && fail 'canonical webgl publish must not be reachable'
 grep -q 'restoreDemo' "${pipeline}" || fail 'E2E must restore the previous demo current'
+# 실패해도 Demo 를 candidate 인 채로 두지 않는다 — 빌드 #2 가 그렇게 남았다.
+grep -q '} finally {' "${pipeline}" || fail 'restore must run on failure too'
+# readiness/rollback/promote 가 환경 묶음 밖에서 불리면 상태 디렉터리를 못 찾는다(빌드 #2).
+grep -q 'withEnv(gameEnv)' "${pipeline}" || fail 'game steps must share one environment block'
 grep -q 'demo-current-before.json' "${pipeline}" || fail 'E2E must record what it borrowed'
 if grep -qE 'deploy-production|production-promotion|approve-production|webgl/prod|festa-production' "${pipeline}"; then
   fail 'E2E pipeline must not touch any production path'
