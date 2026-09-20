@@ -9,6 +9,8 @@ docker_bin="${DOCKER_BIN:-docker}"
 : "${GAME_ENV_FILE:?GAME_ENV_FILE is required}"
 : "${GAME_DEPLOY_STATE_DIR:?GAME_DEPLOY_STATE_DIR is required}"
 : "${CI_ARTIFACT_DIR:?CI_ARTIFACT_DIR is required}"
+# 외부 WSS 검사는 이 환경의 World host 로만 한다 (Batch 1: Demo 는 world-demo.<root>).
+[[ -n "${WORLD_PUBLIC_HOST:-}" ]] || { echo 'WORLD_PUBLIC_HOST is required for the external WebSocket check' >&2; exit 64; }
 approval_evidence_file="${APPROVAL_EVIDENCE_FILE:-}"
 
 compose_file="${GAME_COMPOSE_FILE:-${repo_root}/infra/unity-server/compose.yaml}"

@@ -8,7 +8,9 @@ source "${script_dir}/../lib/assert.sh"
 site="${repo_root}/infra/environments/nginx/sites/demo.conf.template"
 
 assert_file "${site}"
-assert_contains "${site}" 'server_name demo\.\$\{ROOT_DOMAIN\} \$\{ROOT_DOMAIN\};' 'demo must retain the current root-domain alias until Production cutover'
+# Production cutover(2026-09-20) 이후 root domain 은 Production 소유다. Demo 는 demo.<root> 만 선언한다.
+assert_contains "${site}" 'server_name demo\.\$\{ROOT_DOMAIN\};' 'demo must serve demo.<root> only'
+assert_not_contains "${site}" 'server_name demo\.\$\{ROOT_DOMAIN\} \$\{ROOT_DOMAIN\};' 'demo must not claim the root domain after Production cutover'
 assert_not_contains "${site}" '^[[:space:]]*http2 on;' 'demo must remain compatible with the deployed Nginx version'
 assert_contains "${site}" 'location = /unity/manifest\.json' 'manifest must bypass the frontend SPA fallback'
 assert_contains "${site}" 'location /unity/Build/' 'hashed Unity build files need a dedicated location'

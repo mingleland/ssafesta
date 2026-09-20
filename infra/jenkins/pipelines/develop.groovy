@@ -204,8 +204,11 @@ def call() {
                 checkout scm
                 sh "git checkout --detach '${headSha}'"
                 unstash 'candidate-release-manifest-game'
+                // Demo readiness 는 Demo World host 만 검사한다 — 값이 없으면 추론하지 않고 멈춘다 (Batch 1).
+                if (!env.DEMO_WORLD_HOST?.trim()) { error('DEMO_WORLD_HOST is required on the deploy agent (world-demo.<root>)') }
                 withEnv([
                     "RELEASE_MANIFEST_PATH=${gameManifest}",
+                    "WORLD_PUBLIC_HOST=${env.DEMO_WORLD_HOST}",
                     "GAME_ENV_FILE=${env.GAME_ENV_FILE ?: '/srv/festa/config/game.env'}",
                     "CONNECTION_TOKEN_SECRET_FILE=${env.CONNECTION_TOKEN_SECRET_FILE ?: '/opt/festa/secrets/dev-game-connection-token-secret'}",
                     "GAME_DEPLOY_STATE_DIR=${env.GAME_DEPLOY_STATE_DIR ?: '/var/lib/festa-environments/demo/game'}",

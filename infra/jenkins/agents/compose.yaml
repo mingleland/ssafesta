@@ -87,6 +87,8 @@ services:
       WEBGL_RELEASE_ROOT: /srv/festa/webgl
       WEBGL_PUBLIC_BASE_URL: ${WEBGL_PUBLIC_BASE_URL:-https://demo.ssafesta.world/unity}
       WEBGL_RETENTION_COUNT: ${WEBGL_RETENTION_COUNT:-5}
+      # Demo World 전용 public host. readiness 가 Production world.<root> 를 검사하지 않게 한다 (Batch 1).
+      DEMO_WORLD_HOST: ${DEMO_WORLD_HOST:-world-demo.${ROOT_DOMAIN:?set in infra/.env}}
       R2_BACKUP_ENDPOINT: ${R2_BACKUP_ENDPOINT:-}
       R2_BACKUP_BUCKET: ${R2_BACKUP_BUCKET:-}
       GAME_ENV_FILE: ${GAME_ENV_FILE:-/srv/festa/config/game.env}
