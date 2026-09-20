@@ -5,7 +5,7 @@ String checkoutCredential = System.getenv('GITLAB_CHECKOUT_CREDENTIALS_ID') ?: '
 String repositoryUrl = "${serverUrl}/${projectOwner}/${projectPath}.git"
 
 pipelineJob('festa-production-promotion') {
-    description('Consume one human-approved Demo Promotion Receipt from main and stage exactly those artifacts as a Production candidate. No application, Docker, Unity, or WebGL build is permitted.')
+    description('Consume one human-approved Demo Promotion Receipt from main, activate the exact artifacts, verify public Production, and require human approval before known-good. No application, Docker, Unity, or WebGL build is permitted.')
     parameters {
         stringParam('RECEIPT_ID', '', 'Approved receipt under production/receipts')
         stringParam('PRODUCTION_WORLD_HOST', '', 'Production World hostname reserved for public cutover')

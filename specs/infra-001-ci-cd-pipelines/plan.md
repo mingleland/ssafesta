@@ -126,3 +126,13 @@ specs/infra-001-ci-cd-pipelines/
 ## Post-Design Constitution Check
 
 All changed decisions conform to amended Article II-10. No unresolved implementation choice blocks tasks: shared path handling, failure semantics, batch rollback boundary and demo approval are specified by [research.md](./research.md), [data-model.md](./data-model.md), and [contracts/changed-component-contract.md](./contracts/changed-component-contract.md).
+
+## Production final correction (2026-09-20)
+
+- Production은 승인 receipt의 App/WebGL/World artifact를 다시 빌드하거나 repack하지 않고 소비한다.
+- bootstrap은 `prod_ai`에 `~prod:ai:*`와 `~conversation:*`만 허용하고, `prod_back`의 `~prod:*`에서는 `conversation:*`을 거부한다. evidence는 `aiKeyPattern`을 유지하고 `conversationKeyPattern`을 추가한다.
+- same-port migration은 maintenance fence 뒤 legacy `festa-prod-*`를 제거하고 canonical `festa-production-*`을 `28080/28081/28082/27777`에 배치한다. 별도 blue/green port를 만들지 않는다.
+- public activation은 OAuth route를 Back `28081`, WebGL을 `/srv/festa/webgl/prod/current`, World를 `27777`로 연결한다. Demo는 root domain을 소유하지 않는다.
+- CURRENT는 public activation 성공 뒤 기록하고, KNOWN-GOOD는 external 검증과 사람 승인 뒤 별도로 기록한다.
+- 최초 canonical migration에는 `previous`가 없다. 실패하면 maintenance를 유지하며 broken legacy를 복원하지 않는다. 첫 canonical KNOWN-GOOD 이후부터 직전 canonical CURRENT를 exact-artifact rollback 대상으로 기록한다.
+- `festa_prod_readonly`는 실제 consumer가 없어 P0 Production Promotion에서 생성하지 않는다.

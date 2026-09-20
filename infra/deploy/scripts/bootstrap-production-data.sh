@@ -211,6 +211,17 @@ restart_redis() {
   wait_redis_healthy
 }
 
+cleanup_probe_keys() {
+  "${docker_bin}" exec \
+    -e REDISCLI_AUTH="${PROD_REDIS_BACK_PASSWORD}" \
+    "${redis_container}" redis-cli --user prod_back --no-auth-warning \
+    DEL prod:backend:bootstrap:probe >/dev/null 2>&1 || true
+  "${docker_bin}" exec \
+    -e REDISCLI_AUTH="${PROD_REDIS_AI_PASSWORD}" \
+    "${redis_container}" redis-cli --user prod_ai --no-auth-warning \
+    DEL prod:ai:bootstrap:probe conversation:bootstrap:probe >/dev/null 2>&1 || true
+}
+
 printf '%s\n%s\n%s\n' \
   "${acl_name}" \
   "${back_hash}" \
@@ -246,7 +257,7 @@ helper -eu -c '
     >>"${content}"
 
   printf "%s\n" \
-    "user prod_ai on #${ai_hash} ~prod:ai:* +@read +@write +@scripting -@dangerous" \
+    "user prod_ai on #${ai_hash} ~prod:ai:* ~conversation:* +@read +@write +@scripting -@dangerous" \
     >>"${content}"
 
   cat "${content}" >"${temp}"
@@ -264,6 +275,7 @@ on_error() {
   trap - ERR INT TERM
 
   if [[ "${committed}" != 1 ]]; then
+    cleanup_probe_keys
     restore_acl >/dev/null 2>&1 || true
     restart_redis >/dev/null 2>&1 || true
   fi
@@ -275,6 +287,7 @@ on_signal() {
   trap - ERR INT TERM
 
   if [[ "${committed}" != 1 ]]; then
+    cleanup_probe_keys
     restore_acl >/dev/null 2>&1 || true
     restart_redis >/dev/null 2>&1 || true
   fi
@@ -299,7 +312,7 @@ back_allowed="$(
     --user prod_back \
     --no-auth-warning \
     --raw \
-    SET prod:bootstrap:probe ok
+    SET prod:backend:bootstrap:probe ok
 )"
 
 [[ "${back_allowed}" == OK ]]
@@ -312,7 +325,7 @@ back_denied="$(
     --user prod_back \
     --no-auth-warning \
     --raw \
-    SET demo:bootstrap:forbidden nope \
+    SET conversation:bootstrap:forbidden nope \
     2>&1 || true
 )"
 
@@ -332,6 +345,19 @@ ai_allowed="$(
 )"
 
 [[ "${ai_allowed}" == OK ]]
+
+ai_conversation_allowed="$(
+  "${docker_bin}" exec \
+    -e REDISCLI_AUTH="${PROD_REDIS_AI_PASSWORD}" \
+    "${redis_container}" \
+    redis-cli \
+    --user prod_ai \
+    --no-auth-warning \
+    --raw \
+    SET conversation:bootstrap:probe ok
+)"
+
+[[ "${ai_conversation_allowed}" == OK ]]
 
 ai_denied="$(
   "${docker_bin}" exec \
@@ -365,27 +391,15 @@ helper -eu -c '
     "${file}"
 
   grep -Eq \
-    "^user prod_ai on #${ai_hash} ~prod:ai:\\* " \
+    "^user prod_ai on #${ai_hash} ~prod:ai:\\* ~conversation:\\* " \
+    "${file}"
+
+  ! grep -Eq \
+    "^user prod_back .*~conversation:\\*" \
     "${file}"
 '
 
-"${docker_bin}" exec \
-  -e REDISCLI_AUTH="${PROD_REDIS_BACK_PASSWORD}" \
-  "${redis_container}" \
-  redis-cli \
-  --user prod_back \
-  --no-auth-warning \
-  DEL prod:bootstrap:probe \
-  >/dev/null
-
-"${docker_bin}" exec \
-  -e REDISCLI_AUTH="${PROD_REDIS_AI_PASSWORD}" \
-  "${redis_container}" \
-  redis-cli \
-  --user prod_ai \
-  --no-auth-warning \
-  DEL prod:ai:bootstrap:probe \
-  >/dev/null
+cleanup_probe_keys
 
 cleanup_backup
 
@@ -400,12 +414,13 @@ EVIDENCE="${evidence}" python3 - <<'PY'
 import datetime,json,os,pathlib
 path=pathlib.Path(os.environ['EVIDENCE'])
 doc={
- 'schemaVersion':'1.0.0','state':'READY','environment':'production','bootstrapMode':'fresh-isolated',
+ 'schemaVersion':'1.1.0','state':'READY','environment':'production','bootstrapMode':'fresh-isolated',
  'databases':{
    'business':{'name':'festa_prod_business','role':'festa_prod_back_app'},
    'ai':{'name':'festa_prod_ai','role':'festa_prod_ai_app'}},
  'redis':{
    'backUser':'prod_back','backKeyPattern':'prod:*','aiUser':'prod_ai','aiKeyPattern':'prod:ai:*',
+   'conversationKeyPattern':'conversation:*',
    'persistence':'host-acl-file-hashed'},
  'demoDataCopied':False,
  'verifiedAt':datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0).isoformat().replace('+00:00','Z')}
