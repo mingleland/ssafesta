@@ -73,7 +73,7 @@ GitLab's `rules:changes` evaluates the MR diff. A Jenkins `develop` Squash merge
 
 ### 4. WebGL Package Registry delivery
 
-(Batch 2, 2026-09-20 이후 정상 경로) `festa-gitlab-develop/develop` 이 `gameBuildRequired` 일 때 스스로 WebGL+World 를 만들고 게시한다 — `infra/unity-server/runbooks/unity-build.md`. 아래 1–2 는 fallback 이다.
+(Batch 2, 2026-09-20 이후 정상 경로) Jenkins 는 Unity 를 빌드하지 않는다. Unity 담당자가 올린 Unity Release Bundle(`unity-release-bundle/<8sha>`)을 `festa-gitlab-develop/develop` 이 받아 검증·canonical 게시·Demo 반영한다 — `infra/unity-server/runbooks/unity-release-bundle.md`. 아래 1–2 는 fallback 이다.
 
 1. (fallback) 사람이 `publish-webgl-release.sh ZIP <8sha>` 로 zip 구조·lineage 를 검사하고 SHA-256 을 계산한다. 정상 경로에서는 deploy agent 가 `--no-trigger` 로 같은 스크립트를 부른다.
 2. `festa-webgl/<8sha>/festa-webgl-release-<8sha>.zip` + `.sha256` + `.json`(실행 provenance)을 올린다. 같은 version 이 이미 있으면 SHA 가 같을 때만 `WEBGL_RELEASE_EXISTS` 로 성공하고 다르면 65 다. fallback 에서만 업로드 뒤 Jenkins job 을 호출한다.
