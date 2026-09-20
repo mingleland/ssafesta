@@ -7,6 +7,7 @@ FROM ${NODE_RUNTIME_IMAGE} AS node-runtime
 FROM ${JENKINS_INBOUND_AGENT_IMAGE}
 
 ARG PYTHON_JSONSCHEMA_VERSION
+ARG PYTHON_PYYAML_VERSION
 
 USER root
 RUN apt-get update \
@@ -35,11 +36,12 @@ COPY --from=docker-cli /usr/local/libexec/docker/cli-plugins/docker-compose /usr
 COPY --from=node-runtime /usr/local/bin/node /usr/local/bin/node
 COPY --from=node-runtime /usr/local/lib/node_modules/npm /usr/local/lib/node_modules/npm
 RUN python -m venv /opt/jenkins-python \
-    && /opt/jenkins-python/bin/pip install --no-cache-dir "jsonschema==${PYTHON_JSONSCHEMA_VERSION}" \
+    && /opt/jenkins-python/bin/pip install --no-cache-dir "jsonschema==${PYTHON_JSONSCHEMA_VERSION}" "PyYAML==${PYTHON_PYYAML_VERSION}" \
     && ln -s ../lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm \
     && ln -s ../lib/node_modules/npm/bin/npx-cli.js /usr/local/bin/npx \
     && /opt/jenkins-python/bin/python -c 'import sys; assert sys.version_info >= (3, 12)' \
     && /opt/jenkins-python/bin/python -c 'import jsonschema; print(jsonschema.__version__)' \
+    && /opt/jenkins-python/bin/python -c 'import yaml; print(yaml.__version__)' \
     && python -m pip --version \
     && node -e 'const major=Number(process.versions.node.split(".")[0]); if (major < 24) process.exit(1)' \
     && npm --version \

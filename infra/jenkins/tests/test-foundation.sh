@@ -63,6 +63,7 @@ grep -qx 'timestamper:1.30' "${plugins}" || fail "Timestamper plugin is not pinn
 grep -q 'check-agent-capabilities.sh' "${jenkinsfile}" || fail "Agent capability gate is not wired"
 grep -q 'jsonschema==' "${agent_dockerfile}" || fail "Agent image does not pin jsonschema"
 grep -q 'PYTHON_JSONSCHEMA_VERSION' "${agent_compose}" || fail "Agent Compose omits the jsonschema version pin"
+grep -q 'PYTHON_PYYAML_VERSION' "${agent_compose}" || fail "Agent Compose omits the PyYAML version pin"
 for package in libasound2t64 libgl1 libglu1-mesa libgtk-3-0t64 libicu76 libnss3 libxss1 libxtst6; do
   grep -q "^[[:space:]]*${package}[[:space:]\\]*$" "${agent_dockerfile}" || fail "Agent image omits Unity runtime package: ${package}"
 done
@@ -363,6 +364,7 @@ export JENKINS_INBOUND_AGENT_IMAGE="jenkins/inbound-agent:foundation-test-jdk21"
 export DOCKER_CLI_IMAGE="docker:foundation-test-cli"
 export NODE_RUNTIME_IMAGE="node:foundation-test"
 export PYTHON_JSONSCHEMA_VERSION="4.26.0"
+export PYTHON_PYYAML_VERSION="6.0.2"
 export JENKINS_ADMIN_ID="foundation-admin"
 export JENKINS_ADMIN_PASSWORD="foundation-only-value"
 export JENKINS_UNITY_MR_VALIDATOR_PASSWORD="foundation-unity-mr-validator-value"
