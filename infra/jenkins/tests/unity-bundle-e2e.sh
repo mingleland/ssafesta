@@ -29,6 +29,8 @@ if grep -qE 'deploy-production|production-promotion|approve-production|webgl/pro
   fail 'E2E pipeline must not touch any production path'
 fi
 grep -q 'validate-game-release-set.sh' "${pipeline}" || fail 'artifact contract checks stay on in fixture mode'
+# package-write 는 Secret text 다 — usernamePassword 로 묶으면 실행 중에 죽는다(빌드 #1).
+grep -q "string(credentialsId: writeCredentialId" "${pipeline}" || fail 'package write credential must bind as secret text'
 grep -q 'apiEnvironment' "${pipeline}" || fail 'apiEnvironment must be asserted'
 
 # ── publisher 멱등 계약 (curl 스텁)

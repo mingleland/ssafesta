@@ -92,8 +92,8 @@ assert doc["buildProfile"] == "release", doc.get("buildProfile")' '${bundleDir}/
 
                     // ── WebGL zip 은 E2E namespace 로만 올린다. canonical festa-webgl/festa-world 는 이 job 이 만들지 않는다.
                     final String e2ePackage = env.WEBGL_E2E_PACKAGE_NAME ?: 'festa-webgl-e2e'
-                    withCredentials([usernamePassword(credentialsId: writeCredentialId,
-                        usernameVariable: 'GITLAB_PACKAGE_USER', passwordVariable: 'GITLAB_PACKAGE_TOKEN')]) {
+                    // package-write 는 Secret text 다 (develop 파이프라인과 같은 바인딩).
+                    withCredentials([string(credentialsId: writeCredentialId, variable: 'GITLAB_PACKAGE_TOKEN')]) {
                         withEnv(["WEBGL_PACKAGE_NAME=${e2ePackage}"]) {
                             sh "infra/jenkins/scripts/with-credentials.sh GITLAB_PACKAGE_TOKEN -- infra/jenkins/scripts/publish-webgl-release.sh '${webglZip}' '${bundleVersion}' --no-trigger"
                         }
