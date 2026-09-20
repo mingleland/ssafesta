@@ -185,13 +185,20 @@ if not isinstance(env_components, dict) or set(env_components) != {
 }:
     deny("Demo KNOWN_GOOD must contain exactly ai, back, front and game")
 
+# demoReleaseId 는 Demo KNOWN_GOOD 조합의 canonical ID(environment.batchId)다. 컴포넌트별 releaseId 는
+# 서로 달라도 된다 — 부분 배포된 Demo 를 미변경 artifact 재발급 없이 그대로 승격한다 (Batch 1).
 demo_release_id = receipt["demoReleaseId"]
+environment_batch_id = known_good_environment.get("batchId")
+if not isinstance(environment_batch_id, str) or not environment_batch_id:
+    deny("Demo KNOWN_GOOD environment has no batchId")
+if demo_release_id != environment_batch_id:
+    deny(
+        "receipt demoReleaseId does not match Demo KNOWN_GOOD batchId: "
+        f"receipt={demo_release_id!r} environment={environment_batch_id!r}"
+    )
 
 for component in ("ai", "back", "front"):
     approved = env_components[component]
-
-    if approved.get("releaseId") != demo_release_id:
-        deny(f"{component} does not belong to receipt demoReleaseId")
 
     same_identity(
         receipt["applications"][component],
@@ -223,9 +230,6 @@ if current_game.get("state") not in ("CURRENT", "CURRENT/KNOWN_GOOD"):
 for key in ("releaseId", "sourceCommit", "imageRef", "contentId"):
     if current_game.get(key) != known_good_game.get(key):
         deny(f"Demo game current/known-good mismatch for {key}")
-
-if known_good_game.get("releaseId") != demo_release_id:
-    deny("Demo game does not belong to receipt demoReleaseId")
 
 approved_game_from_environment = env_components["game"]
 same_identity(

@@ -17,13 +17,17 @@ def call() {
     writeFile file: 'artifacts/develop/selection.json', text: "${selectionText}\n"
     archiveArtifacts artifacts: 'artifacts/develop/selection.json', allowEmptyArchive: false, fingerprint: true
 
-    final List components = selection.components as List
+    // 네 축 계약 (Batch 1): validation ⊇ build ⊇ (deploy ∩ apps). shared-ci 는 검증만 넓힌다.
+    final List validationComponents = (selection.validationComponents ?: selection.components) as List
+    final List buildComponents = (selection.buildComponents ?: []) as List
+    final List selectedDeploy = (selection.deployComponents ?: []) as List
     if (!(selection.gameBuildRequired instanceof Boolean)) {
         error('component detector must return boolean gameBuildRequired')
     }
     final boolean gameBuildRequired = selection.gameBuildRequired as boolean
+    if (buildComponents.contains('game') && !gameBuildRequired) { error('detector selected a game build without gameBuildRequired') }
 
-    if (components.isEmpty()) {
+    if (validationComponents.isEmpty()) {
         echo "NO_OP: ${selection.reasons.join(', ')}"
         return
     }
@@ -31,29 +35,22 @@ def call() {
     final String artifactRoot = 'artifacts/develop'
     final String releaseId = "develop-${headSha}-${env.BUILD_NUMBER}"
     final String transferDir = '/var/lib/festa-image-transfer'
-    // `components` may be all components for a shared CI change. Only the
-    // detector's deployComponents contract is allowed to mutate dev.
-    final List deployComponents = (selection.deployComponents as List).findAll { it in ['ai', 'back', 'front'] }
+    // Only the detector's deployComponents contract is allowed to mutate demo.
+    final List deployComponents = selectedDeploy.findAll { it in ['ai', 'back', 'front'] }
     final String deployComponentList = deployComponents.join(',')
 
-    echo "SELECTED_COMPONENTS: ${components.join(', ')}; dev batch targets: ${deployComponentList ?: 'none'}"
+    echo "SELECTED_COMPONENTS: validate=${validationComponents.join(', ')}; build=${buildComponents.join(', ') ?: 'none'}; dev batch targets: ${deployComponentList ?: 'none'}"
 
     // game 은 Unity 실행기 하나를 독점하고 빌드가 45분을 넘는다. 그 빌드를 ai·back·front 배포보다
     // 앞에 두면 unity 가 붐빌 때 무관한 파트 배포까지 함께 죽는다 — #468 은 unity 대기 50분 뒤
     // 전체 타임아웃으로 ABORT 되며 이미 만들어 둔 back·front 이미지를 배포하지 못했다 (2026-09-18 실측).
     // 그래서 앱 컴포넌트를 먼저 빌드·배포하고 game 은 뒤에 둔다. 배포 단위가 서로 다르므로
     // release manifest 도 각자 만든다 (schema 는 minItems 1 을 허용한다).
-    final List appComponents = components.findAll { it != 'game' }
+    final List appComponents = buildComponents.findAll { it != 'game' }
     final String appComponentList = appComponents.join(',')
-    final boolean hasGame = components.contains('game')
-    // 배포 여부는 detector 의 deployComponents 계약만 결정한다. shared CI 변경은 네 컴포넌트를 모두
-    // 빌드하지만 배포 대상은 비운다 — 그때 game 을 배포하면 안 된다.
-    final boolean deployGame = (selection.deployComponents as List).contains('game')
-
-    if (deployComponents.isEmpty() && !hasGame) {
-        echo 'NO_OP: game deployment remains on the Phase 3 WebGL path; Dedicated Server deployment is infra-003'
-        return
-    }
+    // game 은 buildComponents 에 있을 때만(= gameBuildRequired) Unity 를 돌린다. 배포는 deployComponents 가 결정한다.
+    final boolean hasGame = buildComponents.contains('game')
+    final boolean deployGame = selectedDeploy.contains('game')
 
     final String appMetadataDir = "${artifactRoot}/release-metadata"
     final String appManifest = "${artifactRoot}/release-manifest.json"
@@ -62,12 +59,24 @@ def call() {
     final String gameManifest = "${artifactRoot}/release-manifest-game.json"
     final String gameBundle = "${releaseId}-game"
 
-    def buildComponent = { String component ->
+    def buildComponent = { String component, List stages = null ->
         load('infra/jenkins/pipelines/component.groovy').call([
             component: component,
             sourceSha: selection.headSha,
-            artifactDir: "artifacts/develop/build/${component}"
+            artifactDir: "artifacts/develop/build/${component}",
+            stages: stages
         ])
+    }
+
+    // 검증만 할 컴포넌트: app 은 validate+test, game 은 validate(정적, Unity 없음).
+    final List validateOnly = validationComponents.findAll { !(it in buildComponents) }
+    validateOnly.each { component ->
+        buildComponent(component, component == 'game' ? ['validate'] : ['validate', 'test'])
+    }
+
+    if (buildComponents.isEmpty()) {
+        echo "NO_OP: validation-only change (${selection.reasons.join(', ')})"
+        return
     }
 
     def candidateManifest = { String label, String comps, String metadataDir, String manifestPath, String bundle, String stashName ->
@@ -180,11 +189,6 @@ def call() {
     }
 
     if (!hasGame) { return }
-
-    if (!gameBuildRequired) {
-        echo 'NO_OP: shared infra change does not alter game build inputs; Unity candidate build skipped'
-        return
-    }
 
     // 여기서부터 game 이다. 위의 앱 배포가 이미 끝났으므로 Unity 대기가 그 배포를 막지 않는다.
     buildComponent('game')

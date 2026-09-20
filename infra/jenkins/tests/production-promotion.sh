@@ -48,6 +48,9 @@ state = pathlib.Path(os.environ["STATE"])
 webgl_root = pathlib.Path(os.environ["WEBGL_ROOT"])
 
 release_id = f"develop-{commit}-1"
+# 부분 배포 조합: front 만 나중 배치에서 나왔다. 조합의 canonical ID 는 batchId 하나다 (Batch 1).
+front_release_id = f"develop-{commit}-2"
+batch_id = "demo-env-fixture000000001"
 
 ids = {
     "ai": "sha256:" + "a" * 64,
@@ -58,7 +61,7 @@ ids = {
 
 components = {
     name: {
-        "releaseId": release_id,
+        "releaseId": front_release_id if name == "front" else release_id,
         "sourceCommit": commit,
         "imageRef": f"festa-{name}:{commit}",
         "contentId": ids[name],
@@ -69,6 +72,7 @@ components = {
 known_good_environment = {
     "schemaVersion": "1.0.0",
     "state": "KNOWN_GOOD",
+    "batchId": batch_id,
     "approvedAt": "2026-09-19T00:01:00Z",
     "approvedBy": "fixture-approver",
     "approvedFromHistory": release_id,
@@ -94,8 +98,14 @@ release_manifest = {
 }
 
 for name in ("ai", "back", "front"):
+    document = dict(release_manifest)
+    if name == "front":
+        # front 는 별도 배치의 current 다 — 미변경 컴포넌트를 재발급하지 않는다.
+        document = {**release_manifest, "releaseId": front_release_id, "components": [
+            item for item in release_manifest["components"] if item["name"] == "front"
+        ]}
     (state / f"dev/batches/current/{name}.json").write_text(
-        json.dumps(release_manifest, indent=2) + "\n"
+        json.dumps(document, indent=2) + "\n"
     )
 
 game_current = {
@@ -178,7 +188,7 @@ receipt = {
     "approvedAt": "2026-09-19T00:10:00Z",
     "approvedBy": "fixture-operator",
     "sourceBranch": "develop",
-    "demoReleaseId": release_id,
+    "demoReleaseId": batch_id,
     "applications": {
         name: components[name]
         for name in ("ai", "back", "front")
@@ -269,6 +279,31 @@ cp \
   "${work}/environment-good.json" \
   "${state}/dev/batches/known-good/environment.json"
 
+# 조합 ID 는 batchId 하나다 — receipt 가 다른 batch 를 가리키면 거부한다 (Batch 1).
+cp "${work}/receipt.json" "${work}/receipt-good.json"
+python3 - "${work}/receipt.json" <<'PY'
+import json, pathlib, sys
+path = pathlib.Path(sys.argv[1]); doc = json.loads(path.read_text())
+doc["demoReleaseId"] = "demo-env-fixture000000002"
+path.write_text(json.dumps(doc, indent=2) + "\n")
+PY
+if run_validator >/dev/null 2>&1; then
+  fail "receipt pointing at a different Demo batchId was accepted"
+fi
+cp "${work}/receipt-good.json" "${work}/receipt.json"
+
+# 컴포넌트 releaseId 는 identity 검증에만 쓴다 — front 의 releaseId 가 KNOWN_GOOD 과 다르면 거부한다.
+python3 - "${work}/receipt.json" <<'PY'
+import json, pathlib, sys
+path = pathlib.Path(sys.argv[1]); doc = json.loads(path.read_text())
+doc["applications"]["front"]["releaseId"] = doc["applications"]["ai"]["releaseId"]
+path.write_text(json.dumps(doc, indent=2) + "\n")
+PY
+if run_validator >/dev/null 2>&1; then
+  fail "front identity with a foreign releaseId was accepted"
+fi
+cp "${work}/receipt-good.json" "${work}/receipt.json"
+
 # Exact World image identity must match Demo known-good.
 cp "${work}/receipt.json" "${work}/receipt-good.json"
 
@@ -330,12 +365,27 @@ if text.index('Human Verification Gate') > text.index('approve-production-known-
 for required in ('PRODUCTION_ALREADY_APPROVED','prepare-production-cutover.sh','rollback-production-release.sh','secret-scan.sh --path artifacts'):
     if required not in text: raise SystemExit(f'Production pipeline missing {required}')
 
-archive = text.split("stage('Archive Evidence')", 1)[1].split("\n    post {", 1)[0]
+# find escape 는 이제 archiveProductionEvidence() 헬퍼 안에 있다.
+archive = text.split("def archiveProductionEvidence()", 1)[1].split("\npipeline {", 1)[0]
 if re.search(r'(?<!\\)\\[();]', archive):
     raise SystemExit('Archive Evidence shell escapes are not Groovy-safe')
 for required in (r'\\(', r'\\)', r'\\;'):
     if required not in archive:
         raise SystemExit(f'Archive Evidence missing Groovy-safe shell escape: {required}')
+
+# Executor 계약 (Batch 1): human gate 는 executor 를 잡지 않고, 실행 stage 는 각자 deploy node 와 checkout 을 확보한다.
+if not re.search(r'^\s*agent none\s*$', text, re.M): raise SystemExit('Production pipeline must declare top-level agent none')
+stages = re.split(r"\n        stage\('", text)[1:]
+for block in stages:
+    name = block.split("'", 1)[0]
+    has_agent = "agent { label 'deploy' }" in block.split('\n            steps', 1)[0]
+    is_gate = 'input(' in block
+    if is_gate and has_agent: raise SystemExit(f'gate stage must not hold an executor: {name}')
+    if not is_gate and not has_agent: raise SystemExit(f'executing stage must acquire the deploy agent itself: {name}')
+    if is_gate and ('sh ' in block or "sh(" in block): raise SystemExit(f'gate stage must not run shell: {name}')
+post = text.split('\n    post {', 1)[1]
+if "node('deploy')" not in post or 'checkout scm' not in post: raise SystemExit('post block must acquire its own deploy node and checkout')
+if 'archiveArtifacts' not in archive: raise SystemExit('evidence must be archived where it is produced')
 PY
 
 prod_state="${work}/production-state"

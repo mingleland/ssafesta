@@ -15,8 +15,26 @@ def withProductionCredentials(Closure body) {
     ]) { body() }
 }
 
+// evidence 는 공유 state 디렉터리에서 다시 모은다 — 어느 deploy node 에서 실행돼도 같은 결과여야 한다.
+// 같은 node/workspace 를 stage 간에 재사용한다고 가정하지 않는다 (Batch 1).
+def archiveProductionEvidence() {
+    sh '''
+        rm -rf artifacts/production-promotion
+        mkdir -p artifacts/production-promotion
+        cp "$PRODUCTION_RECEIPT_PATH" artifacts/production-promotion/receipt.json
+        cp "$PRODUCTION_DATA_EVIDENCE_PATH" artifacts/production-promotion/data-bootstrap.json
+        find "$ENVIRONMENT_STATE_DIR/production" -type f \
+          \\( -name "$PRODUCTION_RECEIPT_ID*.json" -o -name 'current.json' -o -name 'known-good.json' -o -name 'previous.json' \\) \
+          -exec cp {} artifacts/production-promotion/ \\;
+        infra/jenkins/scripts/secret-scan.sh --path artifacts
+    '''
+    archiveArtifacts artifacts: 'artifacts/production-promotion/**/*', allowEmptyArchive: true, fingerprint: true
+}
+
 pipeline {
-    agent { label 'deploy' }
+    // human gate 가 deploy executor 를 붙들지 않도록 top-level agent 를 두지 않는다. 실행 stage 만 deploy 를 잡고,
+    // 상태는 env.* 와 /var/lib/festa-environments 로만 넘긴다 (T-168 곁가지: #503 이 #6 의 gate 뒤에서 대기).
+    agent none
     options {
         timestamps()
         disableConcurrentBuilds()
@@ -25,6 +43,7 @@ pipeline {
     }
     stages {
         stage('Resolve Approved Demo Receipt') {
+            agent { label 'deploy' }
             steps {
                 script {
                     String receiptId = params.RECEIPT_ID?.trim()
@@ -48,6 +67,7 @@ pipeline {
             }
         }
         stage('Validate Receipt, Bootstrap and Main Ancestry') {
+            agent { label 'deploy' }
             steps {
                 sh '''
                     PRODUCTION_PROMOTION_RECEIPT_PATH="$PRODUCTION_RECEIPT_PATH" \
@@ -65,6 +85,7 @@ PY
             }
         }
         stage('Detect Idempotent Receipt') {
+            agent { label 'deploy' }
             steps {
                 script {
                     env.PRODUCTION_ALREADY_APPROVED = sh(returnStdout: true, script: '''
@@ -82,6 +103,7 @@ PY
             }
         }
         stage('Cutover Readiness Gate') {
+            // agent 없음 — input 대기 중 executor 를 점유하지 않는다.
             when { expression { env.PRODUCTION_ALREADY_APPROVED != '1' } }
             steps {
                 script {
@@ -90,6 +112,7 @@ PY
             }
         }
         stage('Maintenance Fence') {
+            agent { label 'deploy' }
             when { expression { env.PRODUCTION_ALREADY_APPROVED != '1' } }
             steps {
                 lock(resource: 'deploy-production') {
@@ -98,6 +121,7 @@ PY
             }
         }
         stage('Replace Legacy with Canonical Candidate') {
+            agent { label 'deploy' }
             when { expression { env.PRODUCTION_ALREADY_APPROVED != '1' } }
             steps {
                 lock(resource: 'deploy-production') {
@@ -118,10 +142,12 @@ PY
             }
         }
         stage('Verify Candidate') {
+            agent { label 'deploy' }
             when { expression { env.PRODUCTION_ALREADY_APPROVED != '1' } }
             steps { sh 'infra/deploy/scripts/verify-production-candidate.sh "$PRODUCTION_RECEIPT_PATH"' }
         }
         stage('Activate Public Production') {
+            agent { label 'deploy' }
             when { expression { env.PRODUCTION_ALREADY_APPROVED != '1' } }
             steps {
                 lock(resource: 'deploy-production') {
@@ -132,6 +158,7 @@ PY
             }
         }
         stage('Verify Public Production') {
+            agent { label 'deploy' }
             when { expression { env.PRODUCTION_ALREADY_APPROVED != '1' } }
             steps {
                 withEnv(["PRODUCTION_WORLD_PUBLIC_URL=${env.PRODUCTION_WORLD_PUBLIC_URL}"]) {
@@ -140,6 +167,7 @@ PY
             }
         }
         stage('Human Verification Gate') {
+            // agent 없음 — 사람이 확인하는 동안 develop Demo 배포가 같은 executor 를 쓸 수 있어야 한다.
             when { expression { env.PRODUCTION_ALREADY_APPROVED != '1' } }
             steps {
                 script {
@@ -148,6 +176,7 @@ PY
             }
         }
         stage('Approve Known Good') {
+            agent { label 'deploy' }
             when { expression { env.PRODUCTION_ALREADY_APPROVED != '1' } }
             steps {
                 script {
@@ -157,42 +186,35 @@ PY
             }
         }
         stage('Archive Evidence') {
-            steps {
-                sh '''
-                    mkdir -p artifacts/production-promotion
-                    cp "$PRODUCTION_RECEIPT_PATH" artifacts/production-promotion/receipt.json
-                    cp "$PRODUCTION_DATA_EVIDENCE_PATH" artifacts/production-promotion/data-bootstrap.json
-                    find "$ENVIRONMENT_STATE_DIR/production" -type f \
-                      \\( -name "$PRODUCTION_RECEIPT_ID*.json" -o -name 'current.json' -o -name 'known-good.json' -o -name 'previous.json' \\) \
-                      -exec cp {} artifacts/production-promotion/ \\;
-                '''
-            }
+            agent { label 'deploy' }
+            steps { script { archiveProductionEvidence() } }
         }
     }
     post {
         failure {
-            script {
-                String prepare = "${env.ENVIRONMENT_STATE_DIR ?: '/var/lib/festa-environments'}/production/cutovers/${env.PRODUCTION_RECEIPT_ID}.prepare.json"
-                if (env.PRODUCTION_ALREADY_APPROVED != '1' && env.PRODUCTION_RECEIPT_PATH && fileExists(prepare)) {
-                    String stateRoot = env.ENVIRONMENT_STATE_DIR ?: '/var/lib/festa-environments'
-                    if (fileExists("${stateRoot}/production/previous.json")) {
-                        String worldSecretFile = env.PROD_CONNECTION_TOKEN_SECRET_FILE ?: '/opt/festa/secrets/prod-game-connection-token-secret'
-                        withProductionCredentials {
-                            withEnv(["PRODUCTION_WORLD_HOST=${env.PRODUCTION_WORLD_HOST_VALUE}", "CONNECTION_TOKEN_SECRET_FILE=${worldSecretFile}"]) {
+            // agent none 이라 post 는 스스로 deploy node 와 checkout 을 확보한다.
+            node('deploy') {
+                checkout scm
+                script {
+                    String prepare = "${env.ENVIRONMENT_STATE_DIR ?: '/var/lib/festa-environments'}/production/cutovers/${env.PRODUCTION_RECEIPT_ID}.prepare.json"
+                    if (env.PRODUCTION_ALREADY_APPROVED != '1' && env.PRODUCTION_RECEIPT_PATH && fileExists(prepare)) {
+                        String stateRoot = env.ENVIRONMENT_STATE_DIR ?: '/var/lib/festa-environments'
+                        if (fileExists("${stateRoot}/production/previous.json")) {
+                            String worldSecretFile = env.PROD_CONNECTION_TOKEN_SECRET_FILE ?: '/opt/festa/secrets/prod-game-connection-token-secret'
+                            withProductionCredentials {
+                                withEnv(["PRODUCTION_WORLD_HOST=${env.PRODUCTION_WORLD_HOST_VALUE}", "CONNECTION_TOKEN_SECRET_FILE=${worldSecretFile}"]) {
+                                    sh 'infra/deploy/scripts/rollback-production-release.sh "$PRODUCTION_RECEIPT_PATH" pipeline-failure'
+                                }
+                            }
+                        } else {
+                            withEnv(["PRODUCTION_WORLD_HOST=${env.PRODUCTION_WORLD_HOST_VALUE}"]) {
                                 sh 'infra/deploy/scripts/rollback-production-release.sh "$PRODUCTION_RECEIPT_PATH" pipeline-failure'
                             }
                         }
-                    } else {
-                        withEnv(["PRODUCTION_WORLD_HOST=${env.PRODUCTION_WORLD_HOST_VALUE}"]) {
-                            sh 'infra/deploy/scripts/rollback-production-release.sh "$PRODUCTION_RECEIPT_PATH" pipeline-failure'
-                        }
                     }
+                    if (env.PRODUCTION_RECEIPT_PATH) { archiveProductionEvidence() }
                 }
             }
-        }
-        always {
-            sh 'infra/jenkins/scripts/secret-scan.sh --path artifacts'
-            archiveArtifacts artifacts: 'artifacts/production-promotion/**/*', allowEmptyArchive: true, fingerprint: true
         }
     }
 }
