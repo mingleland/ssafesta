@@ -59,8 +59,10 @@ matches = [item for item in release['components'] if item['name'] == 'game']
 if len(matches) != 1:
     raise SystemExit('release manifest must contain exactly one game component')
 game = matches[0]
-if game['sourceCommit'] != release['scm']['commit']:
-    raise SystemExit('game source commit differs from release commit')
+# Game 은 pipelineCommit 과 artifactSourceCommit 이 다를 수 있다 (Batch 2-C: content-equivalent Unity artifact 재사용).
+# game.sourceCommit 은 항상 유효한 40자 SHA 여야 하고 image label 의 source-commit 과 일치해야 한다.
+if not isinstance(game.get('sourceCommit'), str) or len(game['sourceCommit']) != 40:
+    raise SystemExit('game component sourceCommit is not a valid 40-character SHA')
 print(release['releaseId'], release['scm']['branch'], game['sourceCommit'], game['imageRef'], game['contentId'], sep='\t')
 PY
 )
@@ -103,6 +105,8 @@ fi
 
 actual_content_id="$(${docker_bin} image inspect --format '{{.Id}}' "${image_ref}")"
 [[ "${actual_content_id}" == "${content_id}" ]] || { echo "game image content ID mismatch: expected=${content_id} actual=${actual_content_id}" >&2; exit 65; }
+actual_commit="$(${docker_bin} image inspect --format '{{index .Config.Labels "org.ssafy-festa.source-commit"}}' "${image_ref}")"
+[[ "${actual_commit}" == "${source_commit}" ]] || { echo "game image label source-commit mismatch: expected=${source_commit} actual=${actual_commit}" >&2; exit 65; }
 
 export GAME_IMAGE_REF="${image_ref}"
 bash "${script_dir}/preflight.sh"

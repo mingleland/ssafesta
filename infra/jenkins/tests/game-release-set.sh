@@ -46,7 +46,7 @@ if [[ -f "${target}" ]]; then cp "${target}" "${output}"; code=200; else : >"${o
 SH
 chmod +x "${work}/bin/docker" "${work}/bin/curl"
 export PATH="${work}/bin:${PATH}" FAKE_REMOTE_ROOT="${work}/remote" FAKE_CONTENT_ID="${content_id}" FAKE_LABEL_COMMIT="${sha}" FAKE_DOCKER_LOG="${work}/docker.log" FAKE_LOADED_MARKER="${work}/loaded" GITLAB_DEPLOY_TOKEN=x
-resolve(){ "${scripts}/resolve-game-artifacts.sh" --source-commit "${sha}"; }
+resolve(){ GIT_REPO_DIR="${repo_root}" "${scripts}/resolve-game-artifacts.sh" --pipeline-commit "${sha}" "$@"; }
 decision(){ python3 -c 'import json,sys; print(json.load(sys.stdin)["decision"])'; }
 put_registry_webgl(){ mkdir -p "${work}/remote/festa-webgl/${rid}"; cp "${zip}.sha256" "${work}/remote/festa-webgl/${rid}/"; }
 put_registry_world(){ mkdir -p "${work}/remote/festa-world/${rid}"; printf '{"sourceCommit":"%s","archiveSha256":"%s","imageContentId":"%s"}' "${sha}" "$(printf 'e%.0s' {1..64})" "${content_id}" >"${work}/remote/festa-world/${rid}/festa-world-release-${rid}.json"; }
@@ -71,14 +71,21 @@ resolve | python3 -c 'import json,sys; d=json.load(sys.stdin); assert d["registr
 rm -rf "${work}/remote/festa-world" "${work}/remote/festa-webgl"
 
 # --- source-identity gate (실제 git) ----------------------------------------------------------
-git init -q "${work}/origin"; git -C "${work}/origin" -c user.name=t -c user.email=t@t commit -q --allow-empty -m base; git -C "${work}/origin" branch -q -M develop
-git clone -q "${work}/origin" "${work}/clone"; git -C "${work}/clone" -c user.name=t -c user.email=t@t commit -q --allow-empty -m local-only
+git init -q "${work}/origin"; mkdir -p "${work}/origin/festa-unity/ProjectSettings"
+printf 'm_EditorVersion: 6000.0.78f1\nm_EditorVersionWithRevision: 6000.0.78f1 (ec8a99a872be)\n' > "${work}/origin/festa-unity/ProjectSettings/ProjectVersion.txt"
+git -C "${work}/origin" add . && git -C "${work}/origin" -c user.name=t -c user.email=t@t commit -q -m base; git -C "${work}/origin" branch -q -M develop
+git clone -q "${work}/origin" "${work}/clone"; echo "change" > "${work}/clone/other.txt"; git -C "${work}/clone" add . && git -C "${work}/clone" -c user.name=t -c user.email=t@t commit -q -m other-change
 local_only="$(git -C "${work}/clone" rev-parse HEAD)"; on_develop="$(git -C "${work}/origin" rev-parse develop)"
 gate(){ GIT_REPO_DIR="${work}/clone" "${scripts}/check-game-source-identity.sh" "$@"; }
-gate --source-commit "${on_develop}" | grep -q '^GAME_SOURCE_OK' || fail 'gate accepts develop commit'
-set +e; gate --source-commit "${local_only}" >/dev/null 2>&1; rc=$?; set -e; [[ "${rc}" -eq 65 ]] || fail 'gate rejects commit not on origin/develop'
+gate --source-commit "${on_develop}" --head "${on_develop}" | grep -q '^GAME_SOURCE_OK' || fail 'gate accepts develop commit'
+# local_only 는 develop 에는 없지만 festa-unity 입력이 base 와 동일하므로 unityInputId 는 통과하고 ANCESTRY_WARNING 출력
+gate --source-commit "${local_only}" --head "${on_develop}" 2>&1 | grep -q 'ANCESTRY_WARNING' || fail 'gate warns when commit is not on develop'
+# festa-unity 내용이 변경되면 unityInputId 불일치로 exit 65 거부
+echo "unity_change" > "${work}/clone/festa-unity/new.txt"; git -C "${work}/clone" add . && git -C "${work}/clone" -c user.name=t -c user.email=t@t commit -q -m unity-diff
+unity_diff_sha="$(git -C "${work}/clone" rev-parse HEAD)"
+set +e; gate --source-commit "${unity_diff_sha}" --head "${on_develop}" >/dev/null 2>&1; rc=$?; set -e; [[ "${rc}" -eq 65 ]] || fail 'gate rejects differing unityInputId'
 set +e; gate --source-commit "$(printf '5%.0s' {1..40})" >/dev/null 2>&1; rc=$?; set -e; [[ "${rc}" -eq 65 ]] || fail 'gate rejects unknown commit'
-make_zip "${work}/dev.zip" "${on_develop}" false; gate --source-commit "${on_develop}" --webgl-zip "${work}/dev.zip" >/dev/null || fail 'gate accepts matching zip'
+make_zip "${work}/dev.zip" "${on_develop}" false; gate --source-commit "${on_develop}" --head "${on_develop}" --webgl-zip "${work}/dev.zip" >/dev/null || fail 'gate accepts matching zip'
 make_zip "${work}/dirty.zip" "${on_develop}" true; set +e; gate --source-commit "${on_develop}" --webgl-zip "${work}/dirty.zip" >/dev/null 2>&1; rc=$?; set -e; [[ "${rc}" -ne 0 ]] || fail 'gate rejects dirty zip'
 set +e; FAKE_LABEL_COMMIT="${local_only}" gate --source-commit "${on_develop}" --image-ref "${image_ref}" >/dev/null 2>&1; rc=$?; set -e; [[ "${rc}" -eq 65 ]] || fail 'gate rejects image with another source-commit'
 set +e; GIT_REPO_DIR="${work}/clone" "${scripts}/check-game-source-identity.sh" --source-commit "${on_develop}" --remote nowhere >/dev/null 2>&1; rc=$?; set -e; [[ "${rc}" -eq 69 ]] || fail 'gate reports fetch failure as 69'

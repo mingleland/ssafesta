@@ -201,9 +201,7 @@ def call() {
     //   Resolve  (deploy)  canonical festa-webgl/festa-world 가 있으면 재사용, bundle 이 있으면 intake, 둘 다 없으면 WAITING 으로 정상 종료
     //   Intake   (deploy)  bundle 4 파일 download → zip/tar/metadata 검증 → docker image load
     //   Consumer (deploy)  SCM identity gate → publish(idempotent) → release-set 검증 → World candidate → readiness → WebGL current → promote
-    final String gameReleaseId = headSha.substring(0, 8)
     final String gameDeployWs = '/home/jenkins/agent/deploy/workspaces/develop-game-deploy'
-    final String bundleDir = "${gameDeployWs}/unity-release-bundle/${gameReleaseId}"
     final String gitlabApi = env.GITLAB_API_V4_URL ?: 'https://lab.ssafy.com/api/v4'
     final String gitlabProject = env.GITLAB_PROJECT_ID ?: '1443023'
     final String readCredentialId = env.GITLAB_PACKAGE_READ_CREDENTIAL_ID ?: 'gitlab-package-read'
@@ -225,10 +223,12 @@ def call() {
     def withReadToken = { Closure body ->
         withCredentials([usernamePassword(credentialsId: readCredentialId, usernameVariable: 'GITLAB_DEPLOY_USER', passwordVariable: 'GITLAB_DEPLOY_TOKEN')]) { body() }
     }
+    final String candidateParam = (params.UNITY_ARTIFACT_CANDIDATE ?: '').trim()
     stage('Resolve Game Artifacts') {
         onDeploy {
             withReadToken {
-                final String text = sh(returnStdout: true, script: "infra/jenkins/scripts/with-credentials.sh GITLAB_DEPLOY_TOKEN -- infra/jenkins/scripts/resolve-game-artifacts.sh --source-commit '${headSha}'").trim()
+                final String candidateArg = candidateParam ? " --candidate '${candidateParam}'" : ''
+                final String text = sh(returnStdout: true, script: "infra/jenkins/scripts/with-credentials.sh GITLAB_DEPLOY_TOKEN -- infra/jenkins/scripts/resolve-game-artifacts.sh --pipeline-commit '${headSha}'${candidateArg}").trim()
                 resolution = readJSON text: text, returnPojo: true
                 writeFile file: "${artifactRoot}/game-resolution.json", text: "${text}\n"
                 archiveArtifacts artifacts: "${artifactRoot}/game-resolution.json", allowEmptyArchive: false, fingerprint: true
@@ -236,15 +236,18 @@ def call() {
         }
     }
     final String decision = resolution.decision as String
+    final String artifactSourceCommit = (resolution.artifactSourceCommit ?: headSha) as String
+    final String gameReleaseId = artifactSourceCommit.substring(0, 8)
+    final String bundleDir = "${gameDeployWs}/unity-release-bundle/${gameReleaseId}"
     if (!(decision in ['REGISTRY_COMPLETE', 'BUNDLE_AVAILABLE', 'PUBLISH_WEBGL', 'PUBLISH_WORLD', 'WAITING_FOR_UNITY_ARTIFACT'])) { error("unknown game artifact resolution: ${decision}") }
-    echo "GAME_ARTIFACTS: ${decision} (festa-webgl/${gameReleaseId}, festa-world/${gameReleaseId}, unity-release-bundle/${gameReleaseId})"
+    echo "GAME_ARTIFACTS: ${decision} (festa-webgl/${gameReleaseId}, festa-world/${gameReleaseId}, unity-release-bundle/${gameReleaseId}, matchedBy=${resolution.matchedBy ?: 'none'})"
     if (decision == 'WAITING_FOR_UNITY_ARTIFACT') {
         // Unity build 를 시작하지 않는다. 담당자가 bundle 을 올린 뒤 같은 SHA 를 다시 돌리면 여기서 이어진다.
-        echo "WAITING_FOR_UNITY_ARTIFACT: no canonical game artifacts and no Unity Release Bundle for ${gameReleaseId}; upload unity-release-bundle/${gameReleaseId} and rebuild this commit"
+        echo "WAITING_FOR_UNITY_ARTIFACT: no canonical game artifacts and no Unity Release Bundle for ${gameReleaseId} (unitySourceSha=${resolution.unitySourceSha ?: headSha}); upload unity-release-bundle/${gameReleaseId} and rebuild this commit"
         return
     }
 
-    final String gameImageRef = "festa-game:${headSha}"
+    final String gameImageRef = "festa-game:${artifactSourceCommit}"
     final String webglZip = "${bundleDir}/festa-webgl-release-${gameReleaseId}.zip"
     String webglSha = resolution.registry?.webglSha256 ?: ''
     String gameContentId = resolution.registry?.worldContentId ?: ''
@@ -256,7 +259,7 @@ def call() {
             if (needWebgl || needWorld) {
                 // Intake: bundle 4 파일을 받아 검증하고 World image 를 로컬 docker 에 올린다. BUNDLE_OK <commit> <zipSha> <contentId>
                 withReadToken {
-                    final String bundleLine = sh(returnStdout: true, script: "infra/jenkins/scripts/with-credentials.sh GITLAB_DEPLOY_TOKEN -- infra/jenkins/scripts/intake-unity-release-bundle.sh --source-commit '${headSha}' --dest '${bundleDir}'").trim().readLines().last()
+                    final String bundleLine = sh(returnStdout: true, script: "infra/jenkins/scripts/with-credentials.sh GITLAB_DEPLOY_TOKEN -- infra/jenkins/scripts/intake-unity-release-bundle.sh --source-commit '${artifactSourceCommit}' --dest '${bundleDir}'").trim().readLines().last()
                     final List parts = bundleLine.tokenize(' ')
                     if (parts.size() != 4 || parts[0] != 'BUNDLE_OK') { error("Unity Release Bundle intake failed: ${bundleLine}") }
                     if (needWebgl) { webglSha = parts[2] }
@@ -270,7 +273,7 @@ def call() {
             }
             // Gate: commit 이 origin 에 있고 develop 조상이며 zip/image 가 그 commit 을 가리킨다. 실패하면 publish 로 못 간다.
             withCredentials([gitUsernamePassword(credentialsId: checkoutCredentialId)]) {
-                sh "infra/jenkins/scripts/check-game-source-identity.sh --source-commit '${headSha}'" +
+                sh "infra/jenkins/scripts/check-game-source-identity.sh --head '${headSha}' --source-commit '${artifactSourceCommit}'" +
                    (needWebgl ? " --webgl-zip '${webglZip}'" : '') + " --image-ref '${gameImageRef}'"
             }
             final String localContentId = sh(returnStdout: true, script: "docker image inspect --format '{{.Id}}' '${gameImageRef}'").trim()
@@ -282,13 +285,13 @@ def call() {
                             sh "infra/jenkins/scripts/with-credentials.sh GITLAB_PACKAGE_TOKEN -- infra/jenkins/scripts/publish-webgl-release.sh '${webglZip}' '${gameReleaseId}' --no-trigger"
                         }
                         if (needWorld) {
-                            sh "infra/jenkins/scripts/with-credentials.sh GITLAB_PACKAGE_TOKEN -- infra/jenkins/scripts/publish-world-release.sh --source-commit '${headSha}' --image-ref '${gameImageRef}' --content-id '${gameContentId}'"
+                            sh "infra/jenkins/scripts/with-credentials.sh GITLAB_PACKAGE_TOKEN -- infra/jenkins/scripts/publish-world-release.sh --source-commit '${artifactSourceCommit}' --image-ref '${gameImageRef}' --content-id '${gameContentId}'"
                         }
                     }
                 }
             }
             if (needWebgl) {
-                sh "infra/jenkins/scripts/validate-game-release-set.sh --source-commit '${headSha}' --webgl-zip '${webglZip}' --webgl-sha256 '${webglSha}' --image-ref '${gameImageRef}' --content-id '${gameContentId}'"
+                sh "infra/jenkins/scripts/validate-game-release-set.sh --source-commit '${artifactSourceCommit}' --webgl-zip '${webglZip}' --webgl-sha256 '${webglSha}' --image-ref '${gameImageRef}' --content-id '${gameContentId}'"
                 // bundle 사본은 게시 뒤 필요 없다 — Registry 가 정본이다.
                 sh "rm -rf -- '${bundleDir}'"
             }
@@ -309,8 +312,8 @@ def call() {
             // 없으므로 deploy agent 의 image 에서 같은 형식으로 다시 만든다 — 출처는 어차피 docker image inspect 다.
             sh """
                 mkdir -p '${gameMetadataDir}'
-                printf '{"schemaVersion":"1.0.0","component":"game","sourceCommit":"%s","storageMode":"local-docker","imageRef":"%s","contentId":"%s"}\\n' '${headSha}' '${gameImageRef}' '${gameContentId}' >'${gameMetadataDir}/game.json'
-                printf '{"sourceCommit":"%s"}\\n' '${headSha}' >'${artifactRoot}/webgl-candidate-manifest.json'
+                printf '{"schemaVersion":"1.0.0","component":"game","sourceCommit":"%s","storageMode":"local-docker","imageRef":"%s","contentId":"%s"}\\n' '${artifactSourceCommit}' '${gameImageRef}' '${gameContentId}' >'${gameMetadataDir}/game.json'
+                printf '{"sourceCommit":"%s"}\\n' '${artifactSourceCommit}' >'${artifactRoot}/webgl-candidate-manifest.json'
             """
             withEnv([
                 'DEPLOY_COMPONENTS=game', "COMPONENT_METADATA_DIR=${gameMetadataDir}", "RELEASE_MANIFEST_PATH=${gameManifest}",

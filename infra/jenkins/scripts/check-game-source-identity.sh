@@ -3,11 +3,12 @@
 #   commit 이 origin 에 존재하고, origin/develop 의 조상이며, zip manifest 가 dirty=false 이고, zip 과 image 가 같은 commit 을 가리킨다.
 # 2026-09-20 외부 artifact 5f148b69 는 로컬에도 GitLab 에도 없는 commit 이었다 — 이런 산출물은 여기서 멈춘다.
 set -euo pipefail
-usage() { echo 'Usage: check-game-source-identity.sh --source-commit SHA [--webgl-zip ZIP] [--image-ref REF] [--remote origin] [--branch develop]' >&2; exit 64; }
-source_commit='' webgl_zip='' image_ref='' remote='origin' branch='develop'
+usage() { echo 'Usage: check-game-source-identity.sh --source-commit SHA [--head HEAD_SHA] [--webgl-zip ZIP] [--image-ref REF] [--remote origin] [--branch develop]' >&2; exit 64; }
+source_commit='' head_sha='' webgl_zip='' image_ref='' remote='origin' branch='develop'
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --source-commit) source_commit="${2:-}"; shift 2 ;;
+    --head) head_sha="${2:-}"; shift 2 ;;
     --webgl-zip) webgl_zip="${2:-}"; shift 2 ;;
     --image-ref) image_ref="${2:-}"; shift 2 ;;
     --remote) remote="${2:-}"; shift 2 ;;
@@ -19,12 +20,44 @@ done
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 repo="${GIT_REPO_DIR:-$(cd "${script_dir}/../../.." && pwd)}"
 docker_bin="${DOCKER_BIN:-docker}"
+python_bin="${PYTHON_BIN:-python3}"
 
 git -C "${repo}" fetch --quiet "${remote}" "${branch}" || { echo "cannot fetch ${remote}/${branch}" >&2; exit 69; }
 git -C "${repo}" cat-file -e "${source_commit}^{commit}" 2>/dev/null \
   || { echo "SOURCE_NOT_IN_REPOSITORY: ${source_commit} is not a commit known to ${remote}" >&2; exit 65; }
-git -C "${repo}" merge-base --is-ancestor "${source_commit}" "${remote}/${branch}" \
-  || { echo "SOURCE_NOT_ON_BRANCH: ${source_commit} is not an ancestor of ${remote}/${branch}" >&2; exit 65; }
+
+# unityInputId 검증: pipelineCommit 과 artifactSourceCommit 의 Unity build input 이 동일해야 한다 (Batch 2-C).
+compute_unity_input_id() {
+  local c="$1"
+  "${python_bin}" - "${repo}" "${c}" <<'INNER_PY'
+import hashlib, subprocess, sys
+repo, commit = sys.argv[1:3]
+try:
+    tree = subprocess.check_output(['git', '-C', repo, 'rev-parse', f'{commit}:festa-unity'], stderr=subprocess.DEVNULL).decode().strip()
+    proj = subprocess.check_output(['git', '-C', repo, 'show', f'{commit}:festa-unity/ProjectSettings/ProjectVersion.txt'], stderr=subprocess.DEVNULL).decode()
+    v = [l.split(':')[1].strip() for l in proj.splitlines() if l.startswith('m_EditorVersion:')][0]
+    r = [l.split('(')[1].split(')')[0] for l in proj.splitlines() if l.startswith('m_EditorVersionWithRevision:')][0]
+except Exception:
+    sys.exit(1)
+raw = f'tree={tree}|unityVersion={v}|unityRevision={r}|buildProfile=release|apiEnvironment=Prod|artifactContract=manifest-1.0.0'
+print(hashlib.sha256(raw.encode('utf-8')).hexdigest())
+INNER_PY
+}
+
+if [[ -n "${head_sha}" ]]; then
+  head_input="$(compute_unity_input_id "${head_sha}")" || { echo "cannot compute unityInputId for head ${head_sha}" >&2; exit 65; }
+  source_input="$(compute_unity_input_id "${source_commit}")" || { echo "cannot compute unityInputId for source ${source_commit}" >&2; exit 65; }
+  [[ "${head_input}" == "${source_input}" ]] || {
+    echo "UNITY_INPUT_ID_MISMATCH: head ${head_sha} input (${head_input}) != source ${source_commit} input (${source_input})" >&2
+    exit 65
+  }
+fi
+
+if git -C "${repo}" merge-base --is-ancestor "${source_commit}" "${remote}/${branch}" 2>/dev/null; then
+  echo "ANCESTRY=true"
+else
+  echo "ANCESTRY_WARNING: ${source_commit} is not an ancestor of ${remote}/${branch} (content-equivalent by unityInputId)" >&2
+fi
 if [[ -n "${webgl_zip}" ]]; then
   bash "${script_dir}/validate-webgl-archive.sh" "${webgl_zip}" --source-commit "${source_commit}" --branch "${branch}" >/dev/null
 fi
