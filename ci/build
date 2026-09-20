@@ -5,10 +5,10 @@ build_project() {
   component_dir="$(ci_component_dir)"
   case "${CI_COMPONENT}" in
     ai) (cd "${component_dir}" && python -m compileall -q -x '\.venv' .) ;;
-    back) (cd "${component_dir}" && if [[ -x ./gradlew ]]; then ./gradlew clean build -x test; else ./mvnw clean package -DskipTests; fi) ;;
+    back) (cd "${component_dir}" && if [[ -x ./gradlew ]]; then ./gradlew build -x test; else ./mvnw package -DskipTests; fi) ;;
     front) (
       cd "${component_dir}"
-      npm ci
+      if [[ ! -d node_modules || package-lock.json -nt node_modules ]]; then npm ci; fi
       npm run assets:verify
       npm run build
       # Jenkins 는 develop workspace 를 재사용하고 checkout 은 artifacts/ 를 지우지 않는다.

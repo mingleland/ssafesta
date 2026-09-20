@@ -91,8 +91,14 @@ mr-status:
         compare_to: 'refs/heads/develop'
         paths:
           - festa-frontend/**/*
-          - ci/**/*
-          - .gitlab-ci.yml
+
+.front-npm-cache:
+  cache:
+    key:
+      files:
+        - festa-frontend/package-lock.json
+    paths:
+      - festa-frontend/node_modules/
 
 .back-changes:
   rules:
@@ -103,8 +109,6 @@ mr-status:
         compare_to: 'refs/heads/develop'
         paths:
           - backend/**/*
-          - ci/**/*
-          - .gitlab-ci.yml
 
 .back-maven-cache:
   variables:
@@ -126,8 +130,14 @@ mr-status:
         compare_to: 'refs/heads/develop'
         paths:
           - festa-ai/**/*
-          - ci/**/*
-          - .gitlab-ci.yml
+
+.ai-pip-cache:
+  cache:
+    key:
+      files:
+        - festa-ai/pyproject.toml
+    paths:
+      - festa-ai/.venv/
 
 .game-changes:
   rules:
@@ -172,6 +182,7 @@ ai-test:
   extends:
     - .component-ci
     - .ai-changes
+    - .ai-pip-cache
   stage: test
   image: python:3.13-slim
   variables:
@@ -183,6 +194,7 @@ ai-build:
   extends:
     - .component-ci
     - .ai-changes
+    - .ai-pip-cache
   stage: build
   image: python:3.13-slim
   variables:
@@ -196,6 +208,7 @@ front-test:
   extends:
     - .component-ci
     - .front-changes
+    - .front-npm-cache
   stage: test
   image: node:24-bookworm-slim
   variables:
@@ -207,6 +220,7 @@ front-build:
   extends:
     - .component-ci
     - .front-changes
+    - .front-npm-cache
   stage: build
   image: node:24-bookworm-slim
   variables:

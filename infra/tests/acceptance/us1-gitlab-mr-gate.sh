@@ -18,8 +18,9 @@ check_gate() {
   rules_section="$(job ".${component}-changes")"
   [[ -n "$rules_section" ]] || fail "missing ${component} change rules"
   grep -Fq "$source_path" <<<"$rules_section" || fail "${component} source path"
-  grep -Fq "ci/**/*" <<<"$rules_section" || fail "${component} shared CI path"
-  grep -Fq ".gitlab-ci.yml" <<<"$rules_section" || fail "${component} shared pipeline path"
+  # Batch 2 최적화 — shared CI/pipeline 변경이 무관한 컴포넌트 전체를 트리거하지 않는다 (selective CI).
+  ! grep -Fq "ci/**/*" <<<"$rules_section" || fail "${component} must not trigger on shared CI path"
+  ! grep -Fq ".gitlab-ci.yml" <<<"$rules_section" || fail "${component} must not trigger on shared pipeline path"
   for stage in test build; do
     section="$(job "${component}-${stage}")"
     [[ -n "$section" ]] || fail "missing ${component}-${stage} job"
@@ -94,4 +95,4 @@ for jira_job in jira-key-check jira-sync-in-progress jira-sync-in-review jira-sy
     grep -Eq '^[[:space:]]+- when: never$' <<<"$job_body" || fail "${jira_job} must stay disabled"
   fi
 done
-echo 'PASS: shared CI/pipeline paths run AI, Front, and Back gates; jira jobs remain disabled'
+echo 'PASS: selective CI gates trigger on component sources only; jira jobs remain disabled'
