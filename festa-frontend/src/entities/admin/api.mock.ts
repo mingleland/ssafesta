@@ -87,10 +87,11 @@ let prizes: PrizeView[] = [
   { prizeId: 3, name: '텀블러', priceCoin: 180, stock: 0, active: false },
 ];
 let purchases: PrizePurchaseView[] = [
-  { purchaseId: 1, prizeId: 1, prizeName: '싸피 후드집업', buyerUserId: 7, buyerNickname: '이벤트참여자', quantity: 1, coinSpent: 240, ledgerEntryId: 108, purchasedAt: at(8), fulfillment: 'PENDING', note: null, updatedAt: at(8) },
-  { purchaseId: 2, prizeId: 2, prizeName: '스티커 세트', buyerUserId: 5, buyerNickname: '싸피생', quantity: 1, coinSpent: 45, ledgerEntryId: 105, purchasedAt: at(7), fulfillment: 'FULFILLED', note: '현장 수령', updatedAt: at(7, 40) },
-  { purchaseId: 3, prizeId: 2, prizeName: '스티커 세트', buyerUserId: 3, buyerNickname: '페스타참가자', quantity: 2, coinSpent: 90, ledgerEntryId: null, purchasedAt: at(9), fulfillment: 'PURCHASED', note: null, updatedAt: at(9) },
-  { purchaseId: 4, prizeId: 3, prizeName: '텀블러', buyerUserId: 6, buyerNickname: '부스주인', quantity: 1, coinSpent: 180, ledgerEntryId: 99, purchasedAt: at(6, 30), fulfillment: 'CANCELLED', note: '재고 소진으로 취소, 코인 환불 필요', updatedAt: at(6, 50) },
+  { purchaseId: 1, prizeId: 1, prizeName: '싸피 후드집업', buyerUserId: 7, buyerNickname: '이벤트참여자', quantity: 1, coinSpent: 240, ledgerEntryId: 108, purchasedAt: at(8), fulfillment: 'PENDING', note: null, updatedAt: at(8), campus: '서울', teamName: 'A604', recipientName: '황덕' },
+  { purchaseId: 2, prizeId: 2, prizeName: '스티커 세트', buyerUserId: 5, buyerNickname: '싸피생', quantity: 1, coinSpent: 45, ledgerEntryId: 105, purchasedAt: at(7), fulfillment: 'FULFILLED', note: '현장 수령', updatedAt: at(7, 40), campus: '대전', teamName: 'B201', recipientName: '김싸피' },
+  // #239 이전 행 — 받는 자 세 값이 함께 null 이어도 렌더된다 (S15P21A604-912)
+  { purchaseId: 3, prizeId: 2, prizeName: '스티커 세트', buyerUserId: 3, buyerNickname: '페스타참가자', quantity: 2, coinSpent: 90, ledgerEntryId: null, purchasedAt: at(9), fulfillment: 'PURCHASED', note: null, updatedAt: at(9), campus: null, teamName: null, recipientName: null },
+  { purchaseId: 4, prizeId: 3, prizeName: '텀블러', buyerUserId: 6, buyerNickname: '부스주인', quantity: 1, coinSpent: 180, ledgerEntryId: 99, purchasedAt: at(6, 30), fulfillment: 'CANCELLED', note: '재고 소진으로 취소, 코인 환불 필요', updatedAt: at(6, 50), campus: null, teamName: null, recipientName: null },
 ];
 
 const SURVEY_KEY = 'SSAFESTA_2026';

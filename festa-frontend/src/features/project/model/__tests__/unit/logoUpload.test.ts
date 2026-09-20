@@ -1,16 +1,18 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { setAccessToken } from '../../../../../shared/api/client';
 import {
   PROJECT_LOGO_PREVIEW_MAX_BYTES,
-  describeLogoUploadError,
-  uploadProjectLogo,
   validateProjectLogo,
+  uploadProjectLogo,
+  fetchProjectLogo,
 } from '../../logoUpload';
 
 describe('project logo preview validation', () => {
-  it('PNG/JPEG/WebP 파일만 허용한다', () => {
+  it('PNG/JPEG/GIF/WebP 파일만 허용한다', () => {
     expect(validateProjectLogo(new File(['x'], 'logo.png', { type: 'image/png' }))).toBeNull();
     expect(validateProjectLogo(new File(['x'], 'logo.svg', { type: 'image/svg+xml' })))
-      .toBe('PNG, JPG, WebP 이미지만 선택할 수 있습니다.');
+      .toBe('PNG, JPG, GIF, WebP 이미지만 선택할 수 있습니다.');
+    expect(validateProjectLogo(new File(['x'], 'logo.gif', { type: 'image/gif' }))).toBeNull();
   });
 
   it('미리보기 안전 상한보다 큰 파일을 거부한다', () => {
@@ -21,84 +23,55 @@ describe('project logo preview validation', () => {
   });
 });
 
-// BE ProjectLogoController(#241) 3단계 계약 — 시작 → presigned PUT → 완료.
-// api() 는 모듈 목으로, 저장소 PUT 은 fetch 스텁으로 갈아 끼운다.
-const apiCalls: { path: string; init?: RequestInit }[] = [];
-vi.mock('../../../../../shared/api/client', () => ({
-  api: (path: string, init?: RequestInit) => {
-    apiCalls.push({ path, init });
-    const queued = mockedResponses.shift();
-    if (queued instanceof Error) return Promise.reject(queued);
-    return Promise.resolve(queued);
-  },
-  isApiError: (e: unknown) =>
-    typeof e === 'object' && e !== null && typeof (e as { code?: unknown }).code === 'string',
-}));
+afterEach(() => { vi.unstubAllGlobals(); setAccessToken(null); });
 
-let mockedResponses: unknown[] = [];
-let putOk = true;
-
-vi.stubGlobal(
-  'fetch',
-  vi.fn(() => Promise.resolve({ ok: putOk })),
-);
-
-afterEach(() => {
-  apiCalls.length = 0;
-  mockedResponses = [];
-  putOk = true;
-  vi.unstubAllGlobals();
-  vi.stubGlobal(
-    'fetch',
-    vi.fn(() => Promise.resolve({ ok: putOk })),
-  );
-});
-
-function pngFile(): File {
-  return new File([new Uint8Array([1, 2, 3])], 'logo.png', { type: 'image/png' });
+const path = '/api/v1/booths/7/project-logos';
+const file = new File(['image'], 'logo.png', { type: 'image/png' });
+function uploadResponses(result: object, putStatus = 200) {
+  return vi.fn()
+    .mockResolvedValueOnce(Response.json({ logoId: 'logo-1', uploadUrl: 'https://storage.example/upload', requiredContentType: 'image/png' }))
+    .mockResolvedValueOnce(new Response(null, { status: putStatus }))
+    .mockResolvedValueOnce(Response.json(result));
 }
 
-describe('project logo upload adapter', () => {
-  it('시작·PUT·완료를 순서대로 부르고 검증된 url 을 돌려준다', async () => {
-    mockedResponses = [
-      { logoId: 'abc', expiresAt: '2026-09-18T00:00:00Z', uploadUrl: 'https://storage.example/put', requiredContentType: 'image/png' },
-      { logoId: 'abc', status: 'READY', url: 'https://be.example/api/v1/booths/7/project-logos/abc/content', failureRule: null },
-    ];
+it('grant → 서명된 PUT → complete, READY 경로만 반환하며 저장소에 토큰을 보내지 않는다', async () => {
+  setAccessToken('member-token');
+  const fetch = uploadResponses({ status: 'READY', url: `${path}/logo-1/content` });
+  vi.stubGlobal('fetch', fetch);
+  expect(await uploadProjectLogo(7, file)).toEqual({ thumbnailUrl: `${path}/logo-1/content` });
+  expect(fetch.mock.calls[0][0]).toContain(path);
+  expect(JSON.parse(fetch.mock.calls[0][1].body)).toEqual({ contentType: 'image/png', byteSize: 5 });
+  expect(fetch.mock.calls[0][1].headers.get('Authorization')).toBe('Bearer member-token');
+  expect(fetch.mock.calls[1]).toEqual(['https://storage.example/upload', expect.objectContaining({
+    method: 'PUT', headers: { 'Content-Type': 'image/png' }, credentials: 'omit', body: file,
+  })]);
+  expect(fetch.mock.calls[2][0]).toContain(`${path}/logo-1/complete`);
+  expect(fetch.mock.calls[2][1].body).toBeUndefined();
+});
 
-    const result = await uploadProjectLogo(pngFile(), 7);
+it('complete HTTP 200이라도 FAILED면 저장 경로를 반환하지 않는다', async () => {
+  vi.stubGlobal('fetch', uploadResponses({ status: 'FAILED', failureRule: 'DIMENSION_EXCEEDED', url: null }));
+  await expect(uploadProjectLogo(7, file)).rejects.toThrow('4096px');
+});
 
-    expect(result).toEqual({ thumbnailUrl: 'https://be.example/api/v1/booths/7/project-logos/abc/content' });
-    expect(apiCalls.map((c) => c.path)).toEqual([
-      '/api/v1/booths/7/project-logos',
-      '/api/v1/booths/7/project-logos/abc/complete',
-    ]);
-    const startBody = JSON.parse((apiCalls[0].init?.body ?? '{}') as string) as { contentType: string; byteSize: number };
-    expect(startBody).toEqual({ contentType: 'image/png', byteSize: 3 });
-  });
+it('PUT 실패 뒤 complete를 부르지 않는다', async () => {
+  const fetch = uploadResponses({}, 403);
+  vi.stubGlobal('fetch', fetch);
+  await expect(uploadProjectLogo(7, file)).rejects.toThrow('업로드하지 못했습니다');
+  expect(fetch).toHaveBeenCalledTimes(2);
+});
 
-  it('완료 검증 실패(FAILED)는 재시도 불가로 사용자 문장을 던진다', async () => {
-    mockedResponses = [
-      { logoId: 'abc', expiresAt: '2026-09-18T00:00:00Z', uploadUrl: 'https://storage.example/put', requiredContentType: 'image/png' },
-      { logoId: 'abc', status: 'FAILED', url: null, failureRule: 'DECODE_FAILED' },
-    ];
+it('다른 부스나 외부 경로를 complete가 반환하면 거부한다', async () => {
+  vi.stubGlobal('fetch', uploadResponses({ status: 'READY', url: 'https://other.example/logo' }));
+  await expect(uploadProjectLogo(7, file)).rejects.toThrow('일치하지 않습니다');
+});
 
-    await expect(uploadProjectLogo(pngFile(), 7)).rejects.toThrow('이미지 파일을 읽을 수 없습니다');
-  });
-
-  it('저장소 PUT 실패는 저장소 문장을 던진다', async () => {
-    putOk = false;
-    mockedResponses = [
-      { logoId: 'abc', expiresAt: '2026-09-18T00:00:00Z', uploadUrl: 'https://storage.example/put', requiredContentType: 'image/png' },
-    ];
-
-    await expect(uploadProjectLogo(pngFile(), 7)).rejects.toThrow('저장소에 올리지 못했습니다');
-  });
-
-  it('미배포(404) 시작 실패는 배포 문장으로 바꾼다', async () => {
-    const notFound = { code: 'NOT_FOUND', message: '없음', errors: [], status: 404 };
-    mockedResponses = [Object.assign(new Error('404'), notFound)];
-
-    await expect(uploadProjectLogo(pngFile(), 7)).rejects.toThrow();
-    expect(describeLogoUploadError(notFound)).toBe('서버에 업로드 기능이 아직 배포되지 않았습니다. 배포 후 다시 시도해 주세요.');
-  });
+it('편집자 로고만 인증 fetch하며 외부 URL로 토큰을 보내지 않는다', async () => {
+  setAccessToken('member-token');
+  const fetch = vi.fn().mockResolvedValue(new Response('image'));
+  vi.stubGlobal('fetch', fetch);
+  await fetchProjectLogo(`${path}/logo-1/content`, new AbortController().signal);
+  expect(fetch.mock.calls[0][1].headers).toEqual({ Authorization: 'Bearer member-token' });
+  await expect(fetchProjectLogo('https://other.example/logo', new AbortController().signal)).rejects.toThrow();
+  expect(fetch).toHaveBeenCalledTimes(1);
 });
