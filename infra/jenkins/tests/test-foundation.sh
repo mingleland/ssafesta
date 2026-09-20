@@ -140,34 +140,19 @@ grep -Fq '"CI_STAGE_SUMMARY_PATH=${artifactRoot}/stage-summaries/${name}.json"' 
   || fail "component CI does not root stage summaries in the Jenkins workspace"
 grep -Fq 'bash "${ci_root}/infra/deploy/scripts/verify-component.sh"' "${repo_root}/ci/verify" \
   || fail "component verification must remain valid after adapter directory dispatch"
-grep -q "ws('/home/jenkins/agent/unity/workspaces/develop-game')" "${component_pipeline}" \
-  || fail "game component CI does not reuse its Unity workspace"
-# Batch 2: 한 checkout 에서 WebGL → Linux Server 를 두 세션으로 만든다(같은 Library, 한 source). 'all' 한 세션은 쓰지 않는다 —
-# 서버 빌드가 죽으면 WebGL 산출물까지 잃는다.
-grep -q 'bash festa-unity/ci/build --target webgl' "${repo_root}/ci/build" \
-  || fail "general game CI must build the WebGL client"
-grep -q 'bash festa-unity/ci/build --target linux-server' "${repo_root}/ci/build" \
-  || fail "general game CI must build the Linux Server"
-! grep -q 'festa-unity/ci/build --target all' "${repo_root}/ci/build" \
-  || fail "general game CI must not run one Unity session for both targets"
-grep -q 'collect-build-resource-evidence.sh start' "${repo_root}/ci/build" && grep -q 'collect-build-resource-evidence.sh finish' "${repo_root}/ci/build" \
-  || fail "game CI must record build resource evidence"
-grep -q 'preflight-license' "${repo_root}/festa-unity/ci/build" \
-  || fail "Unity build adapter must run the license preflight before launching the Editor"
-grep -q 'exit 79' "${repo_root}/festa-unity/ci/preflight-license" \
-  || fail "license preflight must fail fast with exit 79"
-grep -q 'git lfs pull' "${component_pipeline}" && grep -q 'exit 78' "${component_pipeline}" \
-  || fail "game component CI must resolve LFS pointers before Unity and stop on leftovers"
-! grep -q -E '^[[:space:]]*git lfs install' "${component_pipeline}" \
-  || fail "game component CI must not install LFS hooks/filters (core.hooksPath=/dev/null on Jenkins checkouts, #507)"
-grep -q 'hostname: festa-unity-agent' "${agent_compose}" && grep -q 'mac_address:' "${agent_compose}" \
-  || fail "unity agent identity must be pinned so the Unity entitlement survives recreates"
-python3 - "${agent_compose}" <<'PY' || fail "unity agent must mount the image transfer volume for WebGL zips"
-import sys
-text = open(sys.argv[1]).read()
-block = text[text.index('  unity-agent:'):text.index('\nvolumes:')]
-assert 'image_transfer:/var/lib/festa-image-transfer' in block
-PY
+# Batch 2 Consumer-only: Jenkins 는 Unity Editor 를 돌리지 않는다. game 산출물은 Unity Release Bundle 에서만 온다.
+! grep -q "node('unity-6000.0.78f1')" "${component_pipeline}" \
+  || fail "component CI must not run on the Unity agent (Jenkins does not build Unity)"
+grep -q "Jenkins does not build Unity" "${component_pipeline}" \
+  || fail "component CI must refuse game build/package stages"
+! grep -q -E 'preflight-license|hostname: festa-unity-agent|mac_address' "${agent_compose}" "${repo_root}/ci/validate" "${repo_root}/festa-unity/ci/build" \
+  || fail "Unity license handling must not live in CI infrastructure"
+for script in intake-unity-release-bundle.sh resolve-game-artifacts.sh check-game-source-identity.sh validate-game-release-set.sh; do
+  [[ -x "${repo_root}/infra/jenkins/scripts/${script}" ]] || fail "Unity consumer script missing: ${script}"
+done
+# 로컬 producer 어댑터(Unity 담당자 PC)는 한 checkout 에서 WebGL → Linux Server 를 두 세션으로 만든다.
+grep -q 'bash festa-unity/ci/build --target webgl' "${repo_root}/ci/build" && grep -q 'bash festa-unity/ci/build --target linux-server' "${repo_root}/ci/build" \
+  || fail "local game producer adapter must build WebGL and Linux Server"
 for line in 'festa-unity/**/*.fbx filter=lfs' 'festa-unity/**/*.tga filter=lfs' 'docs/LJH/skills/** text eol=lf'; do
   grep -Fq "${line}" "${repo_root}/.gitattributes" || fail ".gitattributes lost rule: ${line}"
 done
@@ -207,8 +192,8 @@ grep -q "final boolean hasGame = buildComponents.contains('game')" "${develop_pi
   || fail "Unity build must be gated by buildComponents (gameBuildRequired), not by validation scope"
 grep -q "component == 'game' ? \['validate'\] : \['validate', 'test'\]" "${develop_pipeline}" \
   || fail "validation-only components must run validate/test without image or Unity builds"
-grep -q "if (component == 'game' && fullBuild)" "${component_pipeline}" \
-  || fail "validate-only game must not enter the Unity node"
+grep -q "component == 'game' && stages.any { it in \['build', 'package'\] }" "${component_pipeline}" \
+  || fail "game component CI must reject build/package stages (Consumer-only)"
 grep -q 'withCredentials(credentialBindings)' "${develop_pipeline}" \
   || fail "dev batch does not bind selected component credentials"
 grep -q "credentialsId: env.DEMO_INTERNAL_INFRA_TO_SPRING_TOKENS_CREDENTIAL_ID, variable: 'INTERNAL_INFRA_TO_SPRING_TOKENS'" "${develop_pipeline}" \
@@ -219,10 +204,11 @@ grep -q 'FRESHNESS_EXPECTED_SHA=' "${develop_pipeline}" \
   || fail "dev batch does not recheck the develop head before deployment"
 grep -q 'deploy-dev-batch.sh' "${develop_pipeline}" \
   || fail "candidate transfer does not activate the Phase 3 dev batch"
-grep -q "stash name: 'candidate-metadata-game'" "${component_pipeline}" \
-  || fail "game candidate metadata cannot leave the Unity workspace"
-grep -q "unstash 'candidate-metadata-game'" "${develop_pipeline}" \
-  || fail "develop pipeline does not collect game candidate metadata"
+# game candidate identity 는 Unity workspace 가 아니라 Unity Release Bundle 의 image-metadata.json 에서 온다 (Batch 2 Consumer-only).
+grep -q 'intake-unity-release-bundle.sh' "${develop_pipeline}" \
+  || fail "develop pipeline does not take game artifacts from the Unity Release Bundle"
+grep -q 'WAITING_FOR_UNITY_ARTIFACT' "${develop_pipeline}" \
+  || fail "develop pipeline must wait (not build) when no game artifact exists"
 grep -q 'image-transfer-init' "${agent_compose}" \
   || fail "shared image transfer volume has no ownership initializer"
 grep -q "branch != 'develop'" "${jenkinsfile}" \

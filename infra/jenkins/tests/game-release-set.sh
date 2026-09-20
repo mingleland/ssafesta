@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Batch 2 consumer 계약: resolve 5분기, source-identity gate, release-set 검증, image archive validator.
+# Batch 2 Consumer-only 계약: resolve(REGISTRY_COMPLETE/BUNDLE_AVAILABLE/PUBLISH_*/WAITING/PARTIAL 65), bundle intake, source-identity gate,
+# release-set 검증, image archive validator, develop.groovy 정적 계약(Jenkins 는 Unity 를 돌리지 않는다).
 set -euo pipefail
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"; repo_root="$(cd "${script_dir}/../../.." && pwd)"
 scripts="${repo_root}/infra/jenkins/scripts"
@@ -24,8 +25,10 @@ zip_sha="$(sha256sum "${zip}" | awk '{print $1}')"; printf '%s  %s\n' "${zip_sha
 cat >"${work}/bin/docker" <<'SH'
 #!/usr/bin/env bash
 set -euo pipefail
+printf '%s\n' "$*" >>"${FAKE_DOCKER_LOG:-/dev/null}"
+if [[ "${1:-} ${2:-}" == 'image load' ]]; then [[ "${3:-}" == --input && -f "${4:?}" ]]; : >"${FAKE_LOADED_MARKER:-/dev/null}"; exit 0; fi
 [[ "${1:-} ${2:-}" == 'image inspect' ]] || exit 64
-[[ "${FAKE_IMAGE_PRESENT:-1}" == 1 ]] || exit 1
+[[ "${FAKE_IMAGE_PRESENT:-1}" == 1 || -f "${FAKE_LOADED_MARKER:-/nonexistent}" ]] || exit 1
 case "${4:-}" in
   '{{.Id}}') printf '%s\n' "${FAKE_CONTENT_ID}";;
   *source-commit*) printf '%s\n' "${FAKE_LABEL_COMMIT}";;
@@ -42,24 +45,30 @@ if [[ -f "${target}" ]]; then cp "${target}" "${output}"; code=200; else : >"${o
 [[ -z "${write_out}" ]] || printf '%s' "${code}"
 SH
 chmod +x "${work}/bin/docker" "${work}/bin/curl"
-export PATH="${work}/bin:${PATH}" FAKE_REMOTE_ROOT="${work}/remote" FAKE_CONTENT_ID="${content_id}" FAKE_LABEL_COMMIT="${sha}" GITLAB_DEPLOY_TOKEN=x
-resolve(){ "${scripts}/resolve-game-artifacts.sh" --source-commit "${sha}" --webgl-dir "$1"; }
+export PATH="${work}/bin:${PATH}" FAKE_REMOTE_ROOT="${work}/remote" FAKE_CONTENT_ID="${content_id}" FAKE_LABEL_COMMIT="${sha}" FAKE_DOCKER_LOG="${work}/docker.log" FAKE_LOADED_MARKER="${work}/loaded" GITLAB_DEPLOY_TOKEN=x
+resolve(){ "${scripts}/resolve-game-artifacts.sh" --source-commit "${sha}"; }
 decision(){ python3 -c 'import json,sys; print(json.load(sys.stdin)["decision"])'; }
 put_registry_webgl(){ mkdir -p "${work}/remote/festa-webgl/${rid}"; cp "${zip}.sha256" "${work}/remote/festa-webgl/${rid}/"; }
-put_registry_world(){ mkdir -p "${work}/remote/festa-world/${rid}"; printf '{"sourceCommit":"%s","archiveSha256":"%s"}' "${sha}" "$(printf 'e%.0s' {1..64})" >"${work}/remote/festa-world/${rid}/festa-world-release-${rid}.json"; }
+put_registry_world(){ mkdir -p "${work}/remote/festa-world/${rid}"; printf '{"sourceCommit":"%s","archiveSha256":"%s","imageContentId":"%s"}' "${sha}" "$(printf 'e%.0s' {1..64})" "${content_id}" >"${work}/remote/festa-world/${rid}/festa-world-release-${rid}.json"; }
+bundle_remote="${work}/remote/unity-release-bundle/${rid}"
+put_bundle_meta(){ mkdir -p "${bundle_remote}"; printf '{"schemaVersion":"1.0.0","component":"game","sourceCommit":"%s","storageMode":"local-docker","imageRef":"%s","contentId":"%s"}' "${sha}" "${image_ref}" "$1" >"${bundle_remote}/image-metadata.json"; }
 
-# --- resolve 5분기 ----------------------------------------------------------------------------
-[[ "$(FAKE_IMAGE_PRESENT=0 resolve "${work}/empty" | decision)" == BUILD_REQUIRED ]] || fail 'none/none → BUILD_REQUIRED'
-[[ "$(FAKE_IMAGE_PRESENT=0 resolve "${work}/webgl" | decision)" == BUILD_REQUIRED ]] || fail 'none + zip only → BUILD_REQUIRED (partial local is not reused)'
-[[ "$(resolve "${work}/webgl" | decision)" == PUBLISH_BOTH ]] || fail 'none + local both → PUBLISH_BOTH'
+# --- resolve ----------------------------------------------------------------------------------
+[[ "$(resolve | decision)" == WAITING_FOR_UNITY_ARTIFACT ]] || fail 'nothing anywhere → WAITING_FOR_UNITY_ARTIFACT (no Unity build is started)'
+put_bundle_meta "${content_id}"
+[[ "$(resolve | decision)" == BUNDLE_AVAILABLE ]] || fail 'bundle only → BUNDLE_AVAILABLE'
 put_registry_world
-[[ "$(resolve "${work}/webgl" | decision)" == PUBLISH_WEBGL ]] || fail 'world only + local zip → PUBLISH_WEBGL'
-set +e; resolve "${work}/empty" >/dev/null 2>&1; rc=$?; set -e; [[ "${rc}" -eq 65 ]] || fail "world only, no zip → 65 (got ${rc})"
+[[ "$(resolve | decision)" == PUBLISH_WEBGL ]] || fail 'world only + bundle → PUBLISH_WEBGL'
+rm -rf "${bundle_remote}"
+set +e; resolve >/dev/null 2>&1; rc=$?; set -e; [[ "${rc}" -eq 65 ]] || fail "world only, no bundle → 65 PARTIAL_REGISTRY (got ${rc})"
 rm -rf "${work}/remote/festa-world"; put_registry_webgl
-[[ "$(resolve "${work}/empty" | decision)" == PUBLISH_WORLD ]] || fail 'webgl only + local image → PUBLISH_WORLD'
-set +e; FAKE_IMAGE_PRESENT=0 resolve "${work}/empty" >/dev/null 2>&1; rc=$?; set -e; [[ "${rc}" -eq 65 ]] || fail "webgl only, no image → 65 (got ${rc})"
+set +e; resolve >/dev/null 2>&1; rc=$?; set -e; [[ "${rc}" -eq 65 ]] || fail "webgl only, no bundle → 65 PARTIAL_REGISTRY (got ${rc})"
+put_bundle_meta "${content_id}"
+[[ "$(resolve | decision)" == PUBLISH_WORLD ]] || fail 'webgl only + bundle → PUBLISH_WORLD'
 put_registry_world
-[[ "$(FAKE_IMAGE_PRESENT=0 resolve "${work}/empty" | decision)" == SKIP_TO_DEPLOY ]] || fail 'both in registry → SKIP_TO_DEPLOY'
+[[ "$(resolve | decision)" == REGISTRY_COMPLETE ]] || fail 'both canonical → REGISTRY_COMPLETE (bundle ignored)'
+resolve | python3 -c 'import json,sys; d=json.load(sys.stdin); assert d["registry"]["worldContentId"].startswith("sha256:"), d' || fail 'resolve exposes canonical world contentId'
+rm -rf "${work}/remote/festa-world" "${work}/remote/festa-webgl"
 
 # --- source-identity gate (실제 git) ----------------------------------------------------------
 git init -q "${work}/origin"; git -C "${work}/origin" -c user.name=t -c user.email=t@t commit -q --allow-empty -m base; git -C "${work}/origin" branch -q -M develop
@@ -103,17 +112,40 @@ set +e; "${v}" "${work}/image.tar" --image-ref "${image_ref}" --content-id "sha2
 set +e; "${v}" "${work}/image.tar" --image-ref "festa-game:other" --content-id "${cfg_id}" >/dev/null 2>&1; rc=$?; set -e; [[ "${rc}" -ne 0 ]] || fail 'archive validator rejects wrong tag'
 set +e; "${v}" "${work}/image.tar" --image-ref "${image_ref}" --content-id "${cfg_id}" --source-commit "$(printf '7%.0s' {1..40})" >/dev/null 2>&1; rc=$?; set -e; [[ "${rc}" -ne 0 ]] || fail 'archive validator rejects label mismatch'
 
+# --- Unity Release Bundle intake (Registry → validate → docker load) ---------------------------
+intake(){ FAKE_CONTENT_ID="${idx_id}" "${scripts}/intake-unity-release-bundle.sh" --source-commit "${sha}" --dest "${work}/intake"; }
+put_bundle_meta "${idx_id}"
+cp "${zip}" "${bundle_remote}/festa-webgl-release-${rid}.zip"; cp "${work}/image.tar" "${bundle_remote}/festa-game-${rid}.tar"
+python3 - "${zip}" "${bundle_remote}/webgl-manifest.json" <<'PY'
+import sys, zipfile
+open(sys.argv[2], 'wb').write(zipfile.ZipFile(sys.argv[1]).read('manifest.json'))
+PY
+rm -f "${FAKE_LOADED_MARKER}"; : >"${FAKE_DOCKER_LOG}"
+out="$(FAKE_IMAGE_PRESENT=0 intake)"; [[ "${out}" == "BUNDLE_OK ${sha} ${zip_sha} ${idx_id}" ]] || fail "intake: ${out}"
+grep -q '^image load --input ' "${FAKE_DOCKER_LOG}" || fail 'intake must docker load the bundle image when absent'
+[[ -f "${work}/intake/festa-webgl-release-${rid}.zip.sha256" ]] || fail 'intake writes the zip checksum sidecar'
+: >"${FAKE_DOCKER_LOG}"; FAKE_IMAGE_PRESENT=1 intake >/dev/null || fail 'intake idempotent'; ! grep -q '^image load' "${FAKE_DOCKER_LOG}" || fail 'intake must not reload a present image'
+rm -f "${bundle_remote}/webgl-manifest.json"; set +e; FAKE_IMAGE_PRESENT=1 intake >/dev/null 2>&1; rc=$?; set -e; [[ "${rc}" -eq 66 ]] || fail 'incomplete bundle → 66'
+python3 - "${zip}" "${bundle_remote}/webgl-manifest.json" <<'PY'
+import json, sys, zipfile
+d = json.loads(zipfile.ZipFile(sys.argv[1]).read('manifest.json')); d['sourceBranch'] = 'main'; json.dump(d, open(sys.argv[2], 'w'))
+PY
+set +e; FAKE_IMAGE_PRESENT=1 intake >/dev/null 2>&1; rc=$?; set -e; [[ "${rc}" -ne 0 ]] || fail 'bundle whose external manifest differs from the zip must be rejected'
+set +e; FAKE_IMAGE_PRESENT=1 FAKE_LABEL_COMMIT="$(printf '9%.0s' {1..40})" intake >/dev/null 2>&1; rc=$?; set -e; [[ "${rc}" -ne 0 ]] || fail 'loaded image with another source-commit must be rejected'
+rm -rf "${bundle_remote}"
+
 # --- develop.groovy 정적 계약 -----------------------------------------------------------------
 python3 - "${repo_root}/infra/jenkins/pipelines/develop.groovy" <<'PY' || fail 'develop.groovy game flow contract'
 import sys
 text = open(sys.argv[1], encoding='utf-8').read()
 game = text[text.index("if (!hasGame) { return }"):]
-order = ["stage('Resolve Game Artifacts')", "if (decision == 'BUILD_REQUIRED')", "buildComponent('game')",
-         "stage('Publish Game Artifacts')", "check-game-source-identity.sh", "publish-webgl-release.sh", "--no-trigger",
+order = ["stage('Resolve Game Artifacts')", "WAITING_FOR_UNITY_ARTIFACT",
+         "stage('Publish Game Artifacts')", "intake-unity-release-bundle.sh", "check-game-source-identity.sh", "publish-webgl-release.sh", "--no-trigger",
          "publish-world-release.sh", "validate-game-release-set.sh", "stage('Deploy Game Release Set')",
          "deploy-game.sh", "game-readiness.sh", "deploy-webgl-release.sh", "promote-game.sh"]
 pos = [game.index(s) for s in order]
 assert pos == sorted(pos), 'game stages are out of contract order'
+assert "buildComponent('game')" not in game and "unity-6000.0.78f1" not in game and 'ci/build' not in game, 'Jenkins must not build Unity'
 assert game.count("rollback-game.sh") >= 2, 'readiness and WebGL activation failures must both roll the world back'
 assert "buildWithParameters" not in game, 'develop must deploy WebGL itself, not trigger the fallback job'
 assert game.index("deploy-webgl-release.sh") > game.index("game-readiness.sh"), 'WebGL current flips only after World readiness'

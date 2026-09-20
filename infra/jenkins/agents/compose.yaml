@@ -112,10 +112,6 @@ services:
     <<: *agent
     profiles: [unity]
     container_name: festa-jenkins-agent-unity
-    # Unity Personal entitlement 는 컨테이너 hostname/machine binding 에 묶인다. 2026-09-19 recreate 로 hostname 이 바뀌자
-    # 라이선스 파일은 그대로인데 "No licenses were found" 가 됐다 (Batch 2). identity 를 고정해 recreate 뒤에도 binding 이 살아남게 한다.
-    hostname: festa-unity-agent
-    mac_address: "02:42:fe:57:a0:01"
     networks:
       - jenkins-control
     command:
@@ -136,8 +132,6 @@ services:
     volumes:
       - unity_workspace:/home/jenkins/agent/unity
       - unity_home:/home/jenkins
-      # WebGL zip 을 deploy agent 로 넘기는 통로 — image 와 같은 transfer 볼륨을 쓴다 (Batch 2).
-      - image_transfer:/var/lib/festa-image-transfer
       - ${UNITY_EDITOR_ROOT:-/opt/unity}:/opt/unity:ro
       - ${CONNECTION_TOKEN_SECRET_FILE:-/opt/festa/secrets/dev-game-connection-token-secret}:${CONNECTION_TOKEN_SECRET_FILE:-/opt/festa/secrets/dev-game-connection-token-secret}:ro
       - ${DOCKER_SOCKET_PATH:-/run/user/1000/docker.sock}:/var/run/docker.sock

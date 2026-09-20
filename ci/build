@@ -17,15 +17,9 @@ build_project() {
       mkdir -p "${CI_ARTIFACT_DIR}/front-dist"
       cp -a dist/. "${CI_ARTIFACT_DIR}/front-dist/"
     ) ;;
-    # WebGL 클라이언트와 Linux Dedicated Server 를 같은 checkout 에서 연달아 만든다 — 한 source 의 client/server 가 한 release set 이다 (Batch 2).
-    # 전후 자원 스냅샷은 Runner/host 용량 판단의 유일한 근거다.
-    game)
-      local evidence="${CI_ARTIFACT_DIR}/resource-evidence.json"
-      bash infra/jenkins/scripts/collect-build-resource-evidence.sh start "${evidence}"
-      bash festa-unity/ci/build --target webgl
-      bash festa-unity/ci/build --target linux-server
-      bash infra/jenkins/scripts/collect-build-resource-evidence.sh finish "${evidence}" festa-unity/Builds/linux-server/festa-unity.x86_64
-      ;;
+    # Unity 담당자 로컬 producer 경로 (Jenkins 는 Unity Editor 를 돌리지 않는다 — Batch 2 Consumer-only).
+    # WebGL 클라이언트와 Linux Dedicated Server 를 같은 checkout 에서 연달아 만들어 한 release set 을 이룬다.
+    game) bash festa-unity/ci/build --target webgl && bash festa-unity/ci/build --target linux-server ;;
   esac
 }
 ci_run build BUILD_FAILED build_project

@@ -36,9 +36,6 @@ fi
 log_file="${CI_ARTIFACT_DIR:-${project_dir}/Builds}/unity-build-${target}.log"
 mkdir -p "$(dirname "${log_file}")"
 
-# 라이선스가 죽어 있으면 45분 뒤가 아니라 지금 멈춘다 (Batch 2, exit 79).
-bash "${project_dir}/ci/preflight-license"
-
 echo "Unity ${unity_version} 배치 빌드 — 타깃 ${target}"
 echo "로그: ${log_file}"
 

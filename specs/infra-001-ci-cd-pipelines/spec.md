@@ -314,24 +314,23 @@ Infra 담당자는 수집 Agent가 모은 로그와 서버 사용량을 조회�
 | C-16 | **확정**: 최초 migration 실패는 maintenance를 유지하며 legacy rollback을 금지한다. | Infra + 팀 | 2026-09-20 |
 | C-17 | **확정**: canonical CURRENT와 human-approved KNOWN-GOOD를 분리하고 후속 canonical release만 previous rollback을 허용한다. | Infra + 팀 | 2026-09-20 |
 
-### Session 2026-09-20 (Batch 2 — Unity build / publish automation)
+### Session 2026-09-20 (Batch 2 — Unity Release Bundle 이후 배포 자동화, Consumer-only)
 
-- Unity 변경이 develop 에 merge 되면 `festa-gitlab-develop/develop` 이 WebGL 클라이언트와 Linux Dedicated Server 를 한 checkout 에서 만들고(두 세션), 결정적 zip 과 docker image 로 패키징해 `festa-webgl/<8sha>`·`festa-world/<8sha>` 로 게시한 뒤 Demo candidate → readiness → current 까지 사람 개입 없이 끝낸다. Unity Editor 수동 Release Build·수동 zip 업로드·`festa-world-package-publish` 수동 파라미터는 HISTORICAL/FALLBACK 이다.
-- Producer 와 Consumer 를 나눈다. Producer(unity agent)는 preflight(라이선스 79·LFS pointer 78·dirty 65) → build → package 까지, Consumer(deploy agent)는 SCM identity gate → publish → release-set 검증 → deploy 만 한다. deploy agent 는 download/sha/manifest/docker load/symlink/readiness 만 하는 경량 consumer 로 남는다.
-- 같은 source 의 산출물은 다시 만들지 않는다. `resolve-game-artifacts.sh` 가 Registry/로컬 상태로 `SKIP_TO_DEPLOY / PUBLISH_* / BUILD_REQUIRED` 를 정하고, 한쪽만 Registry 에 있는데 로컬에서 못 채우면 `PARTIAL_REGISTRY`(65) 로 멈춘다.
-- Registry immutability 는 publisher 가 강제한다: 같은 version + 같은 SHA → `*_RELEASE_EXISTS`(0), 같은 version + 다른 SHA → 65. canonical version 은 source SHA 앞 8자.
-- provenance 를 둘로 나눈다. zip 안 `ci-provenance.json` 은 source-stable 값(sourceCommit/sourceBranch/unityVersion/buildProfile/lfsResolved)만, Registry `.json` sidecar 는 실행 provenance(jenkinsJob/BuildNumber/BuildUrl/builderClass/publishedAt). 그래서 같은 build output 은 같은 zip bytes 다.
-- canonical publish 조건: commit 이 origin 에 존재 ∧ origin/develop 조상 ∧ zip dirty=false ∧ WebGL/World 같은 commit. 2026-09-20 외부 전달 artifact `5f148b69` 는 로컬에도 GitLab 에도 없는 commit 이라 `UNVERIFIABLE_SOURCE → EXTERNAL_OFFLINE_FIXTURE` 로만 썼다(`infra/evidence/batch2-artifact-5f148b69.md`).
-- Demo current 는 WebGL zip 과 World image 가 모두 게시되고 World readiness 가 통과한 뒤에만 바뀐다. 그 전 실패는 canonical current(`/srv/festa/webgl/current`, `dev/batches/current/*.json`)를 건드리지 않으며 candidate World runtime 만 `rollback-game.sh` 로 돌아온다.
-- Git LFS 는 `festa-unity/**/*.{fbx,tga,psd,mp3,exr,skp}` 를 개별 line 으로 추적하고 history 는 다시 쓰지 않는다(NO_HISTORY_REWRITE).
-- Unity Personal entitlement 는 컨테이너 hostname/machine binding 에 묶이므로 unity agent 의 `hostname`/`mac_address` 를 고정한다. `LICENSE_BINDING_STABLE` 은 재활성화 후 recreate 2회 preflight PASS 로 판정한다.
+- **Jenkins 는 Unity Editor 를 돌리지 않는다.** Unity 라이선스·계정·entitlement 는 CI 인프라가 관리하지 않는다. WebGL 클라이언트와 Linux Dedicated Server 는 Unity 담당자의 정상 개발환경에서 만들어지고, Jenkins 는 그 산출물 이후만 자동화한다: source identity → artifact 검증 → canonical Registry publish → compatibility → Demo candidate → readiness → current.
+- 유일한 intake 는 GitLab Generic Package Registry `unity-release-bundle/<8sha>` 이며 내용은 이미 실물로 받은 형식 그대로 4 파일(`festa-webgl-release-<8sha>.zip`, `festa-game-<8sha>.tar`, `webgl-manifest.json`, `image-metadata.json`)이다. `intake-unity-release-bundle.sh` 가 받아 zip/tar/metadata 를 교차검증한 뒤에만 `docker image load` 한다.
+- `resolve-game-artifacts.sh`: canonical `festa-webgl/<8sha>`+`festa-world/<8sha>` 둘 다 있으면 `REGISTRY_COMPLETE`(재사용), 없고 bundle 이 있으면 `BUNDLE_AVAILABLE`, 한쪽만 있고 bundle 이 있으면 없는 쪽만 `PUBLISH_*`, 둘 다 없으면 `WAITING_FOR_UNITY_ARTIFACT`(정상 종료, 아무것도 만들지 않음), 한쪽만 있고 bundle 이 없으면 `PARTIAL_REGISTRY`(65). 이미 게시된 source 는 어떤 경우에도 다시 만들지 않는다.
+- canonical publish 조건: commit 이 origin 에 존재 ∧ origin/develop 조상 ∧ zip dirty=false ∧ WebGL/World 같은 commit(`check-game-source-identity.sh`, SCM 한 경로). 2026-09-20 외부 artifact `5f148b69` 는 로컬에도 GitLab 에도 없는 commit 이라 `UNVERIFIABLE_SOURCE → EXTERNAL_OFFLINE_FIXTURE` 로만 썼다(`infra/evidence/batch2-artifact-5f148b69.md`).
+- Registry immutability 는 publisher 가 강제한다: 같은 version + 같은 SHA → `*_RELEASE_EXISTS`(0), 같은 version + 다른 SHA → 65. canonical version 은 source SHA 앞 8자. `.json` sidecar 는 실행 provenance(jenkinsJob/BuildNumber/BuildUrl/builderClass/publishedAt), zip 안 `ci-provenance.json`(로컬 어댑터가 넣는다면)은 source-stable 값만.
+- Demo current 는 WebGL zip 과 World image 가 모두 게시되고 World readiness 가 통과한 뒤에만 바뀐다. 그 전 실패는 canonical current(`/srv/festa/webgl/current`, `dev/batches/current/*.json`)를 건드리지 않으며 candidate World runtime 만 `rollback-game.sh` 로 돌아온다. deploy agent 는 download/sha/manifest/docker load/symlink/readiness 만 하는 경량 consumer 로 남는다.
+- `ci/build`·`festa-unity/ci/package` 는 Unity 담당자 PC 용 로컬 producer 어댑터(한 checkout, webgl → linux-server 두 세션, 결정적 zip)로 남긴다. Jenkins `component.groovy` 는 game 의 build/package stage 를 거부한다.
+- Git LFS 는 `festa-unity/**/*.{fbx,tga,psd,mp3,exr,skp}` 를 개별 line 으로 추적하고 history 는 다시 쓰지 않는다(NO_HISTORY_REWRITE). 담당자 checkout 은 `git lfs pull` 을 끝낸 상태여야 한다.
+- Unity Cloud Build / UBA / 별도 Unity 계정 자동화 / floating license 는 도입하지 않는다.
 
 | ID | 질문/결정 | 결정 주체 | 결정 시점 |
 |---|---|---|---|
-| C-18 | **확정**: Unity build 는 한 checkout 두 세션(WebGL → Linux Server), 산출물은 8sha version 으로 자동 게시·Demo 자동 반영. 수동 build/upload 는 fallback. | Infra + Unity | 2026-09-20 |
-| C-19 | **확정**: 이미 게시된 source 는 재빌드하지 않는다(Resolve 5분기, PARTIAL_REGISTRY 는 STOP). Registry 같은 version 다른 SHA 는 hard fail. | Infra | 2026-09-20 |
-| C-20 | **확정**: repository 에 없는 commit 의 artifact 는 fixture 로만 쓴다. canonical publish 는 SCM identity gate 를 통과한 producer 산출물만. | Infra + Unity | 2026-09-20 |
-
+| C-18 | **확정**: Jenkins 는 Unity 를 빌드하지 않는다. Unity Release Bundle(`unity-release-bundle/<8sha>`)이 유일한 intake 이며 canonical 8sha version 으로 자동 게시·Demo 자동 반영. 수동 deploy/publish job 은 fallback. | Infra + Unity | 2026-09-20 |
+| C-19 | **확정**: 이미 게시된 source 는 재빌드하지 않는다(REGISTRY_COMPLETE 재사용, PARTIAL_REGISTRY 는 STOP, bundle 없으면 WAITING). Registry 같은 version 다른 SHA 는 hard fail. | Infra | 2026-09-20 |
+| C-20 | **확정**: repository 에 없는 commit 의 artifact 는 fixture 로만 쓴다. canonical publish 는 SCM identity gate 를 통과한 bundle 만. | Infra + Unity | 2026-09-20 |
 
 ## Out of Scope
 

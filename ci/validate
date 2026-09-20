@@ -9,11 +9,9 @@ validate_project() {
     front) [[ -f "${component_dir}/package.json" ]] || { echo 'Front package.json missing' >&2; return 66; } ;;
     game)
       grep -q '6000.0.78f1' "${component_dir}/ProjectSettings/ProjectVersion.txt"
-      for adapter in build test package preflight-license; do
+      for adapter in build test package; do
         [[ -f "${component_dir}/ci/${adapter}" ]] || { echo "Game CI adapter is missing: ${adapter}" >&2; return 66; }
       done
-      # Unity 실행기가 있는 노드(unity agent)에서만 라이선스를 본다. linux-docker 의 validate-only 는 Unity 가 없다 (Batch 1).
-      if [[ -n "${UNITY_EDITOR_ROOT:-}" ]]; then bash "${component_dir}/ci/preflight-license"; fi
       ;;
   esac
 }

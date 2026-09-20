@@ -98,9 +98,9 @@ run_case "${ALL}" '["game"]' '[]' shared-ci true infra/jenkins/pipelines/compone
 run_case "${ALL}" '["game"]' '[]' shared-ci true infra/jenkins/agents/compose.yaml
 # LFS 규칙과 game CI 어댑터는 checkout/build 입력이다 (Batch 2).
 run_case "${ALL}" '["game"]' '[]' shared-ci true .gitattributes
-run_case '["game"]' '["game"]' '["game"]' component-source true festa-unity/ci/preflight-license
+run_case '["game"]' '["game"]' '["game"]' component-source true festa-unity/ci/package
 # consumer 스크립트는 shared-ci 일 뿐 Unity 를 돌리지 않는다.
-run_case "${ALL}" '[]' '[]' shared-ci false infra/jenkins/scripts/publish-webgl-release.sh infra/jenkins/scripts/resolve-game-artifacts.sh
+run_case "${ALL}" '[]' '[]' shared-ci false infra/jenkins/scripts/publish-webgl-release.sh infra/jenkins/scripts/intake-unity-release-bundle.sh
 
 # 검증 전용·dev 전용·문서: 아무것도 고르지 않는다.
 run_case '[]' '[]' '[]' validation-only false infra/unity-server/tests/integration/example.sh
