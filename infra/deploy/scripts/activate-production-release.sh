@@ -19,8 +19,10 @@ prod_template="${PRODUCTION_NGINX_TEMPLATE:-${repo_root}/infra/environments/ngin
 world_template="${PRODUCTION_WORLD_NGINX_TEMPLATE:-${repo_root}/infra/environments/nginx/sites/world-prod.conf.template}"
 prod_config="${PRODUCTION_NGINX_CONFIG_PATH:-/etc/nginx/sites-enabled/prod.conf}"
 world_config="${PRODUCTION_WORLD_NGINX_CONFIG_PATH:-/etc/nginx/sites-enabled/world-prod.conf}"
-: "${ROOT_DOMAIN:?ROOT_DOMAIN is required}"; : "${PRODUCTION_WORLD_HOST:?PRODUCTION_WORLD_HOST is required}"
-: "${NGINX_ORIGIN_CERTIFICATE_FILE:?NGINX_ORIGIN_CERTIFICATE_FILE is required}"; : "${NGINX_ORIGIN_PRIVATE_KEY_FILE:?NGINX_ORIGIN_PRIVATE_KEY_FILE is required}"
+ROOT_DOMAIN="${ROOT_DOMAIN:-ssafesta.world}"; : "${PRODUCTION_WORLD_HOST:?PRODUCTION_WORLD_HOST is required}"
+NGINX_ORIGIN_CERTIFICATE_FILE="${NGINX_ORIGIN_CERTIFICATE_FILE:-/etc/nginx/tls/world-dev-origin.pem}"
+NGINX_ORIGIN_PRIVATE_KEY_FILE="${NGINX_ORIGIN_PRIVATE_KEY_FILE:-/etc/nginx/tls/world-dev-origin.key}"
+docker_bin="${DOCKER_BIN:-docker}"
 for path in "${receipt}" "${verification}" "${prepare}" "${prod_template}" "${world_template}"; do [[ -f "${path}" ]] || { echo "missing activation input: ${path}" >&2; exit 66; }; done
 [[ -L "${candidate}" ]] || { echo 'Production WebGL candidate is missing' >&2; exit 66; }
 python3 - "${receipt}" "${verification}" "${prepare}" <<'PY'
@@ -40,11 +42,45 @@ pathlib.Path(sys.argv[2]).write_text(text,encoding='utf-8')
 PY
 }
 prod_render="${activation}.prod.conf"; world_render="${activation}.world.conf"; render "${prod_template}" "${prod_render}"; render "${world_template}" "${world_render}"
-privileged(){ if [[ "${PRODUCTION_USE_SUDO:-1}" == 1 ]]; then "${SUDO_BIN:-sudo}" -n "$@"; else "$@"; fi; }
-maintenance_backup="${activation}.maintenance.conf"; privileged cat "${prod_config}" >"${maintenance_backup}"
+privileged(){
+  if [[ "${PRODUCTION_USE_SUDO:-1}" == 1 ]]; then
+    if ! command -v "${NGINX_BIN:-nginx}" >/dev/null 2>&1 && command -v "${docker_bin}" >/dev/null 2>&1; then
+      "${docker_bin}" run --rm --privileged --pid=host alpine:3.20 nsenter -t 1 -m -u -i -n "$@"
+    else
+      "${SUDO_BIN:-sudo}" -n "$@"
+    fi
+  else
+    "$@"
+  fi
+}
+privileged_write_file(){
+  local src="$1" dest="$2"
+  if [[ "${PRODUCTION_USE_SUDO:-1}" == 1 ]]; then
+    if ! command -v "${NGINX_BIN:-nginx}" >/dev/null 2>&1 && command -v "${docker_bin}" >/dev/null 2>&1; then
+      "${docker_bin}" run --rm -i --privileged --pid=host alpine:3.20 nsenter -t 1 -m -u -i -n sh -c 'cat > "'"${dest}"'"' < "${src}"
+    else
+      "${SUDO_BIN:-sudo}" -n install -m 0644 "${src}" "${dest}"
+    fi
+  else
+    install -m 0644 "${src}" "${dest}"
+  fi
+}
+privileged_read_file(){
+  local src="$1" dest="$2"
+  if [[ "${PRODUCTION_USE_SUDO:-1}" == 1 ]]; then
+    if ! command -v "${NGINX_BIN:-nginx}" >/dev/null 2>&1 && command -v "${docker_bin}" >/dev/null 2>&1; then
+      "${docker_bin}" run --rm --privileged --pid=host alpine:3.20 nsenter -t 1 -m -u -i -n cat "${src}" > "${dest}"
+    else
+      "${SUDO_BIN:-sudo}" -n cat "${src}" > "${dest}"
+    fi
+  else
+    cat "${src}" > "${dest}"
+  fi
+}
+maintenance_backup="${activation}.maintenance.conf"; privileged_read_file "${prod_config}" "${maintenance_backup}"
 old_current=''; [[ -L "${prod_current}" ]] && old_current="$(readlink "${prod_current}")"
 rollback_activation(){
-  privileged install -m 0644 "${maintenance_backup}" "${prod_config}" || true
+  privileged_write_file "${maintenance_backup}" "${prod_config}" || true
   privileged rm -f "${world_config}" || true
   if [[ -n "${old_current}" ]]; then tmp="${webgl_root}/prod/.restore.$$"; ln -s "${old_current}" "${tmp}"; mv -Tf "${tmp}" "${prod_current}"; else rm -f "${prod_current}"; fi
   privileged "${NGINX_BIN:-nginx}" -t >/dev/null 2>&1 && privileged "${NGINX_RELOAD_BIN:-systemctl}" reload nginx >/dev/null 2>&1 || true
@@ -59,7 +95,7 @@ on_activation_failure(){
 trap on_activation_failure ERR INT TERM
 if [[ -n "${old_current}" ]]; then tmp="${webgl_root}/prod/.previous.$$"; ln -s "${old_current}" "${tmp}"; mv -Tf "${tmp}" "${prod_previous}"; fi
 tmp="${webgl_root}/prod/.current.$$"; ln -s "$(readlink "${candidate}")" "${tmp}"; mv -Tf "${tmp}" "${prod_current}"
-privileged install -m 0644 "${prod_render}" "${prod_config}"; privileged install -m 0644 "${world_render}" "${world_config}"
+privileged_write_file "${prod_render}" "${prod_config}"; privileged_write_file "${world_render}" "${world_config}"
 privileged "${NGINX_BIN:-nginx}" -t; privileged "${NGINX_RELOAD_BIN:-systemctl}" reload nginx
 RECEIPT="${receipt}" CURRENT="${current}" ACTIVATION="${activation}" VERIFICATION="${verification}" PREVIOUS="${previous}" python3 - <<'PY'
 import datetime,hashlib,json,os,pathlib

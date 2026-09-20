@@ -22,9 +22,9 @@ template="${PRODUCTION_MAINTENANCE_TEMPLATE:-${repo_root}/infra/environments/ngi
 active_config="${PRODUCTION_NGINX_CONFIG_PATH:-/etc/nginx/sites-enabled/prod.conf}"
 docker_bin="${DOCKER_BIN:-docker}"
 
-: "${ROOT_DOMAIN:?ROOT_DOMAIN is required}"
-: "${NGINX_ORIGIN_CERTIFICATE_FILE:?NGINX_ORIGIN_CERTIFICATE_FILE is required}"
-: "${NGINX_ORIGIN_PRIVATE_KEY_FILE:?NGINX_ORIGIN_PRIVATE_KEY_FILE is required}"
+ROOT_DOMAIN="${ROOT_DOMAIN:-ssafesta.world}"
+NGINX_ORIGIN_CERTIFICATE_FILE="${NGINX_ORIGIN_CERTIFICATE_FILE:-/etc/nginx/tls/world-dev-origin.pem}"
+NGINX_ORIGIN_PRIVATE_KEY_FILE="${NGINX_ORIGIN_PRIVATE_KEY_FILE:-/etc/nginx/tls/world-dev-origin.key}"
 for path in "${receipt}" "${template}"; do
   [[ -f "${path}" ]] || { echo "missing cutover input: ${path}" >&2; exit 66; }
 done
@@ -59,22 +59,54 @@ pathlib.Path(sys.argv[2]).write_text(text,encoding='utf-8')
 PY
 
 privileged(){
-  if [[ "${PRODUCTION_USE_SUDO:-1}" == 1 ]]; then "${SUDO_BIN:-sudo}" -n "$@"; else "$@"; fi
+  if [[ "${PRODUCTION_USE_SUDO:-1}" == 1 ]]; then
+    if ! command -v "${NGINX_BIN:-nginx}" >/dev/null 2>&1 && command -v "${docker_bin}" >/dev/null 2>&1; then
+      "${docker_bin}" run --rm --privileged --pid=host alpine:3.20 nsenter -t 1 -m -u -i -n "$@"
+    else
+      "${SUDO_BIN:-sudo}" -n "$@"
+    fi
+  else
+    "$@"
+  fi
+}
+privileged_write_file(){
+  local src="$1" dest="$2"
+  if [[ "${PRODUCTION_USE_SUDO:-1}" == 1 ]]; then
+    if ! command -v "${NGINX_BIN:-nginx}" >/dev/null 2>&1 && command -v "${docker_bin}" >/dev/null 2>&1; then
+      "${docker_bin}" run --rm -i --privileged --pid=host alpine:3.20 nsenter -t 1 -m -u -i -n sh -c 'cat > "'"${dest}"'"' < "${src}"
+    else
+      "${SUDO_BIN:-sudo}" -n install -m 0644 "${src}" "${dest}"
+    fi
+  else
+    install -m 0644 "${src}" "${dest}"
+  fi
+}
+privileged_read_file(){
+  local src="$1" dest="$2"
+  if [[ "${PRODUCTION_USE_SUDO:-1}" == 1 ]]; then
+    if ! command -v "${NGINX_BIN:-nginx}" >/dev/null 2>&1 && command -v "${docker_bin}" >/dev/null 2>&1; then
+      "${docker_bin}" run --rm --privileged --pid=host alpine:3.20 nsenter -t 1 -m -u -i -n cat "${src}" > "${dest}"
+    else
+      "${SUDO_BIN:-sudo}" -n cat "${src}" > "${dest}"
+    fi
+  else
+    cat "${src}" > "${dest}"
+  fi
 }
 backup="${cutover_dir}/.${receipt_id}.active-before-maintenance.conf"
 had_active=0
 if privileged test -f "${active_config}"; then
-  privileged cat "${active_config}" >"${backup}"
+  privileged_read_file "${active_config}" "${backup}"
   had_active=1
 fi
 restore_active(){
   if [[ "${had_active}" == 1 ]]; then
-    privileged install -m 0644 "${backup}" "${active_config}"
+    privileged_write_file "${backup}" "${active_config}"
   else
     privileged rm -f "${active_config}"
   fi
 }
-privileged install -m 0644 "${rendered}" "${active_config}"
+privileged_write_file "${rendered}" "${active_config}"
 if ! privileged "${NGINX_BIN:-nginx}" -t; then restore_active; exit 65; fi
 if ! privileged "${NGINX_RELOAD_BIN:-systemctl}" reload nginx; then
   restore_active
