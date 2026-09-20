@@ -70,12 +70,16 @@ grep -Fq 'location /oauth2/' "${prod_template}"
 grep -Fq 'location /login/oauth2/' "${prod_template}"
 grep -Fq 'alias /srv/festa/webgl/prod/current/' "${prod_template}"
 grep -Fq 'proxy_pass http://127.0.0.1:27777' "${world_template}"
-# Demo world vhost 는 world.<root> 를 선언하지 않는다 — Production world-prod.conf 만 그 host 를 가진다 (Batch 1).
+# Demo World 는 demo.<root> 의 루트 WebSocket Upgrade 로 17777 에 들어간다. world.<root> 는 Production world-prod.conf 만 가진다 (Batch 1).
 demo_world_template="${repo_root}/infra/unity-server/nginx/world.conf.template"
-grep -Fq 'server_name ${DEMO_WORLD_HOST};' "${demo_world_template}" || fail 'Demo world vhost must use DEMO_WORLD_HOST'
-if grep -Fq 'world.${ROOT_DOMAIN}' "${demo_world_template}"; then fail 'Demo world vhost still claims the Production World host'; fi
-grep -Fq 'DEMO_WORLD_HOST: ${DEMO_WORLD_HOST:-world-demo.${ROOT_DOMAIN' "${agents}" || fail 'deploy agent must inject DEMO_WORLD_HOST'
-grep -Fq 'WORLD_HOST: world-demo.${ROOT_DOMAIN' "${repo_root}/infra/environments/compose/demo/back.yaml" || fail 'Demo back must issue world-demo tokens'
+if grep -Fq 'world.${ROOT_DOMAIN}' "${demo_world_template}"; then fail 'dedicated Demo world vhost template still claims the Production World host'; fi
+if grep -Fq 'server_name world.${ROOT_DOMAIN}' "${demo_template}"; then fail 'demo site must not claim the Production World host'; fi
+grep -Fq 'websocket http://127.0.0.1:17777;' "${demo_template}" || fail 'demo site must route root WebSocket Upgrade to the Demo World port'
+grep -Fq 'default   http://127.0.0.1:18080;' "${demo_template}" || fail 'demo site must keep plain root traffic on the Demo Front'
+if grep -Fq 'websocket http://127.0.0.1:27777' "${demo_template}"; then fail 'demo site must not route to the Production World'; fi
+grep -Fq 'proxy_pass $festa_demo_root_upstream;' "${demo_template}" || fail 'demo root location must dispatch by Upgrade header'
+grep -Fq 'DEMO_WORLD_HOST: ${DEMO_WORLD_HOST:-demo.${ROOT_DOMAIN' "${agents}" || fail 'deploy agent must inject DEMO_WORLD_HOST'
+grep -Fq 'WORLD_HOST: demo.${ROOT_DOMAIN' "${repo_root}/infra/environments/compose/demo/back.yaml" || fail 'Demo back must issue demo.<root> world tokens'
 grep -Fq 'WORLD_PUBLIC_HOST=${env.DEMO_WORLD_HOST}' "${repo_root}/infra/jenkins/pipelines/develop.groovy" || fail 'develop pipeline must pass the Demo World host to readiness'
 if grep -Eq 'proxy_pass[[:space:]]+http://127\.0\.0\.1:28(080|081|082)' "${maintenance_template}"; then fail 'maintenance config exposes candidate ports'; fi
 work="$(mktemp -d)"; trap 'rm -rf "${work}"' EXIT
