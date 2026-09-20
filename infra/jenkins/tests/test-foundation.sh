@@ -142,12 +142,33 @@ grep -Fq 'bash "${ci_root}/infra/deploy/scripts/verify-component.sh"' "${repo_ro
   || fail "component verification must remain valid after adapter directory dispatch"
 grep -q "ws('/home/jenkins/agent/unity/workspaces/develop-game')" "${component_pipeline}" \
   || fail "game component CI does not reuse its Unity workspace"
-grep -q 'game) bash festa-unity/ci/build --target linux-server' "${repo_root}/ci/build" \
-  || fail "general game CI must build Linux Server only"
-grep -q 'ci_dispatch_or build build_project --target linux-server' "${repo_root}/ci/build" \
-  || fail "general game CI must pass the Linux Server target to its component adapter"
-! grep -q 'game) bash festa-unity/ci/build --target all' "${repo_root}/ci/build" \
-  || fail "general game CI must not build WebGL"
+# Batch 2: 한 checkout 에서 WebGL → Linux Server 를 두 세션으로 만든다(같은 Library, 한 source). 'all' 한 세션은 쓰지 않는다 —
+# 서버 빌드가 죽으면 WebGL 산출물까지 잃는다.
+grep -q 'bash festa-unity/ci/build --target webgl' "${repo_root}/ci/build" \
+  || fail "general game CI must build the WebGL client"
+grep -q 'bash festa-unity/ci/build --target linux-server' "${repo_root}/ci/build" \
+  || fail "general game CI must build the Linux Server"
+! grep -q 'festa-unity/ci/build --target all' "${repo_root}/ci/build" \
+  || fail "general game CI must not run one Unity session for both targets"
+grep -q 'collect-build-resource-evidence.sh start' "${repo_root}/ci/build" && grep -q 'collect-build-resource-evidence.sh finish' "${repo_root}/ci/build" \
+  || fail "game CI must record build resource evidence"
+grep -q 'preflight-license' "${repo_root}/festa-unity/ci/build" \
+  || fail "Unity build adapter must run the license preflight before launching the Editor"
+grep -q 'exit 79' "${repo_root}/festa-unity/ci/preflight-license" \
+  || fail "license preflight must fail fast with exit 79"
+grep -q 'git lfs pull' "${component_pipeline}" && grep -q 'exit 78' "${component_pipeline}" \
+  || fail "game component CI must resolve LFS pointers before Unity and stop on leftovers"
+grep -q 'hostname: festa-unity-agent' "${agent_compose}" && grep -q 'mac_address:' "${agent_compose}" \
+  || fail "unity agent identity must be pinned so the Unity entitlement survives recreates"
+python3 - "${agent_compose}" <<'PY' || fail "unity agent must mount the image transfer volume for WebGL zips"
+import sys
+text = open(sys.argv[1]).read()
+block = text[text.index('  unity-agent:'):text.index('\nvolumes:')]
+assert 'image_transfer:/var/lib/festa-image-transfer' in block
+PY
+for line in 'festa-unity/**/*.fbx filter=lfs' 'festa-unity/**/*.tga filter=lfs' 'docs/LJH/skills/** text eol=lf'; do
+  grep -Fq "${line}" "${repo_root}/.gitattributes" || fail ".gitattributes lost rule: ${line}"
+done
 ! grep -q 'deploy-component.sh' "${component_pipeline}" \
   || fail "Phase 2 component CI must not deploy"
 grep -q 'with-credentials.sh CONNECTION_TOKEN_SECRET_FILE -- infra/deploy/scripts/deploy-component.sh' "${repo_root}/infra/jenkins/pipelines/unity.groovy" \

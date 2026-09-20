@@ -143,6 +143,10 @@ doc = {
  'imageContentId':os.environ['IMAGE_CONTENT_ID'],'archiveSha256':os.environ['ARCHIVE_SHA256'],
  'packageUrl':os.environ['PACKAGE_URL'],
  'createdAt':datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0).isoformat().replace('+00:00','Z'),
+ # 실행 provenance (Batch 2) — WebGL .json sidecar 와 같은 키. 이미지 identity 에는 관여하지 않는다.
+ 'ciProvider':'jenkins' if os.environ.get('JENKINS_JOB') else 'manual',
+ 'jenkinsJob':os.environ.get('JENKINS_JOB') or None,'jenkinsBuildNumber':os.environ.get('JENKINS_BUILD_NUMBER') or None,
+ 'jenkinsBuildUrl':os.environ.get('JENKINS_BUILD_URL') or None,'builderClass':os.environ.get('BUILDER_CLASS') or 'unity-6000.0.78f1',
 }
 path.write_text(json.dumps(doc, indent=2)+'\n', encoding='utf-8')
 PY

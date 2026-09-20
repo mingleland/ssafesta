@@ -83,6 +83,8 @@ runtime_shared_exact = {
 ci_only_shared_exact = {
     "Jenkinsfile",
     ".gitlab-ci.yml",
+    # LFS 추적 규칙 — 검증 범위를 넓히고(아래 game_build_exact 로) Unity 후보를 다시 만든다 (Batch 2).
+    ".gitattributes",
     "infra/.env.example",
     "infra/environments/config/environments/demo.env.example",
 }
@@ -117,7 +119,6 @@ docs_prefixes = (
 )
 docs_exact = {
     ".gitignore",
-    ".gitattributes",
 }
 # 배포 기계 자체를 검증하는 파일과 legacy dev 환경 전용 설정. 컴포넌트를 고르지 않는다.
 # (dev.json/game.compose.yaml 등 game_build_exact 에 있는 항목은 아래 gameBuildRequired 계산에는 그대로 참여한다.)
@@ -144,6 +145,8 @@ game_runtime_prefixes = (
 )
 game_build_exact = {
     "infra/versions.env",
+    # LFS 규칙은 checkout 에 실제로 들어오는 binary 를 바꾼다 (Batch 2).
+    ".gitattributes",
     "infra/jenkins/pipelines/component.groovy",
     "infra/jenkins/scripts/with-credentials.sh",
     "infra/jenkins/scripts/transfer-local-images.sh",
