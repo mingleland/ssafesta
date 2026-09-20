@@ -21,6 +21,17 @@ assert_contains "${validator}" 'NGINX_TEMPLATE_USER:-www-data' 'validator must k
 # 주석으로 위험을 설명하는 건 괜찮다 — 실제 지시자/명령 줄이 live temp root 를 가리키면 안 된다.
 assert_not_contains "${validator}" '^[^#]*/var/lib/nginx' 'validator must never point a directive at the live temp root'
 
+# 검증 경로는 하나여야 한다. 실행 스크립트가 렌더한 설정을 직접 `nginx -t -c` 로 검증하면 다시 T-174 다.
+# 문서에서 그 명령을 언급하는 것은 금지 안내이므로 검사 대상이 아니다 — 실행되는 파일만 본다.
+offenders="$(git -C "${repo_root}" grep -nE 'nginx.*-t[[:space:]]+-c|nginx.*-c[[:space:]]+.*-t' \
+  -- '*.sh' '*.groovy' '*.yml' '*.yaml' 'ci/*' 'Jenkinsfile' 2>/dev/null \
+  | grep -vE ':[[:space:]]*#' \
+  | grep -v '^infra/environments/scripts/validate-nginx-template.sh:' || true)"
+if [[ -n "${offenders}" ]]; then
+  printf '%s\n' "${offenders}" >&2
+  fail 'nginx template validation must go through validate-nginx-template.sh'
+fi
+
 # 실제로 돌려서 계약을 확인한다. nginx 가 없는 환경에서는 건너뛴다.
 if command -v nginx >/dev/null 2>&1 && command -v openssl >/dev/null 2>&1; then
   bash "${validator}" \
