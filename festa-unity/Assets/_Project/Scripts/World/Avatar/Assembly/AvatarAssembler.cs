@@ -219,6 +219,19 @@ namespace Festa.Avatar
         // 정점은 이미 같은 스킨 공간에 있으므로 좌표 변환 없이 이어 붙이면 된다.
         readonly List<GameObject> _merged = new();
 
+        /// <summary>
+        /// 병합으로 <b>런타임에 만든</b> 메시. GameObject 와 함께 파괴되지 않으므로 직접 들고 있다가 해제한다.
+        ///
+        /// <para>코드로 만든 <see cref="Mesh"/> 는 소유한 에셋이 없어서, 붙어 있던 오브젝트를 파괴해도
+        /// 씬이 바뀔 때까지 메모리에 남는다. 아바타 1기의 병합 메시가 1.5만 트라이앵글 남짓이라
+        /// 옷을 갈아입거나 사람이 드나들 때마다 그만큼씩 쌓인다 — 오래 켜 둘수록 느려지는 형태가 된다
+        /// (2026-09-20 데모 실측: 같은 자리에서 p50 25 ms → 42 ms).</para>
+        ///
+        /// <para>원본 파츠 메시는 카탈로그 에셋이라 절대 파괴하면 안 된다. 그래서 렌더러를 훑어 지우지 않고
+        /// <b>여기서 만든 것만</b> 등록해 둔다.</para>
+        /// </summary>
+        readonly List<Mesh> _mergedMeshes = new();
+
         void CombineSameMaterialParts()
         {
             // 병합은 이제 모든 플랫폼에서 켜져 있다 (S15P21A604-258).
@@ -249,6 +262,7 @@ namespace Festa.Avatar
             // 옷을 갈아입으면 셔츠를 뚫고 검은 얼룩으로 나타났다.
             foreach (var go in _merged) if (go) { _dying.Add(go); DestroySafe(go); }
             _merged.Clear();
+            ReleaseMergedMeshes();
 
             // 정리를 마친 뒤에 빠진다 — 위 주석 참조.
             if (!AvatarMeshMerge.Enabled) return;
@@ -317,6 +331,30 @@ namespace Festa.Avatar
             return true;
         }
 
+        /// <summary>병합으로 만든 메시를 해제 목록에 올린다.</summary>
+        void RegisterMergedMesh(Mesh mesh)
+        {
+            if (mesh != null) _mergedMeshes.Add(mesh);
+        }
+
+        /// <summary>
+        /// 앞 회차의 병합 메시를 해제한다.
+        ///
+        /// <para>오브젝트 파괴가 프레임 끝으로 미뤄지는 것과 달리 메시는 참조가 끊기는 순간 버려도 된다 —
+        /// 이 시점에는 이미 <see cref="_merged"/> 를 비웠고 새 병합은 아직 시작하지 않았다.</para>
+        /// </summary>
+        void ReleaseMergedMeshes()
+        {
+            foreach (var mesh in _mergedMeshes) if (mesh) DestroySafe(mesh);
+            _mergedMeshes.Clear();
+        }
+
+        /// <summary>
+        /// 아바타가 사라질 때도 병합 메시를 거둔다. 사람이 드나드는 월드라 이 경로가 실제로는 더 자주 돈다 —
+        /// 조립 중에만 해제하면 접속자가 나갈 때 만들어 둔 메시가 그대로 남는다.
+        /// </summary>
+        void OnDestroy() => ReleaseMergedMeshes();
+
         GameObject BuildMergedRenderer(List<SkinnedMeshRenderer> parts)
         {
             var first = parts[0];
@@ -371,6 +409,7 @@ namespace Festa.Avatar
             go.transform.SetParent(first.transform.parent, false);
             var smr = go.AddComponent<SkinnedMeshRenderer>();
             smr.sharedMesh = mesh;
+            RegisterMergedMesh(mesh);
             smr.bones = first.bones;
             smr.rootBone = first.rootBone;
             smr.sharedMaterial = first.sharedMaterials[0];

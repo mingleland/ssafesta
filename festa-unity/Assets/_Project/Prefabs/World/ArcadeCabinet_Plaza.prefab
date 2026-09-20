@@ -945,8 +945,10 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   _machineId: plaza-arcade-01
-  _cameraLocal: {x: 0, y: 1.45, z: 1.9}
-  _lookLocal: {x: 0, y: 1.3, z: 0.2}
+  _cameraLocal: {x: 0, y: 1.3, z: 0.8}
+  _lookLocal: {x: 0, y: 1.3, z: 0.3}
+  _standLocal: {x: 0, y: 0, z: 1.05}
+  _standAreaSize: {x: 0.95, y: 0.85}
 --- !u!1 &8759325903955150720
 GameObject:
   m_ObjectHideFlags: 0
