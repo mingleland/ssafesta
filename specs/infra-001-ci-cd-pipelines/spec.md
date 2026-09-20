@@ -296,6 +296,23 @@ Infra 담당자는 수집 Agent가 모은 로그와 서버 사용량을 조회�
 |---|---|---|---|
 | C-14 | **확정**: 프로덕션 승격 파이프라인 완성 전, Nginx demo vhost에 `${ROOT_DOMAIN}`을 결합하여 `https://ssafesta.world`를 조기 개방한다 (S15P21A604-928). | Infra + 팀 | 2026-09-18 |
 
+### Session 2026-09-20 (Production Promotion final correction)
+
+- C-14의 조기 alias는 종료한다. Demo는 `demo.ssafesta.world`, Production은 `ssafesta.world`만 소유한다.
+- Production은 승인된 Demo App/WebGL/World artifact를 재빌드·repack하지 않고 canonical `festa-production` runtime에서 그대로 사용한다.
+- Redis `prod_ai`는 `prod:ai:*`와 실제 ConversationRepository namespace인 `conversation:*`만 허용한다. `prod_back`은 `prod:*`만 유지하며 `conversation:*`을 거부한다.
+- public 전환 전 maintenance fence를 적용하고 broken legacy `festa-prod-*`를 제거한 뒤 동일 host port `28080/28081/28082/27777`에 canonical runtime을 배치한다.
+- CURRENT는 public activation, KNOWN-GOOD는 external 검증과 사람 승인 이후의 별도 상태다.
+- 최초 canonical migration에는 `previous`가 없을 수 있다. 실패하면 maintenance를 유지하며 legacy를 복원하지 않는다. 첫 canonical KNOWN-GOOD 이후부터 직전 canonical CURRENT만 exact-artifact rollback 대상으로 사용한다.
+- Production OAuth callback route는 Back `28081`, WebGL은 `/srv/festa/webgl/prod/current`, World는 `27777`을 사용한다.
+- 실제 consumer가 없는 `festa_prod_readonly` role은 P0 범위에서 생성하지 않는다.
+
+| ID | 질문/결정 | 결정 주체 | 결정 시점 |
+|---|---|---|---|
+| C-15 | **확정**: C-14 root alias를 종료하고 root domain은 Production만 소유한다. | Infra + 팀 | 2026-09-20 |
+| C-16 | **확정**: 최초 migration 실패는 maintenance를 유지하며 legacy rollback을 금지한다. | Infra + 팀 | 2026-09-20 |
+| C-17 | **확정**: canonical CURRENT와 human-approved KNOWN-GOOD를 분리하고 후속 canonical release만 previous rollback을 허용한다. | Infra + 팀 | 2026-09-20 |
+
 
 ## Out of Scope
 
@@ -337,4 +354,3 @@ Infra 담당자는 수집 Agent가 모은 로그와 서버 사용량을 조회�
 ### 참고: MVP 이후 후속 과제 (P1)
 - **배포 이력 및 추적성 관리 (US3 / T031~T034)**: `provenance.sh` 및 `show-release.sh` 구현으로 현재 실행 중인 릴리스와 직전 정상 버전의 산출물 SHA/커밋 역추적 CLI 지원.
 - **운영 관측성 및 알림 연동 (US5 / T035~T037)**: Prometheus/Grafana 기반 자원(CPU, Memory, Disk) 대시보드 구축 및 Mattermost 이상 탐지 Webhook 알림 연동.
-
