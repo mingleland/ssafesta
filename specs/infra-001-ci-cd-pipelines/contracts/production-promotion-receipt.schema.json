@@ -45,6 +45,7 @@
       "const": "develop"
     },
     "demoReleaseId": {
+      "description": "Demo KNOWN_GOOD environment.json 의 batchId. 조합(ai·back·front·game·webgl)의 canonical ID 이며, 컴포넌트별 releaseId 는 서로 달라도 된다 (Batch 1).",
       "type": "string",
       "minLength": 1,
       "maxLength": 128

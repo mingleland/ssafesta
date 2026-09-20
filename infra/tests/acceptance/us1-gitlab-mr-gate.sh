@@ -43,6 +43,21 @@ grep -Fq 'CI_PIPELINE_SOURCE == "merge_request_event"' <<<"$status_section" || f
 grep -Fq 'MR pipeline status only' <<<"$status_section" || fail 'MR status no-op command'
 echo 'PASS: infra/docs-only MR receives a successful pipeline status'
 
+# develop → main promotion MR: authoritative gate 는 GitLab 네이티브 mr-status 다. component job 은 develop 대상에서만
+# 돌고, Jenkins external status(jenkinsci/branch) 는 merge 를 결정하지 않는다 — 그 계약은 merge 직전
+# check-promotion-mr-gate.sh 로 강제한다 (Batch 1, 실측 !1220/!1229/!1232).
+for component in ai back front game; do
+  job ".${component}-changes" | grep -Fq 'CI_MERGE_REQUEST_TARGET_BRANCH_NAME != "develop"' \
+    || fail "${component} component CI must be restricted to develop-target MRs"
+done
+gate_check="${repo_root}/infra/deploy/scripts/check-promotion-mr-gate.sh"
+[[ -x "$gate_check" ]] || fail 'promotion MR gate check script is missing or not executable'
+grep -Fq 'merge_request_event' "$gate_check" || fail 'gate check must require the GitLab MR pipeline as head pipeline'
+grep -Fq 'squash' "$gate_check" || fail 'gate check must refuse squash on develop -> main'
+grep -Fq 'GATE_BLOCK' "$gate_check" || fail 'gate check must fail closed'
+bash "$gate_check" not-a-number >/dev/null 2>&1 && fail 'gate check must reject a non-numeric MR iid' || true
+echo 'PASS: develop -> main promotion MR is gated by the native MR pipeline'
+
 check_gate ai 'festa-ai/**/*'
 echo 'PASS: ai-only MR gate'
 check_gate front 'festa-frontend/**/*'

@@ -176,8 +176,16 @@ grep -q 'ENVIRONMENT_STATE_DIR: /var/lib/festa-environments' "${agent_compose}" 
   || fail "deploy agent does not persist dev batch state outside its container filesystem"
 grep -q 'deploy_state:/var/lib/festa-environments' "${agent_compose}" \
   || fail "deploy agent does not mount persistent dev batch state"
-grep -q "final List deployComponents = (selection.deployComponents as List).findAll { it in \['ai', 'back', 'front'\] }" "${develop_pipeline}" \
+grep -q "final List deployComponents = selectedDeploy.findAll { it in \['ai', 'back', 'front'\] }" "${develop_pipeline}" \
   || fail "dev batch must use the detector deployComponents contract and keep game Dedicated Server deployment outside it"
+grep -q "final List buildComponents = (selection.buildComponents" "${develop_pipeline}" \
+  || fail "develop pipeline must build only the detector buildComponents"
+grep -q "final boolean hasGame = buildComponents.contains('game')" "${develop_pipeline}" \
+  || fail "Unity build must be gated by buildComponents (gameBuildRequired), not by validation scope"
+grep -q "component == 'game' ? \['validate'\] : \['validate', 'test'\]" "${develop_pipeline}" \
+  || fail "validation-only components must run validate/test without image or Unity builds"
+grep -q "if (component == 'game' && fullBuild)" "${component_pipeline}" \
+  || fail "validate-only game must not enter the Unity node"
 grep -q 'withCredentials(credentialBindings)' "${develop_pipeline}" \
   || fail "dev batch does not bind selected component credentials"
 grep -q "credentialsId: env.DEMO_INTERNAL_INFRA_TO_SPRING_TOKENS_CREDENTIAL_ID, variable: 'INTERNAL_INFRA_TO_SPRING_TOKENS'" "${develop_pipeline}" \
@@ -200,6 +208,13 @@ grep -q "branch != 'develop'" "${jenkinsfile}" \
   || fail "Jenkinsfile retains legacy component branch dispatch"
 grep -q "multibranchPipelineJob('festa-gitlab-develop')" "${develop_job}" \
   || fail "GitLab develop-only multibranch job is missing"
+# T-168: strategy 1 ("MR source 브랜치 제외") 는 develop→main MR 이 열리는 순간 develop child 를 Dead 로 만든다.
+grep -q 'gitLabBranchDiscovery { strategyId(3) }' "${develop_job}" \
+  || fail "GitLab develop discovery must use strategy 3 (all branches) — T-168"
+! grep -q 'strategyId(1)' "${develop_job}" \
+  || fail "GitLab develop discovery must not exclude MR source branches — T-168"
+grep -q "headWildcardFilter { includes('develop')" "${develop_job}" \
+  || fail "GitLab develop discovery must still be restricted to develop"
 grep -q 'serverName(gitlabServerName)' "${develop_job}" \
   || fail "GitLab develop Job DSL shadows the serverName method"
 grep -q "String gitlabApiCredentialsId = System.getenv('GITLAB_API_CREDENTIALS_ID')" "${develop_job}" \
@@ -259,7 +274,7 @@ grep -q 'infra/unity-server/tests/'   "${repo_root}/infra/jenkins/scripts/detect
 
 grep -q 'selection.gameBuildRequired' "${develop_pipeline}"   || fail "develop pipeline ignores the detector Unity build decision"
 
-grep -q 'Unity candidate build skipped' "${develop_pipeline}"   || fail "develop pipeline lacks the shared-infra Unity skip path"
+grep -q "detector selected a game build without gameBuildRequired" "${develop_pipeline}"   || fail "develop pipeline must refuse a Unity build that the detector did not require"
 grep -q "gitlabCommitStatus(" "${unity_mr_pipeline}" \
   || fail "Unity MR validation does not publish the required GitLab status context"
 grep -Fq "connection: gitLabConnection(gitlabConnectionName)" "${unity_mr_pipeline}" \
