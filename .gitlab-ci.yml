@@ -16,6 +16,9 @@ workflow:
     # develop 대상 MR gate: 소스 브랜치 명명규칙과 무관하게 파이프라인을 항상 생성한다 (GitLab #220 Phase 1).
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "develop" && $CI_MERGE_REQUEST_SOURCE_PROJECT_ID == $CI_PROJECT_ID'
 
+    # develop → main Production Promotion MR gate: develop에서 main으로의 승격 MR에도 pre-merge 파이프라인을 생성한다.
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "main" && $CI_MERGE_REQUEST_SOURCE_PROJECT_ID == $CI_PROJECT_ID'
+
     # ⚠️ 긴급 규약 (2026-09-15, S15P21A604-185) — 파트 브랜치(ai/back/front/game) 대상 MR 에도
     # 파이프라인을 만든다. develop 머지 슬롯이 동시 2개뿐이라 한 건씩 줄 서는 것이 병목이어서,
     # 각 파트가 자기 브랜치에 모아 둔 뒤 한 번에 develop 으로 올리기로 했다.
