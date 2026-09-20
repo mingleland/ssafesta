@@ -106,6 +106,9 @@ run_case '[]' '[]' '[]' shared-ci false infra/jenkins/scripts/publish-webgl-rele
 run_case '[]' '[]' '[]' validation-only false infra/unity-server/tests/integration/example.sh
 run_case '[]' '[]' '[]' validation-only false infra/tests/acceptance/example.sh infra/environments/tests/contract/demo-webgl.sh
 run_case '[]' '[]' '[]' validation-only false infra/environments/compose/dev/ai.yaml infra/environments/config/environments/dev.env.example
+# 운영 데이터 정본은 이미지에 들어가지 않는다 — 배포를 끌고 오지 않는다.
+run_case '[]' '[]' '[]' validation-only false infra/deploy/data/operational/event-prizes.json
+# 아래 두 검사는 직전 커밋이 docs-only 라는 전제를 쓴다 — 이 줄이 마지막 run_case 여야 한다.
 run_case '[]' '[]' '[]' docs-only false specs/infra-001-ci-cd-pipelines/notes.md infra/deploy/runbooks/x.md
 
 head="$(git rev-parse HEAD)"
