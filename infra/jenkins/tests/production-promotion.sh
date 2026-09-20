@@ -309,7 +309,7 @@ cp "${work}/receipt-good.json" "${work}/receipt.json"
 
 pipeline="${repo_root}/infra/jenkins/pipelines/production-promotion.groovy"
 python3 - "${pipeline}" <<'PY'
-import pathlib,sys
+import pathlib,re,sys
 text=pathlib.Path(sys.argv[1]).read_text(encoding='utf-8')
 ordered=[
     "stage('Validate Receipt, Bootstrap and Main Ancestry')",
@@ -329,6 +329,13 @@ if positions!=sorted(positions): raise SystemExit('Production pipeline stage ord
 if text.index('Human Verification Gate') > text.index('approve-production-known-good.sh'): raise SystemExit('known-good approval precedes human gate')
 for required in ('PRODUCTION_ALREADY_APPROVED','prepare-production-cutover.sh','rollback-production-release.sh','secret-scan.sh --path artifacts'):
     if required not in text: raise SystemExit(f'Production pipeline missing {required}')
+
+archive = text.split("stage('Archive Evidence')", 1)[1].split("\n    post {", 1)[0]
+if re.search(r'(?<!\\)\\[();]', archive):
+    raise SystemExit('Archive Evidence shell escapes are not Groovy-safe')
+for required in (r'\\(', r'\\)', r'\\;'):
+    if required not in archive:
+        raise SystemExit(f'Archive Evidence missing Groovy-safe shell escape: {required}')
 PY
 
 prod_state="${work}/production-state"
