@@ -11,11 +11,13 @@ function apiError(code: string, message: string): ApiError {
 // 가격 확정(2026-09-17, S15P21A604-842 후속) — 말랑이·교보 기프트카드는 응모권에서 즉시교환으로
 // 옮겨졌다. 실 BE 가격은 admin 콘솔(-832)에서 따로 등록해야 한다 — 여기는 로컬 mock일 뿐이다.
 const prizes: EventPrize[] = [
-  { prizeId: 1, name: '마이구미', priceCoin: 400, stock: 32, active: true },
-  { prizeId: 2, name: '초코송이', priceCoin: 500, stock: 15, active: true },
-  { prizeId: 3, name: '아이스아메리카노', priceCoin: 600, stock: 4, active: true },
-  { prizeId: 4, name: '말랑이', priceCoin: 700, stock: 47, active: true },
-  { prizeId: 5, name: '교보문고 10000원권', priceCoin: 1000, stock: 3, active: true },
+  { prizeId: 1, name: '마이구미', priceCoin: 400, stock: 32, active: true, closesAt: null, winnerCount: 0 },
+  { prizeId: 2, name: '초코송이', priceCoin: 500, stock: 15, active: true, closesAt: null, winnerCount: 0 },
+  { prizeId: 3, name: '아이스아메리카노', priceCoin: 600, stock: 4, active: true, closesAt: null, winnerCount: 0 },
+  { prizeId: 4, name: '말랑이', priceCoin: 700, stock: 47, active: true, closesAt: null, winnerCount: 0 },
+  { prizeId: 5, name: '교보문고 10000원권', priceCoin: 1000, stock: 3, active: true, closesAt: null, winnerCount: 0 },
+  // 응모권 — entities/raffle 이 winnerCount > 0 만 골라 RafflePrize 로 바꿔 쓴다
+  { prizeId: 103, name: '치킨', priceCoin: 50, stock: 21, active: true, closesAt: null, winnerCount: 1 },
 ];
 
 export async function listPrizes(): Promise<EventPrize[]> {

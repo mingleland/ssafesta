@@ -21,13 +21,13 @@ export async function listRaffles(): Promise<RafflePrize[]> {
 }
 
 export async function enterRaffle(
-  raffleId: number,
+  selected: RafflePrize,
   _idempotencyKey: string,
   _recipient?: PurchaseRecipient,
 ): Promise<RaffleEntryResult> {
-  const raffle = raffles.find((r) => r.raffleId === raffleId);
-  if (!raffle) throw apiError('RAFFLE_NOT_FOUND', '응모권을 찾을 수 없습니다.');
-  if (raffle.stock !== null && raffle.stock <= 0) throw apiError('RAFFLE_OUT_OF_STOCK', '응모권이 모두 소진됐습니다.');
+  const raffle = raffles.find((r) => r.raffleId === selected.raffleId);
+  if (!raffle) throw apiError('EVENT_PRIZE_NOT_FOUND', '응모권을 찾을 수 없습니다.');
+  if (raffle.stock !== null && raffle.stock <= 0) throw apiError('EVENT_PRIZE_OUT_OF_STOCK', '응모권이 모두 소진됐습니다.');
   if (raffle.stock !== null) raffle.stock -= 1;
   return {
     entryId: Date.now(),
