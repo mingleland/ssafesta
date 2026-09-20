@@ -39,6 +39,8 @@ pipeline {
                     env.PRODUCTION_RECEIPT_PATH = receipt
                     env.PRODUCTION_RECEIPT_ID = receiptId
                     env.PRODUCTION_WORLD_HOST_VALUE = worldHost
+                    env.NGINX_ORIGIN_CERTIFICATE_FILE = env.NGINX_ORIGIN_CERTIFICATE_FILE ?: '/etc/nginx/tls/world-dev-origin.pem'
+                    env.NGINX_ORIGIN_PRIVATE_KEY_FILE = env.NGINX_ORIGIN_PRIVATE_KEY_FILE ?: '/etc/nginx/tls/world-dev-origin.key'
                     env.PRODUCTION_DATA_EVIDENCE_PATH = "${stateRoot}/production/data/bootstrap.json"
                     env.PRODUCTION_PUBLIC_BASE_URL = "https://${env.ROOT_DOMAIN}"
                     env.PRODUCTION_WORLD_PUBLIC_URL = "wss://${worldHost}/"

@@ -12,7 +12,33 @@ PY
 )"
 previous="${state_root}/production/previous.json"; current="${state_root}/production/current.json"; output="${state_root}/production/receipts/${receipt_id}.rollback.json"
 prod_config="${PRODUCTION_NGINX_CONFIG_PATH:-/etc/nginx/sites-enabled/prod.conf}"; world_config="${PRODUCTION_WORLD_NGINX_CONFIG_PATH:-/etc/nginx/sites-enabled/world-prod.conf}"
-privileged(){ if [[ "${PRODUCTION_USE_SUDO:-1}" == 1 ]]; then "${SUDO_BIN:-sudo}" -n "$@"; else "$@"; fi; }
+docker_bin="${DOCKER_BIN:-docker}"
+ROOT_DOMAIN="${ROOT_DOMAIN:-ssafesta.world}"
+NGINX_ORIGIN_CERTIFICATE_FILE="${NGINX_ORIGIN_CERTIFICATE_FILE:-/etc/nginx/tls/world-dev-origin.pem}"
+NGINX_ORIGIN_PRIVATE_KEY_FILE="${NGINX_ORIGIN_PRIVATE_KEY_FILE:-/etc/nginx/tls/world-dev-origin.key}"
+privileged(){
+  if [[ "${PRODUCTION_USE_SUDO:-1}" == 1 ]]; then
+    if ! command -v "${NGINX_BIN:-nginx}" >/dev/null 2>&1 && command -v "${docker_bin}" >/dev/null 2>&1; then
+      "${docker_bin}" run --rm --privileged --pid=host alpine:3.20 nsenter -t 1 -m -u -i -n "$@"
+    else
+      "${SUDO_BIN:-sudo}" -n "$@"
+    fi
+  else
+    "$@"
+  fi
+}
+privileged_write_file(){
+  local src="$1" dest="$2"
+  if [[ "${PRODUCTION_USE_SUDO:-1}" == 1 ]]; then
+    if ! command -v "${NGINX_BIN:-nginx}" >/dev/null 2>&1 && command -v "${docker_bin}" >/dev/null 2>&1; then
+      "${docker_bin}" run --rm -i --privileged --pid=host alpine:3.20 nsenter -t 1 -m -u -i -n sh -c 'cat > "'"${dest}"'"' < "${src}"
+    else
+      "${SUDO_BIN:-sudo}" -n install -m 0644 "${src}" "${dest}"
+    fi
+  else
+    install -m 0644 "${src}" "${dest}"
+  fi
+}
 render(){ python3 - "$1" "$2" <<'PY'
 import os,pathlib,sys
 text=pathlib.Path(sys.argv[1]).read_text(encoding='utf-8')
@@ -23,9 +49,8 @@ PY
 }
 mkdir -p "$(dirname "${output}")"
 if [[ ! -f "${previous}" ]]; then
-  : "${ROOT_DOMAIN:?ROOT_DOMAIN is required}"; : "${NGINX_ORIGIN_CERTIFICATE_FILE:?NGINX_ORIGIN_CERTIFICATE_FILE is required}"; : "${NGINX_ORIGIN_PRIVATE_KEY_FILE:?NGINX_ORIGIN_PRIVATE_KEY_FILE is required}"
   maintenance="${output}.maintenance.conf"; render "${repo_root}/infra/environments/nginx/sites/prod-maintenance.conf.template" "${maintenance}"
-  privileged install -m 0644 "${maintenance}" "${prod_config}"; privileged rm -f "${world_config}"
+  privileged_write_file "${maintenance}" "${prod_config}"; privileged rm -f "${world_config}"
   privileged "${NGINX_BIN:-nginx}" -t; privileged "${NGINX_RELOAD_BIN:-systemctl}" reload nginx
   rm -f "${webgl_root}/prod/current"
   if [[ -f "${current}" ]] && python3 - "${current}" "${receipt_id}" <<'PY'
@@ -62,7 +87,7 @@ release="${webgl_root}/releases/${WEBGL_VERSION}"; [[ -d "${release}" && -f "${r
 [[ "$(<"${release}/.artifact-sha256")" == "${WEBGL_SHA}" ]] || { echo 'previous canonical WebGL checksum mismatch' >&2; exit 65; }
 mkdir -p "${webgl_root}/prod"; tmp="${webgl_root}/prod/.rollback.$$"; ln -s "../releases/${WEBGL_VERSION}" "${tmp}"; mv -Tf "${tmp}" "${webgl_root}/prod/current"
 prod_render="${output}.prod.conf"; world_render="${output}.world.conf"; render "${repo_root}/infra/environments/nginx/sites/prod.conf.template" "${prod_render}"; render "${repo_root}/infra/environments/nginx/sites/world-prod.conf.template" "${world_render}"
-privileged install -m 0644 "${prod_render}" "${prod_config}"; privileged install -m 0644 "${world_render}" "${world_config}"; privileged "${NGINX_BIN:-nginx}" -t; privileged "${NGINX_RELOAD_BIN:-systemctl}" reload nginx
+privileged_write_file "${prod_render}" "${prod_config}"; privileged_write_file "${world_render}" "${world_config}"; privileged "${NGINX_BIN:-nginx}" -t; privileged "${NGINX_RELOAD_BIN:-systemctl}" reload nginx
 PREVIOUS="${previous}" CURRENT="${current}" OUTPUT="${output}" RECEIPT_ID="${receipt_id}" REASON="${reason}" python3 - <<'PY'
 import datetime,json,os,pathlib
 p=pathlib.Path(os.environ['PREVIOUS']); d=json.loads(p.read_text(encoding='utf-8')); d['restoredAt']=datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0).isoformat().replace('+00:00','Z')
