@@ -66,6 +66,9 @@ namespace Festa.World
         float _hideAt;
         float _height = FallbackHeight;
 
+        /// <summary>정수리 높이를 이미 재고 있는 이름표. 말풍선은 같은 기준을 공유한다.</summary>
+        WorldNameplate _plateAnchor;
+
         /// <summary>
         /// 말풍선을 띄운다. 대상에 컴포넌트가 없으면 붙여서 쓴다 — 프리팹을 고치지 않아도
         /// 원격 아바타를 포함한 모든 플레이어에 적용된다.
@@ -230,6 +233,7 @@ namespace Festa.World
             _renderer.receiveShadows = false;
             _renderer.enabled = false;
             _nameplate = GetComponent<PlayerNameplate>();
+            _plateAnchor = GetComponent<WorldNameplate>();
 
             var controller = GetComponent<CharacterController>();
             if (controller != null) _height = controller.height;
@@ -286,7 +290,12 @@ namespace Festa.World
             var cam = Camera.main;
             if (cam == null) { SetVisible(false); return; }
 
-            var anchor = transform.position + Vector3.up * (_height + Headroom);
+            // 높이는 **이름표가 재는 정수리**를 그대로 쓴다. 캡슐 높이로 재면 앉거나 누워도 값이 그대로라
+            // 말풍선만 선 키 위 허공에 남는다(2026-09-20 지적). 이름표는 머리 본을 따라가므로 자세가 바뀌면 같이 내려온다.
+            float topY = transform.position.y + _height;
+            if (_plateAnchor == null) _plateAnchor = GetComponent<WorldNameplate>();
+            if (_plateAnchor != null && _plateAnchor.TryGetPostureTopY(out var postureTopY)) topY = postureTopY;
+            var anchor = new Vector3(transform.position.x, topY + Headroom, transform.position.z);
             var toCamera = cam.transform.position - anchor;
 
             // 카메라 뒤로 지나간 대상까지 그리면 화면이 말풍선으로 덮인다.
