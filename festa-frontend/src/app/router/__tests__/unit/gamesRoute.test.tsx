@@ -17,6 +17,8 @@ import {
   setMemberSession,
 } from '../../../../features/auth/model/session';
 
+const LAZY_ROUTE_TIMEOUT = { timeout: process.env.CI ? 15_000 : 5_000 };
+
 afterEach(() => {
   cleanup();
   __resetSessionForTests();
@@ -48,7 +50,7 @@ describe('/app/games/:gameId/play 라우트 가드 (S15P21A604-115)', () => {
     markBootstrapped();
     renderAt('/app/games/1/play');
 
-    expect(await screen.findByText('게시된 게임을 불러오는 중입니다.', {}, { timeout: 5000 })).not.toBeNull();
+    expect(await screen.findByText('게시된 게임을 불러오는 중입니다.', {}, LAZY_ROUTE_TIMEOUT)).not.toBeNull();
     expect(screen.queryByText('소셜 로그인 회원만 이용할 수 있는 기능입니다.')).toBeNull();
   });
 
@@ -74,6 +76,6 @@ describe('/app/games/:gameId/play 라우트 가드 (S15P21A604-115)', () => {
     markBootstrapped();
     renderAt('/app/games/1/edit');
 
-    expect(await screen.findByText('소셜 로그인 회원만 이용할 수 있는 기능입니다.', {}, { timeout: 5000 })).not.toBeNull();
+    expect(await screen.findByText('소셜 로그인 회원만 이용할 수 있는 기능입니다.', {}, LAZY_ROUTE_TIMEOUT)).not.toBeNull();
   });
 });

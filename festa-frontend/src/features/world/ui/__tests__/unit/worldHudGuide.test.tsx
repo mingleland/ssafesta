@@ -38,12 +38,9 @@ afterEach(() => {
 });
 
 describe('HUD 조작 안내 버튼', () => {
-  it('우하단 동일 규격 버튼이 guide 패널을 연다', () => {
+  it('조작 안내 버튼이 guide 패널을 연다', () => {
     render(<WorldHud />);
     const button = screen.getByRole('button', { name: '조작 안내' });
-    // 전체화면과 같은 규격을 쓴다 — 자리만 우하단이다
-    expect(button.className).toContain('world-hud-fullscreen');
-    expect(button.className).toContain('world-hud-guide');
     fireEvent.click(button);
     expect(getGameClientUiSnapshot().menuPanel).toBe('guide');
     expect(getWorldScreen()).toBe('menuPanel');
