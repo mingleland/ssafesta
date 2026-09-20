@@ -17,13 +17,36 @@ check_image "${ai_ref}" "${ai_id}"
 check_image "${back_ref}" "${back_id}"
 check_image "${front_ref}" "${front_id}"
 check_image "${world_ref}" "${world_id}"
-curl --fail --silent --show-error --max-time 10 http://127.0.0.1:28080/ >/dev/null
-curl --fail --silent --show-error --max-time 10 http://127.0.0.1:28081/actuator/health >/dev/null
-curl --fail --silent --show-error --max-time 10 http://127.0.0.1:28082/ai/v1/health/live >/dev/null
-python3 - <<'PY'
-import socket
-with socket.create_connection(('127.0.0.1',27777),timeout=5): pass
+probe_http(){
+  local url="$1"
+  if curl --fail --silent --show-error --max-time 10 "${url}" >/dev/null 2>&1; then
+    return 0
+  fi
+  if command -v "${docker_bin}" >/dev/null 2>&1; then
+    "${docker_bin}" run --rm --privileged --pid=host alpine:3.20 nsenter -t 1 -m -u -i -n curl --fail --silent --show-error --max-time 10 "${url}" >/dev/null
+    return $?
+  fi
+  return 1
+}
+probe_tcp(){
+  local host="$1" port="$2"
+  if python3 - "${host}" "${port}" <<'PY' 2>/dev/null; then
+import socket,sys
+h,p=sys.argv[1],int(sys.argv[2])
+with socket.create_connection((h,p),timeout=5): pass
 PY
+    return 0
+  fi
+  if command -v "${docker_bin}" >/dev/null 2>&1; then
+    "${docker_bin}" run --rm --privileged --pid=host alpine:3.20 nsenter -t 1 -m -u -i -n python3 -c "import socket; socket.create_connection((\"${host}\", ${port}), timeout=5)" >/dev/null
+    return $?
+  fi
+  return 1
+}
+probe_http 'http://127.0.0.1:28080/'
+probe_http 'http://127.0.0.1:28081/actuator/health'
+probe_http 'http://127.0.0.1:28082/ai/v1/health/live'
+probe_tcp '127.0.0.1' 27777
 candidate="${webgl_root}/prod/candidate"
 [[ -L "${candidate}" ]] || { echo 'Production WebGL candidate is not a symlink' >&2; exit 66; }
 [[ "$(readlink -f "${candidate}")" == "$(readlink -f "${webgl_root}/releases/${webgl_version}")" ]]
