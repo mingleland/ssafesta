@@ -268,6 +268,17 @@ public enum ErrorCode {
      */
     MACHINE_NOT_FOUND(HttpStatus.NOT_FOUND, "등록되지 않은 게임기입니다."),
 
+    /**
+     * 오락실 자리 배정의 거절 세 가지 (S15P21A604-942, GitLab #256).
+     *
+     * <p>셋 다 409 다 — 요청은 멀쩡하고 자리 상태가 허락하지 않는 것이라, 고쳐서 다시 보낼 값이
+     * 요청 안에 없다. 없는 {@code machineId} 만 404 {@link #MACHINE_NOT_FOUND} 로 남는다.
+     */
+    ARCADE_MACHINE_TAKEN(HttpStatus.CONFLICT, "이미 다른 게임이 차지한 자리입니다."),
+    ARCADE_SEAT_LIMIT(HttpStatus.CONFLICT, "한 사람이 캐비닛을 두 대까지 쓸 수 있습니다."),
+    ARCADE_ALREADY_SEATED(HttpStatus.CONFLICT,
+            "이 게임은 이미 다른 자리에 걸려 있습니다. 내린 뒤 다시 올리며 자리를 고르세요."),
+
     // ── Game Asset 업로드 (spec 019, #69) ───────────────────────────────────
     // contracts/game-asset-upload.md §6 의 11행이 정본이다. 여기 없는 GAME_ASSET_* 가 응답에
     // 나오면 계약 위반이다. 위반 항목의 구체값은 새 code 가 아니라 errors[].rule 로 나간다

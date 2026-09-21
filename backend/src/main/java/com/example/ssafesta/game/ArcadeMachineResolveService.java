@@ -2,6 +2,7 @@ package com.example.ssafesta.game;
 
 import com.example.ssafesta.common.ApiException;
 import com.example.ssafesta.common.ErrorCode;
+import java.util.List;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -44,6 +45,30 @@ public class ArcadeMachineResolveService {
     }
 
     /**
+     * Every currently installed arcade machine, ordered by the scene's canonical id.
+     *
+     * <p>Deleted games deliberately disappear rather than report {@code GAME_DELETED}: the scene
+     * uses this collection to find empty slots, and a deleted game's binding is no longer an
+     * installed machine. Other unavailable states remain visible so the client can explain why a
+     * machine it can see cannot start its game.
+     */
+    @Transactional(readOnly = true)
+    public List<ListedView> resolveAll() {
+        return bindings.findAllBoundGames().stream()
+                .filter(bound -> !bound.getGame().isDeleted())
+                .map(bound -> listedView(bound.getMachineId(), bound.getGame()))
+                .toList();
+    }
+
+    private ListedView listedView(String machineId, Game game) {
+        ErrorCode blocked = GamePublishedQueryService.blockedReason(game);
+        boolean playable = blocked == null;
+        return new ListedView(machineId, game.getId(), playable ? game.getTitle() : null,
+                playable ? game.getPublishedVersion() : null,
+                playable, playable ? null : blocked.name());
+    }
+
+    /**
      * The resolution body (contracts §Booth Portal Resolution, arcade 변형).
      *
      * <p>No {@code boothId}: these machines are world fixtures, so there is no lease to judge and
@@ -51,5 +76,18 @@ public class ArcadeMachineResolveService {
      */
     public record ResolvedView(String machineId, Long gameId, Integer publishedVersion,
                                boolean playable, String unavailableReason) {
+    }
+
+    /**
+     * The collection shape lets the world match an occupied scene slot to its game without a
+     * thumbnail.
+     *
+     * <p><b>Only a playable game names itself.</b> This path is open to anyone, so a private game's
+     * title would otherwise be readable by walking the list — the same reason
+     * {@link #resolve(String)} withholds {@code publishedVersion} from a game that cannot start.
+     * The machine stays listed either way: the scene needs to know the slot is occupied.
+     */
+    public record ListedView(String machineId, Long gameId, String title, Integer publishedVersion,
+                             boolean playable, String unavailableReason) {
     }
 }
