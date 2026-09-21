@@ -209,6 +209,11 @@ grep -q "withEnv(\['GIT_LFS_SKIP_SMUDGE=1'\])" "${develop_pipeline}" \
   || fail "deploy checkout must skip Git LFS smudge"
 [ "$(grep -c 'checkout scm' "${develop_pipeline}")" = 1 ] \
   || fail "deploy checkout must route through the single LFS-skipping helper"
+# 선언형 파이프라인(unity-bundle-e2e 등)의 암묵적 checkout 은 withEnv 로 감쌀 수 없다. deploy agent 범위로 건다.
+grep -q "GIT_LFS_SKIP_SMUDGE: '1'" "${agent_compose}" \
+  || fail "deploy agent does not skip Git LFS smudge for implicit declarative checkouts"
+[ "$(grep -c 'GIT_LFS_SKIP_SMUDGE' "${agent_compose}")" = 1 ] \
+  || fail "Git LFS smudge skip must stay scoped to the deploy agent"
 grep -q 'deploy-dev-batch.sh' "${develop_pipeline}" \
   || fail "candidate transfer does not activate the Phase 3 dev batch"
 # game candidate identity 는 Unity workspace 가 아니라 Unity Release Bundle 의 image-metadata.json 에서 온다 (Batch 2 Consumer-only).
