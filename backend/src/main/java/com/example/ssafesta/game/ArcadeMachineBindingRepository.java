@@ -1,5 +1,6 @@
 package com.example.ssafesta.game;
 
+import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -28,6 +29,26 @@ public interface ArcadeMachineBindingRepository extends JpaRepository<ArcadeMach
      */
     @Query("select g from ArcadeMachineBinding b join Game g on g.id = b.gameId where b.machineId = :machineId")
     Optional<Game> findBoundGame(@Param("machineId") String machineId);
+
+    /**
+     * Every bound machine and its game, read in <b>one</b> statement and ordered for the scene.
+     *
+     * <p>The same withdrawal race as {@link #findBoundGame(String)} applies to a collection: a
+     * binding query followed by game lookups could combine rows from before and after the withdrawal
+     * commit. Selecting the pair together gives the list one snapshot instead.
+     */
+    @Query("""
+            select b.machineId as machineId, g as game
+            from ArcadeMachineBinding b join Game g on g.id = b.gameId
+            order by b.machineId asc
+            """)
+    List<BoundGameRow> findAllBoundGames();
+
+    interface BoundGameRow {
+        String getMachineId();
+
+        Game getGame();
+    }
 
     /**
      * Every machine that runs this game, unbound — the game is about to be deleted for good.

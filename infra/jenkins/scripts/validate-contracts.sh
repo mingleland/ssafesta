@@ -2,7 +2,7 @@
 set -euo pipefail
 
 usage() {
-  echo "Usage: $0 <release|verification|deployment-record|detection-rule> <json-file> [json-file ...]" >&2
+  echo "Usage: $0 <release|verification|deployment-record|detection-rule|production-promotion-receipt> <json-file> [json-file ...]" >&2
 }
 
 if [[ $# -lt 2 ]]; then
@@ -21,6 +21,7 @@ case "${contract_type}" in
   verification) schema="${repo_root}/specs/infra-001-ci-cd-pipelines/contracts/verification-result.schema.json" ;;
   deployment-record) schema="${repo_root}/infra/contracts/deployment-record.schema.json" ;;
   detection-rule) schema="${repo_root}/specs/infra-001-ci-cd-pipelines/contracts/detection-rule.schema.json" ;;
+  production-promotion-receipt) schema="${repo_root}/specs/infra-001-ci-cd-pipelines/contracts/production-promotion-receipt.schema.json" ;;
   *)
     echo "Unknown contract type: ${contract_type}" >&2
     usage

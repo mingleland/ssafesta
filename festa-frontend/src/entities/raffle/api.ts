@@ -1,26 +1,40 @@
-// 응모권 real API — 경로·필드는 event-shop(EventShopController) 계약을 본떠 만든 추정치다.
-// BE에 이 엔드포인트는 아직 없다(-836 스펙에 추첨 개념 없음, 담당자 확인 결과 추후 추가 예정).
-//
-// 실 계약이 나오면 이 파일만 경로·필드명에 맞춰 고치면 된다 — 화면(EventRewardShopOverlay)은
-// entities/raffle/api.select 너머를 모르므로 건드릴 필요가 없다. 전환은 api.select.ts에서
-// `raffleApi = mockApi` 를 `raffleApi = realApi` 로 바꾸는 한 줄이 전부다.
-import { api } from '../../shared/api/client';
+// 응모권 = winnerCount > 0 인 이벤트 상점 경품이다. 전용 BE 엔드포인트는 없고 앞으로도 없다
+// (EventShopController 하나가 즉시교환과 응모를 같이 처리한다) — 여기서는 event-shop 계약을
+// 화면이 보는 모양(RafflePrize/RaffleEntryResult)으로 바꿔 끼우기만 한다.
+import { listPrizes, purchasePrize } from '../eventShop/api';
 import type { PurchaseRecipient } from '../../shared/contracts/purchaseRecipient';
 import type { RaffleEntryResult, RafflePrize } from './types';
 
 export async function listRaffles(): Promise<RafflePrize[]> {
-  const res = await api<{ raffles: RafflePrize[] }>('/api/v1/event-shop/raffles');
-  return res.raffles;
+  const prizes = await listPrizes();
+  return prizes
+    .filter((prize) => prize.winnerCount > 0)
+    .map((prize) => ({
+      raffleId: prize.prizeId,
+      name: prize.name,
+      priceCoin: prize.priceCoin,
+      stock: prize.stock,
+      active: prize.active,
+      closesAt: prize.closesAt,
+      // 추첨은 마감 직후 스케줄러가 돌린다(EventPrizeClosingScheduler) — 마감 시각이 곧 추첨 시각이다
+      drawAt: prize.closesAt,
+    }));
 }
 
+// raffleId가 아니라 고른 응모권을 통째로 받는다 — 구매 응답에는 추첨 시각이 없어서, 목록 캐시를
+// 다시 뒤지지 않으려면 호출부가 들고 있던 값을 그대로 넘겨주는 편이 맞다.
 export async function enterRaffle(
-  raffleId: number,
+  raffle: RafflePrize,
   idempotencyKey: string,
   recipient?: PurchaseRecipient,
 ): Promise<RaffleEntryResult> {
-  return api<RaffleEntryResult>(`/api/v1/event-shop/raffles/${raffleId}/entries`, {
-    method: 'POST',
-    headers: { 'Idempotency-Key': idempotencyKey },
-    body: JSON.stringify({ ...recipient }),
-  });
+  const result = await purchasePrize(raffle.raffleId, idempotencyKey, 1, recipient);
+  return {
+    entryId: result.purchaseId,
+    raffleId: result.prizeId,
+    raffleName: result.prizeName,
+    coinSpent: result.coinSpent,
+    enteredAt: result.purchasedAt,
+    drawAt: raffle.drawAt,
+  };
 }

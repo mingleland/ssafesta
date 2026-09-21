@@ -17,6 +17,21 @@ mkdir -p "${fixture}/bin" "${fixture}/artifacts" "${fixture}/state"
 printf '%s' 'fixture-secret-with-at-least-thirty-two-bytes' | base64 >"${fixture}/connection-token-secret"
 : >"${fixture}/game.env"
 
+# deploy-game.sh는 실행 중인 Demo world를 교체하기 전에 rollback 가능한
+# human-approved known-good baseline을 요구한다. 이 테스트도 실제 runtime
+# 계약과 동일하게 baseline을 준비한다.
+cat >"${fixture}/state/known-good.json" <<'JSON'
+{
+  "schemaVersion": "1.0.0",
+  "targetId": "demo/game",
+  "releaseId": "known-good-before-test",
+  "sourceCommit": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "imageRef": "festa-world:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "contentId": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "state": "KNOWN_GOOD"
+}
+JSON
+
 cat >"${fixture}/release.json" <<JSON
 {
   "schemaVersion": "1.0.0",

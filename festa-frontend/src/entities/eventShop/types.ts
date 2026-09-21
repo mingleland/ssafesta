@@ -2,6 +2,10 @@
 // (S15P21A604-836, GitLab #217 4번). 응모권은 여기 없다 — 대응 BE가 아직 없다(S15P21A604-842).
 
 // GET /api/v1/event-shop/prizes 원소. 판매 중단(active=false)은 서버가 목록에서 아예 뺀다.
+//
+// winnerCount > 0 이면 그 자리에서 받는 상품이 아니라 응모권이다 — 코인으로 응모하고 closesAt
+// 이후 서버가 추첨한다(EventPrizeClosingScheduler). 응모권 화면은 entities/raffle 이 이 둘을
+// 읽어 RafflePrize 모양으로 바꿔 쓴다.
 export interface EventPrize {
   prizeId: number;
   name: string;
@@ -9,6 +13,10 @@ export interface EventPrize {
   /** null = 무제한 재고 */
   stock: number | null;
   active: boolean;
+  /** 응모 마감 시각(ISO-8601). 즉시교환 상품은 null */
+  closesAt: string | null;
+  /** 0 = 즉시교환, 1 이상 = 응모권(당첨 인원) */
+  winnerCount: number;
 }
 
 // POST /api/v1/event-shop/purchases 201 응답

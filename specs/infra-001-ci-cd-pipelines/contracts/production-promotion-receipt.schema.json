@@ -1,0 +1,239 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ssafy-festa.local/contracts/production-promotion-receipt.schema.json",
+  "title": "SSAFY FESTA Production Promotion Receipt",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "state",
+    "receiptId",
+    "approvedAt",
+    "approvedBy",
+    "sourceBranch",
+    "demoReleaseId",
+    "applications",
+    "webgl",
+    "world",
+    "compatibility",
+    "evidence"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "1.0.0"
+    },
+    "state": {
+      "const": "APPROVED_FOR_PRODUCTION"
+    },
+    "receiptId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]*$"
+    },
+    "approvedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "approvedBy": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.@-]*$"
+    },
+    "sourceBranch": {
+      "const": "develop"
+    },
+    "demoReleaseId": {
+      "description": "Demo KNOWN_GOOD environment.json 의 batchId. 조합(ai·back·front·game·webgl)의 canonical ID 이며, 컴포넌트별 releaseId 는 서로 달라도 된다 (Batch 1).",
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "applications": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ai", "back", "front"],
+      "properties": {
+        "ai": {
+          "$ref": "#/$defs/applicationIdentity"
+        },
+        "back": {
+          "$ref": "#/$defs/applicationIdentity"
+        },
+        "front": {
+          "$ref": "#/$defs/applicationIdentity"
+        }
+      }
+    },
+    "webgl": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "packageName",
+        "packageVersion",
+        "packageUrl",
+        "artifactSha256",
+        "sourceCommit",
+        "sourceBranch",
+        "buildProfile",
+        "apiEnvironment",
+        "compression"
+      ],
+      "properties": {
+        "packageName": {
+          "const": "festa-webgl"
+        },
+        "packageVersion": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$"
+        },
+        "packageUrl": {
+          "type": "string",
+          "format": "uri"
+        },
+        "artifactSha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "sourceCommit": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$"
+        },
+        "sourceBranch": {
+          "const": "develop"
+        },
+        "buildProfile": {
+          "const": "release"
+        },
+        "apiEnvironment": {
+          "const": "Prod"
+        },
+        "compression": {
+          "const": "brotli+fallback"
+        }
+      }
+    },
+    "world": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "packageName",
+        "packageVersion",
+        "packageUrl",
+        "archiveSha256",
+        "sourceCommit",
+        "sourceBranch",
+        "imageRef",
+        "imageContentId"
+      ],
+      "properties": {
+        "packageName": {
+          "const": "festa-world"
+        },
+        "packageVersion": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$"
+        },
+        "packageUrl": {
+          "type": "string",
+          "format": "uri"
+        },
+        "archiveSha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "sourceCommit": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$"
+        },
+        "sourceBranch": {
+          "const": "develop"
+        },
+        "imageRef": {
+          "type": "string",
+          "minLength": 1
+        },
+        "imageContentId": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        }
+      }
+    },
+    "compatibility": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "prefabTreeHash",
+        "demoRuntimeVerified"
+      ],
+      "properties": {
+        "prefabTreeHash": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$"
+        },
+        "demoRuntimeVerified": {
+          "const": true
+        }
+      }
+    },
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "environmentApprovedAt",
+        "webglApprovedAt",
+        "gameApprovedAt",
+        "demoRuntimeVerificationRef"
+      ],
+      "properties": {
+        "environmentApprovedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "webglApprovedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "gameApprovedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "demoRuntimeVerificationRef": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  },
+  "$defs": {
+    "applicationIdentity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "releaseId",
+        "sourceCommit",
+        "imageRef",
+        "contentId"
+      ],
+      "properties": {
+        "releaseId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sourceCommit": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$"
+        },
+        "imageRef": {
+          "type": "string",
+          "minLength": 1
+        },
+        "contentId": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        }
+      }
+    }
+  }
+}
