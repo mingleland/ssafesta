@@ -13,6 +13,10 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from app.clients.spring_booth_access import SpringBoothAccessUnavailable
+from app.clients.spring_document_result import (
+    SpringDocumentResultUnavailable,
+    SpringDocumentResultValidationFailed,
+)
 from app.providers.document_parser import DocumentParseError, ScannedDocumentError
 from app.providers.managed_embedding import ManagedEmbeddingError
 from app.providers.storage import ObjectNotFoundError, ObjectStorageError
@@ -26,6 +30,9 @@ from app.services.document_processing_service import (
 class FailureOutcome:
     code: str
     retryable: bool
+
+
+_DETAIL_MAX_LENGTH = 200
 
 
 def classify_failure(exc: Exception) -> FailureOutcome:
@@ -45,6 +52,32 @@ def classify_failure(exc: Exception) -> FailureOutcome:
         return FailureOutcome(code="SOURCE_NOT_FOUND", retryable=False)
     if isinstance(exc, ObjectStorageError):
         return FailureOutcome(code="STORAGE_UNAVAILABLE", retryable=True)
+    if isinstance(exc, SpringDocumentResultValidationFailed):
+        # Spring 이 결과 요청을 계약 위반으로 거절했다(400). 재시도해도 같으므로 DEAD 이지만,
+        # "무엇이 거절됐는지" 는 남아야 한다 — finalize 의 projectFacts 거절이 UNEXPECTED_ERROR
+        # 로만 남아 두 환경의 문서 처리가 통째로 죽은 원인을 하루 넘게 못 찾았다 (S15P21A604-939).
+        return FailureOutcome(code="CONTRACT_REJECTED", retryable=False)
+    if isinstance(exc, SpringDocumentResultUnavailable):
+        return FailureOutcome(code="SPRING_RESULT_UNAVAILABLE", retryable=True)
     if isinstance(exc, ValueError):
         return FailureOutcome(code="CHUNKING_FAILED", retryable=False)
     return FailureOutcome(code="UNEXPECTED_ERROR", retryable=False)
+
+
+def describe_failure(exc: Exception) -> str:
+    """운영자가 로그·`last_error` 에서 읽을 짧은 사유. 문서 본문·비밀값은 싣지 않는다.
+
+    Spring 오류 봉투에서는 `code` 와 `errors[].field`(계약 필드 이름)만 뽑는다 — 메시지 문장은
+    문서 내용을 되비칠 수 있어 싣지 않는다. 그 밖의 예외는 클래스 이름만 남긴다.
+    """
+    if isinstance(exc, SpringDocumentResultValidationFailed) and isinstance(exc.body, dict):
+        code = exc.body.get("code")
+        fields = [
+            str(item.get("field"))
+            for item in exc.body.get("errors") or []
+            if isinstance(item, dict) and item.get("field")
+        ]
+        detail = f"{type(exc).__name__}: code={code} fields={','.join(fields) or '-'}"
+    else:
+        detail = type(exc).__name__
+    return detail[:_DETAIL_MAX_LENGTH]

@@ -15,7 +15,11 @@ from app.services.document_processing_service import (
     BoothLeaseExpiredError,
     SourceHashMismatchError,
 )
-from app.services.failure_policy import classify_failure
+from app.clients.spring_document_result import (
+    SpringDocumentResultUnavailable,
+    SpringDocumentResultValidationFailed,
+)
+from app.services.failure_policy import classify_failure, describe_failure
 
 
 def test_source_hash_mismatch_is_not_retryable() -> None:
@@ -88,3 +92,45 @@ def test_unknown_exception_falls_back_to_unexpected_error() -> None:
 
     assert outcome.code == "UNEXPECTED_ERROR"
     assert outcome.retryable is False
+
+
+# Spring 이 결과 요청을 계약 위반(400)으로 거절한 경우다. 재시도해도 같으므로 DEAD 이지만
+# UNEXPECTED_ERROR 로 뭉개면 원인이 사라진다 — finalize 의 projectFacts 거절이 그랬다 (S15P21A604-939).
+def test_contract_rejection_is_named_and_not_retryable() -> None:
+    exc = SpringDocumentResultValidationFailed(
+        {"code": "VALIDATION_FAILED", "errors": [{"rule": "FIELD_INVALID", "field": "projectFacts"}]}
+    )
+    outcome = classify_failure(exc)
+
+    assert outcome.code == "CONTRACT_REJECTED"
+    assert outcome.retryable is False
+
+
+def test_spring_result_unavailable_is_retryable() -> None:
+    outcome = classify_failure(SpringDocumentResultUnavailable("document-result returned status 503"))
+
+    assert outcome.code == "SPRING_RESULT_UNAVAILABLE"
+    assert outcome.retryable is True
+
+
+def test_describe_failure_keeps_only_contract_code_and_fields() -> None:
+    exc = SpringDocumentResultValidationFailed(
+        {
+            "code": "VALIDATION_FAILED",
+            "message": "문서 본문 '비밀 기획서' 가 노출되면 안 된다",
+            "errors": [{"rule": "FIELD_INVALID", "field": "projectFacts", "message": "계약에 없는 필드입니다."}],
+        }
+    )
+
+    detail = describe_failure(exc)
+
+    assert detail == "SpringDocumentResultValidationFailed: code=VALIDATION_FAILED fields=projectFacts"
+    assert "비밀 기획서" not in detail
+    assert "계약에 없는" not in detail
+
+
+def test_describe_failure_truncates_and_names_unknown_exceptions() -> None:
+    assert describe_failure(RuntimeError("x" * 1000)) == "RuntimeError"
+    long_field = "f" * 500
+    exc = SpringDocumentResultValidationFailed({"code": "VALIDATION_FAILED", "errors": [{"field": long_field}]})
+    assert len(describe_failure(exc)) == 200
