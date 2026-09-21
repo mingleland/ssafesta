@@ -37,7 +37,7 @@ from app.services.document_processing_service import (
     ProcessingSnapshot,
 )
 from app.services.context_service import ExtractedProjectFacts
-from app.services.failure_policy import classify_failure
+from app.services.failure_policy import classify_failure, describe_failure
 from app.services.project_fact_extractor import ProjectFactExtractor
 
 logger = logging.getLogger(__name__)
@@ -88,6 +88,7 @@ class DocumentProcessingOrchestrator:
                 status="SUPERSEDED",
             )
         except Exception as exc:  # noqa: BLE001 — 모든 처리 실패를 Spring에 보고해야 한다
+            outcome = classify_failure(exc)
             log_event(
                 logger,
                 logging.ERROR,
@@ -98,7 +99,9 @@ class DocumentProcessingOrchestrator:
                 agent_id=snapshot.agent_id,
                 attempt_no=snapshot.attempt_no,
                 status="FAILED",
-                error_code=classify_failure(exc).code,
+                error_code=outcome.code,
+                error_type=type(exc).__name__,
+                error_detail=describe_failure(exc),
             )
             await self._report_failure(snapshot, exc)
         finally:
@@ -166,12 +169,18 @@ class DocumentProcessingOrchestrator:
         self, snapshot: ProcessingSnapshot, exc: Exception
     ) -> None:
         outcome = classify_failure(exc)
+        # 계약 거절·Spring 장애는 사유가 없으면 운영자가 코드만 보고 원인을 못 잡는다. 그 두 경우만
+        # 짧은 사유를 `message` 로 함께 보낸다(last_error). 다른 코드는 코드 자체가 사유다.
+        extra: dict[str, str] = {}
+        if outcome.code in ("CONTRACT_REJECTED", "SPRING_RESULT_UNAVAILABLE"):
+            extra["message"] = describe_failure(exc)
         try:
             await self._result_client.failed(
                 job_id=snapshot.job_id,
                 attempt_no=snapshot.attempt_no,
                 failure_code=outcome.code,
                 retryable=outcome.retryable,
+                **extra,
             )
         except (*_ATTEMPT_LOST_ERRORS, SpringDocumentResultUnavailable):
             # Job을 이미 잃었거나 Spring이 응답하지 않는다 — Spring의 lease
