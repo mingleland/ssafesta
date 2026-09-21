@@ -10,6 +10,13 @@ pipeline {
     }
 
     stages {
+        stage('Prepare Build Artifacts') {
+            steps {
+                // Jenkins workspace는 build 간 재사용된다. 이전 build의 artifacts를 남기면
+                // docs-only build도 오래된 release manifest를 자기 산출물처럼 archive한다.
+                sh 'rm -rf artifacts && mkdir -p artifacts'
+            }
+        }
         stage('Agent Preflight') {
             steps { sh 'infra/jenkins/scripts/check-agent-capabilities.sh' }
         }

@@ -12,8 +12,11 @@ known_good_env="${KNOWN_GOOD_ENVIRONMENT_PATH:-${ENVIRONMENT_STATE_DIR:-/var/lib
 [[ -f "${known_good_env}" ]] || { echo 'promotion denied: no human-approved known-good environment' >&2; exit 66; }
 
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-bash "${script_dir}/validate-contracts.sh" release "${RELEASE_MANIFEST_PATH}"
-bash "${script_dir}/validate-contracts.sh" verification "${DEV_VERIFICATION_RESULT_PATH}"
+# 이 스크립트의 stdout은 Jenkins가 releaseId로 직접 소비한다.
+# contract validator의 진단 출력이 섞이면 DEMO_RELEASE_ID가 여러 줄이 되므로
+# 성공 출력은 버리고 실패 stderr/exit code만 전달한다.
+bash "${script_dir}/validate-contracts.sh" release "${RELEASE_MANIFEST_PATH}" >/dev/null
+bash "${script_dir}/validate-contracts.sh" verification "${DEV_VERIFICATION_RESULT_PATH}" >/dev/null
 
 python_bin="$(command -v python3 || command -v python || true)"
 [[ -n "${python_bin}" ]] || { echo 'Python 3 is required' >&2; exit 69; }

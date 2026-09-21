@@ -158,6 +158,16 @@ namespace Festa.Content
             var striker = target.GetComponentInParent<Festa.World.HighStrikerInteractable>();
             if (striker != null && striker.IsBusy) return true;
 
+            // 누가 붙어서 하고 있는 게임기도 통째로 뺀다 — 한 대에 한 사람이다 (사용자 지시 2026-09-19).
+            var arcade = target.GetComponentInParent<Festa.Content.Arcade.ArcadeMachineInteractable>();
+            if (arcade != null)
+            {
+                var anm = Unity.Netcode.NetworkManager.Singleton;
+                var apo = anm != null && anm.LocalClient != null ? anm.LocalClient.PlayerObject : null;
+                if (arcade.IsOccupied(apo, out _)) return true;
+            }
+
+            // 이미 누가 앉아 있는 의자는 **대상에서 통째로 뺀다**
             // 이미 누가 앉아 있는 의자는 **대상에서 통째로 뺀다** — 프롬프트도 링도 뜨지 않는다.
             // 눌러도 안 되는 버튼을 띄우면 고장으로 읽힌다 (사용자 지시 2026-09-18).
             var chair = target.GetComponentInParent<Festa.World.BoothChairInteractable>();

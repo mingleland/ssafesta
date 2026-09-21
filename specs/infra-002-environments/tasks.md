@@ -45,6 +45,7 @@
 - [X] T012 공통 레이블, 상태 확인 앵커, 내부 네트워크 규약과 공개 포트 없음 기본값을 `infra/environments/compose/common.yaml`에 작성한다
 - [X] T013 고정 이미지, 영속 볼륨과 호스트 포트 비공개 설정을 갖춘 별도 관리 PostgreSQL/Redis 데이터 프로젝트를 `infra/environments/compose/data/compose.yaml`에 작성한다
 - [X] T014 [P] `festa_dev_business`, `festa_dev_ai`, `festa_demo_business`, `festa_demo_ai`, 전용 역할, PUBLIC CONNECT 회수와 AI 전용 pgvector를 구성하는 멱등 부트스트랩 SQL을 `infra/environments/postgres/init/00-databases-and-roles.sql`에 작성한다
+- [X] T014A demo 데이터 조회 요청을 EC2 계정·sudo·docker 그룹 없이 처리하도록 읽기 전용 역할 `festa_demo_readonly`를 `infra/environments/postgres/init/00-databases-and-roles.sql`에 추가하고, 쓰기 권한 부여와 dev database 접근을 `infra/environments/tests/security/cross-environment.sh`가 막게 한다. 조회·반영 절차는 `docs/JSW/28_EC2_인프라_아키텍처_구조도.md` §8에 둔다
 - [X] T015 [P] Redis 기본 사용자를 비활성화하고 `noeviction`을 설정하며 외부 ACL 파일을 불러오고 환경·서비스 ACL 예시를 `infra/environments/redis/redis.conf`와 `infra/environments/redis/users.acl.example`에 정의한다
 - [X] T016 [P] infra-001의 스키마를 복제하지 않고 릴리스 매니페스트와 검증 대상 참조를 `infra/environments/scripts/validate-infra001-contracts.sh`에서 검증한다
 - [X] T017 자격증명, 쿠키, 서명 URL, 개인 키와 원본 환경 덤프를 거부하는 민감정보 제거 검증 근거 기록을 `infra/environments/scripts/write-evidence.sh`에 구현한다
