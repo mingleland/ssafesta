@@ -47,6 +47,12 @@ export function EventShopSection() {
     },
   });
 
+  // 경품 목록의 winnerCount 로 각 구매가 응모권인지 구매권인지 가른다 — 구매 응답엔 그 정보가 없다.
+  // 경품을 못 찾으면(이례적) won 결과 유무로 근사한다: 결과가 있으면 응모였던 것이다.
+  const raffleByPrize = new Map<number, boolean>();
+  (prizes.data ?? []).forEach((p) => raffleByPrize.set(p.prizeId, p.winnerCount > 0));
+  const isRafflePurchase = (p: PrizePurchaseView): boolean => raffleByPrize.get(p.prizeId) ?? p.won !== null;
+
   const [target, setTarget] = useState<PrizePurchaseView | null>(null);
   const [next, setNext] = useState<PrizeFulfillmentStatus | ''>('');
   const [note, setNote] = useState('');
@@ -137,13 +143,14 @@ export function EventShopSection() {
         {purchases.isSuccess && purchases.data.content.length > 0 && (
           <>
             <table className="ad-table">
-              <thead><tr><th>구매</th><th>구매자</th><th>경품</th><th className="num">수량</th><th className="num">코인</th><th>캠퍼스</th><th>조</th><th>받는 분</th><th>코인 차감</th><th>지급 상태</th><th>응모</th><th>시각</th><th /></tr></thead>
+              <thead><tr><th>구매</th><th>구매자</th><th>경품</th><th>구분</th><th className="num">수량</th><th className="num">코인</th><th>캠퍼스</th><th>조</th><th>받는 분</th><th>코인 차감</th><th>지급 상태</th><th>응모</th><th>시각</th><th /></tr></thead>
               <tbody>
                 {purchases.data.content.map((p) => (
                   <tr key={p.purchaseId}>
                     <td className="num">#{p.purchaseId}</td>
                     <td>{p.buyerNickname} <span className="ad-muted">#{p.buyerUserId}</span></td>
                     <td>{p.prizeName}</td>
+                    <td>{isRafflePurchase(p) ? <span className="ad-chip ad-chip-gold">응모권</span> : <span className="ad-chip ad-chip-plain">구매권</span>}</td>
                     <td className="num">{p.quantity}</td>
                     <td className="num">{p.coinSpent.toLocaleString('ko-KR')}</td>
                     <td>{p.campus ?? '-'}</td>
