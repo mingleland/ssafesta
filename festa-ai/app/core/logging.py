@@ -20,6 +20,8 @@ _FIELD_NAMES = frozenset(
         "attempt_no",
         "status",
         "error_code",
+        "error_type",
+        "error_detail",
         "timeout_phase",
         "intent",
     }
