@@ -4,6 +4,18 @@ def call() {
     final String headSha = sh(returnStdout: true, script: 'git rev-parse HEAD').trim()
     if (!(headSha ==~ /^[0-9a-f]{40}$/)) { error('GIT_COMMIT must be a full lowercase SHA') }
 
+    // Deploy agent 는 Unity 원본을 빌드하지 않는다 (Consumer-only). checkout 이 LFS pointer 를 만나면
+    // smudge 가 GitLab LFS endpoint 로 blob 을 받으러 가는데, 거기서 멈추면 checkout 이 600초
+    // timeout 으로 죽는다 — BGM_ArcadeRush.mp3(4.4MB) 반입 후 build #535 가 그렇게 실패했다 (#259).
+    // deploy 경로에 필요한 것은 infra 스크립트·pipeline 정의·설정뿐이라 blob 실체가 필요 없다.
+    // 범위를 deploy checkout 으로 한정한다 — Unity 빌드/MR 검증 경로의 LFS 는 그대로 둔다.
+    def deployCheckout = {
+        withEnv(['GIT_LFS_SKIP_SMUDGE=1']) {
+            checkout scm
+            sh "git checkout --detach '${headSha}'"
+        }
+    }
+
     String range = "--branch develop --head '${headSha}'"
     final String baseSha = env.GIT_BEFORE_SHA ?: env.GIT_PREVIOUS_COMMIT ?: env.GIT_PREVIOUS_SUCCESSFUL_COMMIT ?: ''
     if (baseSha) { range += " --base '${baseSha}'" }
@@ -114,8 +126,7 @@ def call() {
         stage("Deploy Candidate Receipt (${label})") {
             node('deploy') {
                 ws("/home/jenkins/agent/deploy/workspaces/develop-candidate-receipt-${label}") {
-                    checkout scm
-                    sh "git checkout --detach '${headSha}'"
+                    deployCheckout()
                     unstash stashName
                     sh "infra/jenkins/scripts/transfer-local-images.sh --import --bundle '${bundle}' --transfer-dir '${transferDir}'"
                 }
@@ -132,8 +143,7 @@ def call() {
         stage('Deploy Selected Components') {
         node('deploy') {
             ws('/home/jenkins/agent/deploy/workspaces/develop-dev-batch') {
-                checkout scm
-                sh "git checkout --detach '${headSha}'"
+                deployCheckout()
                 unstash 'candidate-release-manifest'
 
                 final List credentialBindings = []
@@ -212,8 +222,7 @@ def call() {
     def onDeploy = { Closure body ->
         node('deploy') {
             ws(gameDeployWs) {
-                checkout scm
-                sh "git checkout --detach '${headSha}'"
+                deployCheckout()
                 body()
             }
         }
