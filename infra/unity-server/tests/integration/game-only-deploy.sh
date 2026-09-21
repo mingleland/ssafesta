@@ -55,6 +55,7 @@ case "${1:-}" in
     if [[ "${3:-}" == --format ]]; then
       case "${4:-}" in
         '{{.Id}}') printf '%s\n' "${content_id}" ;;
+        '{{index .Config.Labels "org.ssafy-festa.source-commit"}}') printf '%s\n' 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' ;;
         '{{.Architecture}}') printf 'amd64\n' ;;
         *) exit 64 ;;
       esac
