@@ -78,12 +78,17 @@ export function WorldChatLayer({ onHeightChange }: { onHeightChange?: (height: n
   const lastSeqRef = useRef(0);
   const [unread, setUnread] = useState(0);
   const wasOpen = useRef(false);
-  // **로그는 말만 싣는다.** 입장 알림(JOIN)은 STOMP 연결 사건이라 재연결·같은 계정의 다른 창에서도
-  // 오고(S15P21A604-855), 한동안 열었을 때만 로그에 섞어 보여 줬다. 지금은 열려 있든 아니든
-  // 시스템 안내 한 줄이 맡는다 — 같은 사건이 화면 상태에 따라 다른 모양으로 나오지 않는다.
+  // **입장 알림은 로그 안에, 온 순서 그대로 선다.** 누가 언제 들어왔는지는 그 앞뒤의 말과 같이
+  // 읽어야 뜻이 통한다 — 따로 떼어 띄우면 지나간 입장이 방금 온 말 위를 가리고, 시간 순서도
+  // 끊긴다. Passive 도 같다: 마지막 몇 줄을 자를 때 말과 입장을 가르지 않는다.
+  //
+  // 대신 **줄의 모양**으로 가른다 — 사람이 한 말이 아니라 월드 상태 변화라서다.
+  const shown = open ? messages : messages.slice(-VISIBLE_WHEN_CLOSED);
+  // 보조기기에 읽히는 것과 스크롤을 따라가는 기준은 갈린다. 읽히는 쪽은 말만 — 입장은 그 줄
+  // 자체가 role="status" 로 알린다. 스크롤은 무엇이 왔든 따라가야 한다.
   const spoken = messages.filter(isSpoken);
-  const shown = open ? spoken : spoken.slice(-VISIBLE_WHEN_CLOSED);
   const latest = spoken[spoken.length - 1];
+  const lastEntry = messages[messages.length - 1];
   const latestAnnouncement = latest === undefined
     ? ''
     : latest.nickname + ': ' + latest.content;
@@ -186,11 +191,6 @@ export function WorldChatLayer({ onHeightChange }: { onHeightChange?: (height: n
     ? (status === 'reconnecting' ? '채팅 연결 중…' : '채팅 연결이 끊어졌습니다')
     : null;
 
-  // 방금 들어온 사람은 **아직 아무도 말하지 않았을 때만** 알린다. 말 한 줄이 오면 그 자리를
-  // 내준다 — 지나간 입장을 계속 띄우면 광장에서 제일 오래된 사실이 제일 위에 남는다.
-  const lastEntry = messages[messages.length - 1];
-  const joinFlash = lastEntry !== undefined && isJoinNotice(lastEntry) ? lastEntry : undefined;
-
   /** 거절 사유 — 읽히는 것과 보이는 것을 가른다(아래 주석) */
   const noticeLine = noticeView === null ? null : (
     <p key="notice" className="world-chat-notice">
@@ -213,7 +213,7 @@ export function WorldChatLayer({ onHeightChange }: { onHeightChange?: (height: n
    * 높이를 지키는 행으로 뒀는데, 문구가 생겨도 입력칸이 안 움직인다는 점은 맞았지만 정상 상태 —
    * 즉 거의 모든 시간 — 에 입력칸 위로 빈 띠가 남았다.
    *
-   * 여러 줄로 쌓지 않는다. 셋 중 하나만 나온다.
+   * 여러 줄로 쌓지 않는다. 둘 중 하나만 나온다. 입장 알림은 여기 오지 않는다 — 로그 안에 선다.
    */
   const systemNotice = noticeLine !== null
     ? noticeLine
@@ -225,19 +225,14 @@ export function WorldChatLayer({ onHeightChange }: { onHeightChange?: (height: n
           {linkText}
         </p>
       )
-      : joinFlash !== undefined
-        ? (
-          <p key={'join-' + String(joinFlash.seq)} className="world-chat-flash" role="status">
-            {joinFlash.nickname}님이 입장하셨습니다.
-          </p>
-        )
-        : null;
+      : null;
 
   // 새 메시지를 어디로 보낼지는 **사용자가 지금 무엇을 보고 있는가**로 갈린다. 맨 아래를 보고
   // 있으면 따라 내려가고, 위를 읽는 중이면 그 자리를 지키고 몇 개가 왔는지만 알린다 —
   // 읽던 줄을 빼앗기지 않게 (S15P21A604-791).
   useEffect(() => {
-    const latestSeq = latest?.seq ?? 0;
+    // 입장 알림도 한 줄을 차지한다 — 말만 세면 그 줄이 온 순간 따라 내려가지 않아 잘린다.
+    const latestSeq = lastEntry?.seq ?? 0;
     const arrived = latestSeq > lastSeqRef.current;
     lastSeqRef.current = latestSeq;
 
@@ -253,7 +248,7 @@ export function WorldChatLayer({ onHeightChange }: { onHeightChange?: (height: n
       return;
     }
     if (arrived) setUnread((n) => n + 1);
-  }, [latest, open]);
+  }, [lastEntry, open]);
 
   function jumpToLatest(): void {
     const log = logRef.current;
@@ -293,7 +288,13 @@ export function WorldChatLayer({ onHeightChange }: { onHeightChange?: (height: n
                 if (atBottomRef.current) setUnread(0);
               }}
             >
-              {shown.map((message) => (
+              {shown.map((message) => isJoinNotice(message) ? (
+                <li key={message.seq} className="world-chat-join" role="status">
+                  {/* 줄(scrim 띠)과 알약을 갈라 둔다 — 띠는 옆줄과 같은 배경 층이고, 알약은
+                      그 위에 놓이는 표식이다. 하나로 합치면 둘 중 하나를 포기해야 한다. */}
+                  <span>{message.nickname}님이 입장하셨습니다.</span>
+                </li>
+              ) : (
                 <li key={message.seq}>
                   <b>{message.nickname}</b> {message.content}
                 </li>

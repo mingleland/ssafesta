@@ -3,6 +3,7 @@ package com.example.ssafesta.internal.ai;
 import static com.example.ssafesta.booth.BoothTestSupport.createMemberWithWallet;
 import static com.example.ssafesta.booth.BoothTestSupport.releaseAllSlots;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -523,6 +524,87 @@ class AiDocumentResultApiIntegrationTest {
     }
 
     // ── heartbeat ───────────────────────────────────────────────────────────
+
+    // ── finalize + projectFacts (계약 §finalize 선택 필드, S15P21A604-396/-597, 사고 S15P21A604-939) ──
+
+    /**
+     * AI 는 추출한 프로젝트 정형 정보를 finalize 본문에 실어 보낸다. 서버가 그 필드를 모르면 strict
+     * 파서가 400 으로 거부하고 워커는 이를 {@code UNEXPECTED_ERROR} 로 뭉개 Job 이 DEAD 가 됐다 —
+     * Demo·Production 의 모든 문서 처리가 그렇게 죽었다 (2026-09-21). 이 자리가 그 계약을 고정한다.
+     */
+    @Test
+    @DisplayName("finalize 에 실린 projectFacts 는 같은 트랜잭션에서 부스 프로젝트에 반영된다")
+    void finalizeCarriesProjectFactsIntoTheBoothsProject() throws Exception {
+        Job job = seedJob("정형정보");
+        Long projectId = jdbc.queryForObject("""
+                INSERT INTO projects (booth_id, name, description) VALUES (?, '정형 프로젝트', '소개글')
+                RETURNING id
+                """, Long.class, job.boothId());
+
+        mockMvc.perform(batch(job, 0, chunk(0, "조각"))).andExpect(status().isNoContent());
+        mockMvc.perform(finalizeRequest(job, """
+                {"attemptNo":0,"sourceHash":"%s","totalChunkCount":1,"embeddingModelId":"%s",
+                 "projectFacts":{"targetAudience":"신입 개발자","techStack":"Spring Boot, PostgreSQL"}}
+                """.formatted(SOURCE_HASH, MODEL)))
+                .andExpect(status().isNoContent());
+
+        assertEquals("SUCCEEDED", jobStatus(job));
+        assertEquals("READY", documentStatus(job));
+        assertEquals("신입 개발자", projectColumn(projectId, "target_audience"));
+        assertEquals("Spring Boot, PostgreSQL", projectColumn(projectId, "tech_stack"));
+        assertEquals(String.valueOf(job.id()), projectColumn(projectId, "facts_job_id"));
+    }
+
+    @Test
+    @DisplayName("projectFacts 가 둘 다 null 이면 무시하고 문서는 그대로 READY 가 된다")
+    void emptyProjectFactsDoNotBlockFinalize() throws Exception {
+        Job job = seedJob("빈정형");
+        Long projectId = jdbc.queryForObject("""
+                INSERT INTO projects (booth_id, name, description) VALUES (?, '빈 프로젝트', '소개글')
+                RETURNING id
+                """, Long.class, job.boothId());
+
+        mockMvc.perform(batch(job, 0, chunk(0, "조각"))).andExpect(status().isNoContent());
+        mockMvc.perform(finalizeRequest(job, """
+                {"attemptNo":0,"sourceHash":"%s","totalChunkCount":1,"embeddingModelId":"%s",
+                 "projectFacts":{"targetAudience":null,"techStack":null}}
+                """.formatted(SOURCE_HASH, MODEL)))
+                .andExpect(status().isNoContent());
+
+        assertEquals("READY", documentStatus(job));
+        assertNull(projectColumn(projectId, "target_audience"));
+        assertNull(projectColumn(projectId, "facts_job_id"));
+    }
+
+    @Test
+    @DisplayName("계약 밖 projectFacts(빈 문자열)는 400 이고 chunk·문서 상태는 바뀌지 않는다")
+    void invalidProjectFactsRollBackTheWholeFinalize() throws Exception {
+        Job job = seedJob("불량정형");
+        mockMvc.perform(batch(job, 0, chunk(0, "조각"))).andExpect(status().isNoContent());
+
+        mockMvc.perform(finalizeRequest(job, """
+                {"attemptNo":0,"sourceHash":"%s","totalChunkCount":1,"embeddingModelId":"%s",
+                 "projectFacts":{"targetAudience":"   ","techStack":"기술"}}
+                """.formatted(SOURCE_HASH, MODEL)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errors[0].field").value("projectFacts.targetAudience"));
+
+        assertEquals(0, chunkCount(job), "거부된 finalize 는 chunk 를 공개하지 않는다");
+        assertEquals(1, stagingCount(job), "staging 이 남아 같은 attempt 로 다시 finalize 할 수 있다");
+        assertEquals("PROCESSING", documentStatus(job));
+    }
+
+    private RequestBuilder finalizeRequest(Job job, String body) {
+        return post("/internal/ai/document-jobs/" + job.id() + "/finalize")
+                .header("Authorization", "Bearer " + SERVICE_TOKEN)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(body);
+    }
+
+    private String projectColumn(Long projectId, String name) {
+        return jdbc.queryForObject("SELECT " + name + "::text FROM projects WHERE id = ?",
+                String.class, projectId);
+    }
 
     @Test
     @DisplayName("heartbeat 가 lease 를 90초 뒤로 밀고 QUEUED 를 RUNNING 으로 올린다")

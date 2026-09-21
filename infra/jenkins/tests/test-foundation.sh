@@ -39,6 +39,9 @@ pass "controller port and mount policy"
 grep -q 'network_mode: host' "${agent_compose}" || fail "linux Docker agent must use host networking"
 grep -q 'http://127.0.0.1:8080' "${agent_compose}" || fail "linux Docker agent must reach Jenkins through loopback"
 grep -q 'TESTCONTAINERS_HOST_OVERRIDE: 127.0.0.1' "${agent_compose}" || fail "linux Docker agent lacks Testcontainers loopback override"
+# rootless Docker 에서 Ryuk 가 마운트할 host 소켓 경로 — 없으면 back: Test 가 Ryuk 기동 실패로 죽는다 (build #544).
+grep -q 'TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE: ${DOCKER_SOCKET_PATH:-/run/user/1000/docker.sock}' "${agent_compose}" \
+  || fail "linux Docker agent lacks Testcontainers rootless socket override for Ryuk"
 pass "rootless Docker Testcontainers network policy"
 
 grep -Fq '${WEBGL_RELEASE_ROOT:-/srv/festa/webgl}:/srv/festa/webgl' "${agent_compose}" \
@@ -205,12 +208,20 @@ grep -q 'gitUsernamePassword(credentialsId: checkoutCredentialId)' "${develop_pi
   || fail "deploy freshness check does not bind the GitLab checkout credential"
 grep -q 'FRESHNESS_EXPECTED_SHA=' "${develop_pipeline}" \
   || fail "dev batch does not recheck the develop head before deployment"
-# deploy agent 는 Unity 원본을 빌드하지 않으므로 LFS blob 이 필요 없다. smudge 가 켜져 있으면
-# checkout 이 LFS endpoint 에서 멈춰 600초 timeout 으로 죽는다 (#259, build #535).
-grep -q "withEnv(\['GIT_LFS_SKIP_SMUDGE=1'\])" "${develop_pipeline}" \
-  || fail "deploy checkout must skip Git LFS smudge"
+# Git LFS smudge 건너뛰기의 정본은 deploy agent compose env 하나다 (!1285). 파이프라인 withEnv 는
+# 선언형 암묵 checkout 에 닿지 않는 중복이라 두지 않는다 (#259, build #535).
+if grep -q 'GIT_LFS_SKIP_SMUDGE' "${develop_pipeline}"; then
+  fail "develop pipeline must not carry its own Git LFS smudge skip — the deploy agent env is the single source"
+fi
 [ "$(grep -c 'checkout scm' "${develop_pipeline}")" = 1 ] \
-  || fail "deploy checkout must route through the single LFS-skipping helper"
+  || fail "deploy checkout must route through the single deployCheckout helper"
+# catch-up: 실패한 push 의 변경을 다시 판정하도록 base 를 덮어쓰는 파라미터 (#259, build #536·#538)
+grep -q "string(name: 'CHANGE_BASE_SHA'" "${repo_root}/Jenkinsfile" \
+  || fail "Jenkinsfile must declare CHANGE_BASE_SHA for deploy catch-up"
+grep -q 'params.CHANGE_BASE_SHA' "${develop_pipeline}" \
+  || fail "develop pipeline must honour CHANGE_BASE_SHA as the detector base"
+grep -q "baseOverride ==~ /^\[0-9a-f\]{40}\$/" "${develop_pipeline}" \
+  || fail "CHANGE_BASE_SHA must be validated as a full lowercase SHA"
 # 선언형 파이프라인(unity-bundle-e2e 등)의 암묵적 checkout 은 withEnv 로 감쌀 수 없다. deploy agent 범위로 건다.
 grep -q "GIT_LFS_SKIP_SMUDGE: '1'" "${agent_compose}" \
   || fail "deploy agent does not skip Git LFS smudge for implicit declarative checkouts"

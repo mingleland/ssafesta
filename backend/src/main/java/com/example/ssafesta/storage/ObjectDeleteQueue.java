@@ -76,6 +76,13 @@ public class ObjectDeleteQueue {
      * deletion, and failing here would fail the withdrawal that called it.
      */
     public void enqueue(String provider, String bucket, String objectKey) {
+        if (objectKey == null || bucket == null || provider == null) {
+            // 좌표 없는 행은 저장소에 지울 것이 없다는 뜻이다. DB 제약(NOT NULL)에 맡기면 호출자의
+            // 트랜잭션이 500 으로 죽으므로 여기서 이름을 붙여 막는다 (S15P21A604-939).
+            throw new IllegalArgumentException(
+                    "delete queue needs provider, bucket and objectKey — got provider=" + provider
+                            + " bucket=" + bucket + " objectKey=" + (objectKey == null ? "null" : "<set>"));
+        }
         jdbc.update("""
                 INSERT INTO game_asset_delete_queue (provider, storage_bucket, object_key)
                 VALUES (?, ?, ?)
