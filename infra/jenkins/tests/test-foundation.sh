@@ -39,6 +39,9 @@ pass "controller port and mount policy"
 grep -q 'network_mode: host' "${agent_compose}" || fail "linux Docker agent must use host networking"
 grep -q 'http://127.0.0.1:8080' "${agent_compose}" || fail "linux Docker agent must reach Jenkins through loopback"
 grep -q 'TESTCONTAINERS_HOST_OVERRIDE: 127.0.0.1' "${agent_compose}" || fail "linux Docker agent lacks Testcontainers loopback override"
+# rootless Docker 에서 Ryuk 가 마운트할 host 소켓 경로 — 없으면 back: Test 가 Ryuk 기동 실패로 죽는다 (build #544).
+grep -q 'TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE: ${DOCKER_SOCKET_PATH:-/run/user/1000/docker.sock}' "${agent_compose}" \
+  || fail "linux Docker agent lacks Testcontainers rootless socket override for Ryuk"
 pass "rootless Docker Testcontainers network policy"
 
 grep -Fq '${WEBGL_RELEASE_ROOT:-/srv/festa/webgl}:/srv/festa/webgl' "${agent_compose}" \
