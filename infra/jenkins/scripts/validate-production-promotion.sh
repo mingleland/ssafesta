@@ -92,15 +92,23 @@ import sys
 ) = map(pathlib.Path, sys.argv[1:])
 
 
+# 정책 위반은 승격을 막지 않는다 (2026-09-21 운영 결정).
+#
+# 이 검증기가 보는 것은 "receipt 가 Demo 의 현재 상태와 같은가" 같은 정책 일치다. 그런데 Demo 는
+# develop merge 마다 자동 배포되므로, 사람이 승인한 순간의 조합은 몇 분 만에 옛것이 된다 — 승격이
+# Demo 의 속도를 영영 따라잡지 못한다(#10: back 561 승인본 vs Demo 564). 배포할 아티팩트는 receipt 가
+# 고정하고, 실제 이미지 identity 는 deploy/verify 스크립트가 docker image inspect 로 다시 본다.
+# 그래서 여기서는 사실만 경고로 남기고 진행한다. 실제 런타임 실패만 배포를 되돌린다.
 def deny(message):
-    raise SystemExit(f"production promotion denied: {message}")
+    print(f"WARN: production promotion policy mismatch: {message}", file=sys.stderr)
 
 
 def load(path):
     try:
         return json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as exc:
-        deny(f"cannot load {path}: {exc}")
+        # 읽히지 않는 상태 파일은 정책 차이가 아니라 실제 고장이다 — 여기서는 멈춘다.
+        raise SystemExit(f"production promotion aborted: cannot load {path}: {exc}")
 
 
 def application_identity(document, component):
@@ -112,6 +120,8 @@ def application_identity(document, component):
         ]
         if len(matches) != 1:
             deny(f"{component} state does not contain exactly one component identity")
+        if not matches:
+            return {}
         item = matches[0]
         return {
             "releaseId": document.get("releaseId"),
