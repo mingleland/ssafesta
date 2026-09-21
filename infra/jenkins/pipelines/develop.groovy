@@ -4,8 +4,26 @@ def call() {
     final String headSha = sh(returnStdout: true, script: 'git rev-parse HEAD').trim()
     if (!(headSha ==~ /^[0-9a-f]{40}$/)) { error('GIT_COMMIT must be a full lowercase SHA') }
 
+    // deploy node 의 checkout 은 한 곳으로 모은다. Git LFS smudge 건너뛰기는 deploy agent 의
+    // compose env(infra/jenkins/agents/compose.yaml, !1285)가 단일 정본이다 — 파이프라인 withEnv 는
+    // 선언형 암묵 checkout 에 닿지 않아 중복이었다 (#259, build #535).
+    def deployCheckout = {
+        checkout scm
+        sh "git checkout --detach '${headSha}'"
+    }
+
     String range = "--branch develop --head '${headSha}'"
-    final String baseSha = env.GIT_BEFORE_SHA ?: env.GIT_PREVIOUS_COMMIT ?: env.GIT_PREVIOUS_SUCCESSFUL_COMMIT ?: ''
+    // detector 는 이번 push 의 diff 만 본다. game 을 고른 push 가 실패로 끝나고 develop 이 그 앞으로
+    // 지나가면 그 번들을 Demo 로 올릴 트리거가 사라진다 (#535 실패 → #542 는 이미 diff 밖). 그때만
+    // 운영자가 명시적으로 game 구간을 연다. 기본값 false 라 push 기반 판정은 그대로다 (#259).
+    final boolean forceGameDeploy = (params.DEPLOY_GAME_TO_DEMO ?: false).toString() == 'true'
+    // 배포를 유발한 push 가 실패로 끝나면(#536·#538 의 front) 그 diff 는 다음 push 의 범위 밖이라 Demo 가
+    // 영원히 뒤처진다. 운영자가 마지막으로 배포된 커밋을 base 로 지정해 그 범위를 다시 판정한다 (#259).
+    // 비우면 push 기반 판정 그대로다.
+    final String baseOverride = (params.CHANGE_BASE_SHA ?: '').toString().trim()
+    if (baseOverride && !(baseOverride ==~ /^[0-9a-f]{40}$/)) { error('CHANGE_BASE_SHA must be a full lowercase SHA') }
+    if (baseOverride) { echo "CHANGE_BASE_SHA override: ${baseOverride}" }
+    final String baseSha = baseOverride ?: env.GIT_BEFORE_SHA ?: env.GIT_PREVIOUS_COMMIT ?: env.GIT_PREVIOUS_SUCCESSFUL_COMMIT ?: ''
     if (baseSha) { range += " --base '${baseSha}'" }
 
     final String selectionText = sh(
@@ -27,7 +45,7 @@ def call() {
     final boolean gameBuildRequired = selection.gameBuildRequired as boolean
     if (buildComponents.contains('game') && !gameBuildRequired) { error('detector selected a game build without gameBuildRequired') }
 
-    if (validationComponents.isEmpty()) {
+    if (validationComponents.isEmpty() && !forceGameDeploy) {
         if (selection.sharedCiChanged) {
             stage('CI Static & Contract Tests') {
                 sh 'for t in infra/jenkins/tests/*.sh; do bash "$t"; done'
@@ -55,8 +73,8 @@ def call() {
     final List appComponents = buildComponents.findAll { it != 'game' }
     final String appComponentList = appComponents.join(',')
     // game 은 buildComponents 에 있을 때만(= gameBuildRequired) Unity 를 돌린다. 배포는 deployComponents 가 결정한다.
-    final boolean hasGame = buildComponents.contains('game')
-    final boolean deployGame = selectedDeploy.contains('game')
+    final boolean hasGame = buildComponents.contains('game') || forceGameDeploy
+    final boolean deployGame = selectedDeploy.contains('game') || forceGameDeploy
 
     final String appMetadataDir = "${artifactRoot}/release-metadata"
     final String appManifest = "${artifactRoot}/release-manifest.json"
@@ -79,7 +97,7 @@ def call() {
         buildComponent(component, component == 'game' ? ['validate'] : ['validate', 'test'])
     }
 
-    if (buildComponents.isEmpty()) {
+    if (buildComponents.isEmpty() && !forceGameDeploy) {
         echo "NO_OP: validation-only change (${selection.reasons.join(', ')})"
         return
     }
@@ -114,8 +132,7 @@ def call() {
         stage("Deploy Candidate Receipt (${label})") {
             node('deploy') {
                 ws("/home/jenkins/agent/deploy/workspaces/develop-candidate-receipt-${label}") {
-                    checkout scm
-                    sh "git checkout --detach '${headSha}'"
+                    deployCheckout()
                     unstash stashName
                     sh "infra/jenkins/scripts/transfer-local-images.sh --import --bundle '${bundle}' --transfer-dir '${transferDir}'"
                 }
@@ -132,8 +149,7 @@ def call() {
         stage('Deploy Selected Components') {
         node('deploy') {
             ws('/home/jenkins/agent/deploy/workspaces/develop-dev-batch') {
-                checkout scm
-                sh "git checkout --detach '${headSha}'"
+                deployCheckout()
                 unstash 'candidate-release-manifest'
 
                 final List credentialBindings = []
@@ -212,8 +228,7 @@ def call() {
     def onDeploy = { Closure body ->
         node('deploy') {
             ws(gameDeployWs) {
-                checkout scm
-                sh "git checkout --detach '${headSha}'"
+                deployCheckout()
                 body()
             }
         }

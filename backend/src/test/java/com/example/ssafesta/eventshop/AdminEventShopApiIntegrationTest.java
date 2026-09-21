@@ -69,9 +69,12 @@ class AdminEventShopApiIntegrationTest {
                 .andExpect(jsonPath("$.stock").value(5))
                 .andExpect(jsonPath("$.active").value(true));
 
+        // 이 운영자가 남긴 행만 센다. action 과 target_type 만으로 세면 경품을 등록하는 다른
+        // 테스트가 생기는 순간 실행 순서에 따라 값이 갈린다 (S15P21A604-941 과 같은 형태).
         assertEquals(1, jdbc.queryForObject(
-                "SELECT count(*) FROM admin_actions WHERE action='PRIZE_CREATE' AND target_type='EVENT_PRIZE'",
-                Integer.class));
+                "SELECT count(*) FROM admin_actions WHERE actor_user_id = ?"
+                        + " AND action='PRIZE_CREATE' AND target_type='EVENT_PRIZE'",
+                Integer.class, admin));
     }
 
     @Test
@@ -175,9 +178,12 @@ class AdminEventShopApiIntegrationTest {
 
         assertEquals(charged + 20, wallets.balanceOf(buyer));
         assertEquals(3, prizes.findById(prize.getId()).orElseThrow().getStock());
+        // 이 구매자의 지갑으로 좁힌다. 사유와 금액만으로 세면 같은 값을 쓰는 다른 테스트가 남긴
+        // 행까지 잡혀서 실행 순서에 따라 통과와 실패가 갈린다 (S15P21A604-941).
         assertEquals(1, jdbc.queryForObject(
-                "SELECT count(*) FROM coin_ledger_entries WHERE reason_type='PRIZE_REFUND' AND amount=20",
-                Integer.class));
+                "SELECT count(*) FROM coin_ledger_entries e JOIN wallets w ON w.id = e.wallet_id"
+                        + " WHERE w.user_id = ? AND e.reason_type='PRIZE_REFUND' AND e.amount=20",
+                Integer.class, buyer));
 
         // CANCELLED is terminal, so no second cancel can pay the refund twice.
         mockMvc.perform(post("/api/v1/admin/event-shop/purchases/" + purchaseId + "/fulfillment")

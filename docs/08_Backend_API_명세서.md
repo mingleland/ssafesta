@@ -1696,6 +1696,13 @@ Game Studio는 Unity 미니게임 API와 분리한다. Spring은 GameProject의 
 - Draft 저장은 구조·schema·상한을 검증하고, Publish는 참조·소유권·Asset·Dialogue 의미를 다시 검증한다.
 - Publish는 Draft read→검증→`game_published_versions` append→`games.published_version` 갱신을
   단일 트랜잭션으로 처리하며 Draft와 기존 발행본은 유지한다.
+- **Publish 요청은 `machineId`(선택)로 오락실 캐비닛을 함께 고를 수 있고, 응답이 `arcadeMachineId`
+  를 돌려준다** (`S15P21A604-942`, GitLab #256). 자리 배정도 같은 트랜잭션이라 자리가 거절되면
+  게시도 남지 않는다. 공개 게임만 자리를 잡고(403 `GAME_NOT_PUBLIC`), 1인 2대까지이며
+  (409 `ARCADE_SEAT_LIMIT`), 남의 자리는 409 `ARCADE_MACHINE_TAKEN`, 이미 자리를 가진 게임의
+  다른 자리 요청은 409 `ARCADE_ALREADY_SEATED`, 화이트리스트에 없는 캐비닛은 404
+  `MACHINE_NOT_FOUND` 다. `visibility` PRIVATE 전환과 소프트 삭제가 자리를 비운다. 계약 정본은
+  `specs/019-game-studio/contracts/game-api.md` §Publish · §Arcade Machine Resolution 이다.
 - GameProject에는 Asset binary·브라우저 임시 URL을 저장하지 않는다. builtin Asset catalog(`builtin://`)
   외에 **사용자 업로드(`asset://`)를 지원한다** — 아래 Asset Upload 절이 그 계약이다.
 - 사용자 Asset 업로드: `POST /api/v1/games/{gameId}/assets` (grant 발급) →

@@ -45,6 +45,11 @@ services:
     environment:
       DOCKER_HOST: unix:///var/run/docker.sock
       TESTCONTAINERS_HOST_OVERRIDE: 127.0.0.1
+      # 이 agent 의 Docker 는 rootless 라 소켓이 host 의 /run/user/1000/docker.sock 이다. Testcontainers 는
+      # Ryuk 컨테이너에 host 경로 /var/run/docker.sock(rootful 소켓, permission denied)을 그대로 마운트해
+      # 0.6초 만에 죽고 "Wait strategy failed. Container is removed" 로 끝난다 — build #544 (첫 back: Test).
+      # Ryuk 가 bind-mount 할 host 소켓 경로를 실제 rootless 소켓으로 알려 준다.
+      TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE: ${DOCKER_SOCKET_PATH:-/run/user/1000/docker.sock}
       ROOT_DOMAIN: ${ROOT_DOMAIN:?set in infra/.env}
     depends_on:
       image-transfer-init:
@@ -74,6 +79,12 @@ services:
       - /home/jenkins/agent/deploy
     environment:
       DOCKER_HOST: unix:///var/run/docker.sock
+      # deploy agent 는 Unity 원본을 빌드하지 않는다 (Consumer-only) — LFS blob 실체가 필요 없다.
+      # smudge 가 켜져 있으면 checkout 이 GitLab LFS endpoint 에서 자격증명을 찾지 못해 멈추고,
+      # build #535 는 그렇게 600초 timeout 으로 죽었다 (#259). 선언형 파이프라인의 암묵적
+      # checkout 은 withEnv 로 감쌀 수 없으므로 범위를 이 agent 로 한정해 건다.
+      # unity agent 에는 걸지 않는다 — Unity 빌드·MR 검증은 LFS blob 이 필요하다.
+      GIT_LFS_SKIP_SMUDGE: '1'
       ENVIRONMENT_STATE_DIR: /var/lib/festa-environments
       ROOT_DOMAIN: ${ROOT_DOMAIN:?set in infra/.env}
       PUBLIC_API_BASE_URL: ${PUBLIC_API_BASE_URL:-}

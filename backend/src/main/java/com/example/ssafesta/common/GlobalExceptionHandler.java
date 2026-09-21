@@ -1,5 +1,6 @@
 package com.example.ssafesta.common;
 
+import jakarta.servlet.http.HttpServletRequest;
 import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -35,9 +36,19 @@ public class GlobalExceptionHandler {
     private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
     @ExceptionHandler(ApiException.class)
-    ResponseEntity<ApiErrorResponse> handleApi(ApiException exception) {
+    ResponseEntity<ApiErrorResponse> handleApi(ApiException exception, HttpServletRequest request) {
         ErrorCode code = exception.errorCode();
-        log.debug("거부 — code={} message={}", code, exception.getMessage());
+        if (request.getRequestURI().startsWith("/internal/")) {
+            // 내부 API 의 거부는 사람이 보낸 요청이 아니라 다른 서비스와의 계약 위반이다. DEBUG 로 두면
+            // 운영에서 보이지 않는다 — AI finalize 의 projectFacts 거부가 UNEXPECTED_ERROR 로만 남았던
+            // 이유다 (S15P21A604-939). 본문·값은 남기지 않고 코드·필드·경로만 남긴다.
+            log.warn("internal API 거부 — code={} path={} fields={} requestId={}", code,
+                    request.getRequestURI(),
+                    exception.errors().stream().map(ApiErrorDetail::field).toList(),
+                    RequestIdFilter.current());
+        } else {
+            log.debug("거부 — code={} message={}", code, exception.getMessage());
+        }
         return ResponseEntity.status(code.status()).body(ApiErrorResponse.of(
                 code, exception.getMessage(), RequestIdFilter.current(),
                 exception.errors(), exception.warnings(), exception.balance()));

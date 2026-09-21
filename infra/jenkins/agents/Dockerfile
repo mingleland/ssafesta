@@ -14,6 +14,7 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends \
         awscli \
         curl \
+        gettext-base \
         jq \
         libasound2t64 \
         libgl1 \
