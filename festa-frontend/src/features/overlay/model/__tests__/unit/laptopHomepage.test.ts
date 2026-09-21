@@ -5,7 +5,12 @@ vi.mock('../../../../../entities/booth/facadeApi.select', async () => {
   return { facadeApi: mockApi };
 });
 
-import { __resetLaptopHomepageForTests, getLaptopHomepageSnapshot, loadLaptopHomepage } from '../../laptopHomepage';
+import {
+  __resetLaptopHomepageForTests,
+  getLaptopHomepageSnapshot,
+  loadLaptopHomepage,
+  resolveLaptopHomepage,
+} from '../../laptopHomepage';
 import { __resetHomepageMockForTests, putHomepage } from '../../../../../entities/booth/homepageApi.mock';
 
 beforeEach(() => {
@@ -39,5 +44,37 @@ describe('loadLaptopHomepage — URL 정본은 booth 조회 (016 C-01)', () => {
     await loadLaptopHomepage(2);
     await first;
     expect(getLaptopHomepageSnapshot()).toMatchObject({ kind: 'no_url', boothId: 2 });
+  });
+});
+
+// 판정이 순수 함수라 `window` 를 스텁하지 않는다 — 현재 오리진을 인자로 넘긴다 (S15P21A604-946).
+describe('resolveLaptopHomepage — 어디에 띄울 수 있는가', () => {
+  const here = { currentOrigin: 'https://demo.ssafesta.world' };
+
+  it('http 주소는 external_only(insecure) — href 는 그대로 남아 새 탭이 연다', () => {
+    expect(resolveLaptopHomepage('http://team.example.com/hello', here)).toEqual({
+      kind: 'external_only',
+      reason: 'insecure',
+      href: 'http://team.example.com/hello',
+      hostname: 'team.example.com',
+    });
+  });
+
+  it('현재 오리진과 같으면 external_only(self_origin) — sandbox 이탈 경로를 만들지 않는다', () => {
+    expect(resolveLaptopHomepage('https://demo.ssafesta.world/app/world', here)).toMatchObject({
+      kind: 'external_only',
+      reason: 'self_origin',
+    });
+  });
+
+  it('외부 https 는 valid', () => {
+    expect(resolveLaptopHomepage('https://team.example.com/', here)).toMatchObject({
+      kind: 'valid',
+      hostname: 'team.example.com',
+    });
+  });
+
+  it('http/https 가 아니면 invalid — 새 탭으로도 넘기지 않는다', () => {
+    expect(resolveLaptopHomepage('javascript:alert(1)', here).kind).toBe('invalid');
   });
 });
