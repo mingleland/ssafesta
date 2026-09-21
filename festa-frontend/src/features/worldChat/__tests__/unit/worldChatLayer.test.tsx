@@ -241,7 +241,7 @@ describe('접근성·표시 규칙 (S15P21A604-791)', () => {
     expect(container.querySelector('.world-chat-hint')).toBeNull();
   });
 
-  it('입장 이벤트는 로그에 섞이지 않는다 — 닫히면 일시 안내, 열면 상단 중앙 안내로 같은 한 줄이다', () => {
+  it('입장 이벤트는 로그 안에 온 순서대로 선다 — 열려 있든 아니든 같은 자리다', () => {
     setMemberSession('at', FUTURE);
     const { container } = render(<WorldChatLayer />);
 
@@ -250,43 +250,45 @@ describe('접근성·표시 규칙 (S15P21A604-791)', () => {
       { type: 'JOIN', nickname: '황덕', sentAt: '2026-09-15T05:00:00.000Z' },
     ]));
 
-    // 닫힌 상태 — 대화 4줄을 밀어내지 않도록 로그가 아니라 일시 안내 자리에 뜬다.
+    // 닫힌 상태에서도 로그 안이다 — 말과 입장을 가르지 않고 마지막 몇 줄을 그대로 자른다.
     // 읽기 알림(sr)은 여전히 마지막 **말**이 기준이다 (S15P21A604-855)
-    expect(container.querySelector('.world-chat-log')?.textContent).not.toContain('입장하셨습니다');
-    expect(container.querySelector('.world-chat-systemline .world-chat-flash')?.textContent)
+    expect(container.querySelector('.world-chat-log .world-chat-join')?.textContent)
       .toBe('황덕님이 입장하셨습니다.');
+    expect(container.querySelector('.world-chat-systemline')).toBeNull();
     expect(container.querySelector('.world-chat-sr')?.textContent).toBe('정헌: 먼저 한 말');
 
     act(() => openWorldChat());
-    expect(container.querySelector('.world-chat-systemline')).toBeNull();
-    // 열어도 로그에는 말만 남고, 사건은 상단 중앙 안내가 맡는다
-    expect(container.querySelector('.world-chat-log')?.textContent).not.toContain('입장하셨습니다');
-    expect(container.querySelector('.world-chat-notice-float .world-chat-flash')?.textContent)
+    // 열어도 같은 줄이다 — 상단 중앙 안내는 거절 사유와 연결 이상만 맡는다
+    expect(container.querySelector('.world-chat-log .world-chat-join')?.textContent)
       .toBe('황덕님이 입장하셨습니다.');
+    expect(container.querySelector('.world-chat-notice-float')).toBeNull();
   });
 
-  it('닫힌 상태에 입장 알림만 도착하면 대화 상자는 만들지 않는다', () => {
+  it('닫힌 상태에 입장 알림만 도착해도 그 한 줄은 보인다', () => {
     setMemberSession('at', FUTURE);
     const { container } = render(<WorldChatLayer />);
 
     act(() => __pushWorldChatForTests([{ type: 'JOIN', nickname: '황덕', sentAt: '2026-09-15T05:00:00.000Z' }]));
 
-    expect(container.querySelector('.world-chat-log')).toBeNull();
+    expect(container.querySelector('.world-chat-log .world-chat-join')?.textContent)
+      .toBe('황덕님이 입장하셨습니다.');
+    // 읽기 알림은 말이 기준이라 비어 있다 — 입장은 그 줄의 role="status" 가 알린다
     expect(container.querySelector('.world-chat-sr')?.textContent).toBe('');
-    expect(container.querySelector('.world-chat-flash')).not.toBeNull();
+    expect(container.querySelector('.world-chat-join')?.getAttribute('role')).toBe('status');
   });
 
-  it('말이 오면 입장 안내가 그 자리를 내준다 — 지나간 입장이 위에 남지 않는다', () => {
+  it('말이 와도 입장 줄은 제자리에 남는다 — 시간 순서가 끊기지 않는다', () => {
     setMemberSession('at', FUTURE);
     const { container } = render(<WorldChatLayer />);
 
     act(() => __pushWorldChatForTests([{ type: 'JOIN', nickname: '황덕', sentAt: '2026-09-15T05:00:00.000Z' }]));
-    expect(container.querySelector('.world-chat-flash')).not.toBeNull();
+    expect(container.querySelector('.world-chat-join')).not.toBeNull();
 
     act(() => __pushWorldChatForTests([
       { senderUserId: 7, nickname: '정헌', sentAt: '2026-09-15T05:00:10.000Z', content: '왔어?' },
     ]));
-    expect(container.querySelector('.world-chat-flash')).toBeNull();
+    const lines = [...container.querySelectorAll('.world-chat-log > li')].map((li) => li.textContent);
+    expect(lines).toEqual(['황덕님이 입장하셨습니다.', '정헌 왔어?']);
   });
 });
 
