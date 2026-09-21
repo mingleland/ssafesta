@@ -19,10 +19,12 @@ namespace Festa.World
     {
         const string ObjectName = "BoothChairBinder";
         const int InteriorCount = 12;
-        const int ScanInterval = 90;     // 프레임 — 1.5 초쯤
+        const int ScanInterval = 300;    // 프레임 — 안전망은 5초, 게시본 재구성은 이벤트로 즉시 받는다
 
         int _lastReported = -1;
+        int _lastSeatCount = -1;
         Transform _root;
+        static bool s_rescanRequested;
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         static void AutoRegister()
@@ -35,27 +37,36 @@ namespace Festa.World
 
         void Update()
         {
-            if (Time.frameCount % ScanInterval != 0) return;
+            if (!s_rescanRequested && Time.frameCount % ScanInterval != 0) return;
+            s_rescanRequested = false;
 
             var root = ResolveRoot();
             if (root == null) return;
-            int attached = Scan(root);
+            int attached = Scan(root, out int seats);
 
             // **한 번 붙이고 끝내지 않는다.** 처음에는 12부스를 다 붙이면 스스로 꺼졌는데, 인테리어가
             // 그 뒤에 다시 만들어지면서 붙여 둔 컴포넌트가 통째로 사라졌다 — 실측하니 48개가 0개가 됐고
             // 사용자 화면에서는 "어떤 의자만 앉힌다" 로 보였다 (2026-09-18).
-            // 다시 짓는 쪽을 쫓아다니는 대신 계속 지켜본다. 1.5 초에 한 번 Find 12회 + 컴포넌트 조회 48회라
-            // 비용이 무시할 수준이고, 무엇이 언제 다시 짓든 빠지지 않는다.
-            if (attached > 0 && attached != _lastReported)
+            // 다시 짓는 쪽을 쫓아다니되, 게시본 재구성 알림이면 즉시, 그 외에는 5초 안전망으로만 확인한다.
+            // 평상시 전수 탐색을 매 1.5초마다 반복해 WebGL GC를 자극하지 않으면서도 재생성은 놓치지 않는다.
+            if ((attached > 0 && attached != _lastReported) || seats != _lastSeatCount)
             {
                 _lastReported = attached;
-                Debug.Log($"[BoothChairBinder] 좌석 {attached}개에 착석을 붙였다");
+                _lastSeatCount = seats;
+                Debug.Log($"[BoothChairBinder] 착석 대상 {seats}개 중 새 연결 {attached}개");
+                if (seats > InteriorCount * 4)
+                    Debug.LogWarning($"[BoothChairBinder] 기대 좌석 수(48)를 넘는 {seats}개를 발견했다 — 저작 계층의 장식용 Chair/Stool 이름을 확인하라.");
             }
         }
 
-        int Scan(Transform root)
+        void OnEnable() => Festa.Booth.WorldBoothPublishedBootstrap.BoothsRebuilt += RequestRescan;
+        void OnDisable() => Festa.Booth.WorldBoothPublishedBootstrap.BoothsRebuilt -= RequestRescan;
+        static void RequestRescan() => s_rescanRequested = true;
+
+        int Scan(Transform root, out int seats)
         {
             int attachedNow = 0;
+            seats = 0;
             for (int slot = 1; slot <= InteriorCount; slot++)
             {
                 var studio = root.Find($"Interior_{slot:00}/BoothSlot_{slot}/Studio");
@@ -68,6 +79,7 @@ namespace Festa.World
                 foreach (Transform seat in studio)
                 {
                     if (!IsSeatName(seat.name)) continue;
+                    seats++;
                     if (seat.GetComponent<BoothChairInteractable>() != null) continue;
                     var chair = seat.gameObject.AddComponent<BoothChairInteractable>();
                     chair.SetSeatHeightRatio(SeatRatioOf(seat));
