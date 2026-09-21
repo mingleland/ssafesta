@@ -77,17 +77,28 @@ export interface AdjustmentResult {
 }
 
 /**
- * 부스 한 칸. GET /booth-slots(공개)에서 OCCUPIED 만 추린 것이다 — 관리자 전용 부스 목록 API 는 없고
- * 강제 비공개(POST /admin/booths/{boothId}/unpublish)만 있다. `entryAvailable` 을 "게시됨" 의
- * 근사치로 쓴다(게시본이 있어야 입장이 열린다).
+ * 관리자 부스 한 칸 — `GET /api/v1/admin/booths` 의 원소 (S15P21A604-951, GitLab #252).
+ *
+ * **관리자 부스만 나온다.** 회원 부스는 목록에 없다. 그리고 호출한 사람의 것만이 아니라 **모든
+ * 관리자의 부스**다 — 관리자 부스는 사람이 아니라 권한을 따라가므로(S15P21A604-905) 자리를 비웠거나
+ * 강등된 관리자의 부스도 남은 관리자가 이어서 운영한다.
+ *
+ * 종전에는 공개 `GET /booth-slots` 에서 OCCUPIED 만 추리고 `entryAvailable` 을 게시 여부의
+ * 근사치로 썼다. 그 목록은 관리자 부스와 회원 부스를 구분하지 못했고, `published` 가 지금은
+ * 서버가 직접 답하는 값이라 근사치가 필요 없다.
+ *
+ * `leaseEndsAt` 은 없다 — 관리자 부스는 만료가 없는 상설 임대다(S15P21A604-905). 대신 언제부터
+ * 서 있는지를 `leaseStartedAt` 이 말한다.
  */
 export interface AdminBoothView {
+  boothId: number;
   slotId: number;
   slotCode: string;
-  boothId: number;
-  boothName: string | null;
-  entryAvailable: boolean;
-  leaseEndsAt: string | null;
+  name: string;
+  published: boolean;
+  leaseStartedAt: string;
+  /** 설치한 관리자 닉네임. 운영 이력 추적용이라 비어 있을 수 있다 */
+  installedBy: string | null;
 }
 
 // ── 이벤트 상점 — BE AdminEventShopController 정본(S15P21A604-853 에 연결) ──────────────────
@@ -122,31 +133,29 @@ export interface PrizeView {
   /** null = 무제한 */
   stock: number | null;
   active: boolean;
-  /** 마감 시각. null 이면 마감 없음 */
+  /** 응모 마감 시각(ISO-8601). 즉시교환 상품은 null (S15P21A604-951) */
   closesAt: string | null;
-  /** 당첨자 수. 0 이면 즉시 구매 상품, 1 이상이면 응모형 (BE winnerCount) */
+  /** 0 = 즉시교환, 1 이상 = 응모권이고 그 수만큼 당첨된다 */
   winnerCount: number;
-  /** 추첨을 마친 시각. null 이면 아직 (응모형만) */
+  /** 추첨을 마친 시각. null 이면 아직 — 마감 전이거나 즉시교환이다 */
   drawnAt: string | null;
 }
 
 /**
- * 경품 등록·수정 입력. `winnerCount` 하나로 종류가 갈린다 — 0 이면 즉시 구매, 1 이상이면 응모형.
- * 응모형은 응모권 수(`stock`)를 반드시 정해야 하고 당첨자 수가 그보다 많을 수 없다(BE validatePrizeFields).
- * `active` 는 수정 때만 쓴다 — 등록은 항상 판매 중으로 시작한다.
+ * 경품 등록·수정 본문 (`POST`/`PUT /api/v1/admin/event-shop/prizes`).
+ *
+ * 수정은 **덮어쓰기**다 — 보내지 않은 필드가 유지되지 않는다. 그래서 폼이 현재 값을 먼저 채우고
+ * 통째로 보낸다.
  */
-export interface PrizeInput {
+export interface PrizeDraft {
   name: string;
   priceCoin: number;
+  /** 생략(null) = 무제한. 응모형이면 응모권 수다 */
   stock: number | null;
+  active: boolean;
   closesAt: string | null;
+  /** 0 이면 즉시교환. 1 이상이면 `stock` 이 있어야 하고 그 수를 넘을 수 없다(BE 검증) */
   winnerCount: number;
-  active?: boolean;
-}
-
-/** 화면 표기: winnerCount 로 즉시 구매/응모형을 가른다 */
-export function prizeKindLabel(winnerCount: number): '즉시 구매' | '응모형' {
-  return winnerCount > 0 ? '응모형' : '즉시 구매';
 }
 
 export interface PrizePurchaseView {
@@ -168,6 +177,11 @@ export interface PrizePurchaseView {
   campus: string | null;
   teamName: string | null;
   recipientName: string | null;
+  /**
+   * 추첨 결과 (S15P21A604-951, GitLab #251). `null` 이면 추첨 전이거나 응모형이 아니다 —
+   * 낙첨(`false`)과 구분해야 하므로 boolean 으로 접지 않는다.
+   */
+  won: boolean | null;
 }
 
 // ── 이벤트 설문 ─────────────────────────────────────────────────────────────────────────
@@ -244,9 +258,10 @@ export interface AdminRepository {
   unpublishBooth(boothId: number, reason: string): Promise<void>;
 
   listPrizes(): Promise<PrizeView[]>;
-  createPrize(input: PrizeInput): Promise<PrizeView>;
-  updatePrize(prizeId: number, input: PrizeInput): Promise<PrizeView>;
-  listPurchases(status: PrizeFulfillmentStatus | 'ALL', page: number, size: number): Promise<Page<PrizePurchaseView>>;
+  createPrize(draft: PrizeDraft): Promise<PrizeView>;
+  updatePrize(prizeId: number, draft: PrizeDraft): Promise<PrizeView>;
+  /** `won` 은 응모 결과 필터다 — `null` 이면 전체, `true` 당첨만, `false` 낙첨만 */
+  listPurchases(status: PrizeFulfillmentStatus | 'ALL', page: number, size: number, won?: boolean | null): Promise<Page<PrizePurchaseView>>;
   updateFulfillment(purchaseId: number, status: PrizeFulfillmentStatus, note?: string): Promise<PrizePurchaseView>;
 
   listEventSurveys(): Promise<EventSurveySummary[]>;

@@ -5,7 +5,7 @@ import { useEffect, useRef } from 'react';
 import type { ReactNode } from 'react';
 import './overlayFrame.css';
 
-export type OverlaySize = 's' | 'm' | 'l' | 'xl';
+export type OverlaySize = 's' | 'm' | 'l' | 'xl' | 'screen';
 
 interface Props {
   title: string;

@@ -1,3 +1,8 @@
+/* 월드 채팅의 표현 — Passive 는 게임 HUD, Active 는 같은 자리에서 펴지는 compact panel.
+   상태 모델·전송 계약은 여기서 다루지 않는다. 이 파일이 정하는 것은 '무엇이 언제 보이는가' 뿐이다. */
+
+/* ── 레이어 ──────────────────────────────────────────────────────────── */
+
 .world-chat {
   position: absolute;
   left: var(--festa-hud-margin-x);
@@ -5,54 +10,142 @@
   width: min(28rem, calc(100vw - 2 * var(--festa-hud-margin-x)));
   display: flex;
   flex-direction: column;
-  gap: 0.25rem;
   pointer-events: auto;
   z-index: var(--festa-z-world-hud);
 }
 
-/* Active — 읽고 쓰는 자리라 바탕을 준다. Passive 는 바탕 없이 월드 위에 글자만 얹는다 */
+/* Passive — 패널이 아니다. 월드가 주인이고 최근 말만 그 위에 얹힌다.
+   클릭도 받지 않는다: 여기서 받을 것이 없고, 월드 조작을 가로채면 안 된다. */
+.world-chat:not(.world-chat-open) {
+  pointer-events: none;
+}
+
+/* Active — 같은 좌하단 anchor 에서 펴지는 compact panel. 폭과 로그 높이를 묶어 월드를 덮지 않는다.
+   전환은 색만 짧게 움직인다 — 슬라이드·확대는 월드 위에서 시선을 빼앗는다. */
 .world-chat-open {
-  padding: 0.5rem 0.6rem;
-  border-radius: 0.6rem;
-  background: rgba(10, 14, 34, 0.55);
+  padding: 0.45rem 0.55rem 0.55rem;
+  border-radius: 0.7rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(8, 11, 28, 0.76);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.38);
+  transition: background-color 140ms ease, border-color 140ms ease;
 }
 
-/* Passive 입력칸 — 늘 떠 있지만 월드를 가리지 않게 물러나 있다. 다만 여기가 채팅 자리라는
-   것은 읽혀야 해서 완전히 흐리게 두지 않는다. focus 하면 선명해진다. */
-.world-chat:not(.world-chat-open) .world-chat-input {
-  opacity: 0.72;
-  background: rgba(10, 14, 34, 0.62);
+@media (prefers-reduced-motion: reduce) {
+  .world-chat-open {
+    transition: none;
+  }
 }
-.world-chat-input:focus { opacity: 1; }
-.world-chat-input::placeholder { color: rgba(255, 255, 255, 0.62); }
 
-/* 게스트 — 쓸 수 없다는 것만 보이고 이유는 focus 했을 때 말한다 */
-.world-chat-input[readonly] { cursor: not-allowed; }
+/* ── Message Area ───────────────────────────────────────────────────── */
+
+/* 새 메시지 배지가 이 안에서 떠 있도록 기준을 만든다. 배지를 형제로 두면 뜨고 사라질 때마다
+   아래 것들이 밀려 Composer 가 움직인다. */
+.world-chat-messages {
+  position: relative;
+  min-height: 0;
+  min-width: 0;
+}
+
+.world-chat-open .world-chat-messages {
+  padding-bottom: 0.4rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
 
 .world-chat-log {
   list-style: none;
   margin: 0;
   padding: 0;
+  display: flex;
+  flex-direction: column;
   max-height: 12rem;
-  overflow-y: auto;
   /* 공백 없는 긴 문자열(@@@…·URL)도 수평 스크롤을 만들지 않고 줄바꿈한다(2026-09-18) */
   overflow-wrap: anywhere;
   font-size: 0.85rem;
-  color: rgba(255, 255, 255, 0.85);
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+  line-height: 1.45;
+  color: rgba(255, 255, 255, 0.92);
 }
 
-/* Passive — 스크롤 막대를 내보이지 않는다. 읽는 자리가 아니라 스쳐 보는 자리다 */
+/* 닉네임은 본문보다 한 단계 위다 — 카드나 말풍선을 만들지 않고 글자만으로 가른다 */
+.world-chat-log b {
+  margin-right: 0.22rem;
+  color: #dbe6ff;
+  font-weight: 700;
+}
+
+/* 입장 알림은 로그 안에 온 순서대로 서되, 말 본문과 섞이지 않는다 — 사람이 한 말이 아니라
+   월드 상태 변화다. 좌측으로 흐르는 말들 사이에서 가운데 알약 하나로 선다.
+
+   **줄과 알약은 다른 것이다.** 줄(li)은 옆줄과 똑같은 한 행이라 Passive 의 scrim 띠를 그대로
+   받고, 알약은 그 위에 놓이는 표식이라 안쪽 span 이 가진다. 알약을 li 에 직접 그리면 띠가
+   사라져 그 행만 배경 없이 뜬다. */
+.world-chat-join {
+  text-align: center;
+}
+
+.world-chat-join > span {
+  display: inline-block;
+  /* 세로 padding 을 주지 않는다 — 그만큼 이 행만 높아져 옆줄과 띠 높이가 어긋난다.
+     알약 높이는 글자 줄상자(line-height 1.45)와 테두리 2px 로 채워지고, 그 합이 말 한 줄의
+     높이와 같아진다. 알약 모양은 세로 여백이 아니라 radius 가 만든다. */
+  padding: 0 0.62rem;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 999px;
+  background: rgba(8, 11, 28, 0.55);
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 0.76rem;
+}
+
+/* Active 는 띠가 없는 패널이라 줄끼리 붙어도 뭉치지 않는다 — 거기서만 위아래로 숨을 준다.
+   Passive 에 같은 여백을 주면 띠 사이가 벌어져 그 행만 따로 떨어져 보인다. */
+.world-chat-open .world-chat-join {
+  margin: 0.2rem 0;
+}
+
+/* ── Passive 메시지 — 보이는 동안은 읽혀야 한다 ──────────────────────── */
+
+/* 글자를 흐리게 만들어 월드에 양보하던 방식을 버렸다. 흐린 글자는 '덜 가리는' 것이 아니라
+   '읽을 수 없는 채로 남는' 것이다. 대신 글자 뒤 배경을 눌러 가독성을 만든다. */
 .world-chat:not(.world-chat-open) .world-chat-log {
-  opacity: 0.6;
   overflow: hidden;
+  /* 줄이 길어져 상자를 넘치면 잘리는 쪽이 **위**여야 한다. 기본값(flex-start)이면 넘친 만큼
+     아래가 잘려 방금 온 말이 사라진다 — Passive 의 관심사는 늘 마지막 줄이다.
+     Active 에는 걸지 않는다: 스크롤되는 flex 열에서 flex-end 는 위로 못 올라가는 버그를 만든다. */
+  justify-content: flex-end;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.9), 0 0 6px rgba(0, 0, 0, 0.55);
 }
 
-/* Passive 에서는 지나간 말이 월드를 계속 가리지 않게 흐려진다. 데이터는 그대로 남아 있고
-   Active 로 들어가면 다시 선명해진다 (S15P21A604-791). */
+/* scrim 을 줄 단위로 건다. 상자에 걸면 말이 전부 사라진 뒤에도 어두운 판만 월드에 남는다 —
+   메시지 배열은 세션 내내 비워지지 않기 때문이다. 줄에 걸면 그 줄과 함께 사라진다.
+   왼쪽에서 오른쪽으로 투명해지는 띠라 카드가 아니라 scrim 으로 읽힌다. */
+.world-chat:not(.world-chat-open) .world-chat-log > li {
+  /* scrim 은 컨테이너보다 조금 왼쪽에서 시작하고(음수 margin) 글자는 그보다 한참 안쪽에서
+     시작한다 — 'scrim 시작 → 여백 → 텍스트' 순서가 보여야 잘린 HUD 가 아니라 화면 가장자리에서
+     흘러나온 띠로 읽힌다. 글자 왼쪽 끝은 Active 패널의 글자 위치(padding 0.55rem)와 같게 둬,
+     두 상태를 오갈 때 문장이 좌우로 튀지 않는다. */
+  margin-left: -0.5rem;
+  padding: 0.12rem 1.1rem 0.12rem 1.05rem;
+  background: linear-gradient(
+    90deg,
+    rgba(4, 7, 20, 0.58) 0%,
+    rgba(4, 7, 20, 0.46) 32%,
+    rgba(4, 7, 20, 0.24) 68%,
+    rgba(4, 7, 20, 0) 100%
+  );
+  animation: world-chat-fade 14s linear forwards;
+}
+
+/* Passive 의 알약은 옆줄과 같은 scrim 띠 **위에** 놓인다. 띠는 li 가 이미 위 규칙으로 받고
+   있으므로 여기서 지우지 않는다 — 알약만 계열을 맞추고, 이미 깔린 띠만큼 농도를 낮춘다.
+   같은 값을 쓰면 두 겹이 포개져 그 자리만 검게 뭉친다. */
+.world-chat:not(.world-chat-open) .world-chat-join > span {
+  background: rgba(4, 7, 20, 0.42);
+}
+
+/* 표시 시간의 대부분은 그대로 읽히고, 지워지기 직전에만 사라진다 */
 @keyframes world-chat-fade {
   0%,
-  40% {
+  82% {
     opacity: 1;
   }
   100% {
@@ -60,43 +153,324 @@
   }
 }
 
-.world-chat:not(.world-chat-open) .world-chat-log li {
-  animation: world-chat-fade 14s ease-in forwards;
-}
-
-/* 말 본문과 섞지 않는다. 입장 알림은 사람이 한 말이 아니라 월드 상태 변화다. */
-.world-chat-join {
-  align-self: center;
-  width: fit-content;
-  margin: 0.2rem auto;
-  padding: 0.18rem 0.55rem;
-  border: 1px solid rgba(126, 224, 165, 0.42);
-  border-radius: 999px;
-  background: rgba(16, 50, 39, 0.56);
-  color: #a9eec2;
-  font-size: 0.76rem;
-  font-weight: 600;
-}
-
 @media (prefers-reduced-motion: reduce) {
-  .world-chat:not(.world-chat-open) .world-chat-log li {
+  .world-chat:not(.world-chat-open) .world-chat-log > li {
     animation: none;
   }
 }
 
-/* 위쪽 로그를 읽는 중에 새 말이 왔을 때만 뜬다 */
-.world-chat-unread {
-  align-self: flex-start;
-  padding: 0.15rem 0.5rem;
+/* ── Active 메시지 — 스크롤바는 여기에만, 그리고 옅게 ────────────────── */
+
+/* ── Passive 일시 안내 ─────────────────────────────────────────────── */
+
+/* 대화 column 과 눈으로 갈리게 가운데로 모은다. 패널을 만들지 않는다 — 글자를 감싸는 만큼만
+   어두운 알약 하나이고, 폭은 문장 길이를 넘지 않는다. */
+.world-chat-systemline {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding-bottom: 0.3rem;
+  text-align: center;
+}
+
+.world-chat-systemline > p {
+  width: fit-content;
+  max-width: 100%;
+  margin: 0;
+  /* 두 덩어리짜리 안내(초읽기)도 들어오므로 세로 여유를 조금 준다 */
+  padding: 0.2rem 0.75rem;
   border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.35);
-  background: rgba(10, 14, 34, 0.8);
+  background: rgba(8, 11, 28, 0.5);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.85);
+  overflow-wrap: anywhere;
+}
+
+/* 입장 같은 사건은 대화보다 한 단계 낮은 층이다 — 읽히되 눈을 끌지 않는다. */
+.world-chat-flash {
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 0.75rem;
+  line-height: 1.4;
+  /* 모델에 수명이 없는 값이라(메시지 버퍼는 세션 내내 남는다) 사라지는 일을 CSS 가 맡는다.
+     끝에서 높이까지 접는 이유는, 투명해진 줄이 레이어 높이를 계속 차지하면 그만큼 좌하단
+     HUD 스택이 밀려 올라가기 때문이다(onHeightChange). */
+  animation: world-chat-flash-out 9s ease-in forwards;
+}
+
+@keyframes world-chat-flash-out {
+  0%,
+  68% {
+    opacity: 1;
+  }
+  90% {
+    opacity: 0;
+    max-height: 3rem;
+  }
+  100% {
+    opacity: 0;
+    max-height: 0;
+    padding-top: 0;
+    padding-bottom: 0;
+  }
+}
+
+/* 월드에 막 들어온 순간 transport 는 아직 'disconnected' 다. 그 한 프레임을 끊김으로 알리면
+   들어올 때마다 경고가 깜빡인다 — 0.7초 늦게 띄워, 그 사이 연결이 서면 아무 일도 없다. */
+.world-chat-status-late {
+  animation: world-chat-line-in 200ms ease-out 700ms both;
+}
+
+@keyframes world-chat-line-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .world-chat-flash {
+    animation: none;
+  }
+
+  /* 지연은 남기고 페이드만 없앤다 — 저 지연이 깜빡임을 막는 장치다 */
+  .world-chat-status-late {
+    animation-duration: 1ms;
+  }
+}
+
+
+.world-chat-open .world-chat-log {
+  overflow-y: auto;
+  padding-right: 0.15rem;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.18) transparent;
+}
+
+.world-chat-open .world-chat-log::-webkit-scrollbar {
+  width: 6px;
+}
+
+.world-chat-open .world-chat-log::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.world-chat-open .world-chat-log::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.world-chat-open .world-chat-log:hover::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+/* ── 떠 있는 것들 — 시스템 안내(위) · 새 메시지 배지(아래) ──────────── */
+
+/* 안내는 패널 **상단 중앙**에 뜬다. 한동안 Composer 바로 위에 뒀는데 거기는 방금 온 말이
+   지나가는 자리라 읽는 줄을 정확히 가렸다. 위쪽은 이미 읽은 줄이 밀려 올라가는 쪽이라
+   가려도 잃는 것이 적다.
+
+   flow 를 차지하지 않으므로 떴다 사라져도 Composer 도 패널 높이도 움직이지 않는다 —
+   행으로 두지 않는 이유는 그 하나다. */
+.world-chat-notice-float {
+  position: absolute;
+  /* 패널 천장에 붙이지 않는다 — 떠 있는 것처럼 보이려면 뒤쪽과 거리가 있어야 한다 */
+  top: 0.5rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 2;
+  max-width: calc(100% - 1rem);
+  animation: world-chat-notice-in 180ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* 문장을 감싸는 만큼만. 가로로 벌리면 토스트가 아니라 띠가 되고, 납작하게 눌러도 마찬가지다 —
+   두 줄이 들어갈 높이와 사방 여유를 준다. */
+.world-chat-notice-float > p {
+  width: fit-content;
+  max-width: 100%;
+  margin: 0 auto;
+  padding: 0.42rem 0.95rem 0.46rem;
+  border-radius: 0.8rem;
+  /* 패널과 같은 색을 더 묽게 — 뒷판이 따로 놀지 않고 월드가 비친다 */
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(8, 11, 28, 0.58);
+  /* 무겁게 떨어지는 판이 아니라 **가까운 그림자 + 옅은 확산** 두 겹이다. 하나만 쓰면
+     붙어 있거나(가까운 것만) 뿌옇게 뜬다(확산만). */
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.22),
+    0 8px 20px -6px rgba(0, 0, 0, 0.38);
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+
+.world-chat-notice-body {
+  display: block;
+}
+
+/* 첫 덩어리 — '무슨 일인지'. 크기로만 앞세운다. */
+.world-chat-notice-head {
+  display: block;
+  font-size: 0.79rem;
+  line-height: 1.35;
+  letter-spacing: -0.01em;
+}
+
+/* 둘째 덩어리 — '그래서 어떻게'. 한 단계 물러선다. */
+.world-chat-notice-tail {
+  display: block;
+  margin-top: 0.1rem;
+  font-size: 0.74rem;
+  line-height: 1.4;
+  color: rgba(255, 255, 255, 0.62);
+}
+
+/* 초읽기가 3→2→1 로 바뀔 때 글자 폭이 흔들리지 않게 */
+.world-chat-notice-count {
+  font-variant-numeric: tabular-nums;
+}
+
+/* 연결 상태·입장처럼 덩어리가 하나인 것은 그대로 한 줄이다 */
+.world-chat-notice-float > .world-chat-status,
+.world-chat-notice-float > .world-chat-flash {
+  font-size: 0.76rem;
+  line-height: 1.4;
+}
+
+/* 툭 떴다 지는 정도면 충분하다 — 미끄러지거나 커지면 월드 위에서 시선을 빼앗는다 */
+@keyframes world-chat-notice-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -0.3rem);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .world-chat-notice-float {
+    animation: none;
+  }
+}
+
+/* 배지는 아래에 남는다 — 눌러서 내려가는 버튼이라 내려갈 방향에 있어야 하고,
+   안내가 위로 옮겨 가 둘이 닿을 자리가 없다 */
+.world-chat-unread {
+  position: absolute;
+  left: 50%;
+  bottom: 0.45rem;
+  transform: translateX(-50%);
+  z-index: 1;
+  padding: 0.16rem 0.6rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.26);
+  background: rgba(12, 17, 40, 0.94);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.42);
   color: #fff;
   font-size: 0.72rem;
+  white-space: nowrap;
   cursor: pointer;
 }
 
-/* 보조기기 전용 — 새로 온 말 한 줄만 읽힌다 */
+.world-chat-unread:hover {
+  border-color: rgba(255, 255, 255, 0.45);
+}
+
+.world-chat-notice {
+  margin: 0;
+  font-size: 0.73rem;
+  line-height: 1.4;
+  /* 초읽기가 3→2→1 로 바뀔 때 글자 폭이 흔들리지 않게 */
+  font-variant-numeric: tabular-nums;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.world-chat-status {
+  margin: 0;
+  font-size: 0.73rem;
+  line-height: 1.4;
+  color: rgba(255, 255, 255, 0.66);
+}
+
+.world-chat-hint {
+  margin: 0;
+  padding: 0.1rem 0 0.35rem;
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+/* ── Composer ───────────────────────────────────────────────────────── */
+
+.world-chat-composer {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding-top: 0.45rem;
+}
+
+/* Passive 에서는 시각적으로 없다. DOM 에는 남긴다 — Enter 로 여는 순간 곧바로 focus 가 가야 하고,
+   height/opacity 로 접은 요소는 그 focus 를 그대로 받는다(visibility·display 로 접으면 못 받는다). */
+.world-chat:not(.world-chat-open) .world-chat-composer {
+  flex: 0 0 auto;
+  height: 0;
+  min-height: 0;
+  padding: 0;
+  margin: 0;
+  opacity: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.world-chat-input {
+  flex: 1;
+  min-width: 0;
+  padding: 0.38rem 0.6rem;
+  border-radius: 0.45rem;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(6, 10, 26, 0.9);
+  color: #fff;
+  font-size: 0.85rem;
+  transition: border-color 120ms ease, background-color 120ms ease, box-shadow 120ms ease;
+}
+
+.world-chat-input::placeholder {
+  color: rgba(255, 255, 255, 0.45);
+}
+
+/* focus 는 색 하나가 아니라 테두리·밝기·링 셋으로 말한다 — 여기 focus 가 있다는 것은 곧
+   키보드 주인이 월드가 아니라 채팅이라는 뜻이라, 한눈에 구분돼야 한다. */
+.world-chat-input:focus {
+  outline: none;
+  border-color: rgba(138, 176, 255, 0.9);
+  background: rgba(13, 19, 46, 0.97);
+  box-shadow: 0 0 0 2px rgba(96, 140, 255, 0.26);
+}
+
+/* 게스트 — 쓸 수 없다는 것만 보이고 이유는 focus 했을 때 말한다 */
+.world-chat-input[readonly] {
+  cursor: not-allowed;
+}
+
+.world-chat-input-over,
+.world-chat-input-over:focus {
+  border-color: #ff8f8f;
+  box-shadow: 0 0 0 2px rgba(255, 120, 120, 0.22);
+}
+
+/* 못 보내는 상태를 입력줄에도 드러낸다. 값은 그대로 둔다 — 연결이 돌아오면 그대로 보낸다 */
+.world-chat-composer-offline .world-chat-input {
+  opacity: 0.6;
+}
+
+.world-chat-count {
+  flex: 0 0 auto;
+  font-size: 0.7rem;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+/* ── 보조기기 전용 — 새로 온 말 한 줄만 읽힌다 ──────────────────────── */
+
 .world-chat-sr {
   position: absolute;
   width: 1px;
@@ -107,54 +481,10 @@
   white-space: nowrap;
 }
 
-.world-chat-notice {
-  margin: 0;
-  font-size: 0.75rem;
-  color: #ffd9d9;
-}
-
-.world-chat-hint {
-  margin: 0;
-  font-size: 0.75rem;
-  color: rgba(255, 255, 255, 0.6);
-}
-
-/* 연결 상태 — 평상시엔 없다. 못 보내는 동안에만 작게 뜬다 (S15P21A604-790) */
-.world-chat-status {
-  margin: 0;
-  font-size: 0.72rem;
-  color: rgba(255, 255, 255, 0.7);
-}
-
-/* 못 보내는 상태를 입력줄에도 드러낸다. 값은 그대로 둔다 — 연결이 돌아오면 그대로 보낸다 */
-.world-chat-input-row-offline {
-  opacity: 0.55;
-}
-
-.world-chat-input-row {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.world-chat-input {
-  flex: 1;
-  padding: 0.35rem 0.6rem;
-  border-radius: 0.4rem;
-  border: 1px solid rgba(255, 255, 255, 0.35);
-  background: rgba(10, 14, 34, 0.85);
-  color: #fff;
-}
-
-.world-chat-input-over {
-  border-color: #ff8a8a;
-}
-
-.world-chat-count {
-  font-size: 0.7rem;
-  color: rgba(255, 255, 255, 0.7);
-}
+/* ── 좁은 화면 ──────────────────────────────────────────────────────── */
 
 @media (max-height: 560px) {
-  .world-chat-log { max-height: min(8rem, 24dvh); }
+  .world-chat-log {
+    max-height: min(8rem, 24dvh);
+  }
 }

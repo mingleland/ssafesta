@@ -18,9 +18,15 @@ vi.mock('../../ui/ConsultationQuickAccess', () => ({
 }));
 
 const { WorldHud } = await import('../../ui/WorldHud');
+const { __resetSessionForTests, setMemberSession } = await import('../../../auth/model/session');
 
-beforeEach(() => { __resetWorldContextForTests(); __resetHostPhaseForTests(); });
-afterEach(() => { cleanup(); __resetWorldContextForTests(); });
+beforeEach(() => {
+  __resetWorldContextForTests();
+  __resetHostPhaseForTests();
+  __resetSessionForTests();
+  setMemberSession('at', new Date(Date.now() + 60_000).toISOString());
+});
+afterEach(() => { cleanup(); __resetWorldContextForTests(); __resetSessionForTests(); });
 
 function mousedownPrevented(el: Element): boolean {
   // fireEvent 는 "기본 동작이 막히지 않았으면 true" 를 돌려준다 (dispatchEvent 규약)
@@ -32,7 +38,7 @@ describe('HUD 버튼 mousedown', () => {
     render(<WorldHud />);
     act(() => applyBoothContext(true, 6)); // 나가기 버튼까지 띄운다
     const buttons = document.querySelectorAll('.world-hud button');
-    expect(buttons.length).toBeGreaterThanOrEqual(3); // 상담 · 전체화면 · 나가기
+    expect(buttons.length).toBeGreaterThanOrEqual(4); // 미션 · 상담 · 전체화면 · 나가기
     for (const b of buttons) expect(mousedownPrevented(b)).toBe(true);
   });
 

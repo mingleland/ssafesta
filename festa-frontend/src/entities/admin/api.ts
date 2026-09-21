@@ -5,7 +5,6 @@
 // 응답 모양이 바뀌면 이 파일의 매핑만 고친다 — 화면은 계약(types.ts)만 본다.
 import { api, isApiError } from '../../shared/api/client';
 import type { MyAccountResponse } from '../user/types';
-import type { SlotView } from '../booth/types';
 import type {
   AccountStatusHistoryView,
   AdjustmentResult,
@@ -22,9 +21,9 @@ import type {
   EventSurveySummary,
   Page,
   PrizeFulfillmentStatus,
-  PrizeInput,
   PrizePurchaseView,
   PrizeView,
+  PrizeDraft,
 } from './types';
 
 const q = (s: string) => encodeURIComponent(s);
@@ -113,18 +112,10 @@ function adjustCoins(userId: number, idempotencyKey: string, signedAmount: numbe
   });
 }
 
-async function listBooths(): Promise<AdminBoothView[]> {
-  const slots = await api<SlotView[]>('/api/v1/booth-slots');
-  return slots
-    .filter((s) => s.status === 'OCCUPIED' && s.boothId !== null)
-    .map((s) => ({
-      slotId: s.slotId,
-      slotCode: s.slotCode,
-      boothId: s.boothId as number,
-      boothName: s.boothName,
-      entryAvailable: s.entryAvailable,
-      leaseEndsAt: s.leaseEndsAt,
-    }));
+// 전용 목록이다 — 공개 슬롯 목록을 걸러 만들던 근사치를 걷었다 (S15P21A604-951, GitLab #252).
+// 정렬(slotCode 오름차순)도 서버가 한다.
+function listBooths(): Promise<AdminBoothView[]> {
+  return api<AdminBoothView[]>('/api/v1/admin/booths');
 }
 
 function unpublishBooth(boothId: number, reason: string): Promise<void> {
@@ -136,29 +127,20 @@ function listPrizes(): Promise<PrizeView[]> {
   return api<PrizeView[]>('/api/v1/admin/event-shop/prizes');
 }
 
-// PrizeRequest(BE) 로 옮긴다 — 등록은 active 를 생략해 BE 기본값(true)에 맡기고, 수정만 실어 보낸다.
-function prizeBody(input: PrizeInput) {
-  return {
-    name: input.name,
-    priceCoin: input.priceCoin,
-    stock: input.stock,
-    closesAt: input.closesAt,
-    winnerCount: input.winnerCount,
-    ...(input.active === undefined ? {} : { active: input.active }),
-  };
+// 등록과 수정은 같은 본문을 쓴다 — 수정은 **덮어쓰기**라 폼이 현재 값을 채워 통째로 보낸다.
+function createPrize(draft: PrizeDraft): Promise<PrizeView> {
+  return api<PrizeView>('/api/v1/admin/event-shop/prizes', { method: 'POST', body: JSON.stringify(draft) });
 }
 
-function createPrize(input: PrizeInput): Promise<PrizeView> {
-  return api<PrizeView>('/api/v1/admin/event-shop/prizes', { method: 'POST', body: JSON.stringify(prizeBody(input)) });
+function updatePrize(prizeId: number, draft: PrizeDraft): Promise<PrizeView> {
+  return api<PrizeView>(`/api/v1/admin/event-shop/prizes/${prizeId}`, { method: 'PUT', body: JSON.stringify(draft) });
 }
 
-function updatePrize(prizeId: number, input: PrizeInput): Promise<PrizeView> {
-  return api<PrizeView>(`/api/v1/admin/event-shop/prizes/${prizeId}`, { method: 'PUT', body: JSON.stringify(prizeBody(input)) });
-}
-
-function listPurchases(status: PrizeFulfillmentStatus | 'ALL', page: number, size: number): Promise<Page<PrizePurchaseView>> {
+function listPurchases(status: PrizeFulfillmentStatus | 'ALL', page: number, size: number, won?: boolean | null): Promise<Page<PrizePurchaseView>> {
   const filter = status === 'ALL' ? '' : `&status=${status}`;
-  return api<Page<PrizePurchaseView>>(`/api/v1/admin/event-shop/purchases?page=${page}&size=${size}${filter}`);
+  // 보내지 않는 것과 false 를 보내는 것이 다르다 — 전자는 전체, 후자는 낙첨만이다.
+  const draw = won === undefined || won === null ? '' : `&won=${String(won)}`;
+  return api<Page<PrizePurchaseView>>(`/api/v1/admin/event-shop/purchases?page=${page}&size=${size}${filter}${draw}`);
 }
 
 function updateFulfillment(purchaseId: number, status: PrizeFulfillmentStatus, note?: string): Promise<PrizePurchaseView> {
