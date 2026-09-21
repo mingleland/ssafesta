@@ -142,6 +142,29 @@ class AiDocumentDeleteIntegrationTest {
                 "SELECT COUNT(*) FROM ai_documents WHERE id = ?", Integer.class, documentId));
     }
 
+    /**
+     * 원본 삭제 sweeper 가 {@code s3_key} 를 비운 EXPIRED 문서다. 저장소에 지울 것이 없으므로 큐에는
+     * 아무것도 들어가지 않아야 하고, 행 삭제는 정상이어야 한다 — NOT NULL 위반으로 500 이 나던 자리
+     * (Demo 문서 7, S15P21A604-939).
+     */
+    @Test
+    void ownerCanDeleteAnExpiredDocumentWhoseOriginalIsAlreadyGone() throws Exception {
+        long agentId = agent("만료삭제");
+        long documentId = seedDocument(agentId, "EXPIRED", null);
+        releaseAllSlots(jdbc);
+        int queuedBefore = jdbc.queryForObject("SELECT COUNT(*) FROM game_asset_delete_queue", Integer.class);
+
+        mockMvc.perform(delete("/api/v1/documents/{id}", documentId)
+                        .header("Authorization", bearer()))
+                .andExpect(status().isNoContent());
+
+        assertEquals(0, jdbc.queryForObject(
+                "SELECT COUNT(*) FROM ai_documents WHERE id = ?", Integer.class, documentId));
+        assertEquals(queuedBefore, jdbc.queryForObject(
+                "SELECT COUNT(*) FROM game_asset_delete_queue", Integer.class),
+                "좌표 없는 문서는 삭제 큐에 아무것도 남기지 않는다");
+    }
+
     @Test
     void deletingAnOriginalWithAnInFlightReplacementIsRefused() throws Exception {
         long agentId = agent("교체중삭제");
