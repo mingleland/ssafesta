@@ -31,9 +31,12 @@ grep -Fq '127.0.0.1:${PROD_WORLD_HOST_PORT:-27777}:7777' "${compose}"
 grep -Fq 'festa_prod_business' "${bootstrap}"
 grep -Fq 'festa_prod_ai' "${bootstrap}"
 # R2 는 Postgres 역할·Redis 네임스페이스와 달리 저장소 설정이 호스트 env 파일에 있어 정적으로 볼 수 없다.
-# 런타임 가드가 사라지면 production 이 다시 demo 버킷을 쓰게 되므로 그 문구가 남아 있는지 확인한다.
-grep -Fq 'Production shares the demo R2 bucket' "${verify}"
-grep -Fq 'Production back and ai disagree on R2_BUCKET' "${verify}"
+# 공유 상태는 배포를 막지 않지만(2026-09-21 운영 결정) 사실은 반드시 드러나야 한다 — 경고 문구와
+# 증거의 r2BucketIsolation 값이 사라지면 공유 여부를 나중에 알 수 없게 된다.
+grep -Fq 'WARN: Production shares the demo R2 bucket' "${verify}"
+grep -Fq 'WARN: Production back and ai disagree on R2_BUCKET' "${verify}"
+grep -Fq "'r2BucketIsolation':os.environ.get('R2_ISOLATION')" "${verify}"
+grep -Fq 'r2_isolation=SHARED_WITH_DEMO' "${verify}"
 grep -Fq 'host-acl-file-hashed' "${bootstrap}"
 grep -Fq '~prod:*' "${bootstrap}"
 grep -Fq '~prod:ai:*' "${bootstrap}"
