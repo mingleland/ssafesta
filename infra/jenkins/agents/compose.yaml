@@ -45,6 +45,11 @@ services:
     environment:
       DOCKER_HOST: unix:///var/run/docker.sock
       TESTCONTAINERS_HOST_OVERRIDE: 127.0.0.1
+      # 이 agent 의 Docker 는 rootless 라 소켓이 host 의 /run/user/1000/docker.sock 이다. Testcontainers 는
+      # Ryuk 컨테이너에 host 경로 /var/run/docker.sock(rootful 소켓, permission denied)을 그대로 마운트해
+      # 0.6초 만에 죽고 "Wait strategy failed. Container is removed" 로 끝난다 — build #544 (첫 back: Test).
+      # Ryuk 가 bind-mount 할 host 소켓 경로를 실제 rootless 소켓으로 알려 준다.
+      TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE: ${DOCKER_SOCKET_PATH:-/run/user/1000/docker.sock}
       ROOT_DOMAIN: ${ROOT_DOMAIN:?set in infra/.env}
     depends_on:
       image-transfer-init:
