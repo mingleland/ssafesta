@@ -69,9 +69,12 @@ class AdminEventShopApiIntegrationTest {
                 .andExpect(jsonPath("$.stock").value(5))
                 .andExpect(jsonPath("$.active").value(true));
 
+        // 이 운영자가 남긴 행만 센다. action 과 target_type 만으로 세면 경품을 등록하는 다른
+        // 테스트가 생기는 순간 실행 순서에 따라 값이 갈린다 (S15P21A604-941 과 같은 형태).
         assertEquals(1, jdbc.queryForObject(
-                "SELECT count(*) FROM admin_actions WHERE action='PRIZE_CREATE' AND target_type='EVENT_PRIZE'",
-                Integer.class));
+                "SELECT count(*) FROM admin_actions WHERE actor_user_id = ?"
+                        + " AND action='PRIZE_CREATE' AND target_type='EVENT_PRIZE'",
+                Integer.class, admin));
     }
 
     @Test
