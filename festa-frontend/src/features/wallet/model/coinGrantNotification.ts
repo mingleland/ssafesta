@@ -29,13 +29,26 @@ export function isCoinGrantNotification(value: unknown): value is CoinGrantNotif
   );
 }
 
+/**
+ * 토스트를 띄우지 않는 지급 사유 (S15P21A604-949).
+ *
+ * 슬롯은 한 번 앉으면 수십 번 돌리는 기계라 당첨마다 알림이 뜨면 그 알림이 월드를 덮는다. 결과는
+ * 슬롯 화면이 그 자리에서 이미 보여 주므로 여기서 한 번 더 말할 것이 없다.
+ *
+ * **잔액·내역 갱신은 건너뛰지 않는다.** 감추는 것은 알림 한 줄뿐이고, HUD 잔액과 코인 사용 내역은
+ * 종전대로 따라간다 — 원장에서 사라지면 그건 감사 기록을 지우는 것이다.
+ */
+const SILENT_REASONS: ReadonlySet<string> = new Set(['SLOT_PAYOUT']);
+
 export function receiveCoinGrantNotification(raw: string): void {
   try {
     const event: unknown = JSON.parse(raw);
     if (!isCoinGrantNotification(event)) throw new Error('unknown coin grant event');
 
-    const reasonText = labelForReason(event.reasonType);
-    showToast(`${reasonText} +${event.amount} 코인이 지급되었습니다.`, 'success');
+    if (!SILENT_REASONS.has(event.reasonType)) {
+      const reasonText = labelForReason(event.reasonType);
+      showToast(`${reasonText} +${event.amount} 코인이 지급되었습니다.`, 'success');
+    }
 
     // 화면 잔액 계산 원칙: 이벤트의 amount로 클라이언트 자체 누적 연산을 하지 않고,
     // refetch된 REST 응답(balance)을 최종 화면 상태 정본으로 사용한다 (S15P21A604-920).
