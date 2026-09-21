@@ -19,6 +19,7 @@ import java.util.function.Supplier;
 import org.junit.jupiter.api.RepeatedTest;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Import;
 
 /**
@@ -29,6 +30,7 @@ import org.springframework.context.annotation.Import;
  */
 @Import(TestcontainersConfiguration.class)
 @SpringBootTest
+@AutoConfigureMockMvc
 class EventShopConcurrencyIntegrationTest {
 
     private static final int REPEATS = 5;
