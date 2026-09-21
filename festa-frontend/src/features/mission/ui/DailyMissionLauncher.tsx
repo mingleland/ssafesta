@@ -3,15 +3,12 @@ import { useSession } from '../../auth/model/session';
 import { openMenuPanelScreen } from '../../world/model/worldScreen';
 import { Tooltip } from '../../../shared/ui/tooltip/Tooltip';
 
-// checklist 메모장형 — 확정 시안 A(2026-09-18). 메모 프레임 안에 체크 2줄 + 밑줄.
+// 일일 미션 패널 헤더(DailyMissionOverlay)와 같은 clipboard+체크 아이콘으로 통일(2026-09-21).
+// 크기는 .world-hud-control svg 가 잡으므로 viewBox 만 둔다.
 const IcMission = (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-    <rect x="4" y="3" width="16" height="18" rx="2" />
-    <path d="M7.5 7.2l1.3 1.3 2.2-2.3" />
-    <path d="M13.5 7h3" />
-    <path d="M7.5 12.2l1.3 1.3 2.2-2.3" />
-    <path d="M13.5 12h3" />
-    <path d="M7.5 17h9" />
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M9 11l3 3 8-8" />
+    <path d="M20 12v7a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h8" />
   </svg>
 );
 
