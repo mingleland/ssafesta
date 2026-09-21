@@ -292,7 +292,7 @@ export function WorldChatLayer({ onHeightChange }: { onHeightChange?: (height: n
                 <li key={message.seq} className="world-chat-join" role="status">
                   {/* 줄(scrim 띠)과 알약을 갈라 둔다 — 띠는 옆줄과 같은 배경 층이고, 알약은
                       그 위에 놓이는 표식이다. 하나로 합치면 둘 중 하나를 포기해야 한다. */}
-                  <span>{message.nickname}님이 입장하셨습니다.</span>
+                  <span><b>{message.nickname}</b>님이 입장하셨습니다.</span>
                 </li>
               ) : (
                 <li key={message.seq}>
