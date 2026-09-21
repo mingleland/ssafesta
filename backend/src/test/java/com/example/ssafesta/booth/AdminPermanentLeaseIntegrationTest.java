@@ -173,9 +173,12 @@ class AdminPermanentLeaseIntegrationTest {
         Long theirs = leaseService.lease(otherAdmin, freeSlotId(), 1).lease().getBoothId();
         Long memberBooth = leaseService.lease(member, freeSlotId(), 1).lease().getBoothId();
 
+        // 전체 개수로 단언하지 않는다. 이 스위트는 클래스 사이에 트랜잭션을 되돌리지 않아서 앞서
+        // 돈 클래스가 남긴 관리자 부스도 이 목록에 실린다 — 개수를 박으면 목록 계약이 아니라
+        // 실행 순서를 단언하게 된다 (S15P21A604-941 의 횡단 테스트가 들어오면서 드러났다).
+        // "관리자 부스만, 그리고 전부" 라는 계약은 아래 세 단언이 그대로 지킨다.
         String body = mockMvc.perform(get("/api/v1/admin/booths").header("Authorization", bearer(admin)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.length()").value(2))
                 .andReturn().getResponse().getContentAsString();
 
         assertTrue(body.contains("\"boothId\":" + mine));
