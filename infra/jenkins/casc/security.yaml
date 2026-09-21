@@ -15,6 +15,8 @@ jenkins:
             value: "${GITLAB_CHECKOUT_CREDENTIALS_ID}"
           - key: GITLAB_PACKAGE_READ_CREDENTIAL_ID
             value: "${GITLAB_PACKAGE_READ_CREDENTIAL_ID}"
+          - key: GITLAB_PACKAGE_WRITE_CREDENTIAL_ID
+            value: "${GITLAB_PACKAGE_WRITE_CREDENTIAL_ID}"
           - key: GITLAB_API_V4_URL
             value: "${GITLAB_API_V4_URL}"
           - key: GITLAB_PROJECT_ID

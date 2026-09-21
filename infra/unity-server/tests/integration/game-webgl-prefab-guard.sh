@@ -29,6 +29,22 @@ mkdir -p "${fixture}/state" "${fixture}/artifacts" "${fixture}/bin"
 printf '%s' 'fixture-secret-with-at-least-thirty-two-bytes' | base64 >"${fixture}/connection-token-secret"
 : >"${fixture}/game.env"
 
+# Runtime foundation hardening 이후 deploy-game.sh는 실행 중인 Demo world를
+# 교체하기 전에 rollback 가능한 known-good baseline을 반드시 요구한다.
+# 이 테스트의 관심사는 그 다음 단계인 WebGL/prefab guard이므로
+# 실제 runtime과 동일한 precondition을 먼저 만족시킨다.
+cat >"${fixture}/state/known-good.json" <<'JSON'
+{
+  "schemaVersion": "1.0.0",
+  "targetId": "demo/game",
+  "releaseId": "known-good-before-prefab-guard",
+  "sourceCommit": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "imageRef": "festa-world:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "contentId": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "state": "KNOWN_GOOD"
+}
+JSON
+
 cat >"${fixture}/bin/docker" <<'SH'
 #!/usr/bin/env bash
 echo 'REACHED_DOCKER' >&2

@@ -130,17 +130,22 @@ class AdminPermanentLeaseIntegrationTest {
     }
 
     /**
-     * {@code GET /booths/mine} 은 "내 부스 하나" 계약이다. 관리자 부스를 섞으면 FE·Unity 계약이
-     * 같이 바뀌므로 제외한다 — 관리자는 슬롯 목록의 {@code mine} 으로 자기 부스를 찾는다.
+     * 관리자도 {@code GET /booths/mine} 으로 자기 부스를 받는다.
+     *
+     * <p>-905 는 이 응답에서 관리자 부스를 뺀 다음 슬롯 목록의 {@code mine} 으로 찾게 했지만,
+     * FE 의 부스 관리창과 스튜디오 게이트는 이 응답만 읽는다 — 그래서 관리자는 임대를 하고도
+     * "부스가 없다" 는 화면을 보고 아무것도 할 수 없었다. 응답 모양은 그대로 부스 하나다.
      */
     @Test
-    void myBoothExcludesAdminBoothsAndTheSlotListStillMarksThemMine() throws Exception {
+    void myBoothAnswersWithTheAdministratorsBoothAndTheSlotListStillMarksItMine() throws Exception {
         Long admin = administrator("목록운영자");
         Long slotId = freeSlotId();
         Long boothId = leaseService.lease(admin, slotId, 1).lease().getBoothId();
 
         mockMvc.perform(get("/api/v1/booths/mine").header("Authorization", bearer(admin)))
-                .andExpect(status().isNoContent());
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.boothId").value(boothId.intValue()))
+                .andExpect(jsonPath("$.lease.slotId").value(slotId.intValue()));
 
         // 응답 순서는 findAllOrdered 와 같다. 필터 표현식 대신 자리로 짚어 어느 칸을 보는지 남긴다.
         int index = indexOfSlot(slotId);
@@ -150,6 +155,19 @@ class AdminPermanentLeaseIntegrationTest {
                 .andExpect(jsonPath("$[" + index + "].mine").value(true))
                 .andExpect(jsonPath("$[" + index + "].boothId").value(boothId.intValue()))
                 .andExpect(jsonPath("$[" + index + "].leaseEndsAt").value("2099-12-31T00:00:00Z"));
+    }
+
+    /** 슬롯을 여러 개 든 관리자에게는 가장 최근에 임대한 부스가 나온다 — 방금 자리를 잡은 그 부스다. */
+    @Test
+    void myBoothGivesTheMostRecentlyLeasedAdminBooth() throws Exception {
+        Long admin = administrator("다중운영자");
+        leaseService.lease(admin, freeSlotId(), 1);
+        BoothLease latest = leaseService.lease(admin, freeSlotId(), 1).lease();
+
+        mockMvc.perform(get("/api/v1/booths/mine").header("Authorization", bearer(admin)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.boothId").value(latest.getBoothId().intValue()))
+                .andExpect(jsonPath("$.lease.slotId").value(latest.getSlotId().intValue()));
     }
 
     /** 반납은 슬롯을 지목한다 — 여러 개를 든 관리자에게는 그것만이 어느 부스인지 말한다. */

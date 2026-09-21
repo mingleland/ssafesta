@@ -1068,7 +1068,13 @@ namespace Festa.World
                     _animator.SetFloat(SpeedHash, running ? 2f : moving ? 1f : 0f);
             }
 
-            if (_player.EmoteId.Value == PlayerEmoteId.None && !SwingHoldsAnimator)
+            // **주먹은 막지 않는다.** 주먹은 상체 마스크 레이어에서만 돌고 다리는 Base Layer 가
+            // 그대로 맡는다(ApplyEmote 의 주먹 분기). 그런데 여기서 전신 이모트와 똑같이 취급해
+            // 이모트가 있으면 Base Layer 갱신을 통째로 건너뛰고 있었다 — 치는 동안 들어온
+            // Run·JumpLaunch·Jump·JumpLand 가 전부 버려져 다리가 주먹을 시작한 순간의 포즈에
+            // 굳었다. 달리다 점프하며 치면 선 자세 그대로 미끄러져 보인다 (사용자 지적 2026-09-18).
+            var activeEmote = _player.EmoteId.Value;
+            if ((activeEmote == PlayerEmoteId.None || IsPunch(activeEmote)) && !SwingHoldsAnimator)
                 CrossFadeLocomotion(state);
         }
 
@@ -1113,6 +1119,15 @@ namespace Festa.World
                     _animator.CrossFadeInFixedTime($"Emote_{emote}", PunchFade, layer, 0f);
                 }
                 else Debug.LogWarning("[AvatarVisual] Punch 레이어를 찾지 못해 주먹을 재생하지 못했다");
+
+                // 전신 이모트를 하던 중에 주먹으로 넘어오면 Base Layer 는 그 이모트 포즈에 멈춰 있다.
+                // 상체만 갈아타고 끝내면 다리가 그 자세로 남아 그대로 미끄러진다 — 위 ApplyAnimState 와
+                // 같은 증상이 시작 시점에 한 번 더 생기는 자리다. 다리를 현재 이동 상태로 되돌린다.
+                if (!SwingHoldsAnimator)
+                {
+                    RestoreBaseGrounding();
+                    CrossFadeLocomotion(_player.AnimState.Value);
+                }
                 return;
             }
             // 다른 연출로 넘어가는 자리면 상체를 즉시 비운다. None 으로 돌아가는 평상시 종료는

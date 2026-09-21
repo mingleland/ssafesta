@@ -118,6 +118,7 @@
  - [X] T027 [US2] `infra/jenkins/pipelines/demo-promotion.groovy`를 추가해 demo 에서 검증된 known-good release manifest 만 입력으로 받는 수동 Production Promotion pipeline을 구현한다
  - [X] T028 [US2] `infra/jenkins/pipelines/demo-promotion.groovy`에서 기존 `build-release-manifest.sh`, `deploy-release.sh`, `verify-release.sh`, `decide-recovery.sh`, `rollback-release.sh`를 재사용해 프로덕션(`ssafesta.world`) 배포를 수행하도록 연결한다
  - [X] T029 [US2] `infra/jenkins/jobs/gitlab-demo-promotion.groovy`를 추가해 승인 권한과 manifest 입력 파라미터를 가진 수동 Jenkins job을 정의한다
+ - [ ] T029A [US2] 프로덕션 진입점 조기 오픈을 위해 `infra/environments/nginx/sites/demo.conf.template`에 `${ROOT_DOMAIN}` 라우팅을 추가하고 Cloudflare TLS 프록시를 검증한다 (S15P21A604-928)
  - [X] T030 [US2] `infra/tests/acceptance/us2-demo-promotion.sh`에 정상, 비AI 가역 rollback, DB·secret/config 수동대기, AI-only 재시도 대기 rehearsal을 추가한다
 
 **Checkpoint**: develop push 는 demo.ssafesta.world 로 자동 배포되고, 사람 검증을 통과한 known-good 릴리스만 No-Squash MR 을 통해 main 및 ssafesta.world 에 배포된다.
@@ -157,6 +158,23 @@
 - [ ] T037 [US5] `infra/tests/acceptance/us5-observability.sh`에 운영 stack 중지 상태에서 CI/dev deploy가 판정 변경 없이 완료되는 실환경 evidence를 추가한다
 
 **Checkpoint**: 운영 관측 실패는 파이프라인의 성공·실패 판정에 영향을 주지 않는다.
+
+---
+
+## Phase 7A: Production Promotion final correction
+
+**Purpose**: 승인된 Demo exact artifact를 canonical Production으로 전환하되 CURRENT, KNOWN-GOOD와 rollback 기준을 분리한다.
+
+- [X] T051 `infra/deploy/scripts/bootstrap-production-data.sh`, `deploy-production-candidate.sh`, Redis ACL fixture와 runtime test에 `conversation:*` allow/deny, persisted ACL, additive evidence contract를 구현한다
+- [X] T052 `prepare-production-cutover.sh`, maintenance Nginx template과 candidate deploy guard에 public fence 뒤 legacy 제거 규칙을 구현한다
+- [X] T053 `activate-production-release.sh`, `verify-production-public.sh`, `approve-production-known-good.sh`에 verified candidate → CURRENT → external/human → KNOWN-GOOD 전환을 구현한다
+- [X] T054 `rollback-production-release.sh`에 최초 migration의 maintenance 유지와 첫 canonical known-good 이후 exact previous rollback을 구현한다
+- [X] T055 Demo root alias 제거, Production OAuth/WebGL/World contract test와 atomic WebGL pointer 전환을 구현한다
+- [X] T056 `infra/jenkins/pipelines/production-promotion.groovy`에 main receipt 검증, readiness gate, maintenance, canonical 배치, public 검증, human approval, evidence archive와 failure handler를 연결한다
+- [X] T057 `infra/jenkins/tests/production-runtime.sh`, `production-promotion.sh`에 Redis, Nginx, state, pipeline regression을 구현한다
+- [X] T058 Production state README와 spec/plan/tasks를 최종 runtime contract에 맞춘다
+
+**Checkpoint**: Stage 1 repository test는 Production runtime을 변경하지 않으며, 실제 activation은 main 승격과 모든 manual gate 뒤에만 수행한다.
 
 ---
 

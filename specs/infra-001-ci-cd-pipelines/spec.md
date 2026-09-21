@@ -200,6 +200,7 @@ Infra 담당자는 수집 Agent가 모은 로그와 서버 사용량을 조회�
 
 - 개발 흐름은 소스 브랜치 이름(`feature/*`, `fix/*`, `chore/*` 등) 제한 없이 `develop`으로 Merge Request를 만들고 Squash Merge한다. 대규모 테스트 슈트(예: 백엔드 Testcontainers) 또는 다수의 자잘한 커밋이 발생하는 파트의 경우 #206 배칭 규약에 따라 파트 브랜치(`back`, `front` 등)에서 작업을 취합한 뒤 `develop`으로 올리는 배치 MR을 병행 허용하며, Net Diff 판정(`compare_to: refs/heads/develop`)을 통해 타 파트 CI 오폭 없이 변경된 파트만 격리 실행한다.
   - GitLab CI/Runner는 merge 전 Front·Back build·test와 GitLab merge 차단을 담당한다. Jenkins Unity agent는 merge 전 Game MR의 test-only 컴파일·EditMode 상태를 게시하며, Jenkins의 merge 후 경로는 네 컴포넌트 selected CI, dev batch 배포·rollback, 수동 demo promotion을 담당한다.
+  - **Session 2026-09-20 (Batch 1) — CI/CD 경계와 배포 결정 계약.** ① `develop → main` promotion MR의 authoritative pre-merge gate는 GitLab 네이티브 `mr-status` pipeline이다. Jenkins가 develop SHA에 게시하는 `jenkinsci/branch` external status는 develop 배포 결과 정보이며 merge를 결정하지 않는다. GitLab은 MR pipeline이 있으면 그것을 `head_pipeline`으로 잡고 없을 때만 external을 잡으므로(실측 !1220/!1229/!1232), merge 직전 `infra/deploy/scripts/check-promotion-mr-gate.sh <iid>`로 `head_pipeline.source == merge_request_event`를 확인하고 아니면 merge하지 않는다. `only_allow_merge_if_pipeline_succeeds`는 유지한다. ② `detect-changed-components.sh`는 네 축을 낸다 — `validationComponents`(shared 변경이면 네 컴포넌트), `buildComponents`(변경된 app + runtime-shared면 app 3종 + `gameBuildRequired`면 game), `deployComponents`(변경된 app + runtime-shared면 app 3종 + game 소스 변경이면 game), `sharedCiChanged`. `ci_only_shared`(Jenkinsfile·.gitlab-ci.yml·ci/·infra/jenkins/·infra/deploy/scripts/ 등)는 검증만 넓히고 빌드·배포·Unity를 늘리지 않는다. `runtime_shared`(demo base compose·demo manifest·deploy/verify-environment·preflight·versions.env·.dockerignore·package-local-image)는 app 3종을 재빌드·재배포한다. 검증 전용 컴포넌트는 app `ci/validate`+`ci/test`, game `ci/validate`(Unity 없음)만 실행한다. ③ Demo KNOWN_GOOD은 컴포넌트별 exact identity의 조합이며 `environment.json.batchId`가 유일한 canonical ID다. 컴포넌트 `releaseId`는 서로 달라도 되고 미변경 artifact는 재발급하지 않는다. Production receipt `demoReleaseId == batchId`. ④ `festa-production-promotion`은 `agent none`이며 human gate stage는 executor를 잡지 않는다. 실행 stage는 각자 `deploy` agent와 checkout을 확보하고, 상태는 `env.*`와 `/var/lib/festa-environments`로만 전달한다(같은 node/workspace 재사용을 가정하지 않는다). ⑤ World endpoint: Dev `wss://world-dev.<root>/`→7777, Demo `wss://demo.<root>/`→17777(demo 사이트 `location /`이 WebSocket Upgrade만 17777로 분기, 일반 HTTPS는 Front), Production `wss://world.<root>/`→27777. Unity 클라이언트는 `endpoint{scheme,host,port}`로 항상 루트 경로에 Upgrade하므로 path 분기는 쓰지 않는다. readiness는 명시된 `WORLD_PUBLIC_HOST`의 실제 Upgrade 101까지 검사하며 환경 host를 추론하지 않는다.
 - `develop` 병합은 변경 컴포넌트만 dev에 자동 배포한다. demo 통합 환경은 dev 검증 후 Jenkins에서 승인한 release만 배포한다.
 - 각 파트는 파이프라인이 호출할 수 있는 빌드 명령과 필수 테스트 범위를 소유하고 유지한다.
 - CI/CD 서비스는 Jenkins를 사용한다. 소스 저장소는 초기 GitHub에서 추후 GitLab으로 이전하되 Jenkins 파이프라인은 유지하고 연동 Webhook만 전환한다.
@@ -287,6 +288,49 @@ Infra 담당자는 수집 Agent가 모은 로그와 서버 사용량을 조회�
 | C-11 | **확정**: 프로덕션 승격은 known-good 승인 조합만 허용한다. | Infra + 팀 | 2026-09-18 |
 | C-12 | **확정**: 장애 구간 조사용으로 이력의 특정 과거 릴리스 재배포를 허용한다. 실서비스 복구 기준선은 known-good 으로 유지한다. | Infra + 팀 | 2026-09-18 |
 | C-13 | **미완**: Jenkins 팀원 6인 개별 계정 및 조회/승격 권한 분리. | Infra | 2026-09-18 |
+
+### Session 2026-09-18 (ssafesta.world 프로덕션 진입점 조기 오픈 — S15P21A604-928)
+
+- Q: 정규 main 승격 파이프라인(US2) 가동 전, 외부 공유를 위해 프로덕션 루트 도메인(`https://ssafesta.world`)을 어떻게 조기 오픈할 것인가? → A: Nginx `demo.conf.template`의 `server_name`에 `${ROOT_DOMAIN}`(`ssafesta.world`)을 추가하여, 루트 도메인 요청을 현재 검증된 `demo` 웹/WebGL/AI 오리진(`:18080`, `/unity/`, `:18082`)으로 동일 서빙한다. Cloudflare DNS A 레코드(`@` → EC2 탄력적 IP, 프록시 활성화) 및 Origin Certificate(`*.ssafesta.world`, `ssafesta.world`)를 재사용하여 즉시 HTTPS 암호화 접속을 지원한다.
+
+| ID | 질문/결정 | 결정 주체 | 결정 시점 |
+|---|---|---|---|
+| C-14 | **확정**: 프로덕션 승격 파이프라인 완성 전, Nginx demo vhost에 `${ROOT_DOMAIN}`을 결합하여 `https://ssafesta.world`를 조기 개방한다 (S15P21A604-928). | Infra + 팀 | 2026-09-18 |
+
+### Session 2026-09-20 (Production Promotion final correction)
+
+- C-14의 조기 alias는 종료한다. Demo는 `demo.ssafesta.world`, Production은 `ssafesta.world`만 소유한다.
+- Production은 승인된 Demo App/WebGL/World artifact를 재빌드·repack하지 않고 canonical `festa-production` runtime에서 그대로 사용한다.
+- Redis `prod_ai`는 `prod:ai:*`와 실제 ConversationRepository namespace인 `conversation:*`만 허용한다. `prod_back`은 `prod:*`만 유지하며 `conversation:*`을 거부한다.
+- public 전환 전 maintenance fence를 적용하고 broken legacy `festa-prod-*`를 제거한 뒤 동일 host port `28080/28081/28082/27777`에 canonical runtime을 배치한다.
+- CURRENT는 public activation, KNOWN-GOOD는 external 검증과 사람 승인 이후의 별도 상태다.
+- 최초 canonical migration에는 `previous`가 없을 수 있다. 실패하면 maintenance를 유지하며 legacy를 복원하지 않는다. 첫 canonical KNOWN-GOOD 이후부터 직전 canonical CURRENT만 exact-artifact rollback 대상으로 사용한다.
+- Production OAuth callback route는 Back `28081`, WebGL은 `/srv/festa/webgl/prod/current`, World는 `27777`을 사용한다.
+- 실제 consumer가 없는 `festa_prod_readonly` role은 P0 범위에서 생성하지 않는다.
+
+| ID | 질문/결정 | 결정 주체 | 결정 시점 |
+|---|---|---|---|
+| C-15 | **확정**: C-14 root alias를 종료하고 root domain은 Production만 소유한다. | Infra + 팀 | 2026-09-20 |
+| C-16 | **확정**: 최초 migration 실패는 maintenance를 유지하며 legacy rollback을 금지한다. | Infra + 팀 | 2026-09-20 |
+| C-17 | **확정**: canonical CURRENT와 human-approved KNOWN-GOOD를 분리하고 후속 canonical release만 previous rollback을 허용한다. | Infra + 팀 | 2026-09-20 |
+
+### Session 2026-09-20 (Batch 2 — Unity Release Bundle 이후 배포 자동화, Consumer-only)
+
+- **Jenkins 는 Unity Editor 를 돌리지 않는다.** Unity 라이선스·계정·entitlement 는 CI 인프라가 관리하지 않는다. WebGL 클라이언트와 Linux Dedicated Server 는 Unity 담당자의 정상 개발환경에서 만들어지고, Jenkins 는 그 산출물 이후만 자동화한다: source identity → artifact 검증 → canonical Registry publish → compatibility → Demo candidate → readiness → current.
+- 유일한 intake 는 GitLab Generic Package Registry `unity-release-bundle/<8sha>` 이며 내용은 이미 실물로 받은 형식 그대로 4 파일(`festa-webgl-release-<8sha>.zip`, `festa-game-<8sha>.tar`, `webgl-manifest.json`, `image-metadata.json`)이다. `intake-unity-release-bundle.sh` 가 받아 zip/tar/metadata 를 교차검증한 뒤에만 `docker image load` 한다.
+- `resolve-game-artifacts.sh`: canonical `festa-webgl/<8sha>`+`festa-world/<8sha>` 둘 다 있으면 `REGISTRY_COMPLETE`(재사용), 없고 bundle 이 있으면 `BUNDLE_AVAILABLE`, 한쪽만 있고 bundle 이 있으면 없는 쪽만 `PUBLISH_*`, 둘 다 없으면 `WAITING_FOR_UNITY_ARTIFACT`(정상 종료, 아무것도 만들지 않음), 한쪽만 있고 bundle 이 없으면 `PARTIAL_REGISTRY`(65). 이미 게시된 source 는 어떤 경우에도 다시 만들지 않는다.
+- canonical publish 조건: commit 이 origin 에 존재 ∧ origin/develop 조상 ∧ zip dirty=false ∧ WebGL/World 같은 commit(`check-game-source-identity.sh`, SCM 한 경로). 2026-09-20 외부 artifact `5f148b69` 는 로컬에도 GitLab 에도 없는 commit 이라 `UNVERIFIABLE_SOURCE → EXTERNAL_OFFLINE_FIXTURE` 로만 썼다(`infra/evidence/batch2-artifact-5f148b69.md`).
+- Registry immutability 는 publisher 가 강제한다: 같은 version + 같은 SHA → `*_RELEASE_EXISTS`(0), 같은 version + 다른 SHA → 65. canonical version 은 source SHA 앞 8자. `.json` sidecar 는 실행 provenance(jenkinsJob/BuildNumber/BuildUrl/builderClass/publishedAt), zip 안 `ci-provenance.json`(로컬 어댑터가 넣는다면)은 source-stable 값만.
+- Demo current 는 WebGL zip 과 World image 가 모두 게시되고 World readiness 가 통과한 뒤에만 바뀐다. 그 전 실패는 canonical current(`/srv/festa/webgl/current`, `dev/batches/current/*.json`)를 건드리지 않으며 candidate World runtime 만 `rollback-game.sh` 로 돌아온다. deploy agent 는 download/sha/manifest/docker load/symlink/readiness 만 하는 경량 consumer 로 남는다.
+- `ci/build`·`festa-unity/ci/package` 는 Unity 담당자 PC 용 로컬 producer 어댑터(한 checkout, webgl → linux-server 두 세션, 결정적 zip)로 남긴다. Jenkins `component.groovy` 는 game 의 build/package stage 를 거부한다.
+- Git LFS 는 `festa-unity/**/*.{fbx,tga,psd,mp3,exr,skp}` 를 개별 line 으로 추적하고 history 는 다시 쓰지 않는다(NO_HISTORY_REWRITE). 담당자 checkout 은 `git lfs pull` 을 끝낸 상태여야 한다.
+- Unity Cloud Build / UBA / 별도 Unity 계정 자동화 / floating license 는 도입하지 않는다.
+
+| ID | 질문/결정 | 결정 주체 | 결정 시점 |
+|---|---|---|---|
+| C-18 | **확정**: Jenkins 는 Unity 를 빌드하지 않는다. Unity Release Bundle(`unity-release-bundle/<8sha>`)이 유일한 intake 이며 canonical 8sha version 으로 자동 게시·Demo 자동 반영. 수동 deploy/publish job 은 fallback. | Infra + Unity | 2026-09-20 |
+| C-19 | **확정**: 이미 게시된 source 는 재빌드하지 않는다(REGISTRY_COMPLETE 재사용, PARTIAL_REGISTRY 는 STOP, bundle 없으면 WAITING). Registry 같은 version 다른 SHA 는 hard fail. | Infra | 2026-09-20 |
+| C-20 | **확정**: repository 에 없는 commit 의 artifact 는 fixture 로만 쓴다. canonical publish 는 SCM identity gate 를 통과한 bundle 만. | Infra + Unity | 2026-09-20 |
 
 ## Out of Scope
 

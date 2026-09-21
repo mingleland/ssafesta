@@ -45,7 +45,14 @@ namespace Festa.Content
 
         async void FillAsync(int boothId)
         {
-            if (boothId <= 0) return;
+            // 조용히 돌아가면 화면은 검은 상자로 남고 원인은 어디에도 남지 않는다 (T-24). 이 경로는
+            // 붙인 오브젝트에 부스 번호가 들어오지 않았다는 뜻이라 데이터가 아니라 배선 문제다.
+            if (boothId <= 0)
+            {
+                Debug.LogWarning($"[BoothScreen] {name}: 부스 번호가 없어(BoothId={boothId}) 화면을 채우지 않는다 — " +
+                                 "BoothRuntimeObject.Init 이 먼저 불렸는지 확인하라.");
+                return;
+            }
 
             BoothProjectDto first = null;
             try
@@ -67,7 +74,15 @@ namespace Festa.Content
                 // 조용히 검은 화면으로 두지 않는다 — 로고를 등록했는데 안 뜨면 원인을 찾을 수 없다 (T-24).
                 Debug.LogWarning($"[BoothScreen] booth={boothId} 이미지 조회 실패: {e.Message}");
             }
-            if (texture == null || this == null || _painted) return;   // 셋 다 없으면 검은 화면 그대로
+            if (this == null || _painted) return;
+            if (texture == null)
+            {
+                // 사용자는 "로고를 넣었는데 안 뜬다" 로 겪는다. 무엇이 비어 있었는지 남겨야 데이터인지 배선인지 가른다.
+                Debug.LogWarning($"[BoothScreen] booth={boothId} 화면을 검은 채로 둔다 — 후보가 모두 비었다. " +
+                                 $"videoUrl='{first?.videoUrl}' thumbnailUrl='{first?.thumbnailUrl}' 전시={(first == null ? "없음" : "있음")}. " +
+                                 "부스 로고는 슬롯 목록의 facade.logoUrl 을 본다.");
+                return;
+            }
             Paint(texture);
         }
 

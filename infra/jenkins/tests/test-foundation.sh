@@ -63,6 +63,7 @@ grep -qx 'timestamper:1.30' "${plugins}" || fail "Timestamper plugin is not pinn
 grep -q 'check-agent-capabilities.sh' "${jenkinsfile}" || fail "Agent capability gate is not wired"
 grep -q 'jsonschema==' "${agent_dockerfile}" || fail "Agent image does not pin jsonschema"
 grep -q 'PYTHON_JSONSCHEMA_VERSION' "${agent_compose}" || fail "Agent Compose omits the jsonschema version pin"
+grep -q 'PYTHON_PYYAML_VERSION' "${agent_compose}" || fail "Agent Compose omits the PyYAML version pin"
 for package in libasound2t64 libgl1 libglu1-mesa libgtk-3-0t64 libicu76 libnss3 libxss1 libxtst6; do
   grep -q "^[[:space:]]*${package}[[:space:]\\]*$" "${agent_dockerfile}" || fail "Agent image omits Unity runtime package: ${package}"
 done
@@ -140,14 +141,22 @@ grep -Fq '"CI_STAGE_SUMMARY_PATH=${artifactRoot}/stage-summaries/${name}.json"' 
   || fail "component CI does not root stage summaries in the Jenkins workspace"
 grep -Fq 'bash "${ci_root}/infra/deploy/scripts/verify-component.sh"' "${repo_root}/ci/verify" \
   || fail "component verification must remain valid after adapter directory dispatch"
-grep -q "ws('/home/jenkins/agent/unity/workspaces/develop-game')" "${component_pipeline}" \
-  || fail "game component CI does not reuse its Unity workspace"
-grep -q 'game) bash festa-unity/ci/build --target linux-server' "${repo_root}/ci/build" \
-  || fail "general game CI must build Linux Server only"
-grep -q 'ci_dispatch_or build build_project --target linux-server' "${repo_root}/ci/build" \
-  || fail "general game CI must pass the Linux Server target to its component adapter"
-! grep -q 'game) bash festa-unity/ci/build --target all' "${repo_root}/ci/build" \
-  || fail "general game CI must not build WebGL"
+# Batch 2 Consumer-only: Jenkins 는 Unity Editor 를 돌리지 않는다. game 산출물은 Unity Release Bundle 에서만 온다.
+! grep -q "node('unity-6000.0.78f1')" "${component_pipeline}" \
+  || fail "component CI must not run on the Unity agent (Jenkins does not build Unity)"
+grep -q "Jenkins does not build Unity" "${component_pipeline}" \
+  || fail "component CI must refuse game build/package stages"
+! grep -q -E 'preflight-license|hostname: festa-unity-agent|mac_address' "${agent_compose}" "${repo_root}/ci/validate" "${repo_root}/festa-unity/ci/build" \
+  || fail "Unity license handling must not live in CI infrastructure"
+for script in intake-unity-release-bundle.sh resolve-game-artifacts.sh check-game-source-identity.sh validate-game-release-set.sh; do
+  [[ -x "${repo_root}/infra/jenkins/scripts/${script}" ]] || fail "Unity consumer script missing: ${script}"
+done
+# 로컬 producer 어댑터(Unity 담당자 PC)는 한 checkout 에서 WebGL → Linux Server 를 두 세션으로 만든다.
+grep -q 'bash festa-unity/ci/build --target webgl' "${repo_root}/ci/build" && grep -q 'bash festa-unity/ci/build --target linux-server' "${repo_root}/ci/build" \
+  || fail "local game producer adapter must build WebGL and Linux Server"
+for line in 'festa-unity/**/*.fbx filter=lfs' 'festa-unity/**/*.tga filter=lfs' 'docs/LJH/skills/** text eol=lf'; do
+  grep -Fq "${line}" "${repo_root}/.gitattributes" || fail ".gitattributes lost rule: ${line}"
+done
 ! grep -q 'deploy-component.sh' "${component_pipeline}" \
   || fail "Phase 2 component CI must not deploy"
 grep -q 'with-credentials.sh CONNECTION_TOKEN_SECRET_FILE -- infra/deploy/scripts/deploy-component.sh' "${repo_root}/infra/jenkins/pipelines/unity.groovy" \
@@ -176,8 +185,16 @@ grep -q 'ENVIRONMENT_STATE_DIR: /var/lib/festa-environments' "${agent_compose}" 
   || fail "deploy agent does not persist dev batch state outside its container filesystem"
 grep -q 'deploy_state:/var/lib/festa-environments' "${agent_compose}" \
   || fail "deploy agent does not mount persistent dev batch state"
-grep -q "final List deployComponents = (selection.deployComponents as List).findAll { it in \['ai', 'back', 'front'\] }" "${develop_pipeline}" \
+grep -q "final List deployComponents = selectedDeploy.findAll { it in \['ai', 'back', 'front'\] }" "${develop_pipeline}" \
   || fail "dev batch must use the detector deployComponents contract and keep game Dedicated Server deployment outside it"
+grep -q "final List buildComponents = (selection.buildComponents" "${develop_pipeline}" \
+  || fail "develop pipeline must build only the detector buildComponents"
+grep -q "final boolean hasGame = buildComponents.contains('game')" "${develop_pipeline}" \
+  || fail "Unity build must be gated by buildComponents (gameBuildRequired), not by validation scope"
+grep -q "component == 'game' ? \['validate'\] : \['validate', 'test'\]" "${develop_pipeline}" \
+  || fail "validation-only components must run validate/test without image or Unity builds"
+grep -q "component == 'game' && stages.any { it in \['build', 'package'\] }" "${component_pipeline}" \
+  || fail "game component CI must reject build/package stages (Consumer-only)"
 grep -q 'withCredentials(credentialBindings)' "${develop_pipeline}" \
   || fail "dev batch does not bind selected component credentials"
 grep -q "credentialsId: env.DEMO_INTERNAL_INFRA_TO_SPRING_TOKENS_CREDENTIAL_ID, variable: 'INTERNAL_INFRA_TO_SPRING_TOKENS'" "${develop_pipeline}" \
@@ -188,10 +205,11 @@ grep -q 'FRESHNESS_EXPECTED_SHA=' "${develop_pipeline}" \
   || fail "dev batch does not recheck the develop head before deployment"
 grep -q 'deploy-dev-batch.sh' "${develop_pipeline}" \
   || fail "candidate transfer does not activate the Phase 3 dev batch"
-grep -q "stash name: 'candidate-metadata-game'" "${component_pipeline}" \
-  || fail "game candidate metadata cannot leave the Unity workspace"
-grep -q "unstash 'candidate-metadata-game'" "${develop_pipeline}" \
-  || fail "develop pipeline does not collect game candidate metadata"
+# game candidate identity 는 Unity workspace 가 아니라 Unity Release Bundle 의 image-metadata.json 에서 온다 (Batch 2 Consumer-only).
+grep -q 'intake-unity-release-bundle.sh' "${develop_pipeline}" \
+  || fail "develop pipeline does not take game artifacts from the Unity Release Bundle"
+grep -q 'WAITING_FOR_UNITY_ARTIFACT' "${develop_pipeline}" \
+  || fail "develop pipeline must wait (not build) when no game artifact exists"
 grep -q 'image-transfer-init' "${agent_compose}" \
   || fail "shared image transfer volume has no ownership initializer"
 grep -q "branch != 'develop'" "${jenkinsfile}" \
@@ -200,6 +218,13 @@ grep -q "branch != 'develop'" "${jenkinsfile}" \
   || fail "Jenkinsfile retains legacy component branch dispatch"
 grep -q "multibranchPipelineJob('festa-gitlab-develop')" "${develop_job}" \
   || fail "GitLab develop-only multibranch job is missing"
+# T-168: strategy 1 ("MR source 브랜치 제외") 는 develop→main MR 이 열리는 순간 develop child 를 Dead 로 만든다.
+grep -q 'gitLabBranchDiscovery { strategyId(3) }' "${develop_job}" \
+  || fail "GitLab develop discovery must use strategy 3 (all branches) — T-168"
+! grep -q 'strategyId(1)' "${develop_job}" \
+  || fail "GitLab develop discovery must not exclude MR source branches — T-168"
+grep -q "headWildcardFilter { includes('develop')" "${develop_job}" \
+  || fail "GitLab develop discovery must still be restricted to develop"
 grep -q 'serverName(gitlabServerName)' "${develop_job}" \
   || fail "GitLab develop Job DSL shadows the serverName method"
 grep -q "String gitlabApiCredentialsId = System.getenv('GITLAB_API_CREDENTIALS_ID')" "${develop_job}" \
@@ -212,6 +237,8 @@ grep -q 'String gitlabProjectFullPath = "${gitlabProjectOwner}/${gitlabProjectPa
   || fail "GitLab develop Job DSL must compose the full GitLab project path"
 grep -q 'projectPath(gitlabProjectFullPath)' "${develop_job}" \
   || fail "GitLab develop Job DSL must pass the full GitLab project path"
+grep -Fq 'gitlabAvatar { disableProjectAvatar(true) }' "${develop_job}" \
+  || fail "GitLab develop Job DSL must disable private project avatar retrieval"
 ! grep -q '^String projectOwner[[:space:]]*=' "${develop_job}" \
   || fail "GitLab develop Job DSL declares a projectOwner variable that shadows the method"
 ! grep -q '^String projectPath[[:space:]]*=' "${develop_job}" \
@@ -235,8 +262,35 @@ grep -q "permission('hudson.model.Item.Build', 'unity-mr-validator')" "${unity_m
   || fail "Unity MR validator cannot build its own job"
 grep -q "node('unity-6000.0.78f1')" "${unity_mr_pipeline}" \
   || fail "Unity MR validation does not use Unity agent"
-grep -q "gitlabCommitStatus(name: 'unity-mr-validation')" "${unity_mr_pipeline}" \
+
+"${python_bin}" - "${repo_root}/.gitlab-ci.yml" <<'PY_GAME_RULE'
+import pathlib
+import sys
+
+text = pathlib.Path(sys.argv[1]).read_text(encoding="utf-8")
+start = text.index(".game-changes:")
+end = text.index("unity-mr-validation-dispatch:", start)
+block = text[start:end]
+
+assert "festa-unity/**/*" in block
+assert "ci/test" in block
+assert "ci/lib.sh" in block
+assert "infra/unity-server/" not in block
+PY_GAME_RULE
+
+grep -q '"gameBuildRequired": game_build_required'   "${repo_root}/infra/jenkins/scripts/detect-changed-components.sh"   || fail "component detector omits the explicit Unity game-build decision"
+
+grep -q 'infra/unity-server/tests/'   "${repo_root}/infra/jenkins/scripts/detect-changed-components.sh"   || fail "Unity Server tests are not classified as validation-only"
+
+grep -q 'selection.gameBuildRequired' "${develop_pipeline}"   || fail "develop pipeline ignores the detector Unity build decision"
+
+grep -q "detector selected a game build without gameBuildRequired" "${develop_pipeline}"   || fail "develop pipeline must refuse a Unity build that the detector did not require"
+grep -q "gitlabCommitStatus(" "${unity_mr_pipeline}" \
   || fail "Unity MR validation does not publish the required GitLab status context"
+grep -Fq "connection: gitLabConnection(gitlabConnectionName)" "${unity_mr_pipeline}" \
+  || fail "Unity MR validation does not bind the configured GitLab connection"
+grep -Fq "builds: [[projectId: gitlabProjectId, revisionHash: sourceSha]]" "${unity_mr_pipeline}" \
+  || fail "Unity MR validation does not bind the exact MR commit to its GitLab status"
 grep -q 'with-credentials.sh -- bash ci/test' "${unity_mr_pipeline}" \
   || fail "Unity MR validation does not use the credential-masking command wrapper"
 grep -q '^set +x$' "${repo_root}/infra/jenkins/scripts/with-credentials.sh" \
@@ -310,6 +364,7 @@ export JENKINS_INBOUND_AGENT_IMAGE="jenkins/inbound-agent:foundation-test-jdk21"
 export DOCKER_CLI_IMAGE="docker:foundation-test-cli"
 export NODE_RUNTIME_IMAGE="node:foundation-test"
 export PYTHON_JSONSCHEMA_VERSION="4.26.0"
+export PYTHON_PYYAML_VERSION="6.0.2"
 export JENKINS_ADMIN_ID="foundation-admin"
 export JENKINS_ADMIN_PASSWORD="foundation-only-value"
 export JENKINS_UNITY_MR_VALIDATOR_PASSWORD="foundation-unity-mr-validator-value"

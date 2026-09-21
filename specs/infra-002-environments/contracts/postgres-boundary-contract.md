@@ -11,12 +11,26 @@
 
 하나의 PostgreSQL 17 + pgvector instance를 공유하지만 database와 login role은 분리한다.
 
+## Read-only operator role
+
+| Role | Database | Privilege | Credential |
+|---|---|---|---|
+| `festa_demo_readonly` | `festa_demo_business`, `festa_demo_ai` | `CONNECT`, public schema `USAGE`, table `SELECT` (default privileges 포함) | 없음 (비밀번호 미설정) |
+
+demo 데이터 확인 요청을 EC2 계정·sudo·docker 그룹 없이 처리하기 위한 운영자 창구다. runtime service는 이 role을 쓰지 않는다.
+
+- 비밀번호를 설정하지 않는다. host 경로가 `scram-sha-256`이라 네트워크로는 인증이 성립하지 않고, 컨테이너 내부 unix socket으로만 붙는다.
+- 쓰기 권한을 주지 않는다. demo 데이터 수정은 Flyway migration으로만 수행한다.
+- dev database에는 어떤 권한도 주지 않는다. dev/demo 경계는 그대로다.
+- 네트워크 접속이 필요해지면 Secret Reference를 추가하고 `ALTER ROLE`로 비밀번호를 건다. 그 변경은 5432 publish 정책 변경과 함께 검토한다.
+
 ## Privilege invariants
 
 - 각 runtime role은 `NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS`다.
 - 각 database의 `PUBLIC CONNECT`와 public schema의 불필요한 CREATE 권한을 회수한다.
 - runtime role은 자기 database CONNECT와 자기 schema의 최소 DML/sequence 권한만 가진다.
 - Spring role은 AI DB에, AI role은 business DB에, dev role은 demo DB에 접근할 수 없다.
+- 조회 전용 role은 runtime role이 아니며 demo 두 database의 읽기 권한만 가진다. 쓰기·DDL·dev 접근은 금지한다.
 - `vector` extension 설치·upgrade와 database/role 생성은 bootstrap admin만 수행한다.
 - credential은 환경별 Secret Reference로 주입하고 example에는 key name만 둔다.
 - PostgreSQL 5432는 Docker internal network에만 존재하고 host/public port로 publish하지 않는다.
@@ -40,6 +54,7 @@
 ## Acceptance probes
 
 - 4개 runtime role × 4개 database CONNECT matrix에서 diagonal만 성공.
+- `festa_demo_readonly`는 demo 두 database에서 `SELECT`만 성공하고 `INSERT`/`UPDATE`와 dev database CONNECT는 실패한다.
 - AI database에만 `vector` extension이 있고 application role이 extension을 변경하지 못함.
 - app container 재생성 뒤 volume data 유지.
 - R2 backup만으로 빈 PostgreSQL instance에 복구.

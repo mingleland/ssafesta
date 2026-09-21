@@ -9,6 +9,8 @@ docker_bin="${DOCKER_BIN:-docker}"
 : "${GAME_ENV_FILE:?GAME_ENV_FILE is required}"
 : "${GAME_DEPLOY_STATE_DIR:?GAME_DEPLOY_STATE_DIR is required}"
 : "${CI_ARTIFACT_DIR:?CI_ARTIFACT_DIR is required}"
+# 외부 WSS 검사는 이 환경의 World host 로만 한다 (Batch 1: Demo 는 world-demo.<root>).
+[[ -n "${WORLD_PUBLIC_HOST:-}" ]] || { echo 'WORLD_PUBLIC_HOST is required for the external WebSocket check' >&2; exit 64; }
 approval_evidence_file="${APPROVAL_EVIDENCE_FILE:-}"
 
 compose_file="${GAME_COMPOSE_FILE:-${repo_root}/infra/unity-server/compose.yaml}"
@@ -59,14 +61,25 @@ if [[ -z "${GAME_READINESS_SKIP_LISTENER_CONNECT:-}" ]]; then
   # 0.25초 만에 거부. Unity 데디케이티드 서버가 월드 씬을 올려 포트를 열기 전이다.
   # 단발 probe 는 구조적으로 이르므로 유한 예산 안에서 폴링한다. 예산을 넘기면 그대로 실패시킨다 —
   # 게이트를 무르게 하지 않는다. 걸린 시간을 남기는 이유는 다음 배포에서 예산을 근거로 조정하기 위해서다.
-  listener_budget_seconds="${GAME_READINESS_LISTENER_TIMEOUT_SECONDS:-120}"
+  listener_budget_seconds="${GAME_READINESS_LISTENER_TIMEOUT_SECONDS:-180}"
   listener_started_at="${SECONDS}"
   listener_deadline=$(( listener_started_at + listener_budget_seconds ))
   listener_attempts=0
   listener_ready=
   while (( SECONDS <= listener_deadline )); do
     listener_attempts=$(( listener_attempts + 1 ))
-    if timeout 5 bash -c "</dev/tcp/${host}/${port}" >/dev/null 2>&1; then listener_ready=1; break; fi
+    if timeout 5 bash -c "</dev/tcp/${host}/${port}" >/dev/null 2>&1; then
+      listener_ready=1
+      break
+    fi
+    # deploy agent 등 컨테이너 내부에서 실행되는 경우 호스트의 loopback 은 컨테이너와 격리되어 있다.
+    # docker socket 이 있으면 호스트 네트워크 네임스페이스를 빌려 루프백 바인딩을 확인한다.
+    if [[ "${host}" == '127.0.0.1' ]] && command -v "${docker_bin}" >/dev/null 2>&1; then
+      if "${docker_bin}" run --rm --net=host --entrypoint /bin/sh festa/jenkins-agent:local -c "timeout 5 bash -c '</dev/tcp/${host}/${port}'" >/dev/null 2>&1; then
+        listener_ready=1
+        break
+      fi
+    fi
     sleep 3
   done
   if [[ -z "${listener_ready}" ]]; then
