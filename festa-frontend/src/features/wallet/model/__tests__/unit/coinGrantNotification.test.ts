@@ -1,3 +1,5 @@
+// @vitest-environment jsdom
+// 캐치업 워터마크가 localStorage를 쓴다(S15P21A604-953) — 기본 node 환경엔 window가 없다.
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const realtime = vi.hoisted(() => ({
@@ -35,6 +37,7 @@ beforeEach(() => {
   toasts.show.mockReset();
   query.invalidate.mockReset();
   wallet.getTransactions.mockResolvedValue({ content: [], page: 0, size: 20, totalElements: 0, totalPages: 0 });
+  window.localStorage.clear();
 });
 
 describe('coinGrantNotification', () => {
@@ -101,5 +104,45 @@ describe('coinGrantNotification', () => {
 
     // invalidateQueries만 호출하고 클라이언트 내부 수동 state mutation이나 로컬 덧셈을 수행하지 않음
     expect(query.invalidate).toHaveBeenCalledWith({ queryKey: ['wallet-balance'] });
+  });
+
+  it('구독 전에 발행된 가입·일일 지급을 catch-up REST 응답에서 찾아 토스트를 대신 띄운다 (S15P21A604-953)', async () => {
+    wallet.getTransactions.mockResolvedValue({
+      content: [
+        { id: 12, entryType: 'CHARGE', amount: 200, balanceAfter: 200, reasonType: 'INITIAL_GRANT', referenceType: null, referenceId: null, createdAt: '2026-09-21T00:00:00Z' },
+        { id: 13, entryType: 'CHARGE', amount: 50, balanceAfter: 250, reasonType: 'DAILY_GRANT', referenceType: null, referenceId: null, createdAt: '2026-09-21T00:01:00Z' },
+      ],
+      page: 0,
+      size: 20,
+      totalElements: 2,
+      totalPages: 1,
+    });
+
+    startCoinGrantNotifications();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(toasts.show).toHaveBeenCalledWith('가입 지급 +200 코인이 지급되었습니다.', 'success');
+    expect(toasts.show).toHaveBeenCalledWith('일일 지급 +50 코인이 지급되었습니다.', 'success');
+  });
+
+  it('이미 알린 거래는 재접속 catch-up에서 다시 토스트를 띄우지 않는다 (S15P21A604-953)', async () => {
+    window.localStorage.setItem('festa.wallet.lastAnnouncedGrantId', '13');
+    wallet.getTransactions.mockResolvedValue({
+      content: [
+        { id: 12, entryType: 'CHARGE', amount: 200, balanceAfter: 200, reasonType: 'INITIAL_GRANT', referenceType: null, referenceId: null, createdAt: '2026-09-21T00:00:00Z' },
+        { id: 13, entryType: 'CHARGE', amount: 50, balanceAfter: 250, reasonType: 'DAILY_GRANT', referenceType: null, referenceId: null, createdAt: '2026-09-21T00:01:00Z' },
+      ],
+      page: 0,
+      size: 20,
+      totalElements: 2,
+      totalPages: 1,
+    });
+
+    startCoinGrantNotifications();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(toasts.show).not.toHaveBeenCalled();
   });
 });
