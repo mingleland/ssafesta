@@ -30,6 +30,10 @@ grep -Fq '127.0.0.1:${PROD_AI_HOST_PORT:-28082}:8000' "${compose}"
 grep -Fq '127.0.0.1:${PROD_WORLD_HOST_PORT:-27777}:7777' "${compose}"
 grep -Fq 'festa_prod_business' "${bootstrap}"
 grep -Fq 'festa_prod_ai' "${bootstrap}"
+# R2 는 Postgres 역할·Redis 네임스페이스와 달리 저장소 설정이 호스트 env 파일에 있어 정적으로 볼 수 없다.
+# 런타임 가드가 사라지면 production 이 다시 demo 버킷을 쓰게 되므로 그 문구가 남아 있는지 확인한다.
+grep -Fq 'Production shares the demo R2 bucket' "${verify}"
+grep -Fq 'Production back and ai disagree on R2_BUCKET' "${verify}"
 grep -Fq 'host-acl-file-hashed' "${bootstrap}"
 grep -Fq '~prod:*' "${bootstrap}"
 grep -Fq '~prod:ai:*' "${bootstrap}"
