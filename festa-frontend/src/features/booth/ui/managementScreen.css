@@ -1,0 +1,13 @@
+/* 콘솔 안에 놓이는 관리 화면의 머리글 (S15P21A604-951).
+   껍데기는 호출부가 이미 그렸으므로 여기서는 제목줄과 간격만 맡는다. */
+.ms-inline { display: flex; flex-direction: column; gap: 0.75rem; min-width: 0; }
+
+.ms-inline-head { display: flex; flex-direction: column; gap: 0.15rem; }
+
+.ms-inline-title { margin: 0; font-size: 1rem; font-weight: 700; }
+
+.ms-inline-sub { margin: 0; font-size: 0.8rem; color: var(--ov-note, rgba(255, 255, 255, 0.62)); }
+
+/* 본문이 정한 액션 줄. 오버레이에서는 footer 자리에 가던 것이다. */
+.ms-inline-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; justify-content: flex-end; }
+

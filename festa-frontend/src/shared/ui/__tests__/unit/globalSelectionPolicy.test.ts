@@ -81,9 +81,19 @@ describe('브랜드 포인터', () => {
   });
 
   it('모양이 곧 사용법인 자리만 되돌린다 — 입력칸의 I빔과 끌기 손잡이', () => {
-    expect(css).toContain('cursor: text !important');
+    // 입력칸은 브랜드 I빔을 먼저 주되 **`text` 로 끝나야 한다** — 그림을 못 읽는 환경에서
+    // 최후 수단이 `auto` 면 "여기는 글자 칸" 이라는 뜻이 사라진다.
+    expect(css).toContain("cursor: url('/cursors/festa-text.png') 16 16, text !important");
     expect(css).toContain('cursor: col-resize !important');
     expect(css).toContain('cursor: grabbing !important');
+  });
+
+  // 누름 판은 hotspot 이 전역 포인터와 **같아야** 한다. 다르면 누르는 순간 촉이 옮겨 앉아
+  // 커서가 튄 것처럼 보인다 — 그림 쪽 어긋남은 T-141 이고, 여기서는 선언이 갈리는 것을 막는다.
+  it('누름 커서는 전역 포인터와 같은 hotspot 을 쓴다', () => {
+    const pressed = blockFor('body.is-pressing :where(*) {');
+    expect(pressed).toContain("cursor:url('/cursors/festa-click.png')72,auto!important");
+    expect(pressed).toContain('image-set(');
   });
 
   // 전역 규칙이 `!important` 라 Game Studio 의 커서가 통째로 덮였다(S15P21A604-854). 저작 도구에서는

@@ -58,12 +58,10 @@
   gap: 10px 16px;
 }
 
-.world-hud-fullscreen {
+/* HUD 버튼 공통 규격 — 전체화면·미션·조작안내가 크기·모서리·테두리·배경을 공유한다.
+   자리만 각 클래스가 left/right/bottom 으로 잡는다(S15P21A604-911 리팩터). */
+.world-hud-control {
   position: absolute;
-  /* 전체화면 토글 (S15P21A604-733). 상담 퀵액세스와 우상단 한 줄에 나란히 서고, 오른쪽 끝은
-     이 버튼이 쓴다 — 상담이 왼쪽 칸이다(2026-09-16). `.world-hud` 는 클릭을 통과시키므로
-     버튼만 다시 받는다. */
-  right: var(--festa-hud-margin-x);
   top: var(--festa-hud-margin-y);
   width: var(--festa-control-size);
   height: var(--festa-control-size);
@@ -78,16 +76,28 @@
   cursor: pointer;
   pointer-events: auto;
 }
-.world-hud-fullscreen svg { width: 48%; height: 48%; }
-.world-hud-fullscreen:hover { background: rgba(20, 26, 52, 0.85); }
-.world-hud-fullscreen:focus-visible { outline: 2px solid rgba(255, 255, 255, 0.9); outline-offset: 2px; }
-/* 조작 안내 버튼 — 전체화면과 같은 규격(크기·모서리·테두리·배경은 위 클래스 그대로)이고
-   자리만 우하단이다. top 을 auto 로 끊지 않으면 위 클래스의 top 이 이긴다. */
+.world-hud-control svg { width: 48%; height: 48%; }
+.world-hud-control:hover { background: rgba(20, 26, 52, 0.85); }
+.world-hud-control:focus-visible { outline: 2px solid rgba(255, 255, 255, 0.9); outline-offset: 2px; }
+.world-hud-missions { left: var(--festa-hud-margin-x); }
+.world-hud-fullscreen {
+  /* 전체화면 토글 (S15P21A604-733). 상담 퀵액세스와 우상단 한 줄에 나란히 서고, 오른쪽 끝은
+     이 버튼이 쓴다 — 상담이 왼쪽 칸이다(2026-09-16). */
+  right: var(--festa-hud-margin-x);
+}
+/* 조작 안내 버튼 — 전체화면과 같은 규격(.world-hud-control)이고 자리만 우하단이다.
+   top 을 auto 로 끊지 않으면 base 의 top 이 이긴다.
+
+   `right` 를 여기서 직접 적는다. -911 리팩터 전에는 이 버튼이 `.world-hud-fullscreen` 을 함께
+   달아 그쪽 `right` 를 빌려 썼는데, 공통 규격을 `.world-hud-control` 로 빼면서 클래스가 갈렸고
+   그때 이 한 줄이 같이 떨어져 나갔다. 가로 자리를 아무도 안 정하면 absolute 요소는 static 위치,
+   즉 **왼쪽 끝**으로 간다 — 화면에서는 채팅 위를 덮는 모양이 된다. */
 .world-hud-guide {
+  right: var(--festa-hud-margin-x);
   top: auto;
   bottom: var(--festa-hud-margin-y);
 }
 @media (prefers-reduced-transparency: reduce) {
-  .world-hud-fullscreen { background: #10142a; backdrop-filter: none; }
+  .world-hud-control { background: #10142a; backdrop-filter: none; }
 }
 

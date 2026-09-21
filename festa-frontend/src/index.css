@@ -95,10 +95,30 @@ body {
   cursor: image-set(url('/cursors/festa-pointer.png') 1x, url('/cursors/festa-pointer@2x.png') 2x) 7 2, auto !important;
 }
 
+/* 누르는 동안의 포인터. 같은 화살표에 링과 별이 붙은 판이다.
+ *
+ * **위 포인터와 같은 틀로 뽑는다** — 32 타일 안 28 박스, hotspot 도 같은 `7 2`. 다르게 두면
+ * 누르는 순간 화살표 크기와 촉 위치가 같이 흔들려 커서가 튄 것처럼 보인다.
+ *
+ * `:active` 를 쓰지 않는 이유는 버튼을 못 가리기 때문이다 — 우클릭·휠 클릭에도 걸린다.
+ * 왼쪽만 보려면 `button` 을 읽어야 하므로 판정은 `main.tsx` 가 하고 여기는 그 결과인
+ * `body.is-pressing` 만 받는다.
+ *
+ * 구체성은 0,1,1 이다 — 아래 글자칸(0,8,1)과 Game Studio 손잡이(0,2,0)는 그대로 이기고,
+ * 전역 포인터(0,0,0)는 진다. */
+body.is-pressing :where(*) {
+  cursor: url('/cursors/festa-click.png') 7 2, auto !important;
+  cursor: image-set(url('/cursors/festa-click.png') 1x, url('/cursors/festa-click@2x.png') 2x) 7 2, auto !important;
+}
+
 input:not([type='button']):not([type='submit']):not([type='reset']):not([type='checkbox']):not([type='radio']):not([type='range']):not([type='color']):not([type='file']),
 textarea,
 [contenteditable='true'] {
-  cursor: text !important;
+  /* 글자를 넣는 칸은 I빔이다. 브랜드 I빔을 먼저 주고, 못 읽는 환경은 뒤의 `text` 로 내려간다 —
+     모양 자체가 사용법인 자리라 최후 수단이 `auto` 면 뜻이 사라진다. 세로로 긴 그림이라
+     hotspot 은 글자 사이를 가리키는 한가운데(16 16)다. */
+  cursor: url('/cursors/festa-text.png') 16 16, text !important;
+  cursor: image-set(url('/cursors/festa-text.png') 1x, url('/cursors/festa-text@2x.png') 2x) 16 16, text !important;
 }
 /* Game Studio 는 저작 도구라 커서가 곧 사용법이다 — 끌 수 있는지, 지금 끌고 있는지, 크기를 바꿀 수
  * 있는지, 어디를 찍는지를 알려 주는 신호가 이것뿐이다. 위 전역 규칙이 `!important` 라 여기서
@@ -142,6 +162,13 @@ textarea,
 #unity-canvas {
   cursor: url('/cursors/festa-pointer.png') 7 2, auto !important;
   cursor: image-set(url('/cursors/festa-pointer.png') 1x, url('/cursors/festa-pointer@2x.png') 2x) 7 2, auto !important;
+}
+
+/* 캔버스는 id 선택자(1,0,0)라 위 누름 규칙(0,1,1)으로는 못 덮는다 — 정작 가장 많이 누르는
+   자리라 같은 id 에 클래스를 더해(1,1,1) 여기서 한 번 더 적는다. */
+body.is-pressing #unity-canvas {
+  cursor: url('/cursors/festa-click.png') 7 2, auto !important;
+  cursor: image-set(url('/cursors/festa-click.png') 1x, url('/cursors/festa-click@2x.png') 2x) 7 2, auto !important;
 }
 
 /* 어두운 표면의 기본 스크롤바 (2026-09-17).
