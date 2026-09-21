@@ -18,15 +18,21 @@ check_gate() {
   rules_section="$(job ".${component}-changes")"
   [[ -n "$rules_section" ]] || fail "missing ${component} change rules"
   grep -Fq "$source_path" <<<"$rules_section" || fail "${component} source path"
-  grep -Fq "ci/**/*" <<<"$rules_section" || fail "${component} shared CI path"
-  grep -Fq ".gitlab-ci.yml" <<<"$rules_section" || fail "${component} shared pipeline path"
+  # Batch 2 최적화 — shared CI/pipeline 변경이 무관한 컴포넌트 전체를 트리거하지 않는다 (selective CI).
+  ! grep -Fq "ci/**/*" <<<"$rules_section" || fail "${component} must not trigger on shared CI path"
+  ! grep -Fq ".gitlab-ci.yml" <<<"$rules_section" || fail "${component} must not trigger on shared pipeline path"
   for stage in test build; do
     section="$(job "${component}-${stage}")"
     [[ -n "$section" ]] || fail "missing ${component}-${stage} job"
     grep -Fq "CI_COMPONENT: ${component}" <<<"$section" || fail "${component}-${stage} component"
     grep -Fq "bash ci/${stage}" <<<"$section" || fail "${component}-${stage} adapter"
-    grep -Fq ".${component}-changes" <<<"$section" || fail "${component}-${stage} change rules"
   done
+  # test 는 파트 브랜치 대상 MR 에서도 돌고(T-175), build 는 develop 대상에서만 돈다.
+  grep -Fq ".${component}-changes" <<<"$(job "${component}-test")" || fail "${component}-test change rules"
+  grep -Fq ".${component}-changes-develop-only" <<<"$(job "${component}-build")" \
+    || fail "${component}-build must stay restricted to develop-target MRs"
+  job ".${component}-changes-develop-only" | grep -Fq 'CI_MERGE_REQUEST_TARGET_BRANCH_NAME != "develop"' \
+    || fail "${component}-build rules must guard the target branch"
 }
 
 require 'CI_PIPELINE_SOURCE == "merge_request_event"' "$pipeline"
@@ -38,18 +44,30 @@ status_section="$(job 'mr-status')"
 [[ -n "$status_section" ]] || fail 'missing MR status job'
 grep -Fq 'stage: validate' <<<"$status_section" || fail 'MR status stage'
 grep -Fq 'CI_PIPELINE_SOURCE == "merge_request_event"' <<<"$status_section" || fail 'MR status rule'
-[[ "$(grep -Fc 'bash infra/jenkins/scripts/secret-scan.sh --path .' "$pipeline")" == 1 ]] \
+[[ "$(grep -Fc 'infra/jenkins/scripts/secret-scan.sh' "$pipeline")" == 1 ]] \
   || fail 'secret scan must run once in mr-status'
+grep -Fq 'CI_MERGE_REQUEST_DIFF_BASE_SHA:+--changed-since' "$pipeline" \
+  || fail 'mr-status secret scan must narrow to the MR diff when the base is known'
+grep -Fq -e '--path .' "$pipeline" || fail 'mr-status secret scan must keep the full-repo fallback path'
 grep -Fq 'MR pipeline status only' <<<"$status_section" || fail 'MR status no-op command'
 echo 'PASS: infra/docs-only MR receives a successful pipeline status'
 
 # develop → main promotion MR: authoritative gate 는 GitLab 네이티브 mr-status 다. component job 은 develop 대상에서만
 # 돌고, Jenkins external status(jenkinsci/branch) 는 merge 를 결정하지 않는다 — 그 계약은 merge 직전
 # check-promotion-mr-gate.sh 로 강제한다 (Batch 1, 실측 !1220/!1229/!1232).
-for component in ai back front game; do
-  job ".${component}-changes" | grep -Fq 'CI_MERGE_REQUEST_TARGET_BRANCH_NAME != "develop"' \
-    || fail "${component} component CI must be restricted to develop-target MRs"
+# 2026-09-20 — 파트 브랜치 구간의 코드 검증 0회를 해제했다(T-175, 러너 동시 실행 2 → 4). ai·back·front 는
+# 파트 브랜치 대상 MR 에서도 *-test 가 돌고, main 승격 MR 에서는 여전히 돌지 않는다.
+for component in ai back front; do
+  rules_section="$(job ".${component}-changes")"
+  grep -Fq 'CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "main"' <<<"$rules_section" \
+    || fail "${component} component CI must stay off develop -> main promotion MRs"
+  ! grep -Fq 'CI_MERGE_REQUEST_TARGET_BRANCH_NAME != "develop"' <<<"$rules_section" \
+    || fail "${component} test must also run on part-branch MRs"
 done
+# game 만 develop 대상에 묶어 둔다 — Unity dispatch 는 Jenkins 를 길게 붙잡고, 그 job 자체가
+# 라이선스 문제로 실패 중이라 파트 브랜치로 넓히면 game MR 이 전부 막힌다.
+job '.game-changes' | grep -Fq 'CI_MERGE_REQUEST_TARGET_BRANCH_NAME != "develop"' \
+  || fail 'game Unity dispatch must stay restricted to develop-target MRs'
 gate_check="${repo_root}/infra/deploy/scripts/check-promotion-mr-gate.sh"
 [[ -x "$gate_check" ]] || fail 'promotion MR gate check script is missing or not executable'
 grep -Fq 'merge_request_event' "$gate_check" || fail 'gate check must require the GitLab MR pipeline as head pipeline'
@@ -94,4 +112,4 @@ for jira_job in jira-key-check jira-sync-in-progress jira-sync-in-review jira-sy
     grep -Eq '^[[:space:]]+- when: never$' <<<"$job_body" || fail "${jira_job} must stay disabled"
   fi
 done
-echo 'PASS: shared CI/pipeline paths run AI, Front, and Back gates; jira jobs remain disabled'
+echo 'PASS: selective CI gates trigger on component sources only; jira jobs remain disabled'

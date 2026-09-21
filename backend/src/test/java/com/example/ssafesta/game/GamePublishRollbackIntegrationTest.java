@@ -44,7 +44,7 @@ class GamePublishRollbackIntegrationTest {
         Long userId = GameTestSupport.createMember(users, "롤백주입");
         Long gameId = games.save(new Game(userId, "롤백 게임")).getId();
         draftService.save(gameId, userId, 0, project(gameId));
-        publishService.publish(gameId, userId, 1);
+        publishService.publish(gameId, userId, 1, null);
         // A real v1 is live before the failure, so "이전 Published가 그대로" is something to check
         // rather than an empty state that would pass trivially.
         assertEquals(1, published.highestVersionNo(gameId));
@@ -55,7 +55,7 @@ class GamePublishRollbackIntegrationTest {
                 .when(games).save(any(Game.class));
 
         assertThrows(DataAccessResourceFailureException.class,
-                () -> publishService.publish(gameId, userId, 2));
+                () -> publishService.publish(gameId, userId, 2, null));
 
         reset(games);
         assertEquals(1, published.highestVersionNo(gameId),

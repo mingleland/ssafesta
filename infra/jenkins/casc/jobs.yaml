@@ -9,3 +9,4 @@ jobs:
   - file: /var/jenkins_home/job_dsl/gitlab-production-promotion.groovy
   - file: /var/jenkins_home/job_dsl/gitlab-postgres-backup.groovy
   - file: /var/jenkins_home/job_dsl/gitlab-postgres-restore-rehearsal.groovy
+  - file: /var/jenkins_home/job_dsl/gitlab-unity-bundle-e2e.groovy

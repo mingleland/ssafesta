@@ -164,8 +164,8 @@ app:
         - plaza-slot-01
         - plaza-slot-02
       # 배수 오름차순. tier = 인덱스 + 1 이고 0 은 낙첨이다 — 낙첨에는 행이 없고 남는 가중치가
-      # 그대로 낙첨 확률이다(0.781). 합 1.00, 기본 RTP = 0.20×2 + 0.01×3 + 0.009×10 = 0.52 이라
-      # 10코인 한 판 기대 손실 4.8코인, 즉 이 기계는 코인 소각처다. 지급 없는 10연속 베팅 뒤
+      # 그대로 낙첨 확률이다(0.718). 합 1.00, 기본 RTP = 0.25×2 + 0.02×3 + 0.012×10 = 0.68 이라
+      # 10코인 한 판 기대 손실 3.2코인, 즉 이 기계는 코인 소각처다. 지급 없는 10연속 베팅 뒤
       # 다음 1회는 service가 ×2(tier 1)로 보장한다. 보장 상태는 별도 저장하지 않고 원장에서 계산한다.
       #
       # ⚠️ 4번째 tier 를 붙이지 마라. Unity 가 tier 를 0..3 으로 자르고(HttpSlotMachineClient)
@@ -173,11 +173,11 @@ app:
       # 기동 시 거부하므로 여기서 조용히 어긋나지는 않는다.
       tiers:
         - multiplier: 2
-          weight: 0.20
+          weight: 0.25
         - multiplier: 3
-          weight: 0.01
+          weight: 0.02
         - multiplier: 10
-          weight: 0.009
+          weight: 0.012
 
   # Unity 월드 접속 정보 (spec 002 FR-010). 배포 값(wss / world.<domain> / 443)은
   # application-infra.yml 이 소유하고 이 세 기본값을 덮는다.
@@ -225,6 +225,34 @@ app:
   game:
     live-limit: 20
     deleted-limit: 5
+
+  # 오락실 캐비닛 (S15P21A604-942, GitLab #256). 자리 배정이 없는 자리를 거절하는 데만 쓰인다 —
+  # 조회(GET /arcade-machines)는 여전히 바인딩된 것만 돌려주고 machineId 의 정본은 Unity 씬이다.
+  # 번호는 가치 순이고 arcade-01 이 입구 정면 프라임 자리다. 씬이 쓰는 값과 글자 그대로 같아야 한다.
+  # 광장 오락기(plaza-arcade-*)는 운영자 고정물이라 여기 없다.
+  arcade:
+    seats-per-user: 2
+    machine-ids:
+      - arcade-01
+      - arcade-02
+      - arcade-03
+      - arcade-04
+      - arcade-05
+      - arcade-06
+      - arcade-07
+      - arcade-08
+      - arcade-09
+      - arcade-10
+      - arcade-11
+      - arcade-12
+      - arcade-13
+      - arcade-14
+      - arcade-15
+      - arcade-16
+      - arcade-17
+      - arcade-18
+      - arcade-19
+      - arcade-20
 
   # 내부 API 인증 (GitLab #102, 2026-08-25 확정 — 방향별 2토큰). 콤마 구분 1~2개이고
   # 송신은 첫 값, 검증은 목록 전체다. jwt-secret 과 같이 기본값을 두지 않는다 — 기본값이 있으면

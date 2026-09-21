@@ -4,8 +4,26 @@ def call() {
     final String headSha = sh(returnStdout: true, script: 'git rev-parse HEAD').trim()
     if (!(headSha ==~ /^[0-9a-f]{40}$/)) { error('GIT_COMMIT must be a full lowercase SHA') }
 
+    // deploy node 의 checkout 은 한 곳으로 모은다. Git LFS smudge 건너뛰기는 deploy agent 의
+    // compose env(infra/jenkins/agents/compose.yaml, !1285)가 단일 정본이다 — 파이프라인 withEnv 는
+    // 선언형 암묵 checkout 에 닿지 않아 중복이었다 (#259, build #535).
+    def deployCheckout = {
+        checkout scm
+        sh "git checkout --detach '${headSha}'"
+    }
+
     String range = "--branch develop --head '${headSha}'"
-    final String baseSha = env.GIT_BEFORE_SHA ?: env.GIT_PREVIOUS_COMMIT ?: env.GIT_PREVIOUS_SUCCESSFUL_COMMIT ?: ''
+    // detector 는 이번 push 의 diff 만 본다. game 을 고른 push 가 실패로 끝나고 develop 이 그 앞으로
+    // 지나가면 그 번들을 Demo 로 올릴 트리거가 사라진다 (#535 실패 → #542 는 이미 diff 밖). 그때만
+    // 운영자가 명시적으로 game 구간을 연다. 기본값 false 라 push 기반 판정은 그대로다 (#259).
+    final boolean forceGameDeploy = (params.DEPLOY_GAME_TO_DEMO ?: false).toString() == 'true'
+    // 배포를 유발한 push 가 실패로 끝나면(#536·#538 의 front) 그 diff 는 다음 push 의 범위 밖이라 Demo 가
+    // 영원히 뒤처진다. 운영자가 마지막으로 배포된 커밋을 base 로 지정해 그 범위를 다시 판정한다 (#259).
+    // 비우면 push 기반 판정 그대로다.
+    final String baseOverride = (params.CHANGE_BASE_SHA ?: '').toString().trim()
+    if (baseOverride && !(baseOverride ==~ /^[0-9a-f]{40}$/)) { error('CHANGE_BASE_SHA must be a full lowercase SHA') }
+    if (baseOverride) { echo "CHANGE_BASE_SHA override: ${baseOverride}" }
+    final String baseSha = baseOverride ?: env.GIT_BEFORE_SHA ?: env.GIT_PREVIOUS_COMMIT ?: env.GIT_PREVIOUS_SUCCESSFUL_COMMIT ?: ''
     if (baseSha) { range += " --base '${baseSha}'" }
 
     final String selectionText = sh(
@@ -27,7 +45,13 @@ def call() {
     final boolean gameBuildRequired = selection.gameBuildRequired as boolean
     if (buildComponents.contains('game') && !gameBuildRequired) { error('detector selected a game build without gameBuildRequired') }
 
-    if (validationComponents.isEmpty()) {
+    if (validationComponents.isEmpty() && !forceGameDeploy) {
+        if (selection.sharedCiChanged) {
+            stage('CI Static & Contract Tests') {
+                sh 'for t in infra/jenkins/tests/*.sh; do bash "$t"; done'
+                sh 'bash infra/unity-server/tests/run-static.sh'
+            }
+        }
         echo "NO_OP: ${selection.reasons.join(', ')}"
         return
     }
@@ -49,15 +73,14 @@ def call() {
     final List appComponents = buildComponents.findAll { it != 'game' }
     final String appComponentList = appComponents.join(',')
     // game 은 buildComponents 에 있을 때만(= gameBuildRequired) Unity 를 돌린다. 배포는 deployComponents 가 결정한다.
-    final boolean hasGame = buildComponents.contains('game')
-    final boolean deployGame = selectedDeploy.contains('game')
+    final boolean hasGame = buildComponents.contains('game') || forceGameDeploy
+    final boolean deployGame = selectedDeploy.contains('game') || forceGameDeploy
 
     final String appMetadataDir = "${artifactRoot}/release-metadata"
     final String appManifest = "${artifactRoot}/release-manifest.json"
     final String appBundle = "${releaseId}-app"
     final String gameMetadataDir = "${artifactRoot}/release-metadata-game"
     final String gameManifest = "${artifactRoot}/release-manifest-game.json"
-    final String gameBundle = "${releaseId}-game"
 
     def buildComponent = { String component, List stages = null ->
         load('infra/jenkins/pipelines/component.groovy').call([
@@ -74,7 +97,7 @@ def call() {
         buildComponent(component, component == 'game' ? ['validate'] : ['validate', 'test'])
     }
 
-    if (buildComponents.isEmpty()) {
+    if (buildComponents.isEmpty() && !forceGameDeploy) {
         echo "NO_OP: validation-only change (${selection.reasons.join(', ')})"
         return
     }
@@ -109,8 +132,7 @@ def call() {
         stage("Deploy Candidate Receipt (${label})") {
             node('deploy') {
                 ws("/home/jenkins/agent/deploy/workspaces/develop-candidate-receipt-${label}") {
-                    checkout scm
-                    sh "git checkout --detach '${headSha}'"
+                    deployCheckout()
                     unstash stashName
                     sh "infra/jenkins/scripts/transfer-local-images.sh --import --bundle '${bundle}' --transfer-dir '${transferDir}'"
                 }
@@ -127,8 +149,7 @@ def call() {
         stage('Deploy Selected Components') {
         node('deploy') {
             ws('/home/jenkins/agent/deploy/workspaces/develop-dev-batch') {
-                checkout scm
-                sh "git checkout --detach '${headSha}'"
+                deployCheckout()
                 unstash 'candidate-release-manifest'
 
                 final List credentialBindings = []
@@ -190,50 +211,167 @@ def call() {
 
     if (!hasGame) { return }
 
-    // 여기서부터 game 이다. 위의 앱 배포가 이미 끝났으므로 Unity 대기가 그 배포를 막지 않는다.
-    buildComponent('game')
-    stage('Collect Game Candidate Metadata') {
-        unstash 'candidate-metadata-game'
-    }
-    candidateManifest('game', 'game', gameMetadataDir, gameManifest, gameBundle, 'candidate-release-manifest-game')
+    // 여기서부터 game 이다 (Batch 2 Consumer-only). Jenkins 는 Unity Editor 를 돌리지 않는다 — WebGL zip 과 World image 는 Unity 담당자가
+    // 자기 개발환경에서 만들어 Registry unity-release-bundle/<8sha> 로 올린 Unity Release Bundle 에서만 온다.
+    //
+    //   Resolve  (deploy)  canonical festa-webgl/festa-world 가 있으면 재사용, bundle 이 있으면 intake, 둘 다 없으면 WAITING 으로 정상 종료
+    //   Intake   (deploy)  bundle 4 파일 download → zip/tar/metadata 검증 → docker image load
+    //   Consumer (deploy)  SCM identity gate → publish(idempotent) → release-set 검증 → World candidate → readiness → WebGL current → promote
+    final String gameDeployWs = '/home/jenkins/agent/deploy/workspaces/develop-game-deploy'
+    final String gitlabApi = env.GITLAB_API_V4_URL ?: 'https://lab.ssafy.com/api/v4'
+    final String gitlabProject = env.GITLAB_PROJECT_ID ?: '1443023'
+    final String readCredentialId = env.GITLAB_PACKAGE_READ_CREDENTIAL_ID ?: 'gitlab-package-read'
+    final String writeCredentialId = env.GITLAB_PACKAGE_WRITE_CREDENTIAL_ID ?: 'gitlab-package-write'
+    final String checkoutCredentialId = env.GITLAB_CHECKOUT_CREDENTIALS_ID ?: ''
+    if (checkoutCredentialId.trim().isEmpty()) { error('GITLAB_CHECKOUT_CREDENTIALS_ID is required for the game source-identity gate') }
 
-    if (!deployGame) {
-        echo 'NO_OP: game candidate built for CI only; deployment was not requested by the component detector'
+    def onDeploy = { Closure body ->
+        node('deploy') {
+            ws(gameDeployWs) {
+                deployCheckout()
+                body()
+            }
+        }
+    }
+
+    Map resolution = null
+    def withReadToken = { Closure body ->
+        withCredentials([usernamePassword(credentialsId: readCredentialId, usernameVariable: 'GITLAB_DEPLOY_USER', passwordVariable: 'GITLAB_DEPLOY_TOKEN')]) { body() }
+    }
+    final String candidateParam = (params.UNITY_ARTIFACT_CANDIDATE ?: '').trim()
+    stage('Resolve Game Artifacts') {
+        onDeploy {
+            withReadToken {
+                final String candidateArg = candidateParam ? " --candidate '${candidateParam}'" : ''
+                final String text = sh(returnStdout: true, script: "infra/jenkins/scripts/with-credentials.sh GITLAB_DEPLOY_TOKEN -- infra/jenkins/scripts/resolve-game-artifacts.sh --pipeline-commit '${headSha}'${candidateArg}").trim()
+                resolution = readJSON text: text, returnPojo: true
+                writeFile file: "${artifactRoot}/game-resolution.json", text: "${text}\n"
+                archiveArtifacts artifacts: "${artifactRoot}/game-resolution.json", allowEmptyArchive: false, fingerprint: true
+            }
+        }
+    }
+    final String decision = resolution.decision as String
+    final String artifactSourceCommit = (resolution.artifactSourceCommit ?: headSha) as String
+    final String gameReleaseId = artifactSourceCommit.substring(0, 8)
+    final String bundleDir = "${gameDeployWs}/unity-release-bundle/${gameReleaseId}"
+    if (!(decision in ['REGISTRY_COMPLETE', 'BUNDLE_AVAILABLE', 'PUBLISH_WEBGL', 'PUBLISH_WORLD', 'WAITING_FOR_UNITY_ARTIFACT'])) { error("unknown game artifact resolution: ${decision}") }
+    echo "GAME_ARTIFACTS: ${decision} (festa-webgl/${gameReleaseId}, festa-world/${gameReleaseId}, unity-release-bundle/${gameReleaseId}, matchedBy=${resolution.matchedBy ?: 'none'})"
+    if (decision == 'WAITING_FOR_UNITY_ARTIFACT') {
+        // Unity build 를 시작하지 않는다. 담당자가 bundle 을 올린 뒤 같은 SHA 를 다시 돌리면 여기서 이어진다.
+        echo "WAITING_FOR_UNITY_ARTIFACT: no canonical game artifacts and no Unity Release Bundle for ${gameReleaseId} (unitySourceSha=${resolution.unitySourceSha ?: headSha}); upload unity-release-bundle/${gameReleaseId} and rebuild this commit"
         return
     }
 
-    stage('Deploy Dedicated Server') {
-        node('deploy') {
-            ws('/home/jenkins/agent/deploy/workspaces/develop-game-deploy') {
-                checkout scm
-                sh "git checkout --detach '${headSha}'"
-                unstash 'candidate-release-manifest-game'
-                withEnv([
-                    "RELEASE_MANIFEST_PATH=${gameManifest}",
-                    "GAME_ENV_FILE=${env.GAME_ENV_FILE ?: '/srv/festa/config/game.env'}",
-                    "CONNECTION_TOKEN_SECRET_FILE=${env.CONNECTION_TOKEN_SECRET_FILE ?: '/opt/festa/secrets/dev-game-connection-token-secret'}",
-                    "GAME_DEPLOY_STATE_DIR=${env.GAME_DEPLOY_STATE_DIR ?: '/var/lib/festa-environments/demo/game'}",
-                    "CI_ARTIFACT_DIR=${artifactRoot}"
-                ]) {
-                    // deploy-game.sh 의 75 는 "배포된 WebGL 과 NGO 프리팹이 어긋나 교체하지 않았다" 는 뜻이다.
-                    // 실패가 아니라 건너뜀이다 — 돌고 있는 월드는 그대로이고, 무관한 커밋마다 빨간 빌드가 쌓이면
-                    // 사람이 검사를 꺼 버린다. deploy-dev-batch.sh 의 superseded 와 같은 관례를 쓴다.
-                    //
-                    // 각 스크립트를 개별 sh 스텝으로 부른다. 이전에는 한 덩어리 sh 문자열 안에 Groovy 의
-                    // error(...) 가 들어 있어 셸이 그것을 명령으로 실행했다 — 단계는 우연히 실패했지만
-                    // 의도한 메시지는 한 번도 나온 적이 없다.
-                    int deployStatus = sh(returnStatus: true, script: 'bash infra/unity-server/scripts/deploy-game.sh')
-                    if (deployStatus == 75) {
-                        currentBuild.result = 'NOT_BUILT'
-                        echo 'SKIPPED: deployed WebGL client and this game candidate disagree on the NGO prefab set; the running demo world was left untouched'
-                    } else if (deployStatus != 0) {
-                        error("Dedicated Server deployment failed with exit ${deployStatus}")
-                    } else if (sh(returnStatus: true, script: 'bash infra/unity-server/scripts/game-readiness.sh') == 0) {
-                        sh 'bash infra/unity-server/scripts/promote-game.sh'
-                    } else {
-                        sh 'bash infra/unity-server/scripts/rollback-game.sh'
-                        error('Dedicated Server deployment verification failed')
+    final String gameImageRef = "festa-game:${artifactSourceCommit}"
+    final String webglZip = "${bundleDir}/festa-webgl-release-${gameReleaseId}.zip"
+    String webglSha = resolution.registry?.webglSha256 ?: ''
+    String gameContentId = resolution.registry?.worldContentId ?: ''
+    final boolean needWebgl = decision in ['BUNDLE_AVAILABLE', 'PUBLISH_WEBGL']
+    final boolean needWorld = decision in ['BUNDLE_AVAILABLE', 'PUBLISH_WORLD']
+
+    stage('Publish Game Artifacts') {
+        onDeploy {
+            if (needWebgl || needWorld) {
+                // Intake: bundle 4 파일을 받아 검증하고 World image 를 로컬 docker 에 올린다. BUNDLE_OK <commit> <zipSha> <contentId>
+                withReadToken {
+                    final String bundleLine = sh(returnStdout: true, script: "infra/jenkins/scripts/with-credentials.sh GITLAB_DEPLOY_TOKEN -- infra/jenkins/scripts/intake-unity-release-bundle.sh --source-commit '${artifactSourceCommit}' --dest '${bundleDir}'").trim().readLines().last()
+                    final List parts = bundleLine.tokenize(' ')
+                    if (parts.size() != 4 || parts[0] != 'BUNDLE_OK') { error("Unity Release Bundle intake failed: ${bundleLine}") }
+                    if (needWebgl) { webglSha = parts[2] }
+                    gameContentId = parts[3]
+                }
+            } else if (!sh(returnStatus: true, script: "docker image inspect '${gameImageRef}' >/dev/null 2>&1").equals(0)) {
+                // REGISTRY_COMPLETE 인데 deploy agent 에 image 가 없다(예: image prune) → canonical festa-world tar 로 되살린다. 재빌드가 아니다.
+                withReadToken {
+                    sh "infra/jenkins/scripts/with-credentials.sh GITLAB_DEPLOY_TOKEN -- infra/deploy/scripts/load-production-world.sh --release-id '${gameReleaseId}' --sha256 '${resolution.registry.worldSha256}' --package-url '${gitlabApi}/projects/${gitlabProject}/packages/generic/festa-world/${gameReleaseId}/festa-world-release-${gameReleaseId}.tar' --image-ref '${gameImageRef}' --content-id '${gameContentId}'"
+                }
+            }
+            // Gate: commit 이 origin 에 있고 develop 조상이며 zip/image 가 그 commit 을 가리킨다. 실패하면 publish 로 못 간다.
+            withCredentials([gitUsernamePassword(credentialsId: checkoutCredentialId)]) {
+                sh "infra/jenkins/scripts/check-game-source-identity.sh --head '${headSha}' --source-commit '${artifactSourceCommit}'" +
+                   (needWebgl ? " --webgl-zip '${webglZip}'" : '') + " --image-ref '${gameImageRef}'"
+            }
+            final String localContentId = sh(returnStdout: true, script: "docker image inspect --format '{{.Id}}' '${gameImageRef}'").trim()
+            if (localContentId != gameContentId) { error("game image ${gameImageRef} on the deploy agent is ${localContentId}, expected ${gameContentId}") }
+            if (needWebgl || needWorld) {
+                withCredentials([string(credentialsId: writeCredentialId, variable: 'GITLAB_PACKAGE_TOKEN')]) {
+                    withEnv(["JENKINS_JOB=${env.JOB_NAME}", "JENKINS_BUILD_NUMBER=${env.BUILD_NUMBER}", "JENKINS_BUILD_URL=${env.BUILD_URL}"]) {
+                        if (needWebgl) {
+                            sh "infra/jenkins/scripts/with-credentials.sh GITLAB_PACKAGE_TOKEN -- infra/jenkins/scripts/publish-webgl-release.sh '${webglZip}' '${gameReleaseId}' --no-trigger"
+                        }
+                        if (needWorld) {
+                            sh "infra/jenkins/scripts/with-credentials.sh GITLAB_PACKAGE_TOKEN -- infra/jenkins/scripts/publish-world-release.sh --source-commit '${artifactSourceCommit}' --image-ref '${gameImageRef}' --content-id '${gameContentId}'"
+                        }
                     }
+                }
+            }
+            if (needWebgl) {
+                sh "infra/jenkins/scripts/validate-game-release-set.sh --source-commit '${artifactSourceCommit}' --webgl-zip '${webglZip}' --webgl-sha256 '${webglSha}' --image-ref '${gameImageRef}' --content-id '${gameContentId}'"
+                // bundle 사본은 게시 뒤 필요 없다 — Registry 가 정본이다.
+                sh "rm -rf -- '${bundleDir}'"
+            }
+            if (!(webglSha ==~ /^[0-9a-f]{64}$/)) { error('WebGL artifact SHA-256 is unknown after publish/resolve') }
+        }
+    }
+
+    if (!deployGame) {
+        echo 'NO_OP: game artifacts published for CI only; deployment was not requested by the component detector'
+        return
+    }
+
+    stage('Deploy Game Release Set') {
+        onDeploy {
+            // Demo readiness 는 Demo World host 만 검사한다 — 값이 없으면 추론하지 않고 멈춘다 (Batch 1).
+            if (!env.DEMO_WORLD_HOST?.trim()) { error('DEMO_WORLD_HOST is required on the deploy agent') }
+            // deploy-game.sh 는 release manifest 로 image identity 를 받는다. 재실행(SKIP/PUBLISH_*)에는 이번 run 의 manifest 가
+            // 없으므로 deploy agent 의 image 에서 같은 형식으로 다시 만든다 — 출처는 어차피 docker image inspect 다.
+            sh """
+                mkdir -p '${gameMetadataDir}'
+                printf '{"schemaVersion":"1.0.0","component":"game","sourceCommit":"%s","storageMode":"local-docker","imageRef":"%s","contentId":"%s"}\\n' '${artifactSourceCommit}' '${gameImageRef}' '${gameContentId}' >'${gameMetadataDir}/game.json'
+                printf '{"sourceCommit":"%s"}\\n' '${artifactSourceCommit}' >'${artifactRoot}/webgl-candidate-manifest.json'
+            """
+            withEnv([
+                'DEPLOY_COMPONENTS=game', "COMPONENT_METADATA_DIR=${gameMetadataDir}", "RELEASE_MANIFEST_PATH=${gameManifest}",
+                "RELEASE_ID=${releaseId}", 'SCM_PROVIDER=gitlab', 'SCM_REPOSITORY=s15-metaverse-game-sub1/S15P21A604', 'SCM_BRANCH=develop',
+                "CI_COMMIT_SHA=${headSha}", "JENKINS_JOB=${env.JOB_NAME}", "JENKINS_BUILD_NUMBER=${env.BUILD_NUMBER}", "JENKINS_BUILD_URL=${env.BUILD_URL}"
+            ]) { sh 'infra/deploy/scripts/build-release-manifest.sh' }
+
+            final String webglPackageUrl = "${env.GITLAB_API_V4_URL ?: 'https://lab.ssafy.com/api/v4'}/projects/${env.GITLAB_PROJECT_ID ?: '1443023'}/packages/generic/festa-webgl/${gameReleaseId}/festa-webgl-release-${gameReleaseId}.zip"
+            withEnv([
+                "RELEASE_MANIFEST_PATH=${gameManifest}",
+                // prefab guard 는 candidate WebGL(같은 commit) 과 대조한다 — 게시된 zip 의 sourceCommit 은 gate 가 이미 headSha 로 증명했다.
+                "WEBGL_MANIFEST_PATH=${artifactRoot}/webgl-candidate-manifest.json",
+                "WORLD_PUBLIC_HOST=${env.DEMO_WORLD_HOST}",
+                "GAME_ENV_FILE=${env.GAME_ENV_FILE ?: '/srv/festa/config/game.env'}",
+                "CONNECTION_TOKEN_SECRET_FILE=${env.CONNECTION_TOKEN_SECRET_FILE ?: '/opt/festa/secrets/dev-game-connection-token-secret'}",
+                "GAME_DEPLOY_STATE_DIR=${env.GAME_DEPLOY_STATE_DIR ?: '/var/lib/festa-environments/demo/game'}",
+                "CI_ARTIFACT_DIR=${artifactRoot}",
+                "WEBGL_EVIDENCE_PATH=${pwd()}/${artifactRoot}/webgl-deployment.json"
+            ]) {
+                // 순서가 계약이다: World candidate runtime → readiness → WebGL current flip(자체 verify/rollback) → promote.
+                // VERIFIED 전 실패는 canonical current(webgl current, batches/current/*.json)를 바꾸지 않는다; World runtime 만
+                // 잠시 candidate 였다가 rollback-game.sh 로 돌아온다. 각 스크립트는 개별 sh 스텝이다(한 덩어리 sh 안의 error() 사고 재발 방지).
+                int deployStatus = sh(returnStatus: true, script: 'bash infra/unity-server/scripts/deploy-game.sh')
+                if (deployStatus == 75) {
+                    currentBuild.result = 'NOT_BUILT'
+                    echo 'SKIPPED: candidate WebGL client and this game candidate disagree on the NGO prefab set; the running demo world was left untouched'
+                } else if (deployStatus != 0) {
+                    error("Dedicated Server deployment failed with exit ${deployStatus}")
+                } else if (sh(returnStatus: true, script: 'bash infra/unity-server/scripts/game-readiness.sh') != 0) {
+                    sh 'bash infra/unity-server/scripts/rollback-game.sh'
+                    error('Dedicated Server deployment verification failed')
+                } else {
+                    int webglStatus = -1
+                    withCredentials([usernamePassword(credentialsId: readCredentialId, usernameVariable: 'GITLAB_DEPLOY_USER', passwordVariable: 'GITLAB_DEPLOY_TOKEN')]) {
+                        webglStatus = sh(returnStatus: true, script: "infra/jenkins/scripts/with-credentials.sh GITLAB_DEPLOY_TOKEN -- infra/jenkins/scripts/deploy-webgl-release.sh --release-id '${gameReleaseId}' --sha256 '${webglSha}' --package-url '${webglPackageUrl}'")
+                    }
+                    archiveArtifacts artifacts: "${artifactRoot}/webgl-deployment.json", allowEmptyArchive: true, fingerprint: true
+                    if (webglStatus != 0) {
+                        // deploy-webgl-release.sh 는 자기 검증 실패 시 previous 로 스스로 되돌린다. World 도 같이 되돌린다.
+                        sh 'bash infra/unity-server/scripts/rollback-game.sh'
+                        error("WebGL release activation failed with exit ${webglStatus}")
+                    }
+                    sh 'bash infra/unity-server/scripts/promote-game.sh'
                 }
             }
         }

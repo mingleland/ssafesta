@@ -1,0 +1,10 @@
+{
+  "_comment": "Production/Demo 이벤트 상점의 운영 상품 정본. provision-operational-data.sh 가 관리자 API로 맞춘다. winnerCount 0 = 즉시교환, 1 이상 = 응모권(당첨 인원). 응모권(치킨)은 추첨 시각이 정해지면 closesAt 과 함께 추가한다 — docs/26.",
+  "prizes": [
+    { "name": "말랑이", "priceCoin": 700, "stock": 3, "winnerCount": 0, "closesAt": null, "active": true },
+    { "name": "마이구미", "priceCoin": 400, "stock": 10, "winnerCount": 0, "closesAt": null, "active": true },
+    { "name": "초코송이", "priceCoin": 500, "stock": 10, "winnerCount": 0, "closesAt": null, "active": true },
+    { "name": "아이스아메리카노", "priceCoin": 600, "stock": 5, "winnerCount": 0, "closesAt": null, "active": true },
+    { "name": "교보문고 10000원권", "priceCoin": 1000, "stock": 1, "winnerCount": 0, "closesAt": null, "active": true }
+  ]
+}

@@ -64,6 +64,14 @@ final class GameTestSupport {
         return write(body);
     }
 
+    /** 오락실 자리를 함께 고르는 게시 요청 (S15P21A604-942). */
+    static String publishRequest(int expectedRevision, String machineId) {
+        ObjectNode body = MAPPER.createObjectNode();
+        body.put("expectedRevision", expectedRevision);
+        body.put("machineId", machineId);
+        return write(body);
+    }
+
     /** The valid project, re-pointed at a game that actually exists in the test database. */
     static ObjectNode validProjectFor(Long gameId) {
         ObjectNode project = loadFixture("/game/fixtures/minimal-top-down-dialogue.json");

@@ -30,6 +30,10 @@ grep -Fq '127.0.0.1:${PROD_AI_HOST_PORT:-28082}:8000' "${compose}"
 grep -Fq '127.0.0.1:${PROD_WORLD_HOST_PORT:-27777}:7777' "${compose}"
 grep -Fq 'festa_prod_business' "${bootstrap}"
 grep -Fq 'festa_prod_ai' "${bootstrap}"
+# R2 는 Postgres 역할·Redis 네임스페이스와 달리 저장소 설정이 호스트 env 파일에 있어 정적으로 볼 수 없다.
+# 런타임 가드가 사라지면 production 이 다시 demo 버킷을 쓰게 되므로 그 문구가 남아 있는지 확인한다.
+grep -Fq 'Production shares the demo R2 bucket' "${verify}"
+grep -Fq 'Production back and ai disagree on R2_BUCKET' "${verify}"
 grep -Fq 'host-acl-file-hashed' "${bootstrap}"
 grep -Fq '~prod:*' "${bootstrap}"
 grep -Fq '~prod:ai:*' "${bootstrap}"
@@ -67,9 +71,22 @@ grep -Fq 'server_name demo.${ROOT_DOMAIN};' "${demo_template}"
 if grep -Fq 'demo.${ROOT_DOMAIN} ${ROOT_DOMAIN}' "${demo_template}"; then fail 'Demo still claims the root domain'; fi
 grep -Fq 'proxy_pass http://127.0.0.1:28081' "${prod_template}"
 grep -Fq 'location /oauth2/' "${prod_template}"
+# Game Studio 초안 저장(최대 2,000,000 bytes)이 nginx 기본 1m 한도에 걸려 413 이 되는 것을 막는다 (GitLab #207).
+grep -Fq 'location /api/ { client_max_body_size 4m;' "${prod_template}"
 grep -Fq 'location /login/oauth2/' "${prod_template}"
 grep -Fq 'alias /srv/festa/webgl/prod/current/' "${prod_template}"
 grep -Fq 'proxy_pass http://127.0.0.1:27777' "${world_template}"
+# Demo World 는 demo.<root> 의 루트 WebSocket Upgrade 로 17777 에 들어간다. world.<root> 는 Production world-prod.conf 만 가진다 (Batch 1).
+demo_world_template="${repo_root}/infra/unity-server/nginx/world.conf.template"
+if grep -Fq 'world.${ROOT_DOMAIN}' "${demo_world_template}"; then fail 'dedicated Demo world vhost template still claims the Production World host'; fi
+if grep -Fq 'server_name world.${ROOT_DOMAIN}' "${demo_template}"; then fail 'demo site must not claim the Production World host'; fi
+grep -Fq 'websocket http://127.0.0.1:17777;' "${demo_template}" || fail 'demo site must route root WebSocket Upgrade to the Demo World port'
+grep -Fq 'default   http://127.0.0.1:18080;' "${demo_template}" || fail 'demo site must keep plain root traffic on the Demo Front'
+if grep -Fq 'websocket http://127.0.0.1:27777' "${demo_template}"; then fail 'demo site must not route to the Production World'; fi
+grep -Fq 'proxy_pass $festa_demo_root_upstream;' "${demo_template}" || fail 'demo root location must dispatch by Upgrade header'
+grep -Fq 'DEMO_WORLD_HOST: ${DEMO_WORLD_HOST:-demo.${ROOT_DOMAIN' "${agents}" || fail 'deploy agent must inject DEMO_WORLD_HOST'
+grep -Fq 'WORLD_HOST: demo.${ROOT_DOMAIN' "${repo_root}/infra/environments/compose/demo/back.yaml" || fail 'Demo back must issue demo.<root> world tokens'
+grep -Fq 'WORLD_PUBLIC_HOST=${env.DEMO_WORLD_HOST}' "${repo_root}/infra/jenkins/pipelines/develop.groovy" || fail 'develop pipeline must pass the Demo World host to readiness'
 if grep -Eq 'proxy_pass[[:space:]]+http://127\.0\.0\.1:28(080|081|082)' "${maintenance_template}"; then fail 'maintenance config exposes candidate ports'; fi
 work="$(mktemp -d)"; trap 'rm -rf "${work}"' EXIT
 touch "${work}/back.env" "${work}/ai.env"

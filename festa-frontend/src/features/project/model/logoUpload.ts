@@ -1,22 +1,22 @@
-// 프로젝트 로고 파일 선택·업로드의 FE 경계 — BE ProjectLogoController(#241, S15P21A604-895)의
-// 3단계 계약(시작 → presigned PUT → 완료)을 이 함수 하나가 대신한다.
-import { api, isApiError } from '../../../shared/api/client';
+// 프로젝트 로고를 부스 소유권으로 업로드하고 서버가 검증한 경로만 편집 폼에 돌려준다 (#241).
+import { api, getAccessToken } from '../../../shared/api/client';
+import { apiBaseUrl } from '../../../shared/config/runtime';
 
-export const PROJECT_LOGO_ACCEPTED_TYPES = ['image/png', 'image/jpeg', 'image/webp'] as const;
+export const PROJECT_LOGO_ACCEPTED_TYPES = ['image/png', 'image/jpeg', 'image/gif', 'image/webp'] as const;
 export const PROJECT_LOGO_ACCEPT = PROJECT_LOGO_ACCEPTED_TYPES.join(',');
 
+// 실제 바이트·4096px·애니메이션 여부의 최종 판정은 complete가 담당한다.
 export const PROJECT_LOGO_PREVIEW_MAX_BYTES = 5 * 1024 * 1024;
-export const PROJECT_LOGO_UPLOAD_AVAILABLE: boolean = true;
 
 export interface ProjectLogoUploadResult {
   thumbnailUrl: string;
 }
 
-export type ProjectLogoUploadAdapter = (file: File, boothId: number) => Promise<ProjectLogoUploadResult>;
+export type ProjectLogoUploadAdapter = (boothId: number, file: File) => Promise<ProjectLogoUploadResult>;
 
 export function validateProjectLogo(file: File): string | null {
   if (!PROJECT_LOGO_ACCEPTED_TYPES.includes(file.type as (typeof PROJECT_LOGO_ACCEPTED_TYPES)[number])) {
-    return 'PNG, JPG, WebP 이미지만 선택할 수 있습니다.';
+    return 'PNG, JPG, GIF, WebP 이미지만 선택할 수 있습니다.';
   }
   if (file.size > PROJECT_LOGO_PREVIEW_MAX_BYTES) {
     return '이미지는 5MB 이하만 선택할 수 있습니다.';
@@ -24,69 +24,53 @@ export function validateProjectLogo(file: File): string | null {
   return null;
 }
 
-/** 시작 응답 — presigned PUT 자리. 10분 유효이다. */
-interface LogoGrant {
-  logoId: string;
-  expiresAt: string;
-  uploadUrl: string;
-  requiredContentType: string;
-}
-
-/** 완료 응답 — 검증 실패도 200 이고 status 로 갈린다. 실패한 자리는 되살아나지 않는다. */
-interface LogoView {
-  logoId: string;
-  status: 'READY' | 'FAILED' | string;
-  url: string | null;
-  failureRule: string | null;
-}
-
 const FAILURE_MESSAGES: Record<string, string> = {
   MIME_NOT_ALLOWED: '지원하지 않는 이미지 형식입니다.',
-  SIZE_EXCEEDED: '이미지는 5MB 이하만 업로드할 수 있습니다.',
-  DIMENSION_EXCEEDED: '이미지 한 변이 4096px 이하여야 합니다.',
-  DECODE_FAILED: '이미지 파일을 읽을 수 없습니다. 손상되지 않은 파일로 다시 시도해 주세요.',
-  UPLOAD_MISSING: '업로드가 저장소에 도달하지 않았습니다. 다시 시도해 주세요.',
-  GRANT_EXPIRED: '업로드 유효 시간(10분)이 지났습니다. 다시 시도해 주세요.',
+  SIZE_EXCEEDED: '이미지는 5MB 이하만 선택할 수 있습니다.',
+  DIMENSION_EXCEEDED: '이미지의 가로와 세로는 각각 4096px 이하여야 합니다.',
+  DECODE_FAILED: '이미지를 읽을 수 없습니다. 다른 파일을 선택해 주세요.',
+  UPLOAD_MISSING: '업로드된 파일을 찾지 못했습니다. 다시 선택해 주세요.',
+  GRANT_EXPIRED: '업로드 시간이 만료됐습니다. 다시 선택해 주세요.',
 };
 
-/** 업로드 실패를 사용자 문장으로 바꾼다 — status·code 는 화면에 내보내지 않는다 */
-export function describeLogoUploadError(error: unknown): string {
-  if (isApiError(error)) {
-    if (error.status === 403) return '업로드 권한이 없습니다. 부스 소유자(편집자) 계정으로 시도해 주세요.';
-    if (error.code === 'PROJECT_LOGO_QUOTA_EXCEEDED') return '저장되지 않은 이미지가 너무 많습니다. 잠시 후 다시 시도해 주세요.';
-    if (error.code === 'BOOTH_LEASE_EXPIRED') return '부스 임대가 만료되어 업로드할 수 없습니다.';
-    if (error.status === 404 || error.status === 405) return '서버에 업로드 기능이 아직 배포되지 않았습니다. 배포 후 다시 시도해 주세요.';
+export const uploadProjectLogo: ProjectLogoUploadAdapter = async (boothId, file) => {
+  const invalid = validateProjectLogo(file);
+  if (invalid) throw new Error(invalid);
+  if (!Number.isSafeInteger(boothId) || boothId <= 0) throw new Error('부스 정보를 확인해 주세요.');
+  const path = `/api/v1/booths/${boothId}/project-logos`;
+  const grant = await api<{ logoId: string; uploadUrl: string; requiredContentType: string }>(path, {
+    method: 'POST', body: JSON.stringify({ contentType: file.type, byteSize: file.size }),
+  });
+  if (typeof grant.logoId !== 'string' || !/^[A-Za-z0-9_-]+$/.test(grant.logoId)
+    || typeof grant.uploadUrl !== 'string' || !/^https?:\/\//.test(grant.uploadUrl)
+    || typeof grant.requiredContentType !== 'string') throw new Error('업로드 응답을 확인할 수 없습니다.');
+  // 서명된 저장소 요청에는 앱의 인증 헤더나 쿠키를 보내지 않는다.
+  const response = await fetch(grant.uploadUrl, {
+    method: 'PUT', headers: { 'Content-Type': grant.requiredContentType }, body: file,
+    credentials: 'omit', signal: AbortSignal.timeout(60_000),
+  });
+  if (!response.ok) throw new Error('이미지를 업로드하지 못했습니다. 다시 선택해 주세요.');
+  const result = await api<{ status: string; url: string | null; failureRule: string | null }>(
+    `${path}/${grant.logoId}/complete`, { method: 'POST' },
+  );
+  if (result.status !== 'READY') {
+    throw new Error(FAILURE_MESSAGES[result.failureRule ?? ''] ?? '이미지 검증에 실패했습니다. 다른 파일을 선택해 주세요.');
   }
-  if (error instanceof Error && error.message !== '') return error.message;
-  return '업로드에 실패했습니다. 잠시 후 다시 시도해 주세요.';
+  if (result.url !== `${path}/${grant.logoId}/content`) throw new Error('업로드한 이미지 경로가 일치하지 않습니다.');
+  return { thumbnailUrl: result.url };
+};
+
+export function isManagedProjectLogo(url: string): boolean {
+  return /^\/api\/v1\/booths\/[1-9]\d*\/project-logos\/[A-Za-z0-9_-]+\/content$/.test(url);
 }
 
-/**
- * presigned PUT 은 raw fetch 로 보낸다 — 저장소는 FE 오리진 밖이고 서명에 Authorization 헤더가
- * 포함되지 않았으므로, api() 를 타면 그 헤더가 끼어들어 저장소가 403 으로 거절한다.
- */
-export const uploadProjectLogo: ProjectLogoUploadAdapter = async (file, boothId) => {
-  const grant = await api<LogoGrant>(`/api/v1/booths/${boothId}/project-logos`, {
-    method: 'POST',
-    body: JSON.stringify({ contentType: file.type, byteSize: file.size }),
+// 미게시 로고는 편집자 인증이 필요하다. 외부 URL에는 Bearer를 보내지 않는다.
+export async function fetchProjectLogo(url: string, signal: AbortSignal): Promise<Blob> {
+  if (!isManagedProjectLogo(url)) throw new Error('프로젝트 로고 경로가 아닙니다.');
+  const token = getAccessToken();
+  const response = await fetch(`${apiBaseUrl()}${url}`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : undefined, signal,
   });
-
-  const put = await fetch(grant.uploadUrl, {
-    method: 'PUT',
-    headers: { 'Content-Type': grant.requiredContentType },
-    body: file,
-  });
-  if (!put.ok) throw new Error('이미지를 저장소에 올리지 못했습니다. 다시 시도해 주세요.');
-
-  const view = await api<LogoView>(
-    `/api/v1/booths/${boothId}/project-logos/${encodeURIComponent(grant.logoId)}/complete`,
-    { method: 'POST' },
-  );
-  if (view.status !== 'READY' || view.url === null) {
-    throw new Error(
-      FAILURE_MESSAGES[view.failureRule ?? ''] ?? '이미지 검증에 실패했습니다. 다른 이미지로 다시 시도해 주세요.',
-    );
-  }
-  return { thumbnailUrl: view.url };
-};
-
+  if (!response.ok) throw new Error('현재 프로젝트 로고를 불러오지 못했습니다.');
+  return response.blob();
+}

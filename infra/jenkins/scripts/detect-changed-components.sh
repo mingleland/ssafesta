@@ -83,6 +83,8 @@ runtime_shared_exact = {
 ci_only_shared_exact = {
     "Jenkinsfile",
     ".gitlab-ci.yml",
+    # LFS 추적 규칙 — 검증 범위를 넓히고(아래 game_build_exact 로) Unity 후보를 다시 만든다 (Batch 2).
+    ".gitattributes",
     "infra/.env.example",
     "infra/environments/config/environments/demo.env.example",
 }
@@ -117,7 +119,6 @@ docs_prefixes = (
 )
 docs_exact = {
     ".gitignore",
-    ".gitattributes",
 }
 # 배포 기계 자체를 검증하는 파일과 legacy dev 환경 전용 설정. 컴포넌트를 고르지 않는다.
 # (dev.json/game.compose.yaml 등 game_build_exact 에 있는 항목은 아래 gameBuildRequired 계산에는 그대로 참여한다.)
@@ -127,6 +128,8 @@ validation_only_prefixes = (
     "infra/environments/tests/",
     "infra/environments/compose/dev/",
     "infra/deploy/compose/dev/",
+    # 운영자가 API 로 주입하는 데이터 정본. 어떤 이미지에도 들어가지 않는다.
+    "infra/deploy/data/",
 )
 validation_only_exact = {
     "infra/environments/config/manifests/dev.json",
@@ -144,6 +147,8 @@ game_runtime_prefixes = (
 )
 game_build_exact = {
     "infra/versions.env",
+    # LFS 규칙은 checkout 에 실제로 들어오는 binary 를 바꾼다 (Batch 2).
+    ".gitattributes",
     "infra/jenkins/pipelines/component.groovy",
     "infra/jenkins/scripts/with-credentials.sh",
     "infra/jenkins/scripts/transfer-local-images.sh",
@@ -201,7 +206,9 @@ game_build_required = any(
 )
 
 shared = ci_shared or runtime_shared
-validation = set(order) if shared else set(touched)
+# runtime_shared 는 demo 런타임 공유 파일(demo/base.yaml 등)이라 app 3종 검증/빌드/배포를 수반한다.
+# ci_only_shared 는 파이프라인/스크립트/설정 변경이므로 무관한 app 전체 검증으로 넓히지 않는다 (Batch 2 최적화).
+validation = (set(apps) if runtime_shared else set()) | set(touched) | ({"game"} if game_build_required else set())
 build = (touched & apps) | (apps if runtime_shared else set()) | ({"game"} if game_build_required else set())
 deploy = (touched & apps) | (apps if runtime_shared else set()) | ({"game"} if ("game" in touched and game_build_required) else set())
 

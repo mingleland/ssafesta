@@ -539,12 +539,17 @@ public class AiDocumentService {
                                 "이 문서를 교체하는 작업이 진행 중입니다. 완료된 뒤 다시 시도해 주세요.");
                     });
 
-            jdbc.update("""
-                    INSERT INTO game_asset_delete_queue (provider, storage_bucket, object_key)
-                    VALUES (?, ?, ?)
-                    ON CONFLICT (provider, storage_bucket, object_key) DO NOTHING
-                    """, document.getStorageProvider(), document.getStorageBucket(),
-                    document.getObjectKey());
+            // EXPIRED 문서는 sweeper 가 원본을 지운 뒤 s3_key 를 NULL 로 비운다 — 저장소에 지울 것이
+            // 없는 정상 상태다. 그 행을 큐에 넣으면 object_key NOT NULL 로 500 이 나 삭제 자체가 막혔다
+            // (Demo 문서 7, S15P21A604-939). 좌표가 있을 때만 큐로 옮기고 행 삭제는 그대로 진행한다.
+            if (document.getObjectKey() != null) {
+                jdbc.update("""
+                        INSERT INTO game_asset_delete_queue (provider, storage_bucket, object_key)
+                        VALUES (?, ?, ?)
+                        ON CONFLICT (provider, storage_bucket, object_key) DO NOTHING
+                        """, document.getStorageProvider(), document.getStorageBucket(),
+                        document.getObjectKey());
+            }
             documents.delete(document);
         });
     }
