@@ -17,6 +17,10 @@ def call() {
     }
 
     String range = "--branch develop --head '${headSha}'"
+    // detector 는 이번 push 의 diff 만 본다. game 을 고른 push 가 실패로 끝나고 develop 이 그 앞으로
+    // 지나가면 그 번들을 Demo 로 올릴 트리거가 사라진다 (#535 실패 → #542 는 이미 diff 밖). 그때만
+    // 운영자가 명시적으로 game 구간을 연다. 기본값 false 라 push 기반 판정은 그대로다 (#259).
+    final boolean forceGameDeploy = (params.DEPLOY_GAME_TO_DEMO ?: false).toString() == 'true'
     final String baseSha = env.GIT_BEFORE_SHA ?: env.GIT_PREVIOUS_COMMIT ?: env.GIT_PREVIOUS_SUCCESSFUL_COMMIT ?: ''
     if (baseSha) { range += " --base '${baseSha}'" }
 
@@ -39,7 +43,7 @@ def call() {
     final boolean gameBuildRequired = selection.gameBuildRequired as boolean
     if (buildComponents.contains('game') && !gameBuildRequired) { error('detector selected a game build without gameBuildRequired') }
 
-    if (validationComponents.isEmpty()) {
+    if (validationComponents.isEmpty() && !forceGameDeploy) {
         if (selection.sharedCiChanged) {
             stage('CI Static & Contract Tests') {
                 sh 'for t in infra/jenkins/tests/*.sh; do bash "$t"; done'
@@ -67,8 +71,8 @@ def call() {
     final List appComponents = buildComponents.findAll { it != 'game' }
     final String appComponentList = appComponents.join(',')
     // game 은 buildComponents 에 있을 때만(= gameBuildRequired) Unity 를 돌린다. 배포는 deployComponents 가 결정한다.
-    final boolean hasGame = buildComponents.contains('game')
-    final boolean deployGame = selectedDeploy.contains('game')
+    final boolean hasGame = buildComponents.contains('game') || forceGameDeploy
+    final boolean deployGame = selectedDeploy.contains('game') || forceGameDeploy
 
     final String appMetadataDir = "${artifactRoot}/release-metadata"
     final String appManifest = "${artifactRoot}/release-manifest.json"
@@ -91,7 +95,7 @@ def call() {
         buildComponent(component, component == 'game' ? ['validate'] : ['validate', 'test'])
     }
 
-    if (buildComponents.isEmpty()) {
+    if (buildComponents.isEmpty() && !forceGameDeploy) {
         echo "NO_OP: validation-only change (${selection.reasons.join(', ')})"
         return
     }
