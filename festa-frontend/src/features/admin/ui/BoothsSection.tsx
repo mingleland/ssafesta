@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { adminApi } from '../../../entities/admin/api.select';
 import type { AdminBoothView } from '../../../entities/admin/types';
+import { notifyBoothSlotChanged } from '../../../unity/host/boothLayoutBridge';
 import { showToast } from '../../../shared/ui/toast/toastStore';
 import { ConfirmDialog, Empty, ErrorBanner, Loading, ReasonField, fmtTime, reasonProblem } from './common';
 
@@ -13,7 +14,13 @@ export function BoothsSection() {
   const [reason, setReason] = useState('');
   const unpublish = useMutation({
     mutationFn: (b: AdminBoothView) => adminApi.unpublishBooth(b.boothId, reason.trim()),
-    onSuccess: (_v, b) => { showToast(`${b.boothName ?? `부스 #${b.boothId}`} 를 비공개했습니다`, 'success'); setTarget(null); setReason(''); void qc.invalidateQueries({ queryKey: ['admin', 'booths'] }); },
+    onSuccess: (_v, b) => {
+      showToast(`${b.boothName ?? `부스 #${b.boothId}`} 를 비공개했습니다`, 'success');
+      // 강제 비공개는 임대까지 회수한다(S15P21A604-927) — 상주 월드가 게시본을 한 번만 읽으므로
+      // 슬롯 변경을 알리지 않으면 그 칸이 옛 모습으로 남는다(GitLab #254).
+      notifyBoothSlotChanged(b.slotId);
+      setTarget(null); setReason(''); void qc.invalidateQueries({ queryKey: ['admin', 'booths'] });
+    },
   });
 
   return (
