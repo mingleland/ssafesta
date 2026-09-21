@@ -12,7 +12,7 @@ import { useSyncExternalStore } from 'react';
 import type { ManagementPanel } from './managementPanel';
 
 /** ESC 메뉴가 여는 하위 화면 */
-export type MenuPanel = 'myInfo' | 'guide' | 'settings' | 'admin' | 'missions';
+export type MenuPanel = 'myInfo' | 'guide' | 'settings' | 'admin' | 'missions' | 'feedback';
 
 /**
  * World 하단 개발용 상호작용 트리거(DEV_ONLY)를 켤지 — dev 빌드 + 명시적 플래그를 동시에 요구한다.

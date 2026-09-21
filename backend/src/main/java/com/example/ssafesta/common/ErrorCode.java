@@ -104,6 +104,9 @@ public enum ErrorCode {
      */
     EVENT_PURCHASE_FULFILLMENT_INVALID(HttpStatus.CONFLICT, "허용되지 않는 처리 상태 전이입니다."),
 
+    // ── 피드백 (S15P21A604-953) ───────────────────────────────────────────
+    FEEDBACK_NOT_FOUND(HttpStatus.NOT_FOUND, "피드백을 찾을 수 없습니다."),
+
     // ── 부스 · 임대 (spec 004) ──────────────────────────────────────────────
     BOOTH_NOT_FOUND(HttpStatus.NOT_FOUND, "부스를 찾을 수 없습니다."),
     BOOTH_SLOT_NOT_FOUND(HttpStatus.NOT_FOUND, "슬롯을 찾을 수 없습니다."),
