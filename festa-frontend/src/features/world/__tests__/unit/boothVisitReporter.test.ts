@@ -2,6 +2,9 @@
 //
 // 경계 판정은 boothVisitTracker.test 가 본다. 여기서 보는 것은 **무엇이 서버로 나가고 무엇이
 // 나가지 않는가** 하나다.
+//
+// Unity 가 싣는 번호는 슬롯이고 방문 API 는 boothId 를 받는다. 둘을 일부러 다른 값으로 둔
+// 슬롯 목록을 물려, 옮겨지지 않으면 바로 드러나게 한다(T-177).
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { __resetSessionForTests, setGuestSession, setMemberSession } from '../../../auth/model/session';
 import {
@@ -17,6 +20,12 @@ vi.mock('../../../../entities/booth/visitApi', () => ({
   exitBooth: (...args: unknown[]) => exitBooth(...args),
 }));
 
+// 슬롯 7 → 부스 71, 슬롯 8 → 부스 82. 슬롯 9 는 빈 칸이다.
+const getSlots = vi.fn();
+vi.mock('../../../../entities/booth/leaseApi.select', () => ({
+  leaseApi: { getSlots: () => getSlots() },
+}));
+
 let stop: () => void;
 let warn: ReturnType<typeof vi.spyOn>;
 
@@ -25,6 +34,13 @@ beforeEach(async () => {
   __resetSessionForTests();
   enterBooth.mockReset().mockResolvedValue({ visitId: 'v-1', enteredAt: 'now' });
   exitBooth.mockReset().mockResolvedValue(undefined);
+  getSlots.mockReset().mockResolvedValue([
+    { slotId: 7, boothId: 71 },
+    { slotId: 8, boothId: 82 },
+    { slotId: 9, boothId: null },
+  ]);
+  const { queryClient } = await import('../../../../app/providers/queryClient');
+  queryClient.clear();
   warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
   const { startBoothVisitReporting } = await import('../../model/boothVisitReporter');
   stop = startBoothVisitReporting();
@@ -43,12 +59,12 @@ const inside = (boothId: number | null) => ({ insideBooth: true, boothId });
 const outside = { insideBooth: false, boothId: null };
 
 describe('부스 방문 발신 (-690)', () => {
-  it('입장은 본문 없이 부스 번호로만 나간다', async () => {
+  it('입장은 슬롯 번호가 아니라 옮겨진 boothId 로 나간다', async () => {
     member();
     applyWorldContextChange(inside(7));
     await flush();
 
-    expect(enterBooth).toHaveBeenCalledWith(7);
+    expect(enterBooth).toHaveBeenCalledWith(71);
     expect(enterBooth).toHaveBeenCalledTimes(1);
   });
 
@@ -59,7 +75,7 @@ describe('부스 방문 발신 (-690)', () => {
     applyWorldContextChange(outside);
     await flush();
 
-    expect(exitBooth).toHaveBeenCalledWith(7, 'v-1');
+    expect(exitBooth).toHaveBeenCalledWith(71, 'v-1');
   });
 
   it('같은 상태가 반복돼도 입장을 두 번 보내지 않는다', async () => {
@@ -78,7 +94,7 @@ describe('부스 방문 발신 (-690)', () => {
     applyWorldContextChange(outside);
     await flush();
 
-    expect(enterBooth).toHaveBeenCalledWith(7);
+    expect(enterBooth).toHaveBeenCalledWith(71);
     expect(exitBooth).not.toHaveBeenCalled();
   });
 
@@ -91,6 +107,18 @@ describe('부스 방문 발신 (-690)', () => {
 
     expect(enterBooth).not.toHaveBeenCalled();
     expect(exitBooth).not.toHaveBeenCalled();
+  });
+
+  it('빈 슬롯이면 아무것도 보내지 않는다 — 지어낸 번호로 남의 부스에 적지 않는다', async () => {
+    member();
+    applyWorldContextChange(inside(9));
+    await flush();
+    applyWorldContextChange(outside);
+    await flush();
+
+    expect(enterBooth).not.toHaveBeenCalled();
+    expect(exitBooth).not.toHaveBeenCalled();
+    expect(warn).toHaveBeenCalled();
   });
 
   it('입장이 실패하면 퇴장도 보내지 않는다 — 서버에 닫을 행이 없다', async () => {
@@ -133,6 +161,6 @@ describe('부스 방문 발신 (-690)', () => {
     applyWorldContextChange(outside);
     await flush();
 
-    expect(exitBooth).not.toHaveBeenCalledWith(8, 'stale');
+    expect(exitBooth).not.toHaveBeenCalledWith(82, 'stale');
   });
 });
