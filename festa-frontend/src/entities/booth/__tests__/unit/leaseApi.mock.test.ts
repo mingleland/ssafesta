@@ -5,6 +5,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { __resetLeaseMockForTests, getMyBooth, getSlots, leaseSlot } from '../../leaseApi.mock';
 import { __resetWalletMockForTests, getWallet } from '../../../wallet/api.mock';
 import { isApiError } from '../../../../shared/api/client';
+import { LEASE_COIN_COST } from '../../types';
+
+// 가격은 BE 설정(app.lease.price-coin)이 정본이라 움직인다 — 숫자를 여기 박아 두면 값이 바뀔 때마다
+// 계약과 무관한 이 파일이 깨진다 (S15P21A604-950). 남는 잔액만 상수로 계산한다.
+const AFTER_LEASE = 200 - LEASE_COIN_COST;
 
 beforeEach(() => {
   __resetLeaseMockForTests();
@@ -44,11 +49,11 @@ describe('getSlots — 목록', () => {
 });
 
 describe('leaseSlot — 임대·오류', () => {
-  it('임대 성공 시 100 차감, 목록에 OCCUPIED·mine 반영', async () => {
+  it('임대 성공 시 임대료만큼 차감, 목록에 OCCUPIED·mine 반영', async () => {
     const r = await leaseSlot(1);
-    expect(r.chargedCoin).toBe(100);
-    expect(r.balanceAfter).toBe(100);
-    expect((await getWallet()).balance).toBe(100);
+    expect(r.chargedCoin).toBe(LEASE_COIN_COST);
+    expect(r.balanceAfter).toBe(AFTER_LEASE);
+    expect((await getWallet()).balance).toBe(AFTER_LEASE);
     const slot = (await getSlots()).find((s) => s.slotId === 1);
     expect(slot?.status).toBe('OCCUPIED');
     expect(slot?.mine).toBe(true);
@@ -58,8 +63,8 @@ describe('leaseSlot — 임대·오류', () => {
     const first = await leaseSlot(1);
     const again = await leaseSlot(1);
     expect(again.leaseId).toBe(first.leaseId);
-    expect((await getWallet()).balance).toBe(100); // 두 번째 차감 없음
-    expect(again.balanceAfter).toBe(100);
+    expect((await getWallet()).balance).toBe(AFTER_LEASE); // 두 번째 차감 없음
+    expect(again.balanceAfter).toBe(AFTER_LEASE);
   });
 
   it('활성 임대 보유 중 다른 슬롯 → ACTIVE_LEASE_LIMIT', async () => {

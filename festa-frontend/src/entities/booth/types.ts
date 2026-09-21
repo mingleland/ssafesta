@@ -46,8 +46,12 @@ export interface BoothFacade {
 export type FacadePutRequest = BoothFacade & { name?: string };
 
 // 1일 임대료. 서버가 실제 차감액의 권위이고(LeaseResponse.chargedCoin) 이 값은 **요청 전 안내용**이다 —
-// 확인 모달과 버튼 라벨이 같은 숫자를 말하게 하려고 한 곳에 둔다. 계약 예시도 100(lease-api.md §응답).
-export const LEASE_COIN_COST = 100;
+// 확인 모달과 버튼 라벨이 같은 숫자를 말하게 하려고 한 곳에 둔다.
+//
+// **정본은 BE `app.lease.price-coin` 이다** (S15P21A604-856 에서 100 → 50). 응답에 가격을 싣는
+// endpoint 가 없어 여기서 한 번 더 적는데, 그래서 BE 가 값을 바꾸면 이 줄도 같이 고쳐야 한다 —
+// 한동안 어긋나 있어서 모달은 100 이라 적고 실제로는 50 만 빠졌다 (S15P21A604-950).
+export const LEASE_COIN_COST = 50;
 
 // 004 소유 상태값 — 만료 판정은 서버 읽기 시점이 권위(C-02), FE는 이 값을 만들지 않는다
 export type LeaseStatus = 'ACTIVE' | 'EXPIRED';
