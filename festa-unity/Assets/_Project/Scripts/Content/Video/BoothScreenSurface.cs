@@ -7,6 +7,7 @@ using System.Text.RegularExpressions;
 using Festa.Booth;
 using UnityEngine;
 using UnityEngine.Networking;
+using UnityEngine.SceneManagement;
 
 namespace Festa.Content
 {
@@ -34,9 +35,28 @@ namespace Festa.Content
         static readonly Dictionary<string, Texture> TextureCache = new();
         /// <summary>처음 진입 때 같은 URL을 여러 화면이 동시에 받는 경우도 한 요청으로 합친다.</summary>
         static readonly Dictionary<string, Task<Texture>> TextureLoads = new();
+        static int s_cacheGeneration;
         static readonly Regex ManagedProjectLogoPath = new(
             @"^/api/v1/booths/[1-9]\d*/project-logos/[A-Za-z0-9_-]+/content$",
             RegexOptions.CultureInvariant);
+
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
+        static void InstallCacheCleanup()
+        {
+            SceneManager.sceneUnloaded -= OnSceneUnloaded;
+            SceneManager.sceneUnloaded += OnSceneUnloaded;
+        }
+
+        static void OnSceneUnloaded(Scene _)
+        {
+            // 다운로드 텍스처는 Resources 소유가 아니다. 씬 전환 뒤 정적 캐시에 남겨 두면
+            // 로고 URL이 바뀔수록 WebGL 메모리가 회수되지 않는다.
+            s_cacheGeneration++;
+            foreach (var texture in TextureCache.Values)
+                if (texture != null) Destroy(texture);
+            TextureCache.Clear();
+            TextureLoads.Clear();
+        }
 
         bool _painted;
         Material _screenMaterial;
@@ -216,12 +236,19 @@ namespace Festa.Content
             if (TextureCache.TryGetValue(resolvedUrl, out var cached)) return cached;
             if (TextureLoads.TryGetValue(resolvedUrl, out var inFlight)) return await inFlight;
 
+            int cacheGeneration = s_cacheGeneration;
             var load = DownloadAsync(resolvedUrl, boothId, label, quiet);
             TextureLoads[resolvedUrl] = load;
             try
             {
                 var texture = await load;
-                if (texture != null) TextureCache[resolvedUrl] = texture;
+                if (texture != null && cacheGeneration == s_cacheGeneration)
+                    TextureCache[resolvedUrl] = texture;
+                else if (texture != null)
+                {
+                    Destroy(texture);
+                    texture = null;
+                }
                 return texture;
             }
             finally
