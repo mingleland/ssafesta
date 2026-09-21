@@ -11,12 +11,14 @@ import type { DailyMissionBoard } from '../../../../entities/mission/types';
 
 const getDailyMissions = vi.fn<() => Promise<DailyMissionBoard>>();
 const claimDailyMission = vi.fn<(id: string) => Promise<unknown>>();
+const toasts = vi.hoisted(() => ({ show: vi.fn() }));
 vi.mock('../../../../entities/mission/api.select', () => ({
   missionApi: {
     getDailyMissions: () => getDailyMissions(),
     claimDailyMission: (id: string) => claimDailyMission(id),
   },
 }));
+vi.mock('../../../../shared/ui/toast/toastStore', () => ({ showToast: toasts.show }));
 
 const { DailyMissionOverlay } = await import('../../ui/DailyMissionOverlay');
 
@@ -51,6 +53,7 @@ function renderPanel() {
 beforeEach(() => {
   getDailyMissions.mockReset();
   claimDailyMission.mockReset();
+  toasts.show.mockReset();
   getDailyMissions.mockResolvedValue(board());
 });
 
@@ -100,6 +103,7 @@ describe('수령', () => {
     await waitFor(() => expect(getDailyMissions).toHaveBeenCalledTimes(2));
     expect(claimDailyMission).toHaveBeenCalledTimes(1);
     expect(claimDailyMission).toHaveBeenCalledWith('WORLD_ENTER');
+    expect(toasts.show).toHaveBeenCalledWith('일일 미션 보상으로 15 코인을 받았습니다.', 'success');
   });
 
   it('ALREADY_CLAIMED 는 배너 없이 재조회로 맞춘다 — 화면이 낡은 것이고 사용자가 잘못한 게 없다', async () => {

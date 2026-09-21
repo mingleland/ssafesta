@@ -29,7 +29,22 @@ export function isCoinGrantNotification(value: unknown): value is CoinGrantNotif
   );
 }
 
+/**
+ * 토스트를 띄우지 않는 지급 사유 (S15P21A604-949).
+ *
+ * 슬롯은 한 번 앉으면 수십 번 돌리는 기계라 당첨마다 알림이 뜨면 그 알림이 월드를 덮는다. 결과는
+ * 슬롯 화면이 그 자리에서 이미 보여 주므로 여기서 한 번 더 말할 것이 없다.
+ *
+ * **잔액·내역 갱신은 건너뛰지 않는다.** 감추는 것은 알림 한 줄뿐이고, HUD 잔액과 코인 사용 내역은
+ * 종전대로 따라간다 — 원장에서 사라지면 그건 감사 기록을 지우는 것이다.
+ *
+ * 실시간 경로·catch-up 경로 둘 다 이 함수 하나를 거치게 해서(리뷰 지적, S15P21A604-953) 두 경로가
+ * 각자 규칙을 들고 있다가 한쪽만 고치는 일을 막는다.
+ */
+const SILENT_REASONS: ReadonlySet<string> = new Set(['SLOT_PAYOUT']);
+
 function announceGrant(amount: number, reasonType: string): void {
+  if (SILENT_REASONS.has(reasonType)) return;
   const reasonText = labelForReason(reasonType);
   showToast(`${reasonText} +${amount} 코인이 지급되었습니다.`, 'success');
 }
@@ -41,7 +56,14 @@ function announceGrant(amount: number, reasonType: string): void {
  */
 const CATCH_UP_REASONS = new Set(['INITIAL_GRANT', 'DAILY_GRANT']);
 
-// 캐치업 토스트 중복 방지 워터마크 — 이미 알려준 거래 id 이하는 다시 띄우지 않는다.
+/**
+ * catch-up이 "방금 놓친 지급"으로 인정하는 나이. 이보다 오래된 건은 알리지 않고 워터마크만
+ * 올려 조용히 넘긴다 (리뷰 지적, S15P21A604-953) — 워터마크가 없는 첫 방문(새 브라우저·시크릿창)
+ * 이 최근 20건 안의 지난 DAILY_GRANT 를 전부 토스트로 쏟아내는 것을 막는다.
+ */
+const RECENT_GRANT_WINDOW_MS = 5 * 60 * 1000;
+
+// catch-up 토스트 중복 방지 워터마크 — 이미 알려준 거래 id 이하는 다시 띄우지 않는다.
 // localStorage는 읽기·쓰기 모두 던질 수 있어(사생활 보호 모드) worldGuide.ts와 같은 guard를 쓴다:
 // 실패하면 "본 적 없다"로 취급한다 — 토스트가 한 번 더 뜨는 것은 실패가 아니다.
 const LAST_ANNOUNCED_KEY = 'festa.wallet.lastAnnouncedGrantId';
@@ -86,20 +108,24 @@ export function receiveCoinGrantNotification(raw: string): void {
 /**
  * 실시간 코인 알림을 시작한다 (S15P21A604-920, S15P21A604-923, S15P21A604-953).
  * 구독 후 초기 transactions 1회 조회로 구독 전 발생한 미수신 지급분을 동기화하고,
- * 그중 가입·일일 지급은 놓친 토스트를 대신 띄운다.
+ * 그중 최근에 놓친 가입·일일 지급은 토스트를 대신 띄운다.
  */
 export function startCoinGrantNotifications(): () => void {
   const stop = subscribeRealtime(COIN_QUEUE, receiveCoinGrantNotification);
 
   // S15P21A604-923/953: 구독 전에 발행된 지급(가입 INITIAL_GRANT, 첫 접속 DAILY_GRANT)은
   // STOMP에 재전송이 없어 유실된다 — 잔액뿐 아니라 토스트도 놓친다. 구독 직후 REST 트랜잭션
-  // 1회 조회로 잔액을 메우고, 아직 알리지 않은 지급 건은 같은 토스트를 대신 띄운다.
+  // 1회 조회로 잔액을 메우고, 그중 방금 놓친 지급 건은 같은 토스트를 대신 띄운다.
   void walletApi.getTransactions(0).then((page) => {
     const lastAnnounced = readLastAnnouncedId();
+    const now = Date.now();
     let maxId = lastAnnounced;
     for (const tx of page.content) {
       if (tx.id > maxId) maxId = tx.id;
-      if (CATCH_UP_REASONS.has(tx.reasonType) && tx.id > lastAnnounced) {
+      if (!CATCH_UP_REASONS.has(tx.reasonType) || tx.id <= lastAnnounced) continue;
+      // 방금 놓친 것만 알린다 — 오래된 지급까지 알리면 워터마크 없는 첫 방문(새 브라우저·
+      // 시크릿창)에서 최근 20건 안의 지난 DAILY_GRANT 가 한꺼번에 쏟아진다.
+      if (now - new Date(tx.createdAt).getTime() <= RECENT_GRANT_WINDOW_MS) {
         announceGrant(tx.amount, tx.reasonType);
       }
     }

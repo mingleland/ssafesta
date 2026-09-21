@@ -10,6 +10,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { missionApi } from '../../../entities/mission/api.select';
 import type { DailyMission } from '../../../entities/mission/types';
 import { isApiError } from '../../../shared/api/client';
+import { showToast } from '../../../shared/ui/toast/toastStore';
 import { OverlayError, OverlayFrame, OverlayLoading } from '../../overlay/ui/OverlayFrame';
 import { missionLabel } from '../model/labels';
 import './dailyMission.css';
@@ -42,7 +43,8 @@ export function DailyMissionOverlay({ onClose }: { onClose: () => void }) {
 
   const claim = useMutation({
     mutationFn: missionApi.claimDailyMission,
-    onSuccess: () => {
+    onSuccess: (result) => {
+      showToast(`일일 미션 보상으로 ${result.reward} 코인을 받았습니다.`, 'success');
       void queryClient.invalidateQueries({ queryKey: ['daily-missions'] });
       // ESC 메뉴 상단과 WalletBadge 가 쓰는 키다. balanceAfter 로 캐시를 직접 쓰지 않는 이유는
       // 그 키의 값이 Wallet 전체이고, 일부만 갈아 끼우면 나머지 필드가 옛 값으로 남는다.

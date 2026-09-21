@@ -1,13 +1,14 @@
 // World 위 React HUD — hud-decisions.md 가 허용한 것만 그린다 (S15P21A604-406).
-// 허용 6종: 이동·조작 안내 / 미니게임 score·progress(해당 콘텐츠 중에만) / Toast·Notification /
-//          Consultation Quick Access / 월드 채팅 / 전체화면.
-// 금지: minimap · HP · quest tracker · hotbar · crosshair · mission panel · 기능 launcher.
+// 허용 7종: 이동·조작 안내 / 미니게임 score·progress(해당 콘텐츠 중에만) / Toast·Notification /
+//          Consultation Quick Access / 월드 채팅 / 전체화면 / 회원 일일 미션 진입점(-911 예외).
+// 금지: minimap · HP · quest tracker · hotbar · crosshair · 그 밖의 mission panel · 기능 launcher.
 // F 상호작용 prompt·하이라이트·이름표는 Unity 소관이라 여기서 만들지 않는다.
 //
 // **조작 안내는 여기서 걷었다** (2026-09-16). ESC 메뉴의 조작 안내 오버레이가 같은 목록
 // (`ControlGuideList`)을 그리므로 상시 카드로 화면 한 귀퉁이를 계속 차지할 이유가 없다.
 import { BoothExitButton } from './BoothExitButton';
 import { ConsultationQuickAccess } from './ConsultationQuickAccess';
+import { DailyMissionLauncher } from '../../mission/ui/DailyMissionLauncher';
 import { openMenuPanelScreen } from '../model/worldScreen';
 import { toggleFullscreen, useFullscreen } from '../../../shared/ui/fullscreen';
 import { Tooltip } from '../../../shared/ui/tooltip/Tooltip';
@@ -22,6 +23,8 @@ export function WorldHud() {
   // 그대로 오고, Tab 으로 HUD 버튼에 가는 키보드 경로도 그대로다. HUD 안에는 입력창이 없다.
   return (
     <div className="world-hud" onMouseDown={(event) => event.preventDefault()}>
+      <DailyMissionLauncher />
+
       {/* 우상단 한 줄 — 상담 · 전체화면 (2026-09-16). 세로로 쌓던 것을 가로로 폈다.
           순서는 DOM 그대로다: .cqa 가 row-reverse 라 상담이 오른쪽 끝에 서고 전체화면이 그 왼쪽에 붙는다. */}
       <ConsultationQuickAccess />
@@ -43,7 +46,7 @@ function GuideButton() {
     <Tooltip content="조작 안내" placement="left">
       <button
         type="button"
-        className="world-hud-fullscreen world-hud-guide"
+        className="world-hud-control world-hud-guide"
         onClick={() => openMenuPanelScreen('guide')}
         aria-label="조작 안내"
       >
@@ -65,7 +68,7 @@ function FullscreenToggle() {
     <Tooltip content={label} placement="bottom">
       <button
         type="button"
-        className="world-hud-fullscreen"
+        className="world-hud-control world-hud-fullscreen"
         onClick={() => { void toggleFullscreen(); }}
         aria-pressed={full}
         aria-label={label}

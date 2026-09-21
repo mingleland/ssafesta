@@ -19,12 +19,10 @@ public class FeedbackService {
 
     private final FeedbackRepository feedback;
     private final UserRepository users;
-    private final MattermostFeedbackNotifier mattermost;
 
-    public FeedbackService(FeedbackRepository feedback, UserRepository users, MattermostFeedbackNotifier mattermost) {
+    public FeedbackService(FeedbackRepository feedback, UserRepository users) {
         this.feedback = feedback;
         this.users = users;
-        this.mattermost = mattermost;
     }
 
     @Transactional
@@ -36,10 +34,7 @@ public class FeedbackService {
         if (trimmed.length() > MAX_CONTENT_LENGTH) {
             throw ApiException.fieldInvalid("content", MAX_CONTENT_LENGTH + "자 이하여야 합니다.");
         }
-        Feedback saved = feedback.save(new Feedback(userId, trimmed, Instant.now()));
-        String nickname = users.findById(userId).map(User::getNickname).orElse(null);
-        mattermost.notifySubmitted(saved, nickname);
-        return saved;
+        return feedback.save(new Feedback(userId, trimmed, Instant.now()));
     }
 
     @Transactional(readOnly = true)

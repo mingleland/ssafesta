@@ -1,9 +1,22 @@
 /* LAPTOP Overlay 콘텐츠 — 프레임 토큰(--ov-*)만 쓴다 */
 .laptop-view { display: flex; flex-direction: column; gap: 8px; height: 100%; min-height: 0; }
+/* 화면이 들어갈 자리. iframe 은 여기 맞춰 늘어나지 않고 1280×720 그대로 그린 뒤 축소해 앉는다
+   — 그래야 사이트가 보는 뷰포트가 창 크기에 따라 달라지지 않는다(LaptopOverlay 의 SCREEN_W 주석).
+
+   **높이는 위에서 내려온다.** 프레임이 height 를 가지므로(overlayFrame.css 의 screen 절) 본문과
+   laptop-view 도 높이를 갖고, 이 상자는 안내문을 빼고 남는 만큼을 받는다. 폭에서 높이를 만들면
+   (aspect-ratio) 본문보다 커질 수 있고, 그때는 줄어들 기준이 없어 스크롤만 생긴다. */
+.laptop-screen {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
 .laptop-iframe {
-  width: 100%;
-  flex-grow: 1;
-  min-height: 420px;
+  flex: none;
   border: 1px solid var(--ov-border);
   border-radius: 12px;
   background: #ffffff;
