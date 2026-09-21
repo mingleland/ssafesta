@@ -153,7 +153,7 @@ public class BoothSlotController {
                     내가 임차 중인 자리를 지금 반납한다. 회원 전용이며 게스트는 `403` 이다.
 
                     **코인은 돌아오지 않는다.** spec 004 D06 의 변심 환불 없음이 그대로 적용되고, 반납은 자리만 비운다 —
-                    다시 임대하면 **처음처럼 100코인을 낸다** (FR-021). 되돌릴 수 없는 요청이므로 클라이언트는 확인을 받는다.
+                    다시 임대하면 **처음처럼 임대료를 낸다** (FR-021). 되돌릴 수 없는 요청이므로 클라이언트는 확인을 받는다.
 
                     **되는 것은 자리와 한도뿐이다.** 반납 즉시 그 슬롯이 `AVAILABLE` 이 되고 활성 임대 한도(D01)가 풀려
                     **곧바로 다른 자리를 임대할 수 있다.** Layout·AI·문서·설문·프로젝트는 **그대로 보존**되고
@@ -198,7 +198,7 @@ public class BoothSlotController {
             @Schema(description = "임대 시작 시각(UTC)", example = "2026-09-02T05:00:00Z") Instant startsAt,
             @Schema(description = "임대 종료 시각(UTC). 시작 + 24시간이다", example = "2026-09-03T05:00:00Z") Instant endsAt,
             @Schema(description = "남은 시간(초). 응답을 만든 순간 기준이라 클라이언트가 다시 계산하지 않아도 된다", example = "86400") long remainingSeconds,
-            @Schema(description = "이번 요청으로 차감된 코인. **재시도(200) 응답에서는 처음 차감한 금액**이며 두 번 빠진 것이 아니다", example = "100") int chargedCoin,
+            @Schema(description = "이번 요청으로 차감된 코인. **재시도(200) 응답에서는 처음 차감한 금액**이며 두 번 빠진 것이 아니다", example = "50") int chargedCoin,
             @Schema(description = "차감 후 잔액. `GET /api/v1/wallets/me` 를 다시 부르지 않아도 된다", example = "150") int balanceAfter) {
 
         static LeaseResponse of(BoothLeaseService.LeaseOutcome outcome) {

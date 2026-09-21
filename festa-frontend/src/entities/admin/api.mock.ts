@@ -22,6 +22,7 @@ import type {
   Page,
   PrizePurchaseView,
   PrizeView,
+  PrizeDraft,
 } from './types';
 
 function apiError(code: string, status: number, message: string): ApiError {
@@ -73,28 +74,47 @@ let nextLedgerId = 500;
 /** 멱등키 → 처리 결과. 키는 대상 회원별이다(BE 와 같다) */
 let adjustments = new Map<string, { signedAmount: number; result: AdjustmentResult }>();
 
-let booths: AdminBoothView[] = [
-  { slotId: 1, slotCode: 'F11-R01', boothId: 11, boothName: 'AI 상담 부스', entryAvailable: true, leaseEndsAt: at(23) },
-  { slotId: 3, slotCode: 'F11-R03', boothId: 13, boothName: '싸피 프로젝트관', entryAvailable: true, leaseEndsAt: at(23) },
-  { slotId: 7, slotCode: 'F11-R07', boothId: 17, boothName: null, entryAvailable: false, leaseEndsAt: at(23) },
+// 관리자 부스는 상설 임대라 만료가 없다 — 만료 대신 언제부터 서 있는지를 든다 (S15P21A604-951).
+const ADMIN_BOOTH_SEED: AdminBoothView[] = [
+  { slotId: 1, slotCode: 'F11-R01', boothId: 11, name: 'AI 상담 부스', published: true, leaseStartedAt: at(-48), installedBy: '운영자 A' },
+  { slotId: 3, slotCode: 'F11-R03', boothId: 13, name: '싸피 프로젝트관', published: true, leaseStartedAt: at(-24), installedBy: '운영자 B' },
+  { slotId: 7, slotCode: 'F11-R07', boothId: 17, name: '관리자 부스 F11-R07', published: false, leaseStartedAt: at(-2), installedBy: null },
 ];
+let booths: AdminBoothView[] = ADMIN_BOOTH_SEED.map((b) => ({ ...b }));
 /** 마스터 소유 부스 — 강제 비공개가 MASTER_PROTECTED 로 거절된다 */
 const MASTER_BOOTH_ID = 11;
 
-let prizes: PrizeView[] = [
-  { prizeId: 1, name: '싸피 후드집업', priceCoin: 240, stock: 3, active: true },
-  { prizeId: 2, name: '스티커 세트', priceCoin: 45, stock: null, active: true },
-  { prizeId: 3, name: '텀블러', priceCoin: 180, stock: 0, active: false },
+// 즉시교환 둘과 응모형 하나를 함께 둔다 — 화면이 winnerCount 로 두 모양을 가르는지 mock 에서 본다.
+const PRIZE_SEED: PrizeView[] = [
+  { prizeId: 1, name: '싸피 후드집업', priceCoin: 240, stock: 3, active: true, closesAt: null, winnerCount: 0, drawnAt: null },
+  { prizeId: 2, name: '스티커 세트', priceCoin: 45, stock: null, active: true, closesAt: null, winnerCount: 0, drawnAt: null },
+  { prizeId: 3, name: '치킨 응모권', priceCoin: 50, stock: 100, active: true, closesAt: at(-40), winnerCount: 1, drawnAt: null },
 ];
-let purchases: PrizePurchaseView[] = [
-  { purchaseId: 1, prizeId: 1, prizeName: '싸피 후드집업', buyerUserId: 7, buyerNickname: '이벤트참여자', quantity: 1, coinSpent: 240, ledgerEntryId: 108, purchasedAt: at(8), fulfillment: 'PENDING', note: null, updatedAt: at(8), campus: '서울', teamName: 'A604', recipientName: '황덕' },
-  { purchaseId: 2, prizeId: 2, prizeName: '스티커 세트', buyerUserId: 5, buyerNickname: '싸피생', quantity: 1, coinSpent: 45, ledgerEntryId: 105, purchasedAt: at(7), fulfillment: 'FULFILLED', note: '현장 수령', updatedAt: at(7, 40), campus: '대전', teamName: 'B201', recipientName: '김싸피' },
+let prizes: PrizeView[] = PRIZE_SEED.map((p) => ({ ...p }));
+const PURCHASE_SEED: PrizePurchaseView[] = [
+  { purchaseId: 1, prizeId: 1, prizeName: '싸피 후드집업', buyerUserId: 7, buyerNickname: '이벤트참여자', quantity: 1, coinSpent: 240, ledgerEntryId: 108, purchasedAt: at(8), fulfillment: 'PENDING', note: null, updatedAt: at(8), campus: '서울', teamName: 'A604', recipientName: '황덕', won: null },
+  { purchaseId: 2, prizeId: 2, prizeName: '스티커 세트', buyerUserId: 5, buyerNickname: '싸피생', quantity: 1, coinSpent: 45, ledgerEntryId: 105, purchasedAt: at(7), fulfillment: 'FULFILLED', note: '현장 수령', updatedAt: at(7, 40), campus: '대전', teamName: 'B201', recipientName: '김싸피', won: null },
   // #239 이전 행 — 받는 자 세 값이 함께 null 이어도 렌더된다 (S15P21A604-912)
-  { purchaseId: 3, prizeId: 2, prizeName: '스티커 세트', buyerUserId: 3, buyerNickname: '페스타참가자', quantity: 2, coinSpent: 90, ledgerEntryId: null, purchasedAt: at(9), fulfillment: 'PURCHASED', note: null, updatedAt: at(9), campus: null, teamName: null, recipientName: null },
-  { purchaseId: 4, prizeId: 3, prizeName: '텀블러', buyerUserId: 6, buyerNickname: '부스주인', quantity: 1, coinSpent: 180, ledgerEntryId: 99, purchasedAt: at(6, 30), fulfillment: 'CANCELLED', note: '재고 소진으로 취소, 코인 환불 필요', updatedAt: at(6, 50), campus: null, teamName: null, recipientName: null },
+  { purchaseId: 3, prizeId: 2, prizeName: '스티커 세트', buyerUserId: 3, buyerNickname: '페스타참가자', quantity: 2, coinSpent: 90, ledgerEntryId: null, purchasedAt: at(9), fulfillment: 'PURCHASED', note: null, updatedAt: at(9), campus: null, teamName: null, recipientName: null, won: null },
+  { purchaseId: 4, prizeId: 3, prizeName: '치킨 응모권', buyerUserId: 6, buyerNickname: '부스주인', quantity: 1, coinSpent: 50, ledgerEntryId: 99, purchasedAt: at(6, 30), fulfillment: 'PURCHASED', note: null, updatedAt: at(6, 50), campus: null, teamName: null, recipientName: null, won: true },
+  // 낙첨 — won:false 와 won:null(추첨 전)이 화면에서 갈리는지 본다
+  { purchaseId: 5, prizeId: 3, prizeName: '치킨 응모권', buyerUserId: 4, buyerNickname: '응모자', quantity: 1, coinSpent: 50, ledgerEntryId: 98, purchasedAt: at(6, 20), fulfillment: 'PURCHASED', note: null, updatedAt: at(6, 20), campus: null, teamName: null, recipientName: null, won: false },
 ];
+let purchases: PrizePurchaseView[] = PURCHASE_SEED.map((p) => ({ ...p }));
 
 const SURVEY_KEY = 'SSAFESTA_2026';
+
+/** BE `AdminEventShopService.validatePrizeFields` 와 같은 표다 (S15P21A604-951) */
+function validatePrizeDraft(draft: PrizeDraft): void {
+  const name = draft.name.trim();
+  if (name === '' || name.length > 200) throw apiError('VALIDATION_FAILED', 400, '경품 이름은 1~200자여야 합니다.');
+  if (draft.priceCoin < 0) throw apiError('VALIDATION_FAILED', 400, '가격은 0 이상이어야 합니다.');
+  if (draft.stock !== null && draft.stock < 0) throw apiError('VALIDATION_FAILED', 400, '재고는 0 이상이어야 합니다.');
+  if (draft.winnerCount < 0) throw apiError('VALIDATION_FAILED', 400, '당첨자 수는 0 이상이어야 합니다.');
+  // 응모형은 응모권 수가 있어야 하고 그보다 많이 당첨시킬 수 없다.
+  if (draft.winnerCount > 0 && draft.stock === null) throw apiError('VALIDATION_FAILED', 400, '응모형은 응모권 수가 필요합니다.');
+  if (draft.stock !== null && draft.winnerCount > draft.stock) throw apiError('VALIDATION_FAILED', 400, '당첨자 수는 응모권 수보다 많을 수 없습니다.');
+}
 const questions = [
   { questionId: 1, prompt: '이번 축제 전체 만족도는?', type: 'RATING', options: ['1', '2', '3', '4', '5'] },
   { questionId: 2, prompt: '가장 좋았던 공간은?', type: 'SINGLE_CHOICE', options: ['부스 전시', '광장 미니게임', 'AI 상담', '아바타 꾸미기'] },
@@ -236,15 +256,45 @@ export const adminApi: AdminRepository = {
     const booth = booths.find((b) => b.boothId === boothId);
     if (booth === undefined) throw apiError('BOOTH_NOT_FOUND', 404, '부스를 찾을 수 없습니다.');
     if (boothId === MASTER_BOOTH_ID) throw apiError('MASTER_PROTECTED', 403, '보호된 계정입니다.');
-    booth.entryAvailable = false;
+    // 실서버는 임대까지 회수해 목록에서 사라진다(S15P21A604-927). mock 도 같게 둔다 — 여기서만
+    // 행이 남으면 화면이 mock 에서만 도는 상태를 갖게 된다.
+    booths = booths.filter((b) => b.boothId !== boothId);
   },
 
   async listPrizes() {
     return prizes.map((p) => ({ ...p }));
   },
 
-  async listPurchases(status, page, size) {
-    const rows = purchases.filter((p) => status === 'ALL' || p.fulfillment === status).sort((a, b) => b.purchaseId - a.purchaseId);
+  // BE 검증과 같은 표다 — mock 에서만 통과하는 값을 만들면 화면이 실서버에서 400 을 처음 본다.
+  async createPrize(draft) {
+    validatePrizeDraft(draft);
+    const prize: PrizeView = {
+      prizeId: Math.max(0, ...prizes.map((p) => p.prizeId)) + 1,
+      name: draft.name.trim(), priceCoin: draft.priceCoin, stock: draft.stock,
+      active: draft.active, closesAt: draft.closesAt, winnerCount: draft.winnerCount, drawnAt: null,
+    };
+    prizes = [...prizes, prize];
+    return { ...prize };
+  },
+
+  async updatePrize(prizeId, draft) {
+    validatePrizeDraft(draft);
+    const prize = prizes.find((p) => p.prizeId === prizeId);
+    if (prize === undefined) throw apiError('EVENT_PRIZE_NOT_FOUND', 404, '경품을 찾을 수 없습니다.');
+    // 덮어쓰기다 — 보내지 않은 필드가 남지 않는다. drawnAt 만 서버 소유라 유지한다.
+    Object.assign(prize, {
+      name: draft.name.trim(), priceCoin: draft.priceCoin, stock: draft.stock,
+      active: draft.active, closesAt: draft.closesAt, winnerCount: draft.winnerCount,
+    });
+    return { ...prize };
+  },
+
+  async listPurchases(status, page, size, won) {
+    const rows = purchases
+      .filter((p) => status === 'ALL' || p.fulfillment === status)
+      // 보내지 않은 것과 false 는 다르다 — 전자는 전체, 후자는 낙첨만이다.
+      .filter((p) => won === undefined || won === null || p.won === won)
+      .sort((a, b) => b.purchaseId - a.purchaseId);
     return paginate(rows.map((p) => ({ ...p })), page, size);
   },
 
@@ -313,9 +363,11 @@ export function __resetAdminMockForTests(): void {
   ledger = ledger.filter((e) => e.id < 500);
   nextLedgerId = 500;
   adjustments = new Map();
-  booths = booths.map((b) => ({ ...b, entryAvailable: b.boothId !== 17 }));
-  prizes = prizes.map((p) => ({ ...p }));
-  purchases = purchases.map((p, i) => ({ ...p, fulfillment: (['PENDING', 'FULFILLED', 'PURCHASED', 'CANCELLED'] as const)[i], note: i === 1 ? '현장 수령' : i === 3 ? '재고 소진으로 취소, 코인 환불 필요' : null }));
+  // seed 를 그대로 복제한다 — 예전에는 현재 배열을 인덱스로 덧칠했는데, 강제 비공개가 행을 지우고
+  // 구매 seed 가 5행으로 늘자 그 표가 범위를 벗어나 fulfillment 에 undefined 를 심었다 (LJH T-139).
+  booths = ADMIN_BOOTH_SEED.map((b) => ({ ...b }));
+  prizes = PRIZE_SEED.map((p) => ({ ...p }));
+  purchases = PURCHASE_SEED.map((p) => ({ ...p }));
   responses = responses.map((r) => ({ ...r }));
   surveyClosed = false;
 }

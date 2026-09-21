@@ -190,7 +190,32 @@ describe('부스·상점·설문', () => {
     fireEvent.change(screen.getByLabelText(/비공개 사유/), { target: { value: '신고 접수' } });
     fireEvent.click(screen.getByRole('button', { name: '비공개' }));
     await waitFor(() => expect(lastToast()).toMatch(/비공개했습니다/));
-    await waitFor(() => expect(within(row).queryByText('미게시')).not.toBeNull());
+    // 강제 비공개는 임대까지 회수하므로(S15P21A604-927) 그 자리가 목록에서 사라진다
+    await waitFor(() => expect(screen.queryByText('싸피 프로젝트관')).toBeNull());
+  });
+
+  it('부스 행에서 운영 관리를 열면 콘솔 안에 머문다', async () => {
+    renderOverlay();
+    fireEvent.click(await screen.findByRole('button', { name: /부스 관리/ }));
+    const row = (await screen.findByText('싸피 프로젝트관')).closest('tr')!;
+    fireEvent.click(within(row).getByRole('button', { name: '프로젝트' }));
+    // 본문은 오버레이를 새로 띄우지 않고 제목줄만 얹는다. 콘솔 내비는 그대로 남는다.
+    await screen.findByRole('heading', { name: '프로젝트 관리' });
+    expect(screen.getByRole('button', { name: /부스 관리/ })).not.toBeNull();
+  });
+
+  it('응모 필터를 당첨만으로 바꾸면 낙첨 행이 빠진다', async () => {
+    renderOverlay();
+    fireEvent.click(await screen.findByRole('button', { name: /이벤트 상점/ }));
+    await screen.findByText('응모자');
+    fireEvent.click(screen.getByLabelText('응모 결과 필터'));
+    fireEvent.click(await screen.findByRole('option', { name: '당첨만' }));
+    // 두 단정을 한 waitFor 로 묶는다 — 갈아끼는 동안 표가 잠깐 Loading 으로 비어 있어서,
+    // 낙첨이 사라진 순간에 바로 당첨 행을 찾으면 아직 안 돌아와 있다.
+    await waitFor(() => {
+      expect(screen.queryByText('응모자')).toBeNull();
+      expect(screen.queryByText('부스주인')).not.toBeNull();
+    });
   });
 
   it('구매 처리 상태를 바꾸면 표가 따라온다', async () => {

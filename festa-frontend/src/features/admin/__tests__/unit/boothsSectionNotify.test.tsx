@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 // 관리자 강제 비공개가 임대까지 회수하므로(S15P21A604-927), 상주 월드에 슬롯 변경을 알리는지 검증한다
 // (GitLab #254). notify 가 누기면 월드의 그 칸은 새로고침 전까지 옛 모습으로 남는다.
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import { act, fireEvent } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -52,7 +52,9 @@ describe('BoothsSection 강제 비공개', () => {
     });
     act(() => {
       const row = screen.getByText('싸피 프로젝트관').closest('tr')!;
-      fireEvent.click(row.querySelector('button')!);
+      // 행 첫 버튼이 아니라 이름으로 집는다 — 운영 관리 4버튼이 앞에 서면서 위치 기반 선택이
+      // '프로젝트' 패널을 열어 버렸다 (S15P21A604-951).
+      fireEvent.click(within(row).getByRole('button', { name: '강제 비공개' }));
     });
 
     // 사유 필수(reasonProblem) — 비우면 onConfirm 이 무시된다. jsdom 에서 dialog 내부는
