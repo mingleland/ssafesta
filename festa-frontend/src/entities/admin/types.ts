@@ -139,6 +139,10 @@ export interface PrizePurchaseView {
   /** 마지막 처리 메모 */
   note: string | null;
   updatedAt: string;
+  /** 받는 자 정보 (GitLab #239, S15P21A604-912). #239 이전 행은 세 값이 함께 null 이다 */
+  campus: string | null;
+  teamName: string | null;
+  recipientName: string | null;
 }
 
 // ── 이벤트 설문 ─────────────────────────────────────────────────────────────────────────

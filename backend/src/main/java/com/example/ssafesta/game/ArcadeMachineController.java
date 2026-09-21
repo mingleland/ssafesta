@@ -5,6 +5,7 @@ import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import java.util.List;
 import org.springframework.http.CacheControl;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -27,6 +28,24 @@ public class ArcadeMachineController {
 
     public ArcadeMachineController(ArcadeMachineResolveService resolver) {
         this.resolver = resolver;
+    }
+
+    @Operation(summary = "오락기 목록 — 씬에 설치된 기계와 실행 가능 여부",
+            description = """
+                    바인딩된 기계만 `machineId` 오름차순으로 돌려준다. Unity 는 자기 씬의 기계 id 와
+                    이 목록을 비교해 빈 자리를 판단한다. 삭제된 게임의 기계는 목록에서 빠지고,
+                    비공개·미게시 게임은 `playable: false` 와 이유를 유지하되 `title` 은 `null` 이다 —
+                    이 경로는 토큰 없이 열려 있어서 못 켜는 게임의 제목까지 줄 이유가 없다.
+
+                    게임에는 썸네일 모델이 없으므로 `thumbnailUrl` 은 응답에 포함하지 않는다.
+                    공개 상태가 바뀌면 바로 반영되어야 하므로 `Cache-Control: no-store` 다.
+                    """)
+    @ApiResponse(responseCode = "200", description = "바인딩된 오락기 목록")
+    @GetMapping
+    public ResponseEntity<List<ArcadeMachineResolveService.ListedView>> list() {
+        return ResponseEntity.ok()
+                .cacheControl(CacheControl.noStore())
+                .body(resolver.resolveAll());
     }
 
     @Operation(summary = "오락기 해석 — 이 기계가 어떤 게임을 실행하는가",

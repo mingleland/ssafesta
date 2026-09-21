@@ -28,3 +28,43 @@ runtime/<target-id>/
 6. 실패 시 candidate와 evidence는 보존한다. 안전 분류가 `SAFE`인 허용 실패만 known-good으로 자동 rollback하며 반복 rollback은 하지 않는다.
 
 운영 백업/복구 절차와 보존 기간은 EC2 디스크 크기 측정 후 확정한다.
+
+## Production Promotion 상태
+
+Production은 `/var/lib/festa-environments/production/` 아래에서 Demo와 분리해 관리한다.
+
+```text
+production/
+├── candidates/<receipt-id>.json
+├── candidates/<receipt-id>.verification.json
+├── cutovers/<receipt-id>.prepare.json
+├── receipts/<receipt-id>.activation.json
+├── receipts/<receipt-id>.external-verification.json
+├── receipts/<receipt-id>.rollback.json
+├── current.json
+├── known-good.json
+└── previous.json                 # 최초 canonical migration에서는 없을 수 있음
+```
+
+- `candidate`: 승인 receipt의 exact App/WebGL/World artifact를 loopback에서 실행하는 상태다.
+- `current`: public Nginx route와 `/srv/festa/webgl/prod/current`가 실제로 가리키는 canonical release다.
+- `known-good`: external 검증 뒤 사람이 승인한 `current`다. Jenkins 자동 검증만으로 갱신하지 않는다.
+- `previous`: 첫 canonical known-good 이후 다음 cutover 직전에 저장한 직전 canonical `current`다.
+
+### Demo 조합과 receipt (Batch 1)
+
+Demo `dev/batches/current/<component>.json` 은 컴포넌트마다 독립된 `releaseId`·`sourceCommit` 을 가진다 — 변경된 컴포넌트만 새 배치로 배포되고, 미변경 컴포넌트는 재발급하지 않는다(freshness override 도 없다). `approve-known-good.sh environment` 는 그 시점의 조합을 `known-good/environment.json` 으로 굳히고 `batchId`(컴포넌트 identity 로부터 결정적으로 만든 `demo-env-<hash>`)를 기록한다. Production receipt 의 `demoReleaseId` 는 이 `batchId` 를 가리키며, validator 는 `demoReleaseId == batchId` 와 컴포넌트별 exact identity(releaseId·sourceCommit·imageRef·contentId)만 검사한다. 같은 조합은 항상 같은 `batchId` 다.
+
+허용 transition은 다음과 같다.
+
+```text
+RUNNING_UNVERIFIED
+  -> VERIFIED
+  -> MAINTENANCE_ACTIVE
+  -> PUBLIC_ACTIVE/CURRENT
+  -> EXTERNAL_VERIFIED
+  -> human approval
+  -> KNOWN_GOOD
+```
+
+최초 migration에서 `previous`가 없으면 실패 시 public route를 maintenance로 유지하거나 되돌리고 `current`를 제거한다. 불완전한 `festa-prod-*` legacy container는 audit evidence에만 기록하며 rollback 대상으로 저장하거나 재생성하지 않는다. 첫 canonical `known-good` 이후의 실패만 `previous`가 가리키는 exact image, World package, WebGL release와 Nginx contract로 rollback한다. 모든 pointer는 같은 파일시스템의 임시 파일 또는 임시 symlink를 rename하여 교체하며, KNOWN-GOOD는 rollback 중 변경하지 않는다.

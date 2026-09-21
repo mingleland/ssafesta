@@ -9,6 +9,7 @@ x-agent: &agent
       DOCKER_CLI_IMAGE: ${DOCKER_CLI_IMAGE:?load infra/versions.env}
       NODE_RUNTIME_IMAGE: ${NODE_RUNTIME_IMAGE:?load infra/versions.env}
       PYTHON_JSONSCHEMA_VERSION: ${PYTHON_JSONSCHEMA_VERSION:?load infra/versions.env}
+      PYTHON_PYYAML_VERSION: ${PYTHON_PYYAML_VERSION:?load infra/versions.env}
   image: festa/jenkins-agent:${JENKINS_AGENT_TAG:-local}
   restart: unless-stopped
   init: true
@@ -87,10 +88,13 @@ services:
       WEBGL_RELEASE_ROOT: /srv/festa/webgl
       WEBGL_PUBLIC_BASE_URL: ${WEBGL_PUBLIC_BASE_URL:-https://demo.ssafesta.world/unity}
       WEBGL_RETENTION_COUNT: ${WEBGL_RETENTION_COUNT:-5}
+      # Demo World public host (demo.<root> 루트 WebSocket). readiness 가 Production world.<root> 를 검사하지 않게 한다 (Batch 1).
+      DEMO_WORLD_HOST: ${DEMO_WORLD_HOST:-demo.${ROOT_DOMAIN:?set in infra/.env}}
       R2_BACKUP_ENDPOINT: ${R2_BACKUP_ENDPOINT:-}
       R2_BACKUP_BUCKET: ${R2_BACKUP_BUCKET:-}
       GAME_ENV_FILE: ${GAME_ENV_FILE:-/srv/festa/config/game.env}
       CONNECTION_TOKEN_SECRET_FILE: ${CONNECTION_TOKEN_SECRET_FILE:-/opt/festa/secrets/dev-game-connection-token-secret}
+      PROD_CONNECTION_TOKEN_SECRET_FILE: ${PROD_CONNECTION_TOKEN_SECRET_FILE:-/opt/festa/secrets/prod-game-connection-token-secret}
     depends_on:
       image-transfer-init:
         condition: service_completed_successfully
@@ -102,6 +106,7 @@ services:
       # Dedicated Server 배포는 compose env 파일과 connection token secret 을 agent 안에서 읽는다.
       - ${GAME_ENV_FILE:-/srv/festa/config/game.env}:${GAME_ENV_FILE:-/srv/festa/config/game.env}:ro
       - ${CONNECTION_TOKEN_SECRET_FILE:-/opt/festa/secrets/dev-game-connection-token-secret}:${CONNECTION_TOKEN_SECRET_FILE:-/opt/festa/secrets/dev-game-connection-token-secret}:ro
+      - ${PROD_CONNECTION_TOKEN_SECRET_FILE:-/opt/festa/secrets/prod-game-connection-token-secret}:${PROD_CONNECTION_TOKEN_SECRET_FILE:-/opt/festa/secrets/prod-game-connection-token-secret}:ro
       - /var/run/docker.sock:/var/run/docker.sock
 
   unity-agent:

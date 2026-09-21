@@ -188,6 +188,19 @@ glab api "projects/s15-metaverse-game-sub1%2FS15P21A604/issues/<IID>/notes?sort=
 붙인다.** `next actor` 는 다음 행동을 해야 하는 주체이고 값은 `나` · `상대` · `양쪽` · `없음`
 넷뿐이다. 이 값 없이 범주를 정하지 않는다.
 
+### 판정 기본 원칙 (경량 판정·임의 단정 금지)
+
+핵심은 **더 많이 추론하는 것이 아니라, 덜 단정하고 근거를 더 잘 표시하는 것**이다.
+
+1. **명시적 신호 최우선**: reviewer/assignee 지정, review_requested, merge conflict, pipeline 실패, draft, 미해결 discussion, 직접 요청 코멘트.
+2. **기술적 blocker**: `has_conflicts=true`, 파이프라인 깨짐 등은 author의 명백한 액션.
+3. **팀 관행은 보조 근거**: 예: `front` 대상 MR의 셀프 머지 관행은 "내가 머지 가능"을 뜻할 뿐, 현재 next actor가 반드시 나라고 확정하지 않는다.
+4. **근거 부족 시 확정 금지**: `mergeable + approved_by=[]`만 보고 기계적으로 '상대 대기'로 분류하지 않고, 반대로 셀프 머지 관행만 보고 '내 액션'으로 확정하지도 않는다. 명시적 handoff가 없으면 **`확인 필요`**로 남긴다.
+5. **복잡한 새 상태 모델 도입 금지**: 기존 5범주를 유지하되 애매한 항목에는 근거와 불확실성을 함께 적는다.
+
+**판정 우선순위**:
+명시적 요청/지정 → 기술적 blocker → author/assignee 관계 → 팀 관행 → 불명확하면 확인 필요/보류
+
 `없음` 은 **5범주 어디에도 넣지 않는다.** 추가 행동이 필요 없는 정보 공유·완료·종결 상태이고,
 보고에서 `액션 없음` 줄로 따로 접는다(6-1). `대기 중` 에 밀어 넣지 마라 — 그러면 없는 대기가
 목록에 쌓인다.
@@ -276,6 +289,13 @@ draft                   Draft 여부
 blocking_discussions_resolved   미해결 discussion이 머지를 막는지
 ```
 
+**MR 판정 기준 요약**:
+
+- `reviewer=@me` + `user_has_approved=false` → **내 액션 필요** (리뷰 미완)
+- `author=@me` + `has_conflicts=true` / CI 실패 / draft → **내 액션 필요** (충돌 해소·수정)
+- `author=@me` + 미해결 discussion → **내 액션 필요** (응답·해결)
+- `author=@me` + `mergeable` + 타깃 `front` + 리뷰어/승인자 미지정: 팀 관행상 셀프 머지 가능하나, 별도 리뷰/handoff 신호가 없으면 임의로 '상대 대기'로 밀어 넣지 않고 **`머지 주체 확인 필요`**로 표시
+
 ## 4. 본문 대조 — 분류된 것만 읽는다
 
 **미열람 호명**·**응답 도착**·**내 액션 필요**로 분류된 것만 본문을 읽고 **요구사항을 뽑는다.** 개수만 보고하면 지시를 놓친다.
@@ -320,6 +340,11 @@ Jira source: Atlassian MCP (JAM unavailable)
 # 내 액션 필요
 !13   미해결 discussion 1건 — guard 이관 방식 질문
 !22   내가 reviewer인데 미승인 — user_has_approved=false (To-Do는 이미 완료 처리됨)
+!1166 author=@me · has_conflicts=true — 충돌 해소 필요
+
+# 확인 필요 (판정 근거 불충분)
+!1168 author=@me · mergeable · front 타깃 — 셀프 머지 가능하나 리뷰/handoff 미확인 → 머지 주체 확인 필요
+
 #133  BE 결정 요청 — ended 를 직원 토픽에 넣을지. 답 전까지 BE 가 계약 문서를 붙들고 있다 (next actor=나)
 #187  약속 미이행 — "구현하겠다" 뒤 !834 develop 도달, 완료 회신 없음 (next actor=나)
 #166  대기 조건 해제 — 기다리던 #175 가 09-12 closed. 남은 조건 재판정 (next actor=나)
