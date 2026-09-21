@@ -233,6 +233,21 @@ export interface EventResponseDetail {
   answers: { questionId: number; prompt: string; value: string }[];
 }
 
+// ── 피드백 (S15P21A604-953) ────────────────────────────────────────────────
+//
+// 최초 발견 판정은 관리자가 목록을 읽고 손으로 고른다 — 자동 중복 판정 기준이 없어서다.
+// 보상 지급은 이 화면이 하지 않는다: 회원 관리·지갑 관리의 기존 코인 조정을 그대로 쓴다.
+
+/** GET /api/v1/admin/feedback 원소 — BE `FeedbackService.AdminFeedbackView` 와 같은 모양 */
+export interface FeedbackView {
+  feedbackId: number;
+  userId: number;
+  nickname: string | null;
+  content: string;
+  firstFound: boolean;
+  createdAt: string;
+}
+
 /**
  * 콘솔이 쓰는 저장소 계약. real(api.ts)·mock(api.mock.ts) 이 둘 다 이 모양이라 화면은 어느 쪽인지 모른다.
  * 새 기능이 BE 없이 들어올 때도 여기 시그니처를 먼저 세우고 mock 을 채운다 — UI 에 분기가 퍼지지 않게.
@@ -269,5 +284,8 @@ export interface AdminRepository {
   listEntrants(surveyKey: string, page: number, size: number): Promise<Page<EventEntrantView>>;
   getEventAggregate(surveyKey: string): Promise<EventQuestionAggregate[]>;
   getEventResponse(surveyKey: string, responseId: number): Promise<EventResponseDetail>;
+
+  listFeedback(page: number, size: number): Promise<Page<FeedbackView>>;
+  setFeedbackFirstFound(feedbackId: number, firstFound: boolean): Promise<FeedbackView>;
 }
 

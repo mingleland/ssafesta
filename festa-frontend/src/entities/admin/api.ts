@@ -19,6 +19,7 @@ import type {
   EventQuestionAggregate,
   EventResponseDetail,
   EventSurveySummary,
+  FeedbackView,
   Page,
   PrizeFulfillmentStatus,
   PrizePurchaseView,
@@ -174,6 +175,18 @@ function getEventResponse(surveyKey: string, responseId: number): Promise<EventR
   return api<EventResponseDetail>(`/api/v1/admin/event-surveys/${q(surveyKey)}/responses/${responseId}`);
 }
 
+// ── 피드백 — AdminFeedbackController(S15P21A604-953) ──
+function listFeedback(page: number, size: number): Promise<Page<FeedbackView>> {
+  return api<Page<FeedbackView>>(`/api/v1/admin/feedback?page=${page}&size=${size}`);
+}
+
+function setFeedbackFirstFound(feedbackId: number, firstFound: boolean): Promise<FeedbackView> {
+  return api<FeedbackView>(`/api/v1/admin/feedback/${feedbackId}/first-found`, {
+    method: 'PATCH',
+    body: JSON.stringify({ firstFound }),
+  });
+}
+
 export const adminApi: AdminRepository = {
   getCapability,
   listAdmins,
@@ -199,4 +212,6 @@ export const adminApi: AdminRepository = {
   listEntrants,
   getEventAggregate,
   getEventResponse,
+  listFeedback,
+  setFeedbackFirstFound,
 };

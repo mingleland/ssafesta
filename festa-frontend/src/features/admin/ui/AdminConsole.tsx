@@ -14,6 +14,7 @@ import { AdminsSection } from './AdminsSection';
 import { BoothsSection } from './BoothsSection';
 import { EventShopSection } from './EventShopSection';
 import { EventSurveySection } from './EventSurveySection';
+import { FeedbackSection } from './FeedbackSection';
 import { MembersSection } from './MembersSection';
 import { OverviewSection } from './OverviewSection';
 import { WalletsSection } from './WalletsSection';
@@ -55,6 +56,7 @@ export function AdminConsole() {
           />
         )}
         {section === 'booths' && <BoothsSection />}
+        {section === 'feedback' && <FeedbackSection />}
       </div>
     </div>
   );
