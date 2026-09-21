@@ -37,6 +37,21 @@ document.addEventListener('contextmenu', (event) => event.preventDefault())
 // 감수하고 전역으로 막는 선택이다.
 document.addEventListener('contextmenu', (event) => event.preventDefault())
 
+// 좌클릭 동안에만 누름 커서로 바꾼다 (2026-09-21).
+//
+// CSS `:active` 로는 버튼을 못 가린다 — 우클릭·휠 클릭에도 똑같이 걸린다. 왼쪽만 보려면
+// `button === 0` 을 읽어야 하므로 판정만 여기서 하고, 커서 그림은 index.css 가 그대로 갖는다.
+//
+// 떼는 것은 window 에서 받는다. 누른 채 창 밖으로 나가 떼면 요소 쪽 mouseup 이 오지 않아
+// 클래스가 남고, 커서가 계속 눌린 모양으로 굳는다. 창이 포커스를 잃는 경우도 같은 구멍이다.
+const PRESSING_CLASS = 'is-pressing'
+document.addEventListener('mousedown', (event) => {
+  if (event.button === 0) document.body.classList.add(PRESSING_CLASS)
+})
+const releasePressing = () => document.body.classList.remove(PRESSING_CLASS)
+window.addEventListener('mouseup', releasePressing)
+window.addEventListener('blur', releasePressing)
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <AppProviders>
