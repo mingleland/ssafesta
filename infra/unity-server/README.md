@@ -27,7 +27,7 @@ bash infra/unity-server/tests/run-static.sh
 1. `.env.example`의 참조 이름을 서버 Secret 저장소와 배포 변수에 매핑한다.
 2. `CONNECTION_TOKEN_SECRET`은 한 번 생성해 Backend issuer와 game verifier가 같은 값을 소비하게 한다. 저장소나 Compose 환경 렌더링 결과에 원문을 남기지 않는다.
 3. `scripts/preflight.sh`로 image ref, Secret 파일, network, volume과 7777 비공개를 확인한다.
-4. Nginx template을 실제 domain/upstream/certificate reference로 렌더링하고 `nginx -t`를 통과시킨다.
+4. Nginx template을 실제 domain/upstream/certificate reference로 렌더링하고 `nginx -t`를 통과시킨다. 설치 전 문법만 볼 때는 `infra/environments/scripts/validate-nginx-template.sh <template>`를 쓴다 — 직접 `nginx -t -c`를 돌리면 살아 있는 서버의 temp 디렉터리 소유권이 바뀐다(T-174).
 5. 외부 DNS/TLS/WSS, 브라우저 2개 10분 idle, 재접속과 수용량 시험은 서버와 도메인이 제공된 뒤에만 완료 처리한다.
 
 현재 준비 상태는 `specs/infra-003-unity-server-deploy/checklists/implementation.md`에서 확인한다.

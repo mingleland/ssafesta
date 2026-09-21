@@ -72,6 +72,12 @@ export GAME_COMPOSE_FILE="${unity_server_dir}/compose.yaml"
 export GAME_READINESS_SKIP_LISTENER_CONNECT=1
 export ENVIRONMENT_STATE_DIR="${fixture}/env"
 
+# readiness 는 World host 를 명시해야 한다 (Batch 1).
+if env -u WORLD_PUBLIC_HOST bash "${unity_server_dir}/scripts/game-readiness.sh" >/dev/null 2>&1; then
+  fail 'game readiness must fail fast without WORLD_PUBLIC_HOST'
+fi
+export WORLD_PUBLIC_HOST=world-demo.example.invalid
+
 bash "${unity_server_dir}/scripts/game-readiness.sh" >/dev/null
 
 assert_contains "${fixture}/artifacts/game-readiness.json" '"processRunning": "PASS"' 'readiness must record process state'

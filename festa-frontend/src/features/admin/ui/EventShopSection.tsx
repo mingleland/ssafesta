@@ -64,7 +64,7 @@ export function EventShopSection() {
         {purchases.isSuccess && purchases.data.content.length > 0 && (
           <>
             <table className="ad-table">
-              <thead><tr><th>구매</th><th>구매자</th><th>경품</th><th className="num">수량</th><th className="num">코인</th><th>코인 차감</th><th>지급 상태</th><th>시각</th><th /></tr></thead>
+              <thead><tr><th>구매</th><th>구매자</th><th>경품</th><th className="num">수량</th><th className="num">코인</th><th>캠퍼스</th><th>조</th><th>받는 분</th><th>코인 차감</th><th>지급 상태</th><th>시각</th><th /></tr></thead>
               <tbody>
                 {purchases.data.content.map((p) => (
                   <tr key={p.purchaseId}>
@@ -73,6 +73,9 @@ export function EventShopSection() {
                     <td>{p.prizeName}</td>
                     <td className="num">{p.quantity}</td>
                     <td className="num">{p.coinSpent.toLocaleString('ko-KR')}</td>
+                    <td>{p.campus ?? '-'}</td>
+                    <td>{p.teamName ?? '-'}</td>
+                    <td>{p.recipientName ?? '-'}</td>
                     <td>{p.ledgerEntryId === null ? <span className="ad-chip ad-chip-bad">미확인</span> : <span className="ad-chip ad-chip-ok">원장 #{p.ledgerEntryId}</span>}</td>
                     <td><StatusChip status={p.fulfillment} />{p.note !== null && <div className="ad-muted" style={{ fontSize: 12 }}>{p.note}</div>}</td>
                     <td>{fmtTime(p.purchasedAt)}</td>

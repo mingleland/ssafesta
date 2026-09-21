@@ -22,14 +22,30 @@ public class TestcontainersConfiguration {
     @Bean
     @ServiceConnection
     PostgreSQLContainer postgresContainer() {
-        return new PostgreSQLContainer(DockerImageName.parse("pgvector/pgvector:pg17")
+        String owner = System.getenv("TESTCONTAINERS_JOB_OWNER");
+        if (owner == null || owner.isBlank()) {
+            owner = System.getenv("CI_RUN_ID");
+        }
+        var container = new PostgreSQLContainer(DockerImageName.parse("pgvector/pgvector:pg17")
                 .asCompatibleSubstituteFor("postgres"));
+        if (owner != null && !owner.isBlank()) {
+            container.withLabel("org.ssafy-festa.testcontainers.owner", owner);
+        }
+        return container;
     }
 
     @Bean
     @ServiceConnection(name = "redis")
     GenericContainer<?> redisContainer() {
-        return new GenericContainer<>(DockerImageName.parse("redis:7.2-alpine")).withExposedPorts(6379);
+        String owner = System.getenv("TESTCONTAINERS_JOB_OWNER");
+        if (owner == null || owner.isBlank()) {
+            owner = System.getenv("CI_RUN_ID");
+        }
+        var container = new GenericContainer<>(DockerImageName.parse("redis:7.2-alpine")).withExposedPorts(6379);
+        if (owner != null && !owner.isBlank()) {
+            container.withLabel("org.ssafy-festa.testcontainers.owner", owner);
+        }
+        return container;
     }
 
 }

@@ -126,6 +126,15 @@ base="${repo_root}/infra/environments/compose/${environment}/base.yaml"
 overlay="${repo_root}/infra/environments/compose/${environment}/${component}.yaml"
 compose=("${docker_bin}" compose --project-name "festa-${environment}" --file "${base}" --file "${overlay}" --profile "${component}")
 "${compose[@]}" config --quiet
+# env-file과 compose가 같은 키를 두 번 정하고 있으면 지금 드러낸다 — 배포는 막지 않는다.
+if [[ -n "${COMPONENT_ENV_FILE:-}" ]]; then
+  compose_config_json="$(mktemp)"
+  if "${compose[@]}" config --format json >"${compose_config_json}" 2>/dev/null; then
+    bash "${script_dir}/audit-env-overrides.sh" --env-file "${COMPONENT_ENV_FILE}" \
+      --compose-config "${compose_config_json}" --service "${component}" || true
+  fi
+  rm -f "${compose_config_json}"
+fi
 if ! "${compose[@]}" up -d --no-deps --wait "${component}"; then
   # 실패한 candidate를 unless-stopped 상태로 방치하면 배포 실패가 host-wide
   # restart storm으로 확대된다. rollback 여부와 관계없이 먼저 target을 정지한다.

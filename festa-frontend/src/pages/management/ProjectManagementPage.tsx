@@ -4,7 +4,7 @@
 // 데이터층은 features/project/model/edit.ts 를 그대로 소비한다 — dirty 키만 PATCH 하는 규칙,
 // 저장 중 입력 차단, projectId null 이면 create 는 전부 그 모델의 계약이고 여기서 바꾸지 않는다.
 // 모델에 없는 필드·조회수 같은 지표를 추가하지 않는다.
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   loadProjectEdit,
@@ -14,12 +14,11 @@ import {
 } from '../../features/project/model/edit';
 import {
   PROJECT_LOGO_ACCEPT,
-  PROJECT_LOGO_UPLOAD_AVAILABLE,
-  describeLogoUploadError,
   uploadProjectLogo,
+  fetchProjectLogo,
+  isManagedProjectLogo,
   validateProjectLogo,
 } from '../../features/project/model/logoUpload';
-import { ManagedLogoImage } from '../../shared/ui/ManagedLogoImage';
 import type { ProjectFieldKey } from '../../shared/contracts/project';
 import { ScreenError, ScreenLoading } from '../../features/shell/ui/PageShell';
 import {
@@ -64,27 +63,41 @@ const GROUPS: { title: string; note?: string; fields: Field[]; extraFields?: Fie
   },
 ];
 
-function ProjectLogoField({
-  savedUrl,
-  disabled,
-  boothId,
-  onUploaded,
-  onRemoved,
-}: {
-  savedUrl: string | null;
-  disabled: boolean;
-  boothId: number;
-  onUploaded: (thumbnailUrl: string) => void;
-  onRemoved: () => void;
+function ProjectLogoField({ boothId, savedUrl, disabled, onUploading }: {
+  boothId: number; savedUrl: string | null; disabled: boolean; onUploading: (value: boolean) => void;
 }) {
   const [selection, setSelection] = useState<{ file: File; url: string } | null>(null);
-  const [uploading, setUploading] = useState(false);
-  const [uploadedNote, setUploadedNote] = useState(false);
-  const [removedNote, setRemovedNote] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [broken, setBroken] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [resolved, setResolved] = useState<{ source: string; url: string } | null>(null);
+  const active = useRef(true);
+  const inFlight = useRef(false);
 
-  const previewUrl = selection?.url ?? savedUrl;
+  const previewUrl = selection?.url ?? (savedUrl && isManagedProjectLogo(savedUrl)
+    ? (resolved?.source === savedUrl ? resolved.url : null) : savedUrl);
+
+  useEffect(() => {
+    active.current = true;
+    return () => { active.current = false; };
+  }, []);
+
+  useEffect(() => {
+    if (!savedUrl || !isManagedProjectLogo(savedUrl)) return;
+    const controller = new AbortController();
+    let objectUrl: string | undefined;
+    void fetchProjectLogo(savedUrl, controller.signal).then((blob) => {
+      if (controller.signal.aborted) return;
+      objectUrl = URL.createObjectURL(blob);
+      setResolved({ source: savedUrl, url: objectUrl });
+    }).catch(() => {
+      if (!controller.signal.aborted) setError('현재 프로젝트 로고를 불러오지 못했습니다.');
+    });
+    return () => {
+      controller.abort();
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [savedUrl]);
 
   useEffect(() => {
     return () => {
@@ -95,58 +108,40 @@ function ProjectLogoField({
   useEffect(() => setBroken(false), [previewUrl]);
 
   async function selectFile(file: File | undefined) {
-    if (!file || uploading) return;
+    if (!file || disabled || inFlight.current) return;
     const validationError = validateProjectLogo(file);
     if (validationError) {
       setError(validationError);
       return;
     }
     setError(null);
-    setUploadedNote(false);
-    setRemovedNote(false);
     setSelection({ file, url: URL.createObjectURL(file) });
+    inFlight.current = true;
     setUploading(true);
+    onUploading(true);
     try {
-      // 서버가 검증해 내려준 url 을 thumbnailUrl 값으로 넣는다 — 저장(PATCH) 때 함께 반영된다
-      const result = await uploadProjectLogo(file, boothId);
-      setSelection((current) => {
-        if (current) URL.revokeObjectURL(current.url);
-        return null;
-      });
-      setUploadedNote(true);
-      onUploaded(result.thumbnailUrl);
-    } catch (uploadError) {
-      // 실패 시에도 로컬 미리보기는 남긴다 — 아직 저장되지 않았다는 안내가 그 자리에서 이어진다
-      setError(describeLogoUploadError(uploadError));
+      const uploaded = await uploadProjectLogo(boothId, file);
+      if (active.current) updateField('thumbnailUrl', uploaded.thumbnailUrl);
+    } catch (cause) {
+      if (active.current) {
+        setSelection(null);
+        setError(cause instanceof Error ? cause.message : '이미지를 업로드하지 못했습니다. 다시 시도해 주세요.');
+      }
     } finally {
-      setUploading(false);
+      inFlight.current = false;
+      if (active.current) {
+        setUploading(false);
+        onUploading(false);
+      }
     }
   }
-
-  // 제거는 draft 값을 null 로 되돌린다 — 실제 반영은 변경 저장(PATCH)이 한다.
-  // 미리보기 상태(selection)는 버리고, 저장된 URL 은 다음 렌더에서 사라진다.
-  function removeImage() {
-    if (uploading) return;
-    setSelection((current) => {
-      if (current) URL.revokeObjectURL(current.url);
-      return null;
-    });
-    setUploadedNote(false);
-    setRemovedNote(true);
-    setError(null);
-    setBroken(false);
-    onRemoved();
-  }
-
-  const hasImage = savedUrl !== null || selection !== null;
 
   return (
     <div className="mg-logo-field">
       <span className="mg-label">대표 이미지</span>
       <div className="mg-logo-box">
         {previewUrl && !broken ? (
-          // 저장된 관리 로고는 토큰付き fetch 로 받는다 — <img> 직접 요청은 편집자 분기에서 404 다
-          <ManagedLogoImage
+          <img
             className="mg-logo-preview"
             src={previewUrl}
             alt={selection ? '선택한 프로젝트 로고 미리보기' : '현재 프로젝트 로고'}
@@ -170,36 +165,18 @@ function ProjectLogoField({
             disabled={disabled || uploading}
             aria-label="프로젝트 로고 이미지 선택"
             onChange={(event) => {
-              selectFile(event.target.files?.[0]);
+              void selectFile(event.target.files?.[0]);
               event.target.value = '';
             }}
           />
         </label>
-        {hasImage && (
-          <button
-            type="button"
-            className="sc-btn"
-            disabled={disabled || uploading}
-            onClick={removeImage}
-          >
-            이미지 제거
-          </button>
-        )}
       </div>
-      <span className="sc-note">PNG, JPG, WebP · 5MB 이하</span>
+      <span className="sc-note">PNG, JPG, GIF, WebP · 5MB 이하 · 가로·세로 4096px 이하</span>
       {error && <span className="mg-field-error" role="alert">{error}</span>}
       <span className="mg-logo-contract-note" role="status">
-        {uploading
-          ? '이미지를 업로드하는 중...'
-          : selection
-            ? `${selection.file.name}은 로컬 미리보기이며 아직 저장되지 않습니다.`
-            : removedNote
-              ? '이미지를 제거했습니다 — 변경 저장을 눌러야 적용됩니다.'
-              : uploadedNote
-                ? '업로드 완료 — 변경 저장을 눌러야 적용됩니다.'
-                : PROJECT_LOGO_UPLOAD_AVAILABLE
-                  ? '업로드할 이미지를 선택해 주세요.'
-                  : '파일 업로드는 서버 연결 준비 중입니다.'}
+        {uploading ? '이미지를 업로드하고 확인하는 중입니다.' : selection
+          ? `${selection.file.name} 업로드 완료. 변경 저장을 누르면 프로젝트에 반영됩니다.`
+          : '업로드할 이미지를 선택해 주세요.'}
       </span>
     </div>
   );
@@ -208,6 +185,7 @@ function ProjectLogoField({
 export function ProjectManagementPage() {
   const boothIdNum = useManagementBoothId();
   const state = useProjectEdit();
+  const [uploadingLogo, setUploadingLogo] = useState(false);
   // 부가 링크(저장소·포트폴리오) 펼침 — 값 유무가 초기값이고, 사용자 토글이 덮어쓴다.
   // 값 유무를 노출 조건에 OR 로 걸면 값이 있는 한 토글이 죽는다(펼침·접힘 둘 다 변화 없음).
   const hasExtraValues =
@@ -218,6 +196,7 @@ export function ProjectManagementPage() {
   const queryClient = useQueryClient();
 
   useEffect(() => {
+    setUploadingLogo(false);
     if (Number.isFinite(boothIdNum)) void loadProjectEdit(boothIdNum);
   }, [boothIdNum]);
 
@@ -299,7 +278,7 @@ export function ProjectManagementPage() {
           <button
             type="button"
             className="sc-btn sc-btn-primary"
-            disabled={saving || state.dirty.size === 0}
+            disabled={saving || uploadingLogo || state.dirty.size === 0}
             onClick={() => void saveProject(queryClient)}
           >
             {saving ? '저장 중...' : '변경 저장'}
@@ -313,13 +292,11 @@ export function ProjectManagementPage() {
             <span className="sc-section-title">기본 정보</span>
           </div>
           <div className="mg-project-identity">
-            <ProjectLogoField
-              savedUrl={state.draft.thumbnailUrl}
-              disabled={saving}
-              boothId={boothIdNum}
-              onUploaded={(url) => updateField('thumbnailUrl', url)}
-              onRemoved={() => updateField('thumbnailUrl', null)}
-            />
+            <div>
+              <ProjectLogoField key={boothIdNum} boothId={boothIdNum} savedUrl={state.draft.thumbnailUrl}
+                disabled={saving} onUploading={setUploadingLogo} />
+              {state.fieldErrors.thumbnailUrl && <span role="alert" className="mg-field-error">{state.fieldErrors.thumbnailUrl}</span>}
+            </div>
             <div className="mg-project-copy">
               {BASIC_FIELDS.map(renderField)}
             </div>

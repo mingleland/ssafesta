@@ -1,0 +1,22 @@
+server {
+    listen 80;
+    server_name ${PRODUCTION_WORLD_HOST};
+    return 301 https://$host$request_uri;
+}
+server {
+    listen 443 ssl;
+    server_name ${PRODUCTION_WORLD_HOST};
+    ssl_certificate ${NGINX_ORIGIN_CERTIFICATE_FILE};
+    ssl_certificate_key ${NGINX_ORIGIN_PRIVATE_KEY_FILE};
+    location / {
+        proxy_pass http://127.0.0.1:27777;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-Proto https;
+        proxy_read_timeout 180s;
+        proxy_send_timeout 180s;
+        proxy_buffering off;
+    }
+}

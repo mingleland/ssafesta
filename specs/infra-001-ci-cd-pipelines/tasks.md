@@ -161,6 +161,23 @@
 
 ---
 
+## Phase 7A: Production Promotion final correction
+
+**Purpose**: 승인된 Demo exact artifact를 canonical Production으로 전환하되 CURRENT, KNOWN-GOOD와 rollback 기준을 분리한다.
+
+- [X] T051 `infra/deploy/scripts/bootstrap-production-data.sh`, `deploy-production-candidate.sh`, Redis ACL fixture와 runtime test에 `conversation:*` allow/deny, persisted ACL, additive evidence contract를 구현한다
+- [X] T052 `prepare-production-cutover.sh`, maintenance Nginx template과 candidate deploy guard에 public fence 뒤 legacy 제거 규칙을 구현한다
+- [X] T053 `activate-production-release.sh`, `verify-production-public.sh`, `approve-production-known-good.sh`에 verified candidate → CURRENT → external/human → KNOWN-GOOD 전환을 구현한다
+- [X] T054 `rollback-production-release.sh`에 최초 migration의 maintenance 유지와 첫 canonical known-good 이후 exact previous rollback을 구현한다
+- [X] T055 Demo root alias 제거, Production OAuth/WebGL/World contract test와 atomic WebGL pointer 전환을 구현한다
+- [X] T056 `infra/jenkins/pipelines/production-promotion.groovy`에 main receipt 검증, readiness gate, maintenance, canonical 배치, public 검증, human approval, evidence archive와 failure handler를 연결한다
+- [X] T057 `infra/jenkins/tests/production-runtime.sh`, `production-promotion.sh`에 Redis, Nginx, state, pipeline regression을 구현한다
+- [X] T058 Production state README와 spec/plan/tasks를 최종 runtime contract에 맞춘다
+
+**Checkpoint**: Stage 1 repository test는 Production runtime을 변경하지 않으며, 실제 activation은 main 승격과 모든 manual gate 뒤에만 수행한다.
+
+---
+
 ## Phase 8: 실환경 gate 및 마무리
 
 **Purpose**: 구현이 아닌 실제 Jenkins/GitLab/EC2에서만 확인 가능한 항목을 기록한다.
@@ -205,4 +222,3 @@ all implementation → T038–T043 live evidence
 - `[P]` means separate files with no incomplete direct dependency; it does not bypass the one Unity executor or a dev batch lock.
 - Do not modify `festa-unity/Docker/`. Do not commit `.env`, tokens, license files, or runtime state.
 - Every task uses exact repository-owned paths; external Unity source repair and credentials are recorded as dependencies, not simulated in Infra code.
-

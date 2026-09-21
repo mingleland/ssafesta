@@ -25,6 +25,8 @@ Jira: `S15P21A604-581` / Task: `T039`
 - **인증정보 미저장 원칙 준수 (FR-018, Secret Policy)**:
   - Unity 계정 비밀번호나 API 토큰은 Jenkins Credentials 또는 파이프라인 환경변수로 보관하지 않음.
   - 라이선스는 운영자가 최초 1회 활성화하였으며, 에이전트 폐기 시에만 라이선스 반납(Return license) 절차를 수행함.
+- **2026-09-20 재실측 (Batch 2, T-169)**: 볼륨 보존만으로는 부족했다. 2026-09-19 recreate 뒤 `Unity.Licensing.Client --showEntitlements` = `No licenses were found.`(`Legacy MachineBinding validation failed`). 판정: LICENSE_PRESENT PASS · LICENSE_VALID PASS · LICENSE_VISIBLE_TO_AGENT PASS · **LICENSE_USABLE_HEADLESS FAIL**. 대응: compose 의 `hostname`/`mac_address` 고정 + 운영자 재활성화 + `festa-unity/ci/preflight-license`(exit 79). 클라이언트 경로: `/opt/unity/editors/6000.0.78f1/Editor/Data/Resources/Licensing/Client/Unity.Licensing.Client`(1.17.4).
+- **2026-09-20 종결**: 위 대응(identity 고정·preflight)은 되돌렸다. Jenkins 는 Unity Editor 를 돌리지 않는다(Batch 2 Consumer-only, `infra/unity-server/runbooks/unity-release-bundle.md`). 이 agent 의 entitlement 는 `festa-unity-mr-validation`(EditMode) 에만 관계되며 CI 배포 경로의 blocker 가 아니다.
 
 ---
 
