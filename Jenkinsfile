@@ -12,6 +12,10 @@ pipeline {
         // 그때 운영자가 이 값으로 game 구간을 연다. 기본값은 false 라 평소 동작은 그대로다.
         // 주의: true 로 돌리면 Demo World 컨테이너가 재생성되어 접속자가 끊긴다 (#228).
         booleanParam(name: 'DEPLOY_GAME_TO_DEMO', defaultValue: false, description: 'Demo World/WebGL 을 이번 실행에서 교체한다. 접속자가 끊긴다.')
+        // detector 의 base 는 push 의 before SHA 다. 배포를 유발한 push 가 실패로 끝나면(#536·#538 front)
+        // 그 변경은 다음 push 의 diff 밖이라 Demo 가 뒤처진 채 남는다. 운영자가 마지막으로 배포된 커밋을
+        // base 로 지정해 그 범위(app 컴포넌트)를 다시 판정·배포한다. 비우면 push 기반 판정 그대로다 (#259).
+        string(name: 'CHANGE_BASE_SHA', defaultValue: '', description: '변경 감지 base 를 이 full 40자 commit 으로 덮어쓴다 (catch-up 전용). 비우면 push 범위.')
     }
 
     options {
