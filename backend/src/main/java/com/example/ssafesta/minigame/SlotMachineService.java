@@ -27,7 +27,7 @@ import org.springframework.transaction.annotation.Transactional;
  * {@code WalletService} takes the wallet row lock on each of them, which also serializes two spins
  * by the same member.
  *
- * <p><b>No daily cap, on purpose</b> (#205 확정값 2). RTP is 0.55, so the machine is a coin sink and
+ * <p><b>No daily cap, on purpose</b> (#205 확정값 2). RTP is 0.68, so the machine is a coin sink and
  * not a source; capping the payout side would leave a capped player's bets going out with nothing
  * coming back, which is the one way this table can actually drain someone. {@code SLOT_PAYOUT} is a
  * different reason from {@code MINIGAME_REWARD}, so {@code WalletService.grantedTodayFor} keeps the

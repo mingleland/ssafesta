@@ -4,37 +4,57 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.math.BigDecimal;
 import java.util.List;
 import org.junit.jupiter.api.Test;
+import org.springframework.boot.context.properties.bind.Binder;
+import org.springframework.boot.context.properties.source.ConfigurationPropertySources;
+import org.springframework.boot.env.YamlPropertySourceLoader;
+import org.springframework.core.io.ClassPathResource;
 
 /**
  * The odds table, checked as arithmetic rather than as text (spec 021 FR-005, GitLab #205 확정값 1).
  *
- * <p>The number that matters is <b>RTP 0.52</b>. It is the one property of this table anyone agreed
- * to: it is what makes the machine a coin sink rather than a coin source, and it is why #205 could
- * settle the "일일 한도" question by saying there is none. A yml edit that moves it is a change to
- * the coin economy, and it should have to come past this assertion to happen.
+ * <p>The number that matters is <b>RTP 0.68</b> (S15P21A604-921; it was 0.52 when the table was
+ * first agreed in #205 확정값 1). It is the one property of this table anyone agreed to: it is what
+ * makes the machine a coin sink rather than a coin source, and it is why #205 could settle the
+ * "일일 한도" question by saying there is none. A yml edit that moves it is a change to the coin
+ * economy, and it should have to come past this assertion to happen.
+ *
+ * <p>Which is why the table is <b>read from {@code application.yml}</b> rather than retyped here.
+ * A copy would let the two drift, and the drifting copy is the one that keeps passing.
+ *
+ * <p>It binds the <b>default</b> document only, not the profile overlays. That is the whole table
+ * today — no profile sets {@code app.minigame.slot-machine} — but a deployment that started
+ * overriding the odds per profile would need this to bind that profile too, or the guard would
+ * pass while production paid something else.
  */
 class SlotMachineOddsTest {
 
-    /** The shipped table (application.yml) — 낙첨 78.1 · ×2 20 · ×3 1 · ×10 0.9. */
+    /** The shipped table, bound from {@code application.yml} — 낙첨 71.8 · ×2 25 · ×3 2 · ×10 1.2. */
     private static SlotMachineProperties shipped() {
-        return new SlotMachineProperties(10, List.of("plaza-slot-01", "plaza-slot-02"), List.of(
-                new SlotMachineProperties.Tier(2, new BigDecimal("0.20")),
-                new SlotMachineProperties.Tier(3, new BigDecimal("0.01")),
-                new SlotMachineProperties.Tier(10, new BigDecimal("0.009"))));
+        try {
+            return new Binder(ConfigurationPropertySources.from(new YamlPropertySourceLoader()
+                    .load("application.yml", new ClassPathResource("application.yml"))))
+                    .bind("app.minigame.slot-machine", SlotMachineProperties.class).get();
+        } catch (IOException e) {
+            throw new UncheckedIOException("application.yml 을 읽지 못했습니다", e);
+        }
     }
 
     @Test
-    void theShippedTableReturns52PercentOfWhatItTakes() {
+    void theShippedTableReturns68PercentOfWhatItTakes() {
         SlotMachineProperties config = shipped();
         BigDecimal rtp = BigDecimal.ZERO;
         for (SlotMachineProperties.Tier tier : config.tiers()) {
             rtp = rtp.add(tier.weight().multiply(BigDecimal.valueOf(tier.multiplier())));
         }
-        assertEquals(0, rtp.compareTo(new BigDecimal("0.52")),
-                "RTP 가 0.52 가 아닙니다 — 코인 경제가 바뀝니다: " + rtp);
+        assertEquals(0, rtp.compareTo(new BigDecimal("0.68")),
+                "RTP 가 0.68 이 아닙니다 — 코인 경제가 바뀝니다: " + rtp);
+        assertTrue(rtp.compareTo(BigDecimal.ONE) < 0,
+                "RTP 는 1.0 미만이어야 합니다 — 슬롯이 코인 공급원이 됩니다: " + rtp);
     }
 
     @Test
@@ -48,11 +68,12 @@ class SlotMachineOddsTest {
         }
         // Wide bounds on purpose — this is not a randomness test. It catches the errors that
         // actually happen to a cumulative walk: an inverted comparison, an off-by-one tier index,
-        // a table read in the wrong order. At 200k draws each band is ~50 sigma from these edges.
-        assertBand("낙첨", hits[0], 0.77, 0.792);
-        assertBand("x2", hits[1], 0.19, 0.21);
-        assertBand("x3", hits[2], 0.007, 0.013);
-        assertBand("x10", hits[3], 0.006, 0.012);
+        // a table read in the wrong order. At 200k draws the tightest band (x2) sits ~10 sigma from
+        // these edges, so a passing run is not luck.
+        assertBand("낙첨", hits[0], 0.707, 0.729);
+        assertBand("x2", hits[1], 0.24, 0.26);
+        assertBand("x3", hits[2], 0.016, 0.024);
+        assertBand("x10", hits[3], 0.008, 0.016);
     }
 
     @Test

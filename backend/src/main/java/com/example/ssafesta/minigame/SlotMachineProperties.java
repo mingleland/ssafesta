@@ -9,9 +9,11 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  * Slot machine settlement policy (spec 021, GitLab #205).
  *
  * <p><b>The odds table is configuration, and that was the decision.</b> GitLab #205 확정값 1 adopted
- * the table approved for GitLab #235 — 낙첨 78.1 · ×2 20 · ×3 1 · ×10 0.9,
- * base RTP 0.52 — and said the balance knobs live in yml so a later change is a configuration edit
- * rather than a code change. The defaults below are that table; nothing here invents a number.
+ * the table approved for GitLab #235 — 낙첨 78.1 · ×2 20 · ×3 1 · ×10 0.9, base RTP 0.52 — and said
+ * the balance knobs live in yml so a later change is a configuration edit rather than a code
+ * change. That is what S15P21A604-921 then did: the shipped table is 낙첨 71.8 · ×2 25 · ×3 2 ·
+ * ×10 1.2, base RTP 0.68, and it lives in yml. Nothing here invents a number — the live values are
+ * in {@code application.yml} and this class only refuses tables that cannot be played.
  *
  * <p><b>낙첨 has no row.</b> It is whatever weight the tiers leave unclaimed, so the table cannot
  * be edited into one that sums to something other than 1.
@@ -103,7 +105,7 @@ public record SlotMachineProperties(int betCoins, List<String> machineIds, List<
      * Draws one outcome. {@code 0} is 낙첨 and carries whatever weight the tiers left over.
      *
      * <p>Drawn in whole ten-thousandths rather than from a float in [0,1): a cumulative comparison
-     * against 0.781 + 0.20 + ... accumulates representation error, and the tier that absorbs it is
+     * against 0.25 + 0.02 + ... accumulates representation error, and the tier that absorbs it is
      * whichever one happens to sit at the boundary.
      */
     public int rollTier() {
