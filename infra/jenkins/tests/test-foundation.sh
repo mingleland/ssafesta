@@ -52,6 +52,8 @@ done
 grep -q 'WEBGL_PUBLIC_BASE_URL:' "${agent_compose}" || fail "deploy agent lacks the public WebGL verification URL"
 grep -q '^[[:space:]]*curl[[:space:]\\]*$' "${agent_dockerfile}" || fail "agent image omits curl"
 grep -q '^[[:space:]]*util-linux[[:space:]\\]*$' "${agent_dockerfile}" || fail "agent image omits flock"
+# public-wss.sh 등 unity-server 테스트가 envsubst 로 nginx 템플릿을 렌더한다 — 이미지에 없으면 CI Static 이 127 로 죽는다 (build #543).
+grep -q '^[[:space:]]*gettext-base[[:space:]\\]*$' "${agent_dockerfile}" || fail "agent image omits envsubst (gettext-base)"
 pass "WebGL deploy agent host path and runtime tools"
 
 for entrypoint in "${repo_root}"/infra/jenkins/scripts/*.sh "${repo_root}"/infra/deploy/scripts/*.sh; do
