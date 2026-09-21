@@ -17,6 +17,8 @@ import {
 } from '../../../entities/aiAgent/api';
 import { isApiError } from '../../../shared/api/client';
 import { OverlayError, OverlayLoading } from '../../overlay/ui/OverlayFrame';
+import { DocumentDeleteDialog } from './DocumentDeleteDialog';
+import { showToast } from '../../../shared/ui/toast/toastStore';
 
 type FormState = {
   name: string;
@@ -110,6 +112,7 @@ export function AiAgentManagementTab({ boothId }: { boothId: number }) {
   const [error, setError] = useState<string | null>(null);
   const [uploadMessage, setUploadMessage] = useState<string | null>(null);
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
+  const [pendingDelete, setPendingDelete] = useState<{ documentId: number; fileName: string } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -167,18 +170,16 @@ export function AiAgentManagementTab({ boothId }: { boothId: number }) {
   const deleteMutation = useMutation({
     mutationFn: (documentId: number) => deleteAiDocument(documentId),
     onSuccess: async () => {
-      setUploadMessage('문서를 삭제했습니다.');
-      setError(null);
+      setPendingDelete(null);
+      showToast('문서를 삭제했습니다.', 'success');
       await queryClient.invalidateQueries({ queryKey: ['ai-agent-documents', agentId] });
     },
-    onError: (cause) => setError(isApiError(cause) ? cause.message : cause instanceof Error ? cause.message : '문서를 삭제하지 못했습니다.'),
+    onError: (cause) => {
+      // 다이얼로그를 닫고 토스트로 알린다.
+      setPendingDelete(null);
+      showToast(isApiError(cause) ? cause.message : cause instanceof Error ? cause.message : '문서를 삭제하지 못했습니다.', 'error');
+    },
   });
-
-  function removeDocument(documentId: number, fileName: string) {
-    if (!window.confirm(`'${fileName}' 문서를 삭제할까요? 되돌릴 수 없습니다.`)) return;
-    setUploadMessage(null);
-    deleteMutation.mutate(documentId);
-  }
 
   // 이름·프롬프트를 비워도 막지 않는다 — 비워둔 채 제출하면 기본값을 채워 넣고 그 값으로
   // 저장한다. 화면에도 실제 저장되는 값을 그대로 반영해 나중에 "왜 이렇게 저장됐지"가 없게 한다.
@@ -327,7 +328,7 @@ export function AiAgentManagementTab({ boothId }: { boothId: number }) {
                           type="button"
                           className="bm-document-remove"
                           disabled={deleteMutation.isPending && deleteMutation.variables === doc.documentId}
-                          onClick={() => removeDocument(doc.documentId, doc.fileName)}
+                          onClick={() => { setUploadMessage(null); setPendingDelete({ documentId: doc.documentId, fileName: doc.fileName }); }}
                         >
                           {deleteMutation.isPending && deleteMutation.variables === doc.documentId ? '삭제 중...' : '삭제'}
                         </button>
@@ -340,6 +341,14 @@ export function AiAgentManagementTab({ boothId }: { boothId: number }) {
           </section>
         </div>
       </div>
+      {pendingDelete && (
+        <DocumentDeleteDialog
+          fileName={pendingDelete.fileName}
+          pending={deleteMutation.isPending}
+          onConfirm={() => deleteMutation.mutate(pendingDelete.documentId)}
+          onCancel={() => setPendingDelete(null)}
+        />
+      )}
     </form>
   );
 }
