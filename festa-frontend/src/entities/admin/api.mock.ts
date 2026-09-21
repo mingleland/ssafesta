@@ -20,6 +20,7 @@ import type {
   EventQuestionAggregate,
   EventResponseDetail,
   Page,
+  PrizeInput,
   PrizePurchaseView,
   PrizeView,
 } from './types';
@@ -81,11 +82,29 @@ let booths: AdminBoothView[] = [
 /** 마스터 소유 부스 — 강제 비공개가 MASTER_PROTECTED 로 거절된다 */
 const MASTER_BOOTH_ID = 11;
 
-let prizes: PrizeView[] = [
-  { prizeId: 1, name: '싸피 후드집업', priceCoin: 240, stock: 3, active: true },
-  { prizeId: 2, name: '스티커 세트', priceCoin: 45, stock: null, active: true },
-  { prizeId: 3, name: '텀블러', priceCoin: 180, stock: 0, active: false },
-];
+function seedPrizes(): PrizeView[] {
+  return [
+    { prizeId: 1, name: '싸피 후드집업', priceCoin: 240, stock: 3, active: true, closesAt: null, winnerCount: 0, drawnAt: null },
+    { prizeId: 2, name: '스티커 세트', priceCoin: 45, stock: null, active: true, closesAt: null, winnerCount: 0, drawnAt: null },
+    { prizeId: 3, name: '텀블러', priceCoin: 180, stock: 0, active: false, closesAt: null, winnerCount: 0, drawnAt: null },
+    // 응모형 — 응모권 50장 중 3명 당첨, 마감 있음
+    { prizeId: 4, name: '닌텐도 스위치 추첨', priceCoin: 100, stock: 50, active: true, closesAt: at(23), winnerCount: 3, drawnAt: null },
+  ];
+}
+let prizes: PrizeView[] = seedPrizes();
+let nextPrizeId = 5;
+
+// BE AdminEventShopService.validatePrizeFields 와 같은 표 — mock 에서만 통과하는 입력이 없게.
+function validatePrize(input: PrizeInput): void {
+  const name = input.name.trim();
+  if (name === '') throw apiError('VALIDATION_FAILED', 400, '경품 이름을 입력해 주세요.');
+  if (name.length > 200) throw apiError('VALIDATION_FAILED', 400, '경품 이름은 200자 이하여야 합니다.');
+  if (input.priceCoin < 0) throw apiError('VALIDATION_FAILED', 400, '가격은 0 이상이어야 합니다.');
+  if (input.stock !== null && input.stock < 0) throw apiError('VALIDATION_FAILED', 400, '재고는 0 이상이거나 무제한이어야 합니다.');
+  if (input.winnerCount < 0) throw apiError('VALIDATION_FAILED', 400, '당첨자 수는 0 이상이어야 합니다.');
+  if (input.winnerCount > 0 && input.stock === null) throw apiError('VALIDATION_FAILED', 400, '응모형 경품은 응모권 수를 지정해야 합니다.');
+  if (input.stock !== null && input.winnerCount > input.stock) throw apiError('VALIDATION_FAILED', 400, '당첨자 수는 응모권 수보다 많을 수 없습니다.');
+}
 let purchases: PrizePurchaseView[] = [
   { purchaseId: 1, prizeId: 1, prizeName: '싸피 후드집업', buyerUserId: 7, buyerNickname: '이벤트참여자', quantity: 1, coinSpent: 240, ledgerEntryId: 108, purchasedAt: at(8), fulfillment: 'PENDING', note: null, updatedAt: at(8), campus: '서울', teamName: 'A604', recipientName: '황덕' },
   { purchaseId: 2, prizeId: 2, prizeName: '스티커 세트', buyerUserId: 5, buyerNickname: '싸피생', quantity: 1, coinSpent: 45, ledgerEntryId: 105, purchasedAt: at(7), fulfillment: 'FULFILLED', note: '현장 수령', updatedAt: at(7, 40), campus: '대전', teamName: 'B201', recipientName: '김싸피' },
@@ -243,6 +262,35 @@ export const adminApi: AdminRepository = {
     return prizes.map((p) => ({ ...p }));
   },
 
+  async createPrize(input) {
+    validatePrize(input);
+    const prize: PrizeView = {
+      prizeId: nextPrizeId++,
+      name: input.name.trim(),
+      priceCoin: input.priceCoin,
+      stock: input.stock,
+      active: true,
+      closesAt: input.closesAt,
+      winnerCount: input.winnerCount,
+      drawnAt: null,
+    };
+    prizes.push(prize);
+    return { ...prize };
+  },
+
+  async updatePrize(prizeId, input) {
+    validatePrize(input);
+    const prize = prizes.find((p) => p.prizeId === prizeId);
+    if (prize === undefined) throw apiError('EVENT_PRIZE_NOT_FOUND', 404, '경품을 찾을 수 없습니다.');
+    prize.name = input.name.trim();
+    prize.priceCoin = input.priceCoin;
+    prize.stock = input.stock;
+    prize.active = input.active ?? true;
+    prize.closesAt = input.closesAt;
+    prize.winnerCount = input.winnerCount;
+    return { ...prize };
+  },
+
   async listPurchases(status, page, size) {
     const rows = purchases.filter((p) => status === 'ALL' || p.fulfillment === status).sort((a, b) => b.purchaseId - a.purchaseId);
     return paginate(rows.map((p) => ({ ...p })), page, size);
@@ -314,7 +362,8 @@ export function __resetAdminMockForTests(): void {
   nextLedgerId = 500;
   adjustments = new Map();
   booths = booths.map((b) => ({ ...b, entryAvailable: b.boothId !== 17 }));
-  prizes = prizes.map((p) => ({ ...p }));
+  prizes = seedPrizes();
+  nextPrizeId = 5;
   purchases = purchases.map((p, i) => ({ ...p, fulfillment: (['PENDING', 'FULFILLED', 'PURCHASED', 'CANCELLED'] as const)[i], note: i === 1 ? '현장 수령' : i === 3 ? '재고 소진으로 취소, 코인 환불 필요' : null }));
   responses = responses.map((r) => ({ ...r }));
   surveyClosed = false;

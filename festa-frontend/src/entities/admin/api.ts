@@ -22,6 +22,7 @@ import type {
   EventSurveySummary,
   Page,
   PrizeFulfillmentStatus,
+  PrizeInput,
   PrizePurchaseView,
   PrizeView,
 } from './types';
@@ -135,6 +136,26 @@ function listPrizes(): Promise<PrizeView[]> {
   return api<PrizeView[]>('/api/v1/admin/event-shop/prizes');
 }
 
+// PrizeRequest(BE) 로 옮긴다 — 등록은 active 를 생략해 BE 기본값(true)에 맡기고, 수정만 실어 보낸다.
+function prizeBody(input: PrizeInput) {
+  return {
+    name: input.name,
+    priceCoin: input.priceCoin,
+    stock: input.stock,
+    closesAt: input.closesAt,
+    winnerCount: input.winnerCount,
+    ...(input.active === undefined ? {} : { active: input.active }),
+  };
+}
+
+function createPrize(input: PrizeInput): Promise<PrizeView> {
+  return api<PrizeView>('/api/v1/admin/event-shop/prizes', { method: 'POST', body: JSON.stringify(prizeBody(input)) });
+}
+
+function updatePrize(prizeId: number, input: PrizeInput): Promise<PrizeView> {
+  return api<PrizeView>(`/api/v1/admin/event-shop/prizes/${prizeId}`, { method: 'PUT', body: JSON.stringify(prizeBody(input)) });
+}
+
 function listPurchases(status: PrizeFulfillmentStatus | 'ALL', page: number, size: number): Promise<Page<PrizePurchaseView>> {
   const filter = status === 'ALL' ? '' : `&status=${status}`;
   return api<Page<PrizePurchaseView>>(`/api/v1/admin/event-shop/purchases?page=${page}&size=${size}${filter}`);
@@ -187,6 +208,8 @@ export const adminApi: AdminRepository = {
   listBooths,
   unpublishBooth,
   listPrizes,
+  createPrize,
+  updatePrize,
   listPurchases,
   updateFulfillment,
   listEventSurveys,

@@ -122,6 +122,31 @@ export interface PrizeView {
   /** null = 무제한 */
   stock: number | null;
   active: boolean;
+  /** 마감 시각. null 이면 마감 없음 */
+  closesAt: string | null;
+  /** 당첨자 수. 0 이면 즉시 구매 상품, 1 이상이면 응모형 (BE winnerCount) */
+  winnerCount: number;
+  /** 추첨을 마친 시각. null 이면 아직 (응모형만) */
+  drawnAt: string | null;
+}
+
+/**
+ * 경품 등록·수정 입력. `winnerCount` 하나로 종류가 갈린다 — 0 이면 즉시 구매, 1 이상이면 응모형.
+ * 응모형은 응모권 수(`stock`)를 반드시 정해야 하고 당첨자 수가 그보다 많을 수 없다(BE validatePrizeFields).
+ * `active` 는 수정 때만 쓴다 — 등록은 항상 판매 중으로 시작한다.
+ */
+export interface PrizeInput {
+  name: string;
+  priceCoin: number;
+  stock: number | null;
+  closesAt: string | null;
+  winnerCount: number;
+  active?: boolean;
+}
+
+/** 화면 표기: winnerCount 로 즉시 구매/응모형을 가른다 */
+export function prizeKindLabel(winnerCount: number): '즉시 구매' | '응모형' {
+  return winnerCount > 0 ? '응모형' : '즉시 구매';
 }
 
 export interface PrizePurchaseView {
@@ -219,6 +244,8 @@ export interface AdminRepository {
   unpublishBooth(boothId: number, reason: string): Promise<void>;
 
   listPrizes(): Promise<PrizeView[]>;
+  createPrize(input: PrizeInput): Promise<PrizeView>;
+  updatePrize(prizeId: number, input: PrizeInput): Promise<PrizeView>;
   listPurchases(status: PrizeFulfillmentStatus | 'ALL', page: number, size: number): Promise<Page<PrizePurchaseView>>;
   updateFulfillment(purchaseId: number, status: PrizeFulfillmentStatus, note?: string): Promise<PrizePurchaseView>;
 
