@@ -78,9 +78,10 @@ describe('코인 조정 멱등키', () => {
 });
 
 describe('부스·상점·설문', () => {
-  it('강제 비공개는 게시 상태를 내리고, 마스터 소유 부스는 보호된다', async () => {
+  // 자리까지 회수하므로 목록에서 사라진다(S15P21A604-927) — 비공개로 남는 것이 아니다.
+  it('강제 비공개는 부스를 목록에서 걷고, 마스터 소유 부스는 보호된다', async () => {
     await adminApi.unpublishBooth(13, '신고');
-    expect((await adminApi.listBooths()).find((b) => b.boothId === 13)?.entryAvailable).toBe(false);
+    expect((await adminApi.listBooths()).find((b) => b.boothId === 13)).toBeUndefined();
     expect(await code(adminApi.unpublishBooth(11, '신고'))).toBe('MASTER_PROTECTED:403');
   });
 
@@ -90,7 +91,8 @@ describe('부스·상점·설문', () => {
     const done = await adminApi.updateFulfillment(1, 'FULFILLED', '현장 수령');
     expect(done).toMatchObject({ fulfillment: 'FULFILLED', note: '현장 수령' });
     // 취소된 것을 되살리는 것도, 지급 완료된 것을 취소하는 것도 같은 코드로 막힌다
-    expect(await code(adminApi.updateFulfillment(4, 'FULFILLED'))).toBe('EVENT_PURCHASE_FULFILLMENT_INVALID:409');
+    await adminApi.updateFulfillment(3, 'CANCELLED');
+    expect(await code(adminApi.updateFulfillment(3, 'FULFILLED'))).toBe('EVENT_PURCHASE_FULFILLMENT_INVALID:409');
     expect(await code(adminApi.updateFulfillment(1, 'CANCELLED'))).toBe('EVENT_PURCHASE_FULFILLMENT_INVALID:409');
   });
 

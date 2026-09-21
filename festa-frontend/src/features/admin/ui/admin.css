@@ -67,6 +67,7 @@
 .ad-textarea { resize: vertical; }
 .ad-field-error { color: #ffb3bb; font-size: 12.5px; }
 .ad-actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.ad-check { display: flex; align-items: center; gap: 8px; font-size: 13.5px; }
 .ad-btn-danger { background: rgba(239, 93, 108, 0.22); border-color: rgba(239, 93, 108, 0.5); color: #ffd4d9; }
 
 .ad-gated { display: inline-flex; flex-direction: column; gap: 4px; }
