@@ -5,7 +5,7 @@
 //
 // URL 의 정본은 GET /booths/{id} 의 homepageUrl 이다(016 C-01 #97) — 이벤트 payload 의 url 은
 // 소비하지 않는다. Unity 는 url 을 보내지 않으므로 payload 의존은 항상 "미준비"로 떨어졌다(-374).
-import { useEffect } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { closeOverlay } from '../../shared/types/overlay';
 import { loadLaptopHomepage, resetLaptopHomepage, useLaptopHomepage } from './model/laptopHomepage';
 import { OverlayEmpty, OverlayError, OverlayFrame, OverlayLoading } from './ui/OverlayFrame';
@@ -22,6 +22,20 @@ interface LaptopOverlayPayload {
   boothId: number;
   objectId: string;
 }
+
+/**
+ * 노트북 화면이 남에게 보여 주는 **뷰포트 크기**. 창이 얼마나 크든 이 값이 고정이다.
+ *
+ * 상자를 창에 맞춰 늘리는 방식으로는 이걸 보장할 수 없다 — Overlay 는 사방 `4vw/4vh` 를 비우므로
+ * 쓸 수 있는 폭이 `92vw` 이고, 노트북 화면을 1400px 안팎의 창에서 열면 1280 에 닿기 전에 창이
+ * 먼저 걸린다. 그러면 사이트는 태블릿 레이아웃을 내주고, 우리는 무엇이 올지 통제하지 못한다.
+ *
+ * 그래서 iframe 은 **항상 1280×720 으로 그리고**, 들어갈 자리가 좁으면 통째로 축소해서 앉힌다.
+ * 사이트가 보는 뷰포트는 그대로 1280 이고 눈에만 작아진다. 확대는 하지 않는다 — 1280 보다 넓은
+ * 자리에서 늘리면 없는 해상도를 지어내는 셈이라 글자만 뭉갠다.
+ */
+const SCREEN_W = 1280;
+const SCREEN_H = 720;
 
 function openInNewTab(href: string): void {
   window.open(href, '_blank', 'noopener,noreferrer');
@@ -88,6 +102,42 @@ export function LaptopOverlay({ payload }: { payload: LaptopOverlayPayload }) {
 
   const ready = homepage.kind === 'valid';
   const externalOnly = homepage.kind === 'external_only';
+
+  // 들어갈 자리를 재서 축소 배율을 정한다. 창 크기·오버레이 여백·머리/바닥 높이가 모두 섞이는
+  // 값이라 CSS 로는 계산할 수 없다 — 실제로 남은 상자를 재는 쪽이 맞다.
+  //
+  // **배율만 정하면 좌우가 뜬다.** 세로가 먼저 걸리면 비율을 지키느라 가로가 남고, 프레임은
+  // 여전히 최대 폭이라 그 차이가 빈 여백으로 보인다. 그래서 배율과 함께 프레임 폭도 줄여
+  // 축소된 화면을 그대로 감싸게 한다.
+  //
+  // 창 resize 에만 반응한다 — 프레임 폭을 우리가 건드리므로, 상자 크기를 관찰하면 그 변화가
+  // 다시 계산을 부르는 고리가 된다.
+  const screenRef = useRef<HTMLDivElement>(null);
+  const [scale, setScale] = useState(1);
+  useLayoutEffect(() => {
+    const box = screenRef.current;
+    const frame = box?.closest<HTMLElement>('.festa-overlay-frame') ?? null;
+    if (box === null || frame === null) return;
+
+    const fit = () => {
+      // 우리가 준 폭을 먼저 걷어야 CSS 가 정한 최대치를 잴 수 있다. 그 상태의 프레임과 화면
+      // 상자의 차이가 곧 머리·바닥·여백이고, 폭을 줄여도 그 값은 변하지 않는다.
+      frame.style.width = '';
+      const chrome = frame.clientWidth - box.clientWidth;
+      const room = { width: box.clientWidth, height: box.clientHeight };
+      if (room.width === 0 || room.height === 0) return;
+      const next = Math.min(1, room.width / SCREEN_W, room.height / SCREEN_H);
+      setScale(next);
+      frame.style.width = String(Math.round(SCREEN_W * next + chrome)) + 'px';
+    };
+
+    fit();
+    window.addEventListener('resize', fit);
+    return () => {
+      window.removeEventListener('resize', fit);
+      frame.style.width = '';
+    };
+  }, [ready]);
   // 새 탭은 둘 다 연다 — 창 안에서 못 여는 것과 아예 못 가는 것은 다르다(016 SC-003).
   const openable = ready || externalOnly;
 
@@ -138,14 +188,17 @@ export function LaptopOverlay({ payload }: { payload: LaptopOverlayPayload }) {
           {/* 소유자가 등록한 임의 URL — sandbox 로 top 탐색(frame-busting)을 계속 차단한다 (-377).
               allow-same-origin 은 외부 origin 콘텐츠라 sandbox 우회로 이어지지 않는다(같은 출처는
               여기까지 오지 않는다 — self_origin 으로 갈린다). 토큰·권한의 근거는 위 상수 주석에 있다. */}
-          <iframe
-            className="laptop-iframe"
-            src={homepage.href}
-            title={homepage.hostname}
-            sandbox={IFRAME_SANDBOX}
-            allow={IFRAME_ALLOW}
-            allowFullScreen
-          />
+          <div ref={screenRef} className="laptop-screen">
+            <iframe
+              className="laptop-iframe"
+              style={{ width: SCREEN_W, height: SCREEN_H, transform: `scale(${scale})` }}
+              src={homepage.href}
+              title={homepage.hostname}
+              sandbox={IFRAME_SANDBOX}
+              allow={IFRAME_ALLOW}
+              allowFullScreen
+            />
+          </div>
           <p className="ov-note">사이트 정책에 따라 여기 표시되지 않을 수 있습니다 — 그때는 새 탭으로 열어 주세요.</p>
         </div>
       )}
