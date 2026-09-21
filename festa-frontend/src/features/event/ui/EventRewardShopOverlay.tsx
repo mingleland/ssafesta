@@ -1,8 +1,8 @@
 // 이벤트 상점 Overlay (S15P21A604-599, 실 연동 S15P21A604-842/836).
 //
-// 즉시교환은 entities/eventShop(GET prizes·POST purchases)에 실제로 연결돼 있다. 응모권은
-// entities/raffle을 쓰지만 그 너머는 아직 mock이다(-836 스펙에 추첨 개념 자체가 없음) —
-// api.select.ts만 real로 바꾸면 이 파일은 손대지 않고 그대로 실 연동이 된다.
+// 즉시교환·응모권 모두 entities/eventShop(GET prizes·POST purchases) 한 계약에 연결돼 있다.
+// 같은 목록에서 winnerCount로 갈린다 — 0이면 즉시교환, 1 이상이면 응모권이다(entities/raffle이
+// 그 조각을 RafflePrize 모양으로 바꿔 준다).
 //
 // 화폐는 wallet Coin이다. 보유량은 기존 `WalletBadge`를 그대로 쓴다 — member 전용 가드까지 그 안에 있다.
 //
@@ -77,8 +77,6 @@ const PURCHASE_ERROR_LABELS: Record<string, string> = {
   EVENT_PRIZE_INACTIVE: '판매가 중단된 경품입니다.',
   INSUFFICIENT_COIN: '코인이 부족합니다.',
   EVENT_PRIZE_NOT_FOUND: '경품을 찾을 수 없습니다.',
-  RAFFLE_OUT_OF_STOCK: '방금 응모권이 모두 소진됐습니다.',
-  RAFFLE_NOT_FOUND: '응모권을 찾을 수 없습니다.',
 };
 
 export function EventRewardShopOverlay() {
@@ -123,7 +121,7 @@ export function EventRewardShopOverlay() {
     mutationFn: ({ raffle, recipient }: { raffle: RafflePrize; recipient: PurchaseRecipient }) => {
       const key = raffleKeys.get(raffle.raffleId) ?? newIdempotencyKey();
       raffleKeys.set(raffle.raffleId, key);
-      return raffleApi.enterRaffle(raffle.raffleId, key, recipient);
+      return raffleApi.enterRaffle(raffle, key, recipient);
     },
     onSuccess: (result, { raffle }) => {
       raffleKeys.delete(raffle.raffleId);
@@ -135,6 +133,7 @@ export function EventRewardShopOverlay() {
         note: drawTimeLabel(result.drawAt),
       });
       void queryClient.invalidateQueries({ queryKey: ['event-shop-raffles'] });
+      void queryClient.invalidateQueries({ queryKey: ['event-shop-prizes'] });
       void queryClient.invalidateQueries({ queryKey: ['wallet-balance'] });
     },
     onError: (error) => {
@@ -143,6 +142,7 @@ export function EventRewardShopOverlay() {
       const message = isApiError(error) ? PURCHASE_ERROR_LABELS[error.code] ?? error.message : '응모에 실패했습니다.';
       showToast(message, 'error');
       void queryClient.invalidateQueries({ queryKey: ['event-shop-raffles'] });
+      void queryClient.invalidateQueries({ queryKey: ['event-shop-prizes'] });
       void queryClient.invalidateQueries({ queryKey: ['wallet-balance'] });
     },
   });
@@ -183,8 +183,10 @@ export function EventRewardShopOverlay() {
     };
   }
 
+  // 응모권(winnerCount > 0)은 같은 목록에 섞여 오지만 아래 raffle 카드로 따로 그린다
   const instantCards = prizesQuery.isSuccess
-    ? [...prizesQuery.data]
+    ? prizesQuery.data
+        .filter((prize) => (prize.winnerCount ?? 0) === 0)
         .sort((a, b) => PRIZE_DISPLAY_ORDER.indexOf(a.name) - PRIZE_DISPLAY_ORDER.indexOf(b.name))
         .map(toInstantCard)
     : [];
@@ -234,6 +236,13 @@ export function EventRewardShopOverlay() {
       icon={IcGift}
       onClose={closeOverlay}
       headerAction={<WalletBadge />}
+      // 설문 참여는 상점이 비었을 때만이 아니라 늘 가능해야 한다 — 상품이 있으면 아래 안내판이
+      // 걷히므로 그 버튼도 사라진다. 그래서 상시 노출되는 footer 에 둔다(-608, 대상 -842).
+      footer={
+        <button type="button" className="ov-btn ov-btn-primary" onClick={() => openVisitorOverlay('SURVEY', surveyTarget)}>
+          설문 참여하기
+        </button>
+      }
     >
       {isPending && <OverlayLoading label="상품 목록을 불러오는 중..." />}
       {!isPending && isError && (
@@ -251,16 +260,8 @@ export function EventRewardShopOverlay() {
         <div className="ov-grid-wrap">
           <OverlayCardGrid cards={allCards} label="이벤트 상점 상품 목록" columns={3} />
           {allCards.length === 0 && (
-            <OverlayNotice
-              title="경품 상점 준비 중"
-              message="설문 참여 시 추첨을 통해 경품을 드립니다."
-              action={
-                // 부스 설문과 같은 오버레이로 간다 — 다른 것은 payload의 source 하나다 (-608)
-                <button type="button" className="ov-btn ov-btn-primary" onClick={() => openVisitorOverlay('SURVEY', surveyTarget)}>
-                  설문 참여하기
-                </button>
-              }
-            />
+            // 설문 버튼은 상시 footer 로 옮겼다 — 여기선 안내 문구만 남긴다
+            <OverlayNotice title="경품 상점 준비 중" message="설문 참여 시 추첨을 통해 경품을 드립니다." />
           )}
         </div>
       )}

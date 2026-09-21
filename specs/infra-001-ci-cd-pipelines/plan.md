@@ -73,8 +73,10 @@ GitLab's `rules:changes` evaluates the MR diff. A Jenkins `develop` Squash merge
 
 ### 4. WebGL Package Registry delivery
 
-1. Unity 담당자 PC의 `publish-webgl-release.sh`가 zip 구조를 확인하고 SHA-256을 계산한다.
-2. 도우미가 `festa-webgl/<release-id>/festa-webgl-release-<release-id>.zip`과 checksum을 업로드한다. 두 업로드 성공 뒤에만 Jenkins job을 호출한다.
+(Batch 2, 2026-09-20 이후 정상 경로) Jenkins 는 Unity 를 빌드하지 않는다. Unity 담당자가 올린 Unity Release Bundle(`unity-release-bundle/<8sha>`)을 `festa-gitlab-develop/develop` 이 받아 검증·canonical 게시·Demo 반영한다 — `infra/unity-server/runbooks/unity-release-bundle.md`. 아래 1–2 는 fallback 이다.
+
+1. (fallback) 사람이 `publish-webgl-release.sh ZIP <8sha>` 로 zip 구조·lineage 를 검사하고 SHA-256 을 계산한다. 정상 경로에서는 deploy agent 가 `--no-trigger` 로 같은 스크립트를 부른다.
+2. `festa-webgl/<8sha>/festa-webgl-release-<8sha>.zip` + `.sha256` + `.json`(실행 provenance)을 올린다. 같은 version 이 이미 있으면 SHA 가 같을 때만 `WEBGL_RELEASE_EXISTS` 로 성공하고 다르면 65 다. fallback 에서만 업로드 뒤 Jenkins job 을 호출한다.
 3. deploy-agent는 Jenkins의 GitLab Deploy Token으로 package를 내려받고 SHA-256·안전한 ZIP entry·manifest 참조를 검증한다.
 4. 검증된 산출물을 `/srv/festa/webgl/releases/<release-id>`에 설치하고 `current`를 원자적으로 전환한다.
 5. 공개 HTTP의 MIME·Brotli·Cache-Control 검증 실패 시 이전 `current`를 복원한다. known-good 기록까지 성공했을 때만 `current`·`previous`와 최신 `current.legacy.<UTC 14자리 timestamp>` 두 개를 남기고 오래된 legacy를 정리한다. 이 경로는 Dedicated Server를 조작하지 않는다.
@@ -126,3 +128,13 @@ specs/infra-001-ci-cd-pipelines/
 ## Post-Design Constitution Check
 
 All changed decisions conform to amended Article II-10. No unresolved implementation choice blocks tasks: shared path handling, failure semantics, batch rollback boundary and demo approval are specified by [research.md](./research.md), [data-model.md](./data-model.md), and [contracts/changed-component-contract.md](./contracts/changed-component-contract.md).
+
+## Production final correction (2026-09-20)
+
+- Production은 승인 receipt의 App/WebGL/World artifact를 다시 빌드하거나 repack하지 않고 소비한다.
+- bootstrap은 `prod_ai`에 `~prod:ai:*`와 `~conversation:*`만 허용하고, `prod_back`의 `~prod:*`에서는 `conversation:*`을 거부한다. evidence는 `aiKeyPattern`을 유지하고 `conversationKeyPattern`을 추가한다.
+- same-port migration은 maintenance fence 뒤 legacy `festa-prod-*`를 제거하고 canonical `festa-production-*`을 `28080/28081/28082/27777`에 배치한다. 별도 blue/green port를 만들지 않는다.
+- public activation은 OAuth route를 Back `28081`, WebGL을 `/srv/festa/webgl/prod/current`, World를 `27777`로 연결한다. Demo는 root domain을 소유하지 않는다.
+- CURRENT는 public activation 성공 뒤 기록하고, KNOWN-GOOD는 external 검증과 사람 승인 뒤 별도로 기록한다.
+- 최초 canonical migration에는 `previous`가 없다. 실패하면 maintenance를 유지하며 broken legacy를 복원하지 않는다. 첫 canonical KNOWN-GOOD 이후부터 직전 canonical CURRENT를 exact-artifact rollback 대상으로 기록한다.
+- `festa_prod_readonly`는 실제 consumer가 없어 P0 Production Promotion에서 생성하지 않는다.

@@ -33,26 +33,53 @@ print(json.load(open(sys.argv[1]))['backupSetId'])
 PY
 )"
 restore_rows="${work}/restore.tsv"
-while IFS= read -r source_db; do
-  restore_db="$(backup_target_database "$target" "$source_db")"
-  read -r dump_key expected_sha < <(backup_python - "${work}/manifest.json" "$source_db" <<'PY'
-import json,sys
-item=next(x for x in json.load(open(sys.argv[1]))['databases'] if x['database'] == sys.argv[2])
-print(item['dumpKey'], item['sha256'])
-PY
-)
-  printf '%s\t%s\t%s\t%s\n' "$source_db" "$restore_db" "$dump_key" "$expected_sha" >>"$restore_rows"
-  backup_aws cp "s3://${R2_BACKUP_BUCKET}/${dump_key}" "${work}/${source_db}.dump" --only-show-errors
-  actual_sha="$(sha256sum "${work}/${source_db}.dump" | awk '{print $1}')"
-  [[ "$actual_sha" == "$expected_sha" ]] || backup_die "checksum mismatch: $source_db"
-  backup_psql postgres -c "DROP DATABASE IF EXISTS \"${restore_db}\""
-  backup_psql postgres -c "CREATE DATABASE \"${restore_db}\""
-  "${DOCKER_BIN}" exec -i -e PGPASSWORD "${POSTGRES_CONTAINER}" pg_restore -U festa_admin -d "$restore_db" --no-owner --no-privileges <"${work}/${source_db}.dump"
-done < <(backup_databases "$(backup_python - "${work}/manifest.json" <<'PY'
+: >"${restore_rows}"
+
+restore_environment="$(backup_python - "${work}/manifest.json" <<'PYJSON_ENV'
 import json,sys
 print(json.load(open(sys.argv[1]))['environment'])
-PY
-)")
+PYJSON_ENV
+)"
+
+# Phase A:
+# 모든 dump를 다운로드하고 모든 checksum을 검증한다.
+# 이 단계가 전부 끝나기 전에는 PostgreSQL mutation을 시작하지 않는다.
+while IFS= read -r source_db; do
+  restore_db="$(backup_target_database "${target}" "${source_db}")"
+
+  read -r dump_key expected_sha < <(
+    backup_python - "${work}/manifest.json" "${source_db}" <<'PYJSON_DUMP'
+import json,sys
+manifest=json.load(open(sys.argv[1]))
+item=next(
+    item for item in manifest['databases']
+    if item['database'] == sys.argv[2]
+)
+print(item['dumpKey'], item['sha256'])
+PYJSON_DUMP
+  )
+
+  backup_aws cp     "s3://${R2_BACKUP_BUCKET}/${dump_key}"     "${work}/${source_db}.dump"     --only-show-errors
+
+  actual_sha="$(sha256sum "${work}/${source_db}.dump" | awk '{print $1}')"
+
+  [[ "${actual_sha}" == "${expected_sha}" ]]     || backup_die "checksum mismatch: ${source_db}"
+
+  printf '%s\t%s\n'     "${source_db}"     "${restore_db}"     >>"${restore_rows}"
+done < <(backup_databases "${restore_environment}")
+
+# Phase B:
+# 모든 artifact가 검증된 뒤에만 disposable DB를 변경한다.
+while IFS=$'\t' read -r source_db restore_db; do
+  [[ -n "${source_db}" && -n "${restore_db}" ]] || continue
+
+  backup_psql postgres     -c "DROP DATABASE IF EXISTS \"${restore_db}\""
+
+  backup_psql postgres     -c "CREATE DATABASE \"${restore_db}\""
+
+  "${DOCKER_BIN}" exec -i -e PGPASSWORD "${POSTGRES_CONTAINER}"     pg_restore     -U festa_admin     -d "${restore_db}"     --no-owner     --no-privileges     <"${work}/${source_db}.dump"
+done <"${restore_rows}"
+
 mkdir -p "${BACKUP_STATE_DIR}/restores"
 state="${BACKUP_STATE_DIR}/restores/${target}.json"
 backup_python - "$state" "${work}/manifest.json" "$restore_rows" <<'PY'

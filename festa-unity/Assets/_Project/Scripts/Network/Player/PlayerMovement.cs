@@ -590,7 +590,25 @@ namespace Festa.Network
             // 기존 이동 경로를 그대로 탄다.
             if (PositionIsAnchored())
             {
-                ClearTransientPushes();
+                ClearHorizontalPushes();
+
+                // **공중이면 떨어뜨린다.** 고정은 "남이 밀어도 자리를 지킨다" 는 뜻이지 "중력을 끈다" 가
+                // 아니다. 예전에는 수직 속도까지 지우고 Move 를 건너뛰어서, 점프로 떠 있는 동안 F 나
+                // Esc 로 잠금이 걸리면 그 높이에 그대로 굳었다 (사용자 지적 2026-09-18).
+                // 수평만 막고 중력은 그대로 적용해 발이 땅에 닿게 한다 — 착지하면 아래 고정 경로로 간다.
+                //
+                // 좌석·소파 자세는 예외다. 그 자세의 기준 높이는 바닥이 아니라 좌면이라, 중력을 주면
+                // 앉은 사람이 의자에서 흘러내린다 (S15P21A604-907 에서 맞춰 둔 높이가 무너진다).
+                if (!IsSeatedPose() && _controller != null && _controller.enabled && !_controller.isGrounded)
+                {
+                    _controller.Move(Vector3.up * (_verticalSpeed * Time.deltaTime));
+                    return;
+                }
+
+                _verticalSpeed = 0f;
+                _airborne = false;
+                _jumped = false;
+                _jumpPending = false;
                 return;
             }
 
@@ -615,24 +633,29 @@ namespace Festa.Network
         bool PositionIsAnchored()
         {
             if (Festa.Integration.InputBridge.IsLocked) return true;
+            return IsSeatedPose();
+        }
+
+        /// <summary>의자에 앉았거나 소파에 누운 자세. 이 자세의 기준 높이는 바닥이 아니라 좌면이다.</summary>
+        bool IsSeatedPose()
+        {
             if (_player == null) return false;
             var emote = _player.EmoteId.Value;
             return LiePoseTable.IsLie(emote) || SitPoseTable.IsSit(emote);
         }
 
-        /// <summary>잠금 해제 직후 이전 프레임의 밀림이 한 번 더 적용되지 않게 잔류 속도를 버린다.</summary>
-        void ClearTransientPushes()
+        /// <summary>
+        /// 잠금 해제 직후 이전 프레임의 밀림이 한 번 더 적용되지 않게 <b>수평</b> 잔류 속도를 버린다.
+        /// 수직은 건드리지 않는다 — 공중에서 잠긴 사람이 떨어져야 하기 때문이다.
+        /// </summary>
+        void ClearHorizontalPushes()
         {
-            _verticalSpeed = 0f;
             _separationVelocity = Vector3.zero;
             _externalPush = Vector3.zero;
             _externalPushSpeed = 0f;
             _externalPushUntil = 0f;
             _noStandPush = Vector3.zero;
             _noStandPushUntil = 0f;
-            _airborne = false;
-            _jumped = false;
-            _jumpPending = false;
         }
 
         // ── 사람끼리 부드럽게 밀어내기 (S15P21A604-761, 2026-09-16 재설계) ──────

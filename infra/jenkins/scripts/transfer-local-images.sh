@@ -54,8 +54,10 @@ for item in components:
     content_id=item.get('contentId')
     if name not in {'ai','back','front','game'} or name in seen:
         raise SystemExit('release manifest has invalid or duplicate component metadata')
-    if item.get('storageMode') != 'local-docker' or item.get('sourceCommit') != commit:
+    if item.get('storageMode') != 'local-docker' or (name != 'game' and item.get('sourceCommit') != commit):
         raise SystemExit(f'release manifest has invalid local candidate metadata: {name}')
+    if name == 'game' and (not isinstance(item.get('sourceCommit'), str) or len(item.get('sourceCommit')) != 40):
+        raise SystemExit('release manifest has invalid game sourceCommit')
     if not isinstance(image_ref,str) or not image_ref or not isinstance(content_id,str) or not re.fullmatch(r'sha256:[0-9a-f]{64}',content_id):
         raise SystemExit(f'release manifest has invalid candidate identity: {name}')
     seen.add(name)

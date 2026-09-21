@@ -5,13 +5,13 @@ map $http_upgrade $festa_connection_upgrade {
 
 server {
     listen 80;
-    server_name world.${ROOT_DOMAIN};
+    server_name ${DEMO_WORLD_HOST};
     return 301 https://$host$request_uri;
 }
 
 server {
     listen 443 ssl;
-    server_name world.${ROOT_DOMAIN};
+    server_name ${DEMO_WORLD_HOST};
 
     ssl_certificate ${NGINX_ORIGIN_CERTIFICATE_FILE};
     ssl_certificate_key ${NGINX_ORIGIN_PRIVATE_KEY_FILE};

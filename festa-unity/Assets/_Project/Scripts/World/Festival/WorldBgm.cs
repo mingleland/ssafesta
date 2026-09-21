@@ -22,21 +22,31 @@ namespace Festa.World
     {
         [SerializeField] AudioClip _morning;    // 11층: Algorithmic Morning
         [SerializeField] AudioClip _circus;     // 축제: Midnight Circus
+        [SerializeField] AudioClip _arcade;     // 오락실: Arcade Rush
         // 두 곡의 원본 음량은 사실상 같다 — 실측 2026-09-10: K-가중 라우드니스 −19.54 / −19.61 LUFS
         // (RMS 로도 −17.4 / −17.9 dBFS). 그러니 배율 차이는 곡 보정이 아니라 그냥 취향이고,
         // 0.5 / 0.55 의 0.8 dB 차이는 들리지 않는다. **전체가 크다**는 지적을 받아 같은 비율로 낮춘다.
         [SerializeField] float _morningVolume = 0.38f;
         [SerializeField] float _circusVolume = 0.41f;
+        [SerializeField] float _arcadeVolume = 0.40f;
         [Tooltip("볼륨이 목표로 수렴하는 속도 (초당). 걸음 속도와 어울리는 완만한 값.")]
         [SerializeField] float _fadeSpeed = 1.4f;
 
         AudioSource _morningSrc;
         AudioSource _circusSrc;
+        AudioSource _arcadeSrc;
+
+        /// <summary>축제장 서쪽 벽. 이 너머가 오락실 증축부다 (FestaArcadeRoomBuilder 와 같은 값).</summary>
+        const float ArcadeWallX = -930f;
+
+        /// <summary>오락실 방이 시작되는 x. 복도 9 m × 13.26 u/m 만큼 안쪽이다.</summary>
+        const float ArcadeRoomX = -1049f;
 
         void Awake()
         {
             _morningSrc = MakeSource(_morning);
             _circusSrc = MakeSource(_circus);
+            _arcadeSrc = MakeSource(_arcade);
         }
 
         AudioSource MakeSource(AudioClip clip)
@@ -57,12 +67,13 @@ namespace Festa.World
             // Camera.main 을 바로 읽었는데, 플레이어가 스폰되기 전의 카메라는 원점에
             // 있고 원점은 구역 판정상 복도(z 0 → t 0.52 → circus 0.1022)라 축제 트랙이
             // 켜졌다. 11F 진입 첫 0.3초에 축제 음악이 새어 나온 원인이다 (GitLab #140).
-            float m = 0f, c = 0f;
-            if (TryGetEarPosition(out var p)) (m, c) = ZoneWeights(p);
+            float m = 0f, c = 0f, a = 0f;
+            if (TryGetEarPosition(out var p)) (m, c, a) = ZoneWeights(p);
 
             float dt = _fadeSpeed * Time.deltaTime;
             _morningSrc.volume = Mathf.MoveTowards(_morningSrc.volume, m * _morningVolume, dt);
             _circusSrc.volume = Mathf.MoveTowards(_circusSrc.volume, c * _circusVolume, dt);
+            _arcadeSrc.volume = Mathf.MoveTowards(_arcadeSrc.volume, a * _arcadeVolume, dt);
         }
 
         /// <summary>
@@ -95,11 +106,19 @@ namespace Festa.World
             return true;
         }
 
-        static (float morning, float circus) ZoneWeights(Vector3 p)
+        static (float morning, float circus, float arcade) ZoneWeights(Vector3 p)
         {
-            if (p.x > 500f) return (0f, 0.35f);    // 내부 부스 홀
-            if (p.x < -228f) return (0f, 1f);      // 축제 부지
-            if (p.z < -118f) return (1f, 0f);      // 11층 방
+            // 오락실 — 축제장 서쪽 벽 너머는 증축한 복도와 오락실뿐이다. 9 m 복도를 걷는 동안
+            // 축제가 잦아들고 오락실이 차오른다. 11층 → 축제와 같은 언어다 (2026-09-20).
+            if (p.x < ArcadeWallX)
+            {
+                float k = Mathf.InverseLerp(ArcadeWallX, ArcadeRoomX, p.x);   // 0 = 입구, 1 = 방 안
+                return (0f, Mathf.Clamp01(1f - k * 1.9f), Mathf.Clamp01((k - 0.47f) * 1.9f));
+            }
+
+            if (p.x > 500f) return (0f, 0.35f, 0f);    // 내부 부스 홀
+            if (p.x < -228f) return (0f, 1f, 0f);      // 축제 부지
+            if (p.z < -118f) return (1f, 0f, 0f);      // 11층 방
 
             // 복도·개활 전실 — 계곡형 크로스페이드. 두 곡을 절반씩 섞으면 조성이
             // 달라 불협화음이 난다. 전반부에서 아침이 완전히 꺼지고, 짧은 고요를
@@ -107,7 +126,7 @@ namespace Festa.World
             float t = Mathf.InverseLerp(-110f, 100f, p.z);
             float morning = Mathf.Clamp01(1f - t * 1.9f);          // t 0.53 에서 소멸
             float circus = Mathf.Clamp01((t - 0.47f) * 1.9f);      // t 0.47 부터 상승
-            return (morning, circus);
+            return (morning, circus, 0f);
         }
     }
 }

@@ -84,6 +84,8 @@
 
 `PUBLIC CONNECT`를 회수하고 각 role은 자기 database에만 접근한다. role은 `NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS`이며 AI DB의 `vector` extension은 관리자만 설치한다.
 
+운영자 조회용으로 `festa_demo_readonly` role을 하나 더 둔다. demo 두 database의 `SELECT`만 가지며 비밀번호가 없어 컨테이너 내부 unix socket으로만 붙는다. runtime service는 쓰지 않는다.
+
 ## 5. Object Storage Provider
 
 | Field | Type | Rule |
