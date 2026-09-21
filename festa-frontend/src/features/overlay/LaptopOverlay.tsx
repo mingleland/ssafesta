@@ -95,7 +95,8 @@ export function LaptopOverlay({ payload }: { payload: LaptopOverlayPayload }) {
     <OverlayFrame
       title="부스 홈페이지"
       subtitle={openable ? homepage.hostname : '노트북'}
-      size="xl"
+      // 안쪽 iframe 이 1280×720 이 되도록 잡은 크기다 — 상세는 overlayFrame.css 의 screen 절
+      size="screen"
       icon={IcLaptop}
       onClose={closeOverlay}
       status={<span className="ov-note">Esc 또는 바깥을 눌러 월드로 돌아갑니다</span>}

@@ -66,6 +66,17 @@
 .festa-overlay-frame[data-size='l'] { width: min(880px, 100%); max-height: min(680px, 100%); }
 .festa-overlay-frame[data-size='xl'] { width: min(1180px, 100%); max-height: min(780px, 100%); }
 
+/* 'screen' 은 바깥 상자가 아니라 **안쪽 iframe 이 몇 px 인가**로 잡은 유일한 크기다. 남의 사이트를
+   그대로 띄우는 자리라 상자를 적당히 크게 잡는 것으로는 부족하다 — 대부분의 반응형 사이트가
+   데스크톱 레이아웃을 1280px 부터 내주므로, 그보다 좁으면 태블릿 화면이 들어온다.
+
+   그래서 iframe 안쪽이 1280×720(16:9) 이 되도록 바깥 치수를 거꾸로 계산했다:
+     너비  1280 + 본문 padding 16×2 + iframe 테두리 1×2 + 프레임 테두리 1×2 = 1316
+     높이  720 + 본문 padding 16×2 + 안내문 19 + 줄 간격 8 + 머리 66 + 바닥 61 + 테두리 2 = 908
+
+   창이 그보다 좁거나 낮으면 100% 가 먼저 걸리고, iframe 은 flex-grow 라 남는 만큼만 차지한다. */
+.festa-overlay-frame[data-size='screen'] { width: min(1316px, 100%); max-height: min(908px, 100%); }
+
 /* ── Header ── */
 .festa-overlay-head {
   display: flex;
