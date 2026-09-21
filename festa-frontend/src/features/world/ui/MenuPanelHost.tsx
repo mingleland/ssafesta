@@ -6,6 +6,7 @@ import { OverlayFrame } from '../../overlay/ui/OverlayFrame';
 import { MyInfoOverlay } from '../../profile/ui/MyInfoOverlay';
 import { AdminOverlay } from '../../admin/ui/AdminOverlay';
 import { DailyMissionOverlay } from '../../mission/ui/DailyMissionOverlay';
+import { FeedbackOverlay } from '../../feedback/ui/FeedbackOverlay';
 import { MusicSettings } from '../../audio/ui/MusicSettings';
 import { ControlGuideList } from './ControlGuideList';
 import type { MenuPanel } from '../model/gameClientUi';
@@ -14,6 +15,7 @@ export function MenuPanelHost({ panel, onClose }: { panel: MenuPanel; onClose: (
   if (panel === 'myInfo') return <MyInfoOverlay onClose={onClose} />;
   if (panel === 'admin') return <AdminOverlay onClose={onClose} />;
   if (panel === 'missions') return <DailyMissionOverlay onClose={onClose} />;
+  if (panel === 'feedback') return <FeedbackOverlay onClose={onClose} />;
   if (panel === 'guide') {
     return (
       <OverlayFrame title="조작 안내" subtitle="월드에서 사용하는 기본 조작" size="s" onClose={onClose}>

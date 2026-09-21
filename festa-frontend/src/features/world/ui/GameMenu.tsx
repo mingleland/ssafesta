@@ -48,6 +48,12 @@ const IcUser = (
   </svg>
 );
 
+const IcFeedback = (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M21 11.5a8.38 8.38 0 0 1-8.5 8.5 8.5 8.5 0 0 1-3.8-.9L4 20l1.1-4.5A8.38 8.38 0 0 1 4 11.5 8.5 8.5 0 0 1 12.5 3a8.38 8.38 0 0 1 8.5 8.5Z" />
+  </svg>
+);
+
 const IcHelp = (
   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" aria-hidden="true">
     <circle cx="12" cy="12" r="8.6" />
@@ -219,6 +225,14 @@ export function GameMenu({ onClose, onOpenPanel }: Props) {
                 <button type="button" className="gm-card" onClick={openAvatarCustomization}>
                   {IcUser}
                   <span>아바타 변경</span>
+                </button>
+              )}
+              {/* 게스트에게는 감춘다 — 제출이 403 MEMBER_ONLY 다(최초 발견 보상이 회원 코인
+                  조정으로 이어지므로 신원이 있어야 한다). */}
+              {isMember && (
+                <button type="button" className="gm-card" onClick={() => onOpenPanel('feedback')}>
+                  {IcFeedback}
+                  <span>피드백</span>
                 </button>
               )}
               {/* 이용 안내는 조작 안내가 아니라 안내 가이드(WORLD_GUIDE) 오버레이를 연다.

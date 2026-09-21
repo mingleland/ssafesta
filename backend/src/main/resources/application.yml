@@ -117,6 +117,10 @@ app:
     reconciliation-initial-delay: PT5M
     reconciliation-scan-interval: PT1H
 
+  # 피드백 (S15P21A604-953). 웹훅 URL 미설정 시 알림은 조용히 스킵한다 — 제출 자체는 막지 않는다.
+  feedback:
+    mattermost-webhook-url: ${MATTERMOST_FEEDBACK_WEBHOOK_URL:}
+
   # 미니게임 정산 (spec 014 C-03·C-04). 시간대는 여기 없다 — 위 daily-grant-zone 하나가
   # "코인 정책의 하루"를 정하고, 사본을 두면 일일 지급과 미니게임 한도가 다른 달력을 쓰게 된다.
   # C-03 이 "수치는 밸런스 조정 가능하게 데이터로 둔다" 로 확정했으므로 아래는 그 확정의 구현이지
