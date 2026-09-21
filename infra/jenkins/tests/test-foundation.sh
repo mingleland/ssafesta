@@ -203,6 +203,12 @@ grep -q 'gitUsernamePassword(credentialsId: checkoutCredentialId)' "${develop_pi
   || fail "deploy freshness check does not bind the GitLab checkout credential"
 grep -q 'FRESHNESS_EXPECTED_SHA=' "${develop_pipeline}" \
   || fail "dev batch does not recheck the develop head before deployment"
+# deploy agent 는 Unity 원본을 빌드하지 않으므로 LFS blob 이 필요 없다. smudge 가 켜져 있으면
+# checkout 이 LFS endpoint 에서 멈춰 600초 timeout 으로 죽는다 (#259, build #535).
+grep -q "withEnv(\['GIT_LFS_SKIP_SMUDGE=1'\])" "${develop_pipeline}" \
+  || fail "deploy checkout must skip Git LFS smudge"
+[ "$(grep -c 'checkout scm' "${develop_pipeline}")" = 1 ] \
+  || fail "deploy checkout must route through the single LFS-skipping helper"
 grep -q 'deploy-dev-batch.sh' "${develop_pipeline}" \
   || fail "candidate transfer does not activate the Phase 3 dev batch"
 # game candidate identity 는 Unity workspace 가 아니라 Unity Release Bundle 의 image-metadata.json 에서 온다 (Batch 2 Consumer-only).
