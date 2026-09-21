@@ -196,7 +196,8 @@ public class OpenApiConfiguration {
                 tag("Booth Staff", "부스 직원 목록과 역할 관리. 소유자는 읽기 전용 행으로 함께 나온다"),
                 tag("World Session", "Unity 월드 접속 주소와 1회용 입장 토큰 발급"),
                 tag("Admin", "관리자 권한 관리. 관리자만 관리자를 만들 수 있고, 마스터 계정은 어떤 조치의 대상도 되지 않는다"),
-                tag("Event Shop", "이벤트 상점의 경품 목록·구매. 코인 차감과 경품 지급 처리는 별개다"));
+                tag("Event Shop", "이벤트 상점의 경품 목록·구매. 코인 차감과 경품 지급 처리는 별개다"),
+                tag("Feedback", "회원 피드백 제출. 최초 발견 판정과 보상은 관리자 화면이 처리한다"));
     }
 
     private Tag tag(String name, String description) {

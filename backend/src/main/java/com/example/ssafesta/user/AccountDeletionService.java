@@ -64,6 +64,9 @@ public class AccountDeletionService {
         // 와 같은 관례로 탈퇴와 함께 지운다 — event_purchases.buyer_user_id 가 users(id) 를
         // 참조하므로 이 줄이 없으면 상점에서 구매한 적 있는 회원의 탈퇴가 FK 위반으로 실패한다.
         jdbc.update("DELETE FROM event_purchases WHERE buyer_user_id = ?", userId);
+        // 피드백 제출 이력. 같은 이유로 탈퇴와 함께 지운다 — feedback_submissions.user_id 가
+        // users(id) 를 참조하므로 이 줄이 없으면 피드백을 낸 회원의 탈퇴가 FK 위반으로 실패한다.
+        jdbc.update("DELETE FROM feedback_submissions WHERE user_id = ?", userId);
         jdbc.update("DELETE FROM booth_staffs WHERE user_id = ?", userId);
         jdbc.update("DELETE FROM booth_staffs WHERE booth_id IN (SELECT id FROM booths WHERE owner_user_id = ?)", userId);
         jdbc.update("DELETE FROM staff_invitations WHERE invited_user_id = ? OR invited_by_user_id = ?", userId, userId);
