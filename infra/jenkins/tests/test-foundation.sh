@@ -52,6 +52,8 @@ done
 grep -q 'WEBGL_PUBLIC_BASE_URL:' "${agent_compose}" || fail "deploy agent lacks the public WebGL verification URL"
 grep -q '^[[:space:]]*curl[[:space:]\\]*$' "${agent_dockerfile}" || fail "agent image omits curl"
 grep -q '^[[:space:]]*util-linux[[:space:]\\]*$' "${agent_dockerfile}" || fail "agent image omits flock"
+# public-wss.sh 등 unity-server 테스트가 envsubst 로 nginx 템플릿을 렌더한다 — 이미지에 없으면 CI Static 이 127 로 죽는다 (build #543).
+grep -q '^[[:space:]]*gettext-base[[:space:]\\]*$' "${agent_dockerfile}" || fail "agent image omits envsubst (gettext-base)"
 pass "WebGL deploy agent host path and runtime tools"
 
 for entrypoint in "${repo_root}"/infra/jenkins/scripts/*.sh "${repo_root}"/infra/deploy/scripts/*.sh; do
@@ -203,6 +205,17 @@ grep -q 'gitUsernamePassword(credentialsId: checkoutCredentialId)' "${develop_pi
   || fail "deploy freshness check does not bind the GitLab checkout credential"
 grep -q 'FRESHNESS_EXPECTED_SHA=' "${develop_pipeline}" \
   || fail "dev batch does not recheck the develop head before deployment"
+# deploy agent 는 Unity 원본을 빌드하지 않으므로 LFS blob 이 필요 없다. smudge 가 켜져 있으면
+# checkout 이 LFS endpoint 에서 멈춰 600초 timeout 으로 죽는다 (#259, build #535).
+grep -q "withEnv(\['GIT_LFS_SKIP_SMUDGE=1'\])" "${develop_pipeline}" \
+  || fail "deploy checkout must skip Git LFS smudge"
+[ "$(grep -c 'checkout scm' "${develop_pipeline}")" = 1 ] \
+  || fail "deploy checkout must route through the single LFS-skipping helper"
+# 선언형 파이프라인(unity-bundle-e2e 등)의 암묵적 checkout 은 withEnv 로 감쌀 수 없다. deploy agent 범위로 건다.
+grep -q "GIT_LFS_SKIP_SMUDGE: '1'" "${agent_compose}" \
+  || fail "deploy agent does not skip Git LFS smudge for implicit declarative checkouts"
+[ "$(grep -c 'GIT_LFS_SKIP_SMUDGE' "${agent_compose}")" = 1 ] \
+  || fail "Git LFS smudge skip must stay scoped to the deploy agent"
 grep -q 'deploy-dev-batch.sh' "${develop_pipeline}" \
   || fail "candidate transfer does not activate the Phase 3 dev batch"
 # game candidate identity 는 Unity workspace 가 아니라 Unity Release Bundle 의 image-metadata.json 에서 온다 (Batch 2 Consumer-only).
@@ -210,6 +223,18 @@ grep -q 'intake-unity-release-bundle.sh' "${develop_pipeline}" \
   || fail "develop pipeline does not take game artifacts from the Unity Release Bundle"
 grep -q 'WAITING_FOR_UNITY_ARTIFACT' "${develop_pipeline}" \
   || fail "develop pipeline must wait (not build) when no game artifact exists"
+# 자동 탐색이 번들을 못 찾을 때 운영자가 source commit 을 지정하는 경로. 읽기만 하고 선언이 없으면 항상 빈 값이다 (#259).
+grep -q "params.UNITY_ARTIFACT_CANDIDATE" "${develop_pipeline}" \
+  || fail "develop pipeline does not accept an explicit Unity artifact candidate"
+grep -q "string(name: 'UNITY_ARTIFACT_CANDIDATE'" "${jenkinsfile}" \
+  || fail "Jenkinsfile does not declare the Unity artifact candidate parameter"
+# 배포를 유발한 push 가 실패하고 develop 이 그 앞으로 지나가면 game 배포 트리거가 사라진다 (#259).
+grep -q "booleanParam(name: 'DEPLOY_GAME_TO_DEMO'" "${jenkinsfile}" \
+  || fail "Jenkinsfile does not declare the explicit game deploy parameter"
+grep -q 'final boolean forceGameDeploy' "${develop_pipeline}" \
+  || fail "develop pipeline cannot open the game path without a fresh game diff"
+grep -q "final boolean deployGame = selectedDeploy.contains('game') || forceGameDeploy" "${develop_pipeline}" \
+  || fail "explicit game deploy must go through the same deployGame gate"
 grep -q 'image-transfer-init' "${agent_compose}" \
   || fail "shared image transfer volume has no ownership initializer"
 grep -q "branch != 'develop'" "${jenkinsfile}" \

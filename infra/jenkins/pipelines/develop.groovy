@@ -4,7 +4,23 @@ def call() {
     final String headSha = sh(returnStdout: true, script: 'git rev-parse HEAD').trim()
     if (!(headSha ==~ /^[0-9a-f]{40}$/)) { error('GIT_COMMIT must be a full lowercase SHA') }
 
+    // Deploy agent 는 Unity 원본을 빌드하지 않는다 (Consumer-only). checkout 이 LFS pointer 를 만나면
+    // smudge 가 GitLab LFS endpoint 로 blob 을 받으러 가는데, 거기서 멈추면 checkout 이 600초
+    // timeout 으로 죽는다 — BGM_ArcadeRush.mp3(4.4MB) 반입 후 build #535 가 그렇게 실패했다 (#259).
+    // deploy 경로에 필요한 것은 infra 스크립트·pipeline 정의·설정뿐이라 blob 실체가 필요 없다.
+    // 범위를 deploy checkout 으로 한정한다 — Unity 빌드/MR 검증 경로의 LFS 는 그대로 둔다.
+    def deployCheckout = {
+        withEnv(['GIT_LFS_SKIP_SMUDGE=1']) {
+            checkout scm
+            sh "git checkout --detach '${headSha}'"
+        }
+    }
+
     String range = "--branch develop --head '${headSha}'"
+    // detector 는 이번 push 의 diff 만 본다. game 을 고른 push 가 실패로 끝나고 develop 이 그 앞으로
+    // 지나가면 그 번들을 Demo 로 올릴 트리거가 사라진다 (#535 실패 → #542 는 이미 diff 밖). 그때만
+    // 운영자가 명시적으로 game 구간을 연다. 기본값 false 라 push 기반 판정은 그대로다 (#259).
+    final boolean forceGameDeploy = (params.DEPLOY_GAME_TO_DEMO ?: false).toString() == 'true'
     final String baseSha = env.GIT_BEFORE_SHA ?: env.GIT_PREVIOUS_COMMIT ?: env.GIT_PREVIOUS_SUCCESSFUL_COMMIT ?: ''
     if (baseSha) { range += " --base '${baseSha}'" }
 
@@ -27,7 +43,7 @@ def call() {
     final boolean gameBuildRequired = selection.gameBuildRequired as boolean
     if (buildComponents.contains('game') && !gameBuildRequired) { error('detector selected a game build without gameBuildRequired') }
 
-    if (validationComponents.isEmpty()) {
+    if (validationComponents.isEmpty() && !forceGameDeploy) {
         if (selection.sharedCiChanged) {
             stage('CI Static & Contract Tests') {
                 sh 'for t in infra/jenkins/tests/*.sh; do bash "$t"; done'
@@ -55,8 +71,8 @@ def call() {
     final List appComponents = buildComponents.findAll { it != 'game' }
     final String appComponentList = appComponents.join(',')
     // game 은 buildComponents 에 있을 때만(= gameBuildRequired) Unity 를 돌린다. 배포는 deployComponents 가 결정한다.
-    final boolean hasGame = buildComponents.contains('game')
-    final boolean deployGame = selectedDeploy.contains('game')
+    final boolean hasGame = buildComponents.contains('game') || forceGameDeploy
+    final boolean deployGame = selectedDeploy.contains('game') || forceGameDeploy
 
     final String appMetadataDir = "${artifactRoot}/release-metadata"
     final String appManifest = "${artifactRoot}/release-manifest.json"
@@ -79,7 +95,7 @@ def call() {
         buildComponent(component, component == 'game' ? ['validate'] : ['validate', 'test'])
     }
 
-    if (buildComponents.isEmpty()) {
+    if (buildComponents.isEmpty() && !forceGameDeploy) {
         echo "NO_OP: validation-only change (${selection.reasons.join(', ')})"
         return
     }
@@ -114,8 +130,7 @@ def call() {
         stage("Deploy Candidate Receipt (${label})") {
             node('deploy') {
                 ws("/home/jenkins/agent/deploy/workspaces/develop-candidate-receipt-${label}") {
-                    checkout scm
-                    sh "git checkout --detach '${headSha}'"
+                    deployCheckout()
                     unstash stashName
                     sh "infra/jenkins/scripts/transfer-local-images.sh --import --bundle '${bundle}' --transfer-dir '${transferDir}'"
                 }
@@ -132,8 +147,7 @@ def call() {
         stage('Deploy Selected Components') {
         node('deploy') {
             ws('/home/jenkins/agent/deploy/workspaces/develop-dev-batch') {
-                checkout scm
-                sh "git checkout --detach '${headSha}'"
+                deployCheckout()
                 unstash 'candidate-release-manifest'
 
                 final List credentialBindings = []
@@ -212,8 +226,7 @@ def call() {
     def onDeploy = { Closure body ->
         node('deploy') {
             ws(gameDeployWs) {
-                checkout scm
-                sh "git checkout --detach '${headSha}'"
+                deployCheckout()
                 body()
             }
         }
