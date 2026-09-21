@@ -1,8 +1,13 @@
 package com.example.ssafesta.booth;
 
+import com.example.ssafesta.ai.AiAgent;
+import com.example.ssafesta.ai.AiAgentRepository;
 import com.example.ssafesta.project.Project;
 import com.example.ssafesta.project.ProjectRepository;
+import com.example.ssafesta.user.User;
+import com.example.ssafesta.user.UserRepository;
 import java.time.Instant;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 import org.slf4j.Logger;
@@ -34,15 +39,20 @@ public class BoothQueryService {
     private final BoothLeaseRepository leases;
     private final BoothAccessGuard accessGuard;
     private final ProjectRepository projects;
+    private final AiAgentRepository agents;
+    private final UserRepository users;
 
     public BoothQueryService(BoothSlotRepository slots, BoothRepository booths,
                              BoothLeaseRepository leases, BoothAccessGuard accessGuard,
-                             ProjectRepository projects) {
+                             ProjectRepository projects, AiAgentRepository agents,
+                             UserRepository users) {
         this.slots = slots;
         this.booths = booths;
         this.leases = leases;
         this.accessGuard = accessGuard;
         this.projects = projects;
+        this.agents = agents;
+        this.users = users;
     }
 
     /**
@@ -74,15 +84,64 @@ public class BoothQueryService {
         }).toList();
     }
 
-    /** The member's own booth and its lease, or empty when they have never leased (FR-007). */
+    /**
+     * The member's own booth and its lease, or empty when they have never leased (FR-007).
+     *
+     * <p><b>An administrator's booth answers here too</b> (S15P21A604-905 의 핫픽스). That ticket left it out
+     * on the assumption that the console would find it through {@code GET /booth-slots}'s {@code
+     * mine}, but nothing reads that field: 부스 관리 and the studio owner gate both ask this endpoint
+     * alone, so an administrator who had just leased was told they have no booth — they could not
+     * open, edit or publish the booth they were standing in.
+     *
+     * <p>The response shape is unchanged: one booth. An administrator holding several slots gets the
+     * most recent one, which is the one they just leased.
+     */
+    // ponytail: 다중 슬롯 관리자는 마지막 부스만 보인다 — 목록을 주는 응답이 필요해지면 그때 계약을 늘린다.
     @Transactional(readOnly = true)
     public Optional<MyBoothView> findMyBooth(Long userId) {
         Instant now = Instant.now();
-        return booths.findByOwnerUserId(userId).map(booth -> {
-            BoothLease lease = leases.findValidByBoothId(booth.getId(), now).orElse(null);
-            BoothSlot slot = lease == null ? null : slots.findById(lease.getSlotId()).orElse(null);
-            return MyBoothView.of(booth, lease, slot, now);
-        });
+        // 관리자 부스가 먼저다: 그 부스는 임대를 들고 있는 동안에만 존재하고(반납하면 삭제된다),
+        // 회원 시절의 부스는 임대 없이도 남아 있어서 그것을 먼저 주면 지금 운영 중인 부스가 가려진다.
+        return booths.findFirstByOwnerUserIdAndAdminOwnedTrueOrderByIdDesc(userId)
+                .or(() -> booths.findByOwnerUserIdAndAdminOwnedFalse(userId))
+                .map(booth -> {
+                    BoothLease lease = leases.findValidByBoothId(booth.getId(), now).orElse(null);
+                    BoothSlot slot = lease == null ? null : slots.findById(lease.getSlotId()).orElse(null);
+                    return MyBoothView.of(booth, lease, slot, now);
+                });
+    }
+
+    /**
+     * Every administrator booth, for the administrator console (S15P21A604-933).
+     *
+     * <p><b>Not scoped to the caller.</b> An administrator booth follows the role rather than the
+     * person who set it up (FR-023, S15P21A604-905), so one console lists them all and any
+     * administrator can act on any of them — otherwise a booth put up by someone who is away, or
+     * since demoted, is a booth nobody can reach.
+     *
+     * <p>Sorted by slot code so the list reads in floor order rather than in the order the booths
+     * happened to be taken.
+     */
+    // ponytail: 부스당 임대·자리·설치자를 따로 읽는다. 관리자 부스는 슬롯 수(현재 12)를 넘지 못해
+    // 상한이 작다 — 목록이 길어지면 슬롯 목록처럼 한 문장으로 읽는 조인 쿼리로 바꿄다.
+    @Transactional(readOnly = true)
+    public List<AdminBoothView> listAdminBooths() {
+        Instant now = Instant.now();
+        return booths.findByAdminOwnedTrue().stream()
+                .map(booth -> {
+                    BoothLease lease = leases.findValidByBoothId(booth.getId(), now).orElse(null);
+                    BoothSlot slot = lease == null ? null : slots.findById(lease.getSlotId()).orElse(null);
+                    String installedBy = users.findById(booth.getOwnerUserId())
+                            .map(User::getNickname).orElse(null);
+                    return new AdminBoothView(booth.getId(),
+                            lease == null ? null : lease.getSlotId(),
+                            slot == null ? null : slot.getSlotCode(),
+                            booth.getName(), booth.isPublished(),
+                            lease == null ? null : lease.getStartsAt(), installedBy);
+                })
+                .sorted(Comparator.comparing(AdminBoothView::slotCode,
+                        Comparator.nullsLast(Comparator.naturalOrder())))
+                .toList();
     }
 
     /**
@@ -98,7 +157,22 @@ public class BoothQueryService {
         return new PublicBoothView(booth.getId(), lease.getSlotId(), booth.getName(),
                 lease.getStatus().name(), true, lease.getEndsAt(),
                 BoothFacadeService.FacadeView.of(booth), booth.getPublishedLayoutVersion(),
-                visibleHomepageUrl(booth));
+                visibleHomepageUrl(booth), handoffEnabled(booth.getId()));
+    }
+
+    /**
+     * Whether this booth takes a human handoff, read by the visitor's chat overlay to hide the
+     * '사람 상담 요청' button before it can be pressed (GitLab #249, S15P21A604-914).
+     *
+     * <p>No agent means no one to hand off to, so the absent row reads {@code false} rather than
+     * an error — the button is simply not offered. There is no {@code published} gate here, unlike
+     * {@link #visibleHomepageUrl}: a visitor cannot reach an unpublished booth at all, and this is
+     * a boolean about the booth rather than an address pointing out of it. {@code AiAgent.status}
+     * is not consulted either, so this answer is the same value the owner's
+     * {@code GET /booths/{id}/agents} reports — two screens, one number.
+     */
+    private boolean handoffEnabled(Long boothId) {
+        return agents.findByBoothId(boothId).map(AiAgent::isHandoffEnabled).orElse(false);
     }
 
     /**
@@ -202,12 +276,27 @@ public class BoothQueryService {
     }
 
     /**
+     * One row of the administrator console's booth list (S15P21A604-933).
+     *
+     * @param slotId       null only in the window where the booth exists without a valid lease.
+     *        A returned administrator booth is deleted outright, so in practice it is always set;
+     *        the console still has to render the row rather than drop a booth it cannot explain.
+     * @param published    whether visitors can see it right now — the one status the console acts on
+     *        (강제 비공개)
+     * @param installedBy  the nickname of whoever leased it. <b>Not an owner</b>: the booth follows
+     *        the administrator role, and this only answers "who put it up".
+     */
+    public record AdminBoothView(Long boothId, Long slotId, String slotCode, String name,
+                                 boolean published, Instant leaseStartedAt, String installedBy) {
+    }
+
+    /**
      * What docs/08 §3 promised all along. {@code facade} and {@code publishedLayoutVersion} were in
      * the documented contract before spec 005; they are only now backed by columns (V8·V9).
      */
     public record PublicBoothView(Long boothId, Long slotId, String name, String leaseStatus,
                                   boolean entryAvailable, Instant endsAt,
                                   BoothFacadeService.FacadeView facade, Integer publishedLayoutVersion,
-                                  String homepageUrl) {
+                                  String homepageUrl, boolean handoffEnabled) {
     }
 }

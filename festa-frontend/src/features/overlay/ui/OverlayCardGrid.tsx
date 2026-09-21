@@ -11,13 +11,20 @@ import type { ReactNode } from 'react';
 
 export interface OverlayCard {
   id: string;
-  /** 38px 배지 안에 들어가는 그림. 없으면 배지를 그리지 않는다 */
+  /** 38px 배지 안에 들어가는 그림. 없으면 배지를 그리지 않는다. `media`와는 동시에 안 쓴다 */
   icon?: ReactNode;
+  /**
+   * 큰 사진 레이아웃(S15P21A604-842) — 있으면 카드가 세로(아이콘+제목+...) 대신 가로(사진|본문)로
+   * 그려진다. 이벤트 상점처럼 실물 상품 사진이 핵심인 화면 전용. `icon`과는 동시에 안 쓴다.
+   */
+  media?: ReactNode;
+  /** 사진 바로 아래 붙는 한 줄 표기(예: "서울캠퍼스 한정"). media가 없으면 무시된다 */
+  mediaNote?: ReactNode;
   title: string;
   desc?: string;
   /** `.ov-chip` 묶음 — 상점의 "남은 N개"·"N C" 가 여기 온다 */
   chips?: ReactNode;
-  /** 카드 하단 액션. 가이드 카드에는 없고 상점 카드에는 [교환] 이 온다 */
+  /** 카드 하단 액션. 가이드 카드에는 없고 상점 카드에는 [구매] 가 온다 */
   action?: ReactNode;
   disabled?: boolean;
 }
@@ -26,24 +33,45 @@ interface Props {
   cards: OverlayCard[];
   /** 스크린 리더용 목록 이름 */
   label: string;
+  /** 지정하면 auto-fit 대신 정확히 이 열 수로 고정한다(예: 상품 6개를 3/3으로, S15P21A604-842 후속) */
+  columns?: number;
 }
 
-export function OverlayCardGrid({ cards, label }: Props) {
+export function OverlayCardGrid({ cards, label, columns }: Props) {
   return (
-    <ul className="ov-card-grid" aria-label={label}>
-      {cards.map((card) => (
-        <li key={card.id} className="ov-card" data-disabled={card.disabled === true ? '' : undefined}>
-          {card.icon !== undefined && <span className="ov-card-icon">{card.icon}</span>}
-          <span className="ov-card-title">{card.title}</span>
-          {card.desc !== undefined && <span className="ov-card-desc">{card.desc}</span>}
-          {(card.chips !== undefined || card.action !== undefined) && (
-            <span className="ov-card-foot">
+    <ul
+      className="ov-card-grid"
+      aria-label={label}
+      style={columns !== undefined ? { gridTemplateColumns: `repeat(${columns}, 1fr)` } : undefined}
+    >
+      {cards.map((card) =>
+        card.media !== undefined ? (
+          <li key={card.id} className="ov-card" data-layout="media" data-disabled={card.disabled === true ? '' : undefined}>
+            <span className="ov-card-media-col">
+              <span className="ov-card-media">{card.media}</span>
+              {card.mediaNote !== undefined && <span className="ov-card-media-note">{card.mediaNote}</span>}
+            </span>
+            <span className="ov-card-body">
+              <span className="ov-card-title">{card.title}</span>
+              {card.desc !== undefined && <span className="ov-card-desc">{card.desc}</span>}
               {card.chips}
               {card.action}
             </span>
-          )}
-        </li>
-      ))}
+          </li>
+        ) : (
+          <li key={card.id} className="ov-card" data-disabled={card.disabled === true ? '' : undefined}>
+            {card.icon !== undefined && <span className="ov-card-icon">{card.icon}</span>}
+            <span className="ov-card-title">{card.title}</span>
+            {card.desc !== undefined && <span className="ov-card-desc">{card.desc}</span>}
+            {(card.chips !== undefined || card.action !== undefined) && (
+              <span className="ov-card-foot">
+                {card.chips}
+                {card.action}
+              </span>
+            )}
+          </li>
+        ),
+      )}
     </ul>
   );
 }

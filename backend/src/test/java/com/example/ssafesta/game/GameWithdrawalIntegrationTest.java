@@ -48,7 +48,7 @@ class GameWithdrawalIntegrationTest {
         // GameDraftApiIntegrationTest.
         drafts.save(new GameDraft(gameId, "1.0.0",
                 GameTestSupport.write(GameTestSupport.validProjectFor(gameId)), userId));
-        publishService.publish(gameId, userId, 1);
+        publishService.publish(gameId, userId, 1, null);
 
         assertEquals(1, published.highestVersionNo(gameId), "발행본이 있는 상태에서 탈퇴한다");
 

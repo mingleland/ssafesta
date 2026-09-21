@@ -22,7 +22,7 @@ beforeEach(() => {
 
 describe('Staff 상담 (C-06 동시 1건)', () => {
   it('큐 로드 — Handoff 요약 포함', async () => {
-    await loadStaffQueue();
+    await loadStaffQueue(7);
     const s = getStaffConsultationSnapshot();
     expect(s.status).toBe('ready');
     expect(s.queue).toHaveLength(2);
@@ -30,7 +30,7 @@ describe('Staff 상담 (C-06 동시 1건)', () => {
   });
 
   it('수락 → active·큐에서 제거. 활성 중에는 추가 수락 게이트', async () => {
-    await loadStaffQueue();
+    await loadStaffQueue(7);
     await acceptRequest('req-1');
     const s = getStaffConsultationSnapshot();
     expect(s.active?.requestId).toBe('req-1');
@@ -41,8 +41,8 @@ describe('Staff 상담 (C-06 동시 1건)', () => {
   });
 
   it('큐 새로고침 중에는 수락이 게이트된다 — 낡은 목록 복원 레이스의 1차 방어 (-377)', async () => {
-    await loadStaffQueue();
-    const reload = loadStaffQueue(); // status 가 loading 으로 전환된 동안
+    await loadStaffQueue(7);
+    const reload = loadStaffQueue(7); // status 가 loading 으로 전환된 동안
     await acceptRequest('req-1'); // canAccept=false — no-op
     expect(getStaffConsultationSnapshot().active).toBeNull();
     await reload;
@@ -52,7 +52,7 @@ describe('Staff 상담 (C-06 동시 1건)', () => {
   });
 
   it('accept 실패는 actionError 로 드러난다 — 조용히 삼키지 않는다 (-377)', async () => {
-    await loadStaffQueue();
+    await loadStaffQueue(7);
     await acceptRequest('req-없음');
     const s = getStaffConsultationSnapshot();
     expect(s.actionError).toBe('accept');
@@ -61,7 +61,7 @@ describe('Staff 상담 (C-06 동시 1건)', () => {
   });
 
   it('종료 후 다시 수락 가능', async () => {
-    await loadStaffQueue();
+    await loadStaffQueue(7);
     await acceptRequest('req-1');
     await endActiveConsultation();
     expect(getStaffConsultationSnapshot().active).toBeNull();

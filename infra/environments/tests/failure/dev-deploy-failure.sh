@@ -61,7 +61,9 @@ fi
 SH
 chmod +x "${FIXTURE_ROOT}/verify-with-front-failure"
 
-if DEV_BATCH_ID=multi-component-failure DEPLOY_COMPONENTS=back,front \
+# develop 배치의 운영 기본값은 demo지만, 이 failure rehearsal은
+# dev 환경 rollback 격리를 검증한다. verifier도 dev를 보므로 대상 환경을 명시한다.
+if FESTA_DEPLOY_ENVIRONMENT=dev DEV_BATCH_ID=multi-component-failure DEPLOY_COMPONENTS=back,front \
   RELEASE_MANIFEST_PATH="${RELEASE_MANIFEST}" CI_ARTIFACT_DIR="${FIXTURE_ROOT}/artifacts" \
   DEV_BATCH_STATE_DIR="${batch_state}" DEV_BACK_ENV_FILE="${COMPONENT_ENV_FILE}" \
   REPO_ROOT="${repo_root}" FORCED_FAIL_MANIFEST="${RELEASE_MANIFEST}" \

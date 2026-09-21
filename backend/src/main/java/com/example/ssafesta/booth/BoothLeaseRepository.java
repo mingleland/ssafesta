@@ -36,10 +36,16 @@ public interface BoothLeaseRepository extends JpaRepository<BoothLease, Long> {
     Optional<BoothLease> findValidByLesseeUserId(@Param("userId") Long userId, @Param("moment") Instant moment);
 
     /**
-     * Locks the member's {@code ACTIVE} lease row so an early return can decide its fate alone
+     * Locks the slot's {@code ACTIVE} lease row so an early return can decide its fate alone
      * (FR-020). <b>Deliberately has no time predicate</b> — this only takes the lock; validity is
-     * then re-read through {@link #findValidByLesseeUserId}, which keeps the expiry rule in the one
+     * then re-read through {@link #findValidBySlotId}, which keeps the expiry rule in the one
      * place this interface promises it lives.
+     *
+     * <p><b>Keyed on the slot rather than the lessee</b> (S15P21A604-905). An administrator holds a
+     * lease per slot, so a lessee-keyed lookup would return several rows and throw where it used to
+     * answer. The slot is the narrower key for everyone — one slot has at most one {@code ACTIVE}
+     * lease ({@code ux_booth_leases_active_slot}) — and the caller checks the lessee afterwards, so
+     * a member's outcome is unchanged: naming a slot they do not hold is still refused.
      *
      * <p>Binding a {@code moment} here could not work: this query <i>is</i> how the lock is taken,
      * so the caller has no instant to pass yet, and a bound parameter would not refresh while the
@@ -55,9 +61,9 @@ public interface BoothLeaseRepository extends JpaRepository<BoothLease, Long> {
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("""
             select l from BoothLease l
-            where l.lesseeUserId = :userId and l.status = com.example.ssafesta.booth.LeaseStatus.ACTIVE
+            where l.slotId = :slotId and l.status = com.example.ssafesta.booth.LeaseStatus.ACTIVE
             """)
-    Optional<BoothLease> findActiveByLesseeUserIdForUpdate(@Param("userId") Long userId);
+    Optional<BoothLease> findActiveBySlotIdForUpdate(@Param("slotId") Long slotId);
 
     @Query("""
             select l from BoothLease l

@@ -36,7 +36,9 @@ from app.services.document_processing_service import (
     EmbeddedChunk,
     ProcessingSnapshot,
 )
-from app.services.failure_policy import classify_failure
+from app.services.context_service import ExtractedProjectFacts
+from app.services.failure_policy import classify_failure, describe_failure
+from app.services.project_fact_extractor import ProjectFactExtractor
 
 logger = logging.getLogger(__name__)
 
@@ -54,12 +56,14 @@ class DocumentProcessingOrchestrator:
         result_client: SpringDocumentResultClient,
         booth_access_client: SpringBoothAccessClient,
         heartbeat_interval_seconds: float,
+        project_fact_extractor: ProjectFactExtractor | None = None,
         max_chunks_per_batch: int = DEFAULT_MAX_CHUNKS_PER_BATCH,
         max_batch_bytes: int = DEFAULT_MAX_BATCH_BYTES,
     ) -> None:
         self._embedding_service = embedding_service
         self._result_client = result_client
         self._booth_access_client = booth_access_client
+        self._project_fact_extractor = project_fact_extractor
         self._heartbeat_interval_seconds = heartbeat_interval_seconds
         self._max_chunks_per_batch = max_chunks_per_batch
         self._max_batch_bytes = max_batch_bytes
@@ -69,7 +73,8 @@ class DocumentProcessingOrchestrator:
         try:
             await self._ensure_lease_active(snapshot)
             chunks = await self._embedding_service.compute_embedded_chunks(snapshot)
-            await self._send_and_finalize(snapshot, chunks)
+            project_facts = await self._extract_project_facts(snapshot, chunks)
+            await self._send_and_finalize(snapshot, chunks, project_facts)
         except _ATTEMPT_LOST_ERRORS:
             log_event(
                 logger,
@@ -83,6 +88,7 @@ class DocumentProcessingOrchestrator:
                 status="SUPERSEDED",
             )
         except Exception as exc:  # noqa: BLE001 — 모든 처리 실패를 Spring에 보고해야 한다
+            outcome = classify_failure(exc)
             log_event(
                 logger,
                 logging.ERROR,
@@ -93,7 +99,9 @@ class DocumentProcessingOrchestrator:
                 agent_id=snapshot.agent_id,
                 attempt_no=snapshot.attempt_no,
                 status="FAILED",
-                error_code=classify_failure(exc).code,
+                error_code=outcome.code,
+                error_type=type(exc).__name__,
+                error_detail=describe_failure(exc),
             )
             await self._report_failure(snapshot, exc)
         finally:
@@ -109,7 +117,10 @@ class DocumentProcessingOrchestrator:
             raise BoothLeaseExpiredError(result.denial_code or "BOOTH_LEASE_EXPIRED")
 
     async def _send_and_finalize(
-        self, snapshot: ProcessingSnapshot, chunks: tuple[EmbeddedChunk, ...]
+        self,
+        snapshot: ProcessingSnapshot,
+        chunks: tuple[EmbeddedChunk, ...],
+        project_facts: ExtractedProjectFacts | None,
     ) -> None:
         for batch_seq, batch in enumerate(self._split_into_batches(chunks)):
             await self._result_client.chunk_batch(
@@ -119,24 +130,57 @@ class DocumentProcessingOrchestrator:
                 chunks=[_to_chunk_batch_item(chunk) for chunk in batch],
             )
         await self._ensure_lease_active(snapshot)
-        await self._result_client.finalize(
-            job_id=snapshot.job_id,
-            attempt_no=snapshot.attempt_no,
-            source_hash=snapshot.source_hash,
-            total_chunk_count=len(chunks),
-            embedding_model_id=chunks[0].embedding_model_id,
-        )
+        finalize_arguments: dict[str, object] = {
+            "job_id": snapshot.job_id,
+            "attempt_no": snapshot.attempt_no,
+            "source_hash": snapshot.source_hash,
+            "total_chunk_count": len(chunks),
+            "embedding_model_id": chunks[0].embedding_model_id,
+        }
+        if project_facts is not None:
+            finalize_arguments["project_facts"] = project_facts
+        await self._result_client.finalize(**finalize_arguments)
+
+    async def _extract_project_facts(
+        self,
+        snapshot: ProcessingSnapshot,
+        chunks: tuple[EmbeddedChunk, ...],
+    ) -> ExtractedProjectFacts | None:
+        if self._project_fact_extractor is None:
+            return None
+        try:
+            return await self._project_fact_extractor.extract(chunks)
+        except Exception:  # noqa: BLE001 — 최적화 실패가 문서 READY를 막아서는 안 된다
+            log_event(
+                logger,
+                logging.WARNING,
+                "project_fact_extraction_failed",
+                job_id=snapshot.job_id,
+                document_id=snapshot.document_id,
+                booth_id=snapshot.booth_id,
+                agent_id=snapshot.agent_id,
+                attempt_no=snapshot.attempt_no,
+                status="SKIPPED",
+                error_code="PROJECT_FACT_EXTRACTION_FAILED",
+            )
+            return None
 
     async def _report_failure(
         self, snapshot: ProcessingSnapshot, exc: Exception
     ) -> None:
         outcome = classify_failure(exc)
+        # 계약 거절·Spring 장애는 사유가 없으면 운영자가 코드만 보고 원인을 못 잡는다. 그 두 경우만
+        # 짧은 사유를 `message` 로 함께 보낸다(last_error). 다른 코드는 코드 자체가 사유다.
+        extra: dict[str, str] = {}
+        if outcome.code in ("CONTRACT_REJECTED", "SPRING_RESULT_UNAVAILABLE"):
+            extra["message"] = describe_failure(exc)
         try:
             await self._result_client.failed(
                 job_id=snapshot.job_id,
                 attempt_no=snapshot.attempt_no,
                 failure_code=outcome.code,
                 retryable=outcome.retryable,
+                **extra,
             )
         except (*_ATTEMPT_LOST_ERRORS, SpringDocumentResultUnavailable):
             # Job을 이미 잃었거나 Spring이 응답하지 않는다 — Spring의 lease

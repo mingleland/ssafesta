@@ -7,6 +7,20 @@ deploy="${repo_root}/infra/jenkins/scripts/deploy-webgl-release.sh"
 fixture="$(mktemp -d)"
 trap 'rm -rf "${fixture}"' EXIT
 
+python_bin="${PYTHON_BIN:-}"
+if [[ -z "${python_bin}" ]]; then
+  if command -v python3 >/dev/null 2>&1; then
+    python_bin=python3
+  elif command -v python >/dev/null 2>&1; then
+    python_bin=python
+  else
+    echo 'Python 3 is required.' >&2
+    exit 69
+  fi
+fi
+"${python_bin}" -c 'import sys; assert sys.version_info.major == 3'
+export PYTHON_BIN="${python_bin}"
+
 export WEBGL_RELEASE_ROOT="${fixture}/webgl"
 export ENVIRONMENT_STATE_DIR="${fixture}/state"
 export WEBGL_PUBLIC_BASE_URL='https://demo.example.invalid/unity'
@@ -218,27 +232,65 @@ deploy_package "${third}" new00002
 cat >"${fixture}/bin/curl" <<'SH'
 #!/usr/bin/env bash
 set -euo pipefail
-url="${!#}"
+output=''; write_out=''; upload=''; fail_mode=0; url=''
+while [[ $# -gt 0 ]]; do case "$1" in --output) output="${2:-}";shift 2;; --write-out) write_out="${2:-}";shift 2;; --upload-file) upload="${2:-}";shift 2;; --header|--user|--data-urlencode|--request) shift 2;; --fail|--fail-with-body) fail_mode=1;shift;; --silent|--show-error|--location) shift;; -*) exit 64;; *) url="$1";shift;; esac; done
 printf '%s\n' "${url}" >>"${CURL_CALLS}"
-if [[ "${FAIL_CHECKSUM_UPLOAD:-0}" == 1 && "${url}" == *.sha256 ]]; then exit 22; fi
+if [[ "${FAIL_CHECKSUM_UPLOAD:-0}" == 1 && -n "${upload}" && "${url}" == *.sha256 ]]; then exit 22; fi
+[[ "${url}" == */buildWithParameters ]] && exit 0
+relative="${url#*/packages/generic/}"; target="${FAKE_REMOTE_ROOT}/${relative}"; code=200
+if [[ -n "${upload}" ]]; then mkdir -p "$(dirname "${target}")"; cp "${upload}" "${target}"; code=201
+elif [[ -f "${target}" ]]; then [[ -z "${output}" ]] || cp "${target}" "${output}"
+else [[ -z "${output}" ]] || : >"${output}"; code=404; fi
+[[ -z "${write_out}" ]] || printf '%s' "${code}"; (( ! fail_mode || code < 400 )) || exit 22
 SH
 chmod +x "${fixture}/bin/curl"
 export GITLAB_PACKAGE_TOKEN='fixture-write-token'
 export JENKINS_USER='fixture-publisher'
 export JENKINS_API_TOKEN='fixture-api-token'
 export JENKINS_URL='https://ci.example.invalid'
+export FAKE_REMOTE_ROOT="${fixture}/remote"
+export WEBGL_EXPECTED_UNITY_VERSION=''
+# 픽스처 manifest 의 sourceCommit 은 'a'*40 — canonical version 은 그 앞 8자다.
 export CURL_CALLS="${fixture}/publish-success.calls"
-"${repo_root}/infra/jenkins/scripts/publish-webgl-release.sh" "${third}" publish01 >/dev/null
-[[ "$(wc -l <"${CURL_CALLS}")" -eq 3 ]]
+"${repo_root}/infra/jenkins/scripts/publish-webgl-release.sh" "${third}" aaaaaaaa | grep -q '^PUBLISHED_WEBGL_RELEASE: aaaaaaaa '
+# lookup(404) + zip + sha256 + json + trigger
+[[ "$(wc -l <"${CURL_CALLS}")" -eq 5 ]]
 tail -n 1 "${CURL_CALLS}" | grep -Fq '/job/festa-webgl-package-deploy/buildWithParameters'
+[[ -f "${FAKE_REMOTE_ROOT}/festa-webgl/aaaaaaaa/festa-webgl-release-aaaaaaaa.zip" && -f "${FAKE_REMOTE_ROOT}/festa-webgl/aaaaaaaa/festa-webgl-release-aaaaaaaa.json" ]]
+grep -q '"jenkinsJob": null' "${FAKE_REMOTE_ROOT}/festa-webgl/aaaaaaaa/festa-webgl-release-aaaaaaaa.json"
+
+# 같은 version + 같은 SHA → idempotent, 업로드 없음
+export CURL_CALLS="${fixture}/publish-again.calls"
+"${repo_root}/infra/jenkins/scripts/publish-webgl-release.sh" "${third}" aaaaaaaa --no-trigger | grep -q '^WEBGL_RELEASE_EXISTS: aaaaaaaa '
+[[ "$(wc -l <"${CURL_CALLS}")" -eq 1 ]]
+
+# 같은 version + 다른 SHA → hard fail 65, 업로드 없음
+export CURL_CALLS="${fixture}/publish-collision.calls"
+other="$(make_package other001)"
+set +e; "${repo_root}/infra/jenkins/scripts/publish-webgl-release.sh" "${other}" aaaaaaaa --no-trigger >/dev/null 2>&1; collision=$?; set -e
+[[ "${collision}" -eq 65 && "$(wc -l <"${CURL_CALLS}")" -eq 1 ]]
+
+# RELEASE_ID 가 sourceCommit 접두사가 아니면 거부
+set +e; "${repo_root}/infra/jenkins/scripts/publish-webgl-release.sh" "${third}" bbbbbbbb --no-trigger >/dev/null 2>&1; prefix=$?; set -e
+[[ "${prefix}" -eq 65 ]]
+
+# --no-trigger 새 version: Jenkins 호출 없음, JENKINS_* 불필요
+export CURL_CALLS="${fixture}/publish-notrigger.calls"
+rm -rf "${FAKE_REMOTE_ROOT}/festa-webgl/aaaaaaaa"
+( unset JENKINS_USER JENKINS_API_TOKEN JENKINS_URL; JENKINS_JOB=festa-gitlab-develop/develop JENKINS_BUILD_NUMBER=7 "${repo_root}/infra/jenkins/scripts/publish-webgl-release.sh" "${third}" aaaaaaaa --no-trigger >/dev/null )
+[[ "$(wc -l <"${CURL_CALLS}")" -eq 4 ]]
+! grep -q 'buildWithParameters' "${CURL_CALLS}"
+grep -q '"jenkinsBuildNumber": "7"' "${FAKE_REMOTE_ROOT}/festa-webgl/aaaaaaaa/festa-webgl-release-aaaaaaaa.json"
 
 export CURL_CALLS="${fixture}/publish-failure.calls"
 export FAIL_CHECKSUM_UPLOAD=1
-if "${repo_root}/infra/jenkins/scripts/publish-webgl-release.sh" "${third}" publish02 >/dev/null 2>&1; then
+rm -rf "${FAKE_REMOTE_ROOT}/festa-webgl/aaaaaaaa"
+if "${repo_root}/infra/jenkins/scripts/publish-webgl-release.sh" "${third}" aaaaaaaa >/dev/null 2>&1; then
   echo 'publisher accepted a failed checksum upload' >&2; exit 1
 fi
 unset FAIL_CHECKSUM_UPLOAD
-[[ "$(wc -l <"${CURL_CALLS}")" -eq 2 ]]
+# lookup + zip + (실패한) sha256 — json 과 trigger 는 나가지 않는다
+[[ "$(wc -l <"${CURL_CALLS}")" -eq 3 ]]
 ! grep -q 'buildWithParameters' "${CURL_CALLS}"
 
 echo 'PASS: WebGL package publish ordering, deployment validation, idempotency, rollback and retention'

@@ -93,7 +93,7 @@ class GameConcurrencyIntegrationTest {
                 pool.submit(() -> {
                     try {
                         start.await();
-                        publishService.publish(owner.gameId(), owner.userId(), 1);
+                        publishService.publish(owner.gameId(), owner.userId(), 1, null);
                         succeeded.incrementAndGet();
                     } catch (Exception refusedOrRaced) {
                         // Revision conflict, constraint violation or a serialisation failure — all of

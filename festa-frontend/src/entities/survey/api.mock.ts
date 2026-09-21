@@ -14,6 +14,7 @@ import type {
   SurveyTextAnswerPage,
 } from './api.port';
 import { RUN_QUESTIONS } from './fixtures/run';
+import { EVENT_RUN_QUESTIONS } from './fixtures/eventRun';
 import { RESULT_AGGREGATES, TEXT_ANSWERS, TEXT_PAGE_SIZE } from './fixtures/result';
 
 /** 평범한 설문이 있는 부스 */
@@ -28,6 +29,8 @@ export const MOCK_BOOTH_CLOSED = 4;
 export const MOCK_BOOTH_SUBMIT_FAIL = 5;
 /** 결과 조회가 실패하는 부스 */
 export const MOCK_BOOTH_RESULT_FAIL = 6;
+/** 설문이 아직 없는 부스 — 결과 탭이 404 SURVEY_NOT_FOUND 를 정상 상태로 다루는지 보는 시나리오 */
+export const MOCK_BOOTH_NO_SURVEY = 9;
 /** 보상이 걸린 설문 — 게스트 차단 안내 확인용 */
 export const MOCK_BOOTH_REWARDED = 7;
 /**
@@ -105,7 +108,8 @@ export const surveyMockPort: SurveyPort = {
         surveyKey === MOCK_EVENT_SURVEY_DONE
           ? { responseId: 9001, submittedAt: '2026-09-10T04:12:00Z' }
           : null,
-      questions: RUN_QUESTIONS,
+      // 이벤트 설문은 확정 문항(V37 시드)을 쓴다 — 부스 6유형 데모와 다르다
+      questions: EVENT_RUN_QUESTIONS,
     };
   },
 
@@ -119,6 +123,7 @@ export const surveyMockPort: SurveyPort = {
   async getResult(boothId: number): Promise<SurveyResultSnapshot> {
     const surveyId = surveyIdOf(boothId);
     if (boothId === MOCK_BOOTH_RESULT_FAIL) throw apiError('UNKNOWN', '일시적인 오류입니다.');
+    if (boothId === MOCK_BOOTH_NO_SURVEY) throw apiError('SURVEY_NOT_FOUND', '설문을 찾을 수 없습니다.');
     if (boothId === MOCK_BOOTH_EMPTY || boothId === MOCK_BOOTH_NEW) {
       // 응답 0건이어도 문항은 다 실려 온다(계약 §7) — 빈 판정은 totalResponses 가 한다
       return {

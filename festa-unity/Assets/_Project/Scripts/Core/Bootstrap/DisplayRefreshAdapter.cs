@@ -53,6 +53,24 @@ namespace Festa.Core
         const float CooldownAfterUp = 20f;     // 올라간 뒤는 더 길게 — 올렸다 내렸다가 제일 나쁘다
         const int MinInterval = 1, MaxInterval = 4;
 
+        /// <summary>
+        /// 화면 주사율별로 허용할 가장 느린 swap 간격.
+        ///
+        /// <para>120Hz에서 vSync4의 명목값은 30fps지만, WebGL 메인 스레드 작업이 33.3ms 경계를
+        /// 조금만 넘으면 다음 rAF까지 기다려 실제로는 41.7ms(24fps)에 붙는다. 데모에서 전 구역
+        /// p50 41~42ms로 재현됐다(S15P21A604-947). 한 단계 빠른 vSync3은 같은 세션에서 p50 24ms를
+        /// 유지했으므로 100~139Hz 화면은 40fps 아래로 내리지 않는다.</para>
+        ///
+        /// <para>60~90Hz는 vSync2까지 허용해 최소 30~45fps를 보장하고, 140Hz 이상은 기존 상한을
+        /// 유지한다. 적응기는 이 경계 안에서만 하향·상향 탐침한다.</para>
+        /// </summary>
+        static int MaxIntervalForRefreshRate(int hz)
+        {
+            if (hz < 100) return 2;
+            if (hz < 140) return 3;
+            return MaxInterval;
+        }
+
         // 상향 탐침 — 실패하면 기다리는 시간을 두 배로 늘리고 상한에서 멈춘다.
         const float ProbeBackoffStart = 20f;
         const float ProbeBackoffMax = 240f;
@@ -252,7 +270,8 @@ namespace Festa.Core
                 return;
             }
 
-            if (missRate > StepDownMissRate && _interval < MaxInterval)
+            int maxInterval = MaxIntervalForRefreshRate(_hz);
+            if (missRate > StepDownMissRate && _interval < maxInterval)
             {
                 _cleanWindows = 0;
                 Apply(_interval + 1,
@@ -304,7 +323,7 @@ namespace Festa.Core
 
         void Apply(int interval, string why)
         {
-            interval = Mathf.Clamp(interval, MinInterval, MaxInterval);
+            interval = Mathf.Clamp(interval, MinInterval, MaxIntervalForRefreshRate(_hz));
             int before = QualitySettings.vSyncCount;
             QualitySettings.vSyncCount = interval;
             _interval = interval;

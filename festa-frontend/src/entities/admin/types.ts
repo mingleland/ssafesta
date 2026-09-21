@@ -2,15 +2,13 @@
 //
 // 두 부류가 섞여 있다. **BE 구현이 정본인 것**(origin/develop backend user/Admin*Controller,
 // wallet/AdminWalletController, booth/AdminBoothPublicationController, survey/AdminEventSurveyController)과
-// **BE 가 아직 없어 FE 가 먼저 정한 것**이다. 후자는 각 항목에 `[FE contract]` 로 표시한다 —
-// BE 가 도달하면 그 응답에 맞춰 real adapter(api.ts)만 고치고 화면은 건드리지 않는다.
+// 전부 BE 정본이다 — user/Admin*Controller·wallet/AdminWalletController·
+// booth/AdminBoothPublicationController·survey/AdminEventSurveyController(#217 5건 연결 완료).
 import type { WalletTransaction } from '../wallet/types';
 
-/**
- * 내가 관리자인가. [FE contract] — `GET /users/me` 에 아직 이 두 칸이 없다. real adapter 는
- * 응답에 칸이 있으면 읽고 없으면 false 로 둔다. **FE 가드는 UX 보조일 뿐이고 최종 판정은 매 요청
- * BE(AdminGuard)가 한다** — 토큰의 role 은 관리자도 MEMBER 라 FE 가 스스로 알 길이 없다.
- */
+/** 내가 관리자인가 — `GET /users/me` 응답의 `admin`·`master` 칸(#217 1번).
+ *  **FE 가드는 UX 보조일 뿐이고 최종 판정은 매 요청 BE(AdminGuard)가 한다** — 토큰의 role 은
+ *  관리자도 MEMBER 라 FE 가 스스로 알 길이 없다. */
 export interface AdminCapability {
   admin: boolean;
   master: boolean;
@@ -27,8 +25,8 @@ export interface AdminView {
 export type AccountStatus = 'ACTIVE' | 'SUSPENDED';
 
 /**
- * 회원 검색 결과 한 행. [FE contract] — BE 에 관리자용 회원 검색·상세가 없다(-742 기능 7·8 제외).
- * 기대 경로: `GET /api/v1/admin/users?query=&page=&size=` · `GET /api/v1/admin/users/{userId}`
+ * 회원 검색 결과 한 행 — BE `AdminUserOperationService.AdminUserSummaryView` 와 같은 모양.
+ * `GET /api/v1/admin/users?query=&page=&size=` · `GET /api/v1/admin/users/{userId}`
  */
 export interface AdminMemberView {
   userId: number;
@@ -92,7 +90,7 @@ export interface AdminBoothView {
   leaseEndsAt: string | null;
 }
 
-// ── 이벤트 상점 [FE contract 전부] — BE 에 경품·구매 도메인이 아직 없다 ──────────────────────
+// ── 이벤트 상점 — BE AdminEventShopController 정본(S15P21A604-853 에 연결) ──────────────────
 //
 // 코인 차감(원장)과 경품 지급은 **다른 사건**이다. 원장에 SPEND 가 남았다고 물건을 받은 것이 아니다.
 // 그래서 구매 한 건이 `ledgerEntryId`(돈) 와 `fulfillment`(물건) 를 따로 든다.
@@ -141,6 +139,10 @@ export interface PrizePurchaseView {
   /** 마지막 처리 메모 */
   note: string | null;
   updatedAt: string;
+  /** 받는 자 정보 (GitLab #239, S15P21A604-912). #239 이전 행은 세 값이 함께 null 이다 */
+  campus: string | null;
+  teamName: string | null;
+  recipientName: string | null;
 }
 
 // ── 이벤트 설문 ─────────────────────────────────────────────────────────────────────────
@@ -154,8 +156,8 @@ export interface EventEntrantView {
 }
 
 /**
- * 공식 설문 요약. [FE contract] 목록 API 가 없다. real adapter 는 알려진 key 로
- * `GET /event-surveys/{key}/run`(BE 정본)과 entrants 첫 페이지를 합쳐 만든다.
+ * 공식 설문 요약 — BE `AdminEventSurveyService.EventSurveyView` 와 같은 모양.
+ * `GET /api/v1/admin/event-surveys`
  */
 export interface EventSurveySummary {
   surveyKey: string;
@@ -169,7 +171,8 @@ export interface EventSurveySummary {
 
 export type EventQuestionType = 'SINGLE_CHOICE' | 'MULTI_CHOICE' | 'RATING' | 'TEXT' | string;
 
-/** 질문별 집계. [FE contract] */
+/** 질문별 집계 — BE `AdminEventSurveyService.QuestionAggregateView` 와 같은 모양.
+ *  `GET /api/v1/admin/event-surveys/{key}/aggregate` */
 export interface EventQuestionAggregate {
   questionId: number;
   prompt: string;
@@ -181,7 +184,8 @@ export interface EventQuestionAggregate {
   textSamples: string[];
 }
 
-/** 개별 응답. [FE contract] */
+/** 개별 응답 — BE `AdminEventSurveyService.EventResponseView` 와 같은 모양.
+ *  `GET /api/v1/admin/event-surveys/{key}/responses/{responseId}` */
 export interface EventResponseDetail {
   responseId: number;
   userId: number;

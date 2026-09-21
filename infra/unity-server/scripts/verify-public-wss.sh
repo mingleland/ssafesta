@@ -21,9 +21,12 @@ else
   fail "usage: $0 [--approval-evidence <PASS file>] --output <evidence file>"
 fi
 
-: "${ROOT_DOMAIN:?ROOT_DOMAIN is required}"
-[[ "${ROOT_DOMAIN}" =~ ^[A-Za-z0-9.-]+$ ]] || fail 'ROOT_DOMAIN contains unsupported characters'
-world_host="world.${ROOT_DOMAIN}"
+# 검사할 host 는 호출자가 명시한다. ROOT_DOMAIN 에서 추론하지 않는다 — 추론하면 Demo readiness 가
+# Production World(world.<root>)를 검사하고 PASS 하는 false positive 가 난다 (2026-09-20 실측, Batch 1).
+#   Dev  WORLD_PUBLIC_HOST=world-dev.<root>   Demo WORLD_PUBLIC_HOST=world-demo.<root>   Production world.<root>
+[[ -n "${WORLD_PUBLIC_HOST:-}" ]] || { echo 'WORLD_PUBLIC_HOST is required (no environment inference)' >&2; exit 64; }
+[[ "${WORLD_PUBLIC_HOST}" =~ ^[A-Za-z0-9.-]+$ ]] || fail 'WORLD_PUBLIC_HOST contains unsupported characters'
+world_host="${WORLD_PUBLIC_HOST}"
 
 if [[ -n "${approval_evidence}" ]]; then
   assert_file "${approval_evidence}"

@@ -5,7 +5,11 @@ String checkoutCredential = System.getenv('GITLAB_CHECKOUT_CREDENTIALS_ID') ?: '
 String repositoryUrl = "${serverUrl}/${projectOwner}/${projectPath}.git"
 
 pipelineJob('festa-webgl-package-deploy') {
-    description('Deploy an immutable, QA-complete Unity WebGL Generic Package to the EC2 Nginx release path.')
+    description(
+        'FALLBACK/HISTORICAL (Batch 2): deploy an already-published Unity WebGL Generic Package to the EC2 Nginx release path. ' +
+        'The normal path is festa-gitlab-develop/develop, which builds, publishes and activates WebGL+World itself; ' +
+        'use this job only to re-activate a Registry release by hand.'
+    )
     parameters {
         stringParam('RELEASE_ID', '', 'Immutable Generic Package version/release ID')
         stringParam('ARTIFACT_SHA256', '', 'Expected lowercase SHA-256 of festa-webgl-release-<RELEASE_ID>.zip')

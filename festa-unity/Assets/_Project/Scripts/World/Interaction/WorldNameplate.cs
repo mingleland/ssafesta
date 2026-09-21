@@ -320,6 +320,20 @@ namespace Festa.World
             Debug.Log($"[WorldNameplate] '{_label}' 구조물 정점 {_structureTopY:F1} (정수리 {_topY:F1}, 지붕 {nearest.name})");
         }
 
+        /// <summary>
+        /// 지금 자세의 정수리 월드 Y. 말풍선처럼 <b>같은 머리 위</b>를 쓰는 표시가 재사용한다 —
+        /// 각자 캡슐 높이로 따로 재면 앉거나 누웠을 때 한쪽만 허공에 남는다(2026-09-20 지적).
+        /// 아직 한 번도 재지 못했으면 false.
+        /// </summary>
+        public bool TryGetPostureTopY(out float topY)
+        {
+            topY = 0f;
+            if (!_measured) return false;
+            topY = RawTopY();
+            return true;
+        }
+
+        /// <summary>지금 자세의 정수리 높이. 머리 본이 있으면 자세를 따라간다.</summary>
         /// <summary>지금 자세의 정수리 높이. 머리 본이 있으면 자세를 따라간다.</summary>
         float RawTopY()
         {

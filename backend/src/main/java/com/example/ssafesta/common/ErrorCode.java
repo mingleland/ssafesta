@@ -94,6 +94,10 @@ public enum ErrorCode {
     /** 관리자가 판매를 내린 경품이다 — 삭제하지 않고 {@code active=false} 로 내린다. */
     EVENT_PRIZE_INACTIVE(HttpStatus.CONFLICT, "현재 판매 중인 경품이 아닙니다."),
     EVENT_PRIZE_OUT_OF_STOCK(HttpStatus.CONFLICT, "재고가 부족합니다."),
+    /** 마감 시각이 지났다 (S15P21A604-922). 스케줄러가 판매를 내리기 전에도 이 시각이 경계다. */
+    EVENT_PRIZE_CLOSED(HttpStatus.CONFLICT, "응모가 마감됐습니다."),
+    /** 응모형 경품은 인당 1회다 (S15P21A604-922). */
+    EVENT_PRIZE_ALREADY_ENTERED(HttpStatus.CONFLICT, "이미 응모하셨습니다."),
     /**
      * 처리 상태 전이 규칙(PURCHASED→PENDING/FULFILLED/CANCELLED, PENDING→FULFILLED/CANCELLED)을
      * 벗어난 요청이다. {@code FULFILLED}·{@code CANCELLED} 는 종단 상태라 되돌리지 않는다.
@@ -169,6 +173,13 @@ public enum ErrorCode {
      * 사용자가 할 일이 서로 다르다. {@link #DOCUMENT_LIMIT_EXCEEDED} 와 같은 결이다.
      */
     DOCUMENT_NOT_REPLACEABLE(HttpStatus.CONFLICT, "이 문서는 교체할 수 없습니다."),
+    /**
+     * 처리 중인 문서는 삭제할 수 없다 (FR-012, S15P21A604-831). 업로드가 끝난 {@code QUEUED}와
+     * {@code PROCESSING}은 살아 있는 {@code ai_document_jobs} 행을 가질 수 있어, 지금 지우면 CASCADE가
+     * 그 Job 행을 워커 밑에서 걷어 간다. 업로드 전 {@code QUEUED(uploaded_at IS NULL)}는 아직 Job이
+     * 없으므로 삭제할 수 있다. 완료(READY)나 이미 끝난 상태(FAILED·EXPIRED·DISABLED)도 안전하다.
+     */
+    DOCUMENT_NOT_DELETABLE(HttpStatus.CONFLICT, "처리 중인 문서는 삭제할 수 없습니다. 완료된 뒤 다시 시도해 주세요."),
     /**
      * 늦게 도착한 이전 attempt 의 결과다 (GitLab #119 §3, S15P21A604-400).
      *
@@ -256,6 +267,17 @@ public enum ErrorCode {
      * 고정물이라 월드를 끊지 않는다 (spec 019 FR-020).
      */
     MACHINE_NOT_FOUND(HttpStatus.NOT_FOUND, "등록되지 않은 게임기입니다."),
+
+    /**
+     * 오락실 자리 배정의 거절 세 가지 (S15P21A604-942, GitLab #256).
+     *
+     * <p>셋 다 409 다 — 요청은 멀쩡하고 자리 상태가 허락하지 않는 것이라, 고쳐서 다시 보낼 값이
+     * 요청 안에 없다. 없는 {@code machineId} 만 404 {@link #MACHINE_NOT_FOUND} 로 남는다.
+     */
+    ARCADE_MACHINE_TAKEN(HttpStatus.CONFLICT, "이미 다른 게임이 차지한 자리입니다."),
+    ARCADE_SEAT_LIMIT(HttpStatus.CONFLICT, "한 사람이 캐비닛을 두 대까지 쓸 수 있습니다."),
+    ARCADE_ALREADY_SEATED(HttpStatus.CONFLICT,
+            "이 게임은 이미 다른 자리에 걸려 있습니다. 내린 뒤 다시 올리며 자리를 고르세요."),
 
     // ── Game Asset 업로드 (spec 019, #69) ───────────────────────────────────
     // contracts/game-asset-upload.md §6 의 11행이 정본이다. 여기 없는 GAME_ASSET_* 가 응답에

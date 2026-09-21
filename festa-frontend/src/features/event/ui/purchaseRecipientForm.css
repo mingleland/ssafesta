@@ -1,0 +1,34 @@
+/* 받는 자 정보 확인 모달 — Overlay Local Baseline(--ov-*) 위에 얹는다(purchaseResultDialog.css와 같은 관례). */
+.ov-recipient {
+  width: min(360px, calc(100vw - 32px));
+  padding: 22px 24px 20px;
+  border: 1px solid var(--ov-border-strong);
+  border-radius: var(--ov-radius);
+  background: var(--ov-surface-raised);
+  color: var(--ov-text);
+  font-family: var(--ov-font);
+  font-size: 14px;
+  line-height: 1.6;
+  box-shadow: var(--ov-shadow);
+}
+.ov-recipient::backdrop { background: rgba(6, 9, 26, 0.62); backdrop-filter: blur(2px); }
+
+.ov-recipient-title { margin: 0 0 6px; font-size: 17px; font-weight: 800; letter-spacing: -0.01em; }
+.ov-recipient-lead { margin: 0 0 16px; color: var(--ov-text-muted); font-size: 12.5px; line-height: 1.55; }
+
+.ov-recipient-field { display: flex; flex-direction: column; gap: 5px; margin-bottom: 12px; font-size: 13px; color: var(--ov-text-muted); }
+.ov-recipient-field select,
+.ov-recipient-field input {
+  height: 36px;
+  padding: 0 10px;
+  border: 1px solid var(--ov-border-strong);
+  border-radius: var(--ov-radius-control);
+  background: var(--ov-surface-sunken);
+  color: var(--ov-text);
+  font-family: inherit;
+  font-size: 13.5px;
+}
+.ov-recipient-field select:focus-visible,
+.ov-recipient-field input:focus-visible { outline: 2px solid var(--ov-accent); outline-offset: 1px; }
+
+.ov-recipient-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 6px; }

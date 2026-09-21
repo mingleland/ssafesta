@@ -208,8 +208,16 @@ namespace Festa.Network
         // 그래서 비어 있는 가장 낮은 슬롯을 배정하고 끊길 때 반납한다 — 혼자 테스트하면
         // 항상 0번, 같은 자리다. 40명이 함께 있어도 슬롯은 겹치지 않는다.
 
+        // 격자 칸 수는 정원과 함께 움직인다. 8x5=40 이던 것을 정원 100 상향(S15P21A604-935)에
+        // 맞춰 8x13=104 로 넓혔다. **열을 늘리지 않고 행만 늘린 이유**는 동쪽 한계가 이미
+        // 검증돼 있어서다 — 동쪽 열 x=5.5 는 엘리베이터 문(x=17)과 Seal_East_02(x=9.02) 사이에
+        // 간신히 들어가 있다. 열을 하나만 더해도(x=10.5) 그 봉인을 문다. 남북(z)은 로비가 열려
+        // 있어 여유가 있고, 넓힌 칸이 실제로 바닥에 닿는지는 FestaSpawnGridAudit 로 확인한다.
         const int SpawnColumns = 8;
-        const int SpawnRows = 5;
+        const int SpawnRows = 13;
+
+        /// <summary>격자가 담을 수 있는 인원. 검증 도구와 스폰 계산이 같은 값을 본다.</summary>
+        public const int SpawnSlotCount = SpawnColumns * SpawnRows;
         // 아바타 지름이 4.4 unit(반지름 2.2) 이므로 간격이 그보다 커야 겹치지 않는다.
         // 이전 값 2.25 는 지름의 절반이어서 스폰 순간 서로 파묻혔다 — Player↔Player 충돌을
         // 꺼 둔 덕에 통과했을 뿐이다.
@@ -241,10 +249,15 @@ namespace Festa.Network
             return slot;
         }
 
-        static Vector3 GetSpawnPosition(int slot)
+        /// <summary>
+        /// 슬롯의 월드 좌표. 검증 도구(FestaSpawnGridAudit)가 같은 계산을 다시 쓰지 않도록 공개한다 —
+        /// 격자를 넓힐 때 도구와 실제 스폰이 갈라지면 검증이 의미를 잃는다.
+        /// </summary>
+        public static Vector3 GetSpawnPosition(int slot)
         {
             // 슬롯 수를 넘으면 감싼다 — 정원(MaxPlayers)이 격자보다 커지는 경우의 안전장치.
-            slot %= SpawnColumns * SpawnRows;
+            // 감싸는 순간 두 사람이 같은 칸에서 시작하므로, 격자는 정원 이상으로 유지한다.
+            slot %= SpawnSlotCount;
             int column = slot % SpawnColumns;
             int row = slot / SpawnColumns;
             float x = SpawnCenter.x + (column - (SpawnColumns - 1) * 0.5f) * SpawnSpacing;

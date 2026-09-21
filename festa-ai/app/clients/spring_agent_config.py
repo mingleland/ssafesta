@@ -14,6 +14,7 @@ import httpx
 
 from app.services.context_service import (
     AgentPromptConfig,
+    ProjectFacts,
     RESPONSE_LENGTH_INSTRUCTIONS,
     ROLE_INSTRUCTIONS,
     TONE_INSTRUCTIONS,
@@ -27,6 +28,7 @@ _FOUND_FIELDS = {
     "systemPrompt",
     "forbiddenTopics",
 }
+_FOUND_FIELDS_WITH_PROJECT_FACTS = _FOUND_FIELDS | {"projectFacts"}
 _DENIED_FIELDS = {"found", "denialCode"}
 _DENIAL_CODES = {"AGENT_NOT_IN_BOOTH", "AGENT_INACTIVE"}
 
@@ -112,7 +114,7 @@ class SpringAgentConfigClient:
                 )
             raise AgentConfigDenied(denial_code)
 
-        if set(body) != _FOUND_FIELDS:
+        if set(body) not in (_FOUND_FIELDS, _FOUND_FIELDS_WITH_PROJECT_FACTS):
             raise SpringAgentConfigUnavailable(
                 "Spring agent-config success shape is invalid"
             )
@@ -122,6 +124,7 @@ class SpringAgentConfigClient:
         response_length = body["responseLength"]
         system_prompt = body["systemPrompt"]
         forbidden_topics = body["forbiddenTopics"]
+        project_facts = _parse_project_facts(body.get("projectFacts"))
         if type(role) is not str or role not in ROLE_INSTRUCTIONS:
             raise SpringAgentConfigUnavailable("Spring agent-config role is invalid")
         if type(tone) is not str or tone not in TONE_INSTRUCTIONS:
@@ -150,4 +153,37 @@ class SpringAgentConfigClient:
             response_length=response_length,
             system_prompt=system_prompt,
             forbidden_topics=tuple(forbidden_topics),
+            project_facts=project_facts,
         )
+
+
+def _parse_project_facts(value: object) -> ProjectFacts | None:
+    if value is None:
+        return None
+    allowed_fields = {
+        "introduction",
+        "targetAudience",
+        "techStack",
+    }
+    if not isinstance(value, Mapping) or not set(value) <= allowed_fields:
+        raise SpringAgentConfigUnavailable(
+            "Spring agent-config projectFacts shape is invalid"
+        )
+    facts = tuple(value.get(field) for field in allowed_fields)
+    if any(
+        item is not None and (type(item) is not str or not item.strip())
+        for item in facts
+    ):
+        raise SpringAgentConfigUnavailable(
+            "Spring agent-config projectFacts value is invalid"
+        )
+    try:
+        return ProjectFacts(
+            introduction=value.get("introduction"),
+            target_audience=value.get("targetAudience"),
+            tech_stack=value.get("techStack"),
+        )
+    except ValueError as exc:
+        raise SpringAgentConfigUnavailable(
+            "Spring agent-config projectFacts value is invalid"
+        ) from exc

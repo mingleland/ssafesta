@@ -9,6 +9,7 @@
 import { BoothExitButton } from './BoothExitButton';
 import { ConsultationQuickAccess } from './ConsultationQuickAccess';
 import { DailyMissionLauncher } from '../../mission/ui/DailyMissionLauncher';
+import { openMenuPanelScreen } from '../model/worldScreen';
 import { toggleFullscreen, useFullscreen } from '../../../shared/ui/fullscreen';
 import { Tooltip } from '../../../shared/ui/tooltip/Tooltip';
 import './worldHud.css';
@@ -29,9 +30,32 @@ export function WorldHud() {
       <ConsultationQuickAccess />
       <FullscreenToggle />
 
+      {/* 조작 안내 — 우하단. 여는 것은 ESC 메뉴의 그 오버레이와 같은 'guide' 패널이다.
+          HUD 에서 직접 열 뿐이고, 새 슬롯을 만들지 않으므로 배타·ESC·입력 잠금이 그대로
+          따라온다. 닫으면 월드로 돌아간다(메뉴를 거치지 않는다). */}
+      <GuideButton />
+
       {/* 컨텍스트 액션 — 부스 안일 때만 뜬다. 상시 HUD 가 아니다 (S15P21A604-627, #174) */}
       <BoothExitButton />
     </div>
+  );
+}
+
+function GuideButton() {
+  return (
+    <Tooltip content="조작 안내" placement="left">
+      <button
+        type="button"
+        className="world-hud-control world-hud-guide"
+        onClick={() => openMenuPanelScreen('guide')}
+        aria-label="조작 안내"
+      >
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <rect x="2.5" y="6" width="19" height="12" rx="2.5" />
+          <path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M6 14h.01M18 14h.01M9.5 14h5" />
+        </svg>
+      </button>
+    </Tooltip>
   );
 }
 

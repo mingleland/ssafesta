@@ -102,7 +102,8 @@ class SecurityConfiguration {
                         // above is open. Resolution reads only which game is bound and whether it
                         // is public; there is no owner or lease in this path to judge
                         // (S15P21A604-602).
-                        .requestMatchers(HttpMethod.GET, "/api/v1/arcade-machines/*").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/v1/arcade-machines",
+                                "/api/v1/arcade-machines/*").permitAll()
                         // A published game's assets are read without a session: the play page
                         // resolves asset:// for a guest, and the filter runs before the service can
                         // decide anything (GitLab #69, 2026-08-28 — "필터에서는 경로를 열고 판정은
@@ -141,7 +142,7 @@ class SecurityConfiguration {
         CorsConfiguration cors = new CorsConfiguration();
         cors.setAllowedOrigins(List.of(properties.frontendBaseUrl()));
         cors.setAllowedMethods(List.of("GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"));
-        cors.setAllowedHeaders(List.of("Authorization", "Content-Type"));
+        cors.setAllowedHeaders(List.of("Authorization", "Content-Type", "Idempotency-Key"));
         cors.setExposedHeaders(List.of("Set-Cookie", RequestIdFilter.HEADER));
         cors.setAllowCredentials(true);
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();

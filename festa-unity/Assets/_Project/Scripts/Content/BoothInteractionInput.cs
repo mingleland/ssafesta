@@ -156,7 +156,30 @@ namespace Festa.Content
         static bool TemporarilyBlocked(Festa.Booth.BoothInteractionTarget target)
         {
             var striker = target.GetComponentInParent<Festa.World.HighStrikerInteractable>();
-            return striker != null && striker.IsBusy;
+            if (striker != null && striker.IsBusy) return true;
+
+            // 누가 붙어서 하고 있는 게임기도 통째로 뺀다 — 한 대에 한 사람이다 (사용자 지시 2026-09-19).
+            var arcade = target.GetComponentInParent<Festa.Content.Arcade.ArcadeMachineInteractable>();
+            if (arcade != null)
+            {
+                var anm = Unity.Netcode.NetworkManager.Singleton;
+                var apo = anm != null && anm.LocalClient != null ? anm.LocalClient.PlayerObject : null;
+                if (arcade.IsOccupied(apo, out _)) return true;
+            }
+
+            // 이미 누가 앉아 있는 의자는 **대상에서 통째로 뺀다**
+            // 이미 누가 앉아 있는 의자는 **대상에서 통째로 뺀다** — 프롬프트도 링도 뜨지 않는다.
+            // 눌러도 안 되는 버튼을 띄우면 고장으로 읽힌다 (사용자 지시 2026-09-18).
+            var chair = target.GetComponentInParent<Festa.World.BoothChairInteractable>();
+            if (chair != null)
+            {
+                var nm = Unity.Netcode.NetworkManager.Singleton;
+                var po = nm != null && nm.LocalClient != null ? nm.LocalClient.PlayerObject : null;
+                if (chair.IsOccupied(po, out _)) return true;
+                // 내가 앉아 있는 동안에도 뺀다 — 앉은 채 F 가 다시 먹으면 자세만 바뀌며 몸이 튄다.
+                if (Festa.World.SitPoseTable.IsLocalPlayerSitting()) return true;
+            }
+            return false;
         }
 
         /// <summary>사거리 안에서 가장 가까운 F 응답 대상. 없으면 null. 현재 대상이 사거리 안이면 히스테리시스를 둔다.</summary>
@@ -291,6 +314,8 @@ namespace Festa.Content
                 return "타이밍 스톱 게임";
             if (target.GetComponentInParent<Festa.World.LoungeSofaInteractable>() != null)
                 return "소파에 눕기";
+            if (target.GetComponentInParent<Festa.World.BoothChairInteractable>() != null)
+                return "의자에 앉기";
             // 작동 중에는 여기까지 오지 않는다 — TemporarilyBlocked 가 대상에서 통째로 뺀다.
             if (target.GetComponentInParent<Festa.World.HighStrikerInteractable>() != null)
                 return "망치로 내리치기";

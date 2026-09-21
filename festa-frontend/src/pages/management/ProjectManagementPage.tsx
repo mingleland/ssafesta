@@ -4,7 +4,7 @@
 // 데이터층은 features/project/model/edit.ts 를 그대로 소비한다 — dirty 키만 PATCH 하는 규칙,
 // 저장 중 입력 차단, projectId null 이면 create 는 전부 그 모델의 계약이고 여기서 바꾸지 않는다.
 // 모델에 없는 필드·조회수 같은 지표를 추가하지 않는다.
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   loadProjectEdit,
@@ -14,7 +14,9 @@ import {
 } from '../../features/project/model/edit';
 import {
   PROJECT_LOGO_ACCEPT,
-  PROJECT_LOGO_UPLOAD_AVAILABLE,
+  uploadProjectLogo,
+  fetchProjectLogo,
+  isManagedProjectLogo,
   validateProjectLogo,
 } from '../../features/project/model/logoUpload';
 import type { ProjectFieldKey } from '../../shared/contracts/project';
@@ -38,7 +40,7 @@ const BASIC_FIELDS: Field[] = [
   { key: 'description', label: '소개', kind: 'area' },
 ];
 
-const GROUPS: { title: string; note?: string; fields: Field[] }[] = [
+const GROUPS: { title: string; note?: string; fields: Field[]; extraFields?: Field[]; extraLabel?: string }[] = [
   {
     title: '대표 · 미디어',
     note: '월드의 전시 패널에 그려지는 값입니다.',
@@ -51,18 +53,51 @@ const GROUPS: { title: string; note?: string; fields: Field[] }[] = [
     note: '방문자가 더 알아보고 싶을 때 따라가는 주소입니다.',
     fields: [
       { key: 'deployUrl', label: '서비스 주소', kind: 'url', hint: 'https://' },
+    ],
+    // 저장소·포트폴리오는 부가 링크다 — 상시 노출 대신 접어 두고, 값이 있으면 자연스럽게 펼친다.
+    extraFields: [
       { key: 'gitUrl', label: '저장소 주소', kind: 'url', hint: 'https://' },
       { key: 'portfolioUrl', label: '포트폴리오 주소', kind: 'url', hint: 'https://' },
     ],
+    extraLabel: '저장소 · 포트폴리오 주소',
   },
 ];
 
-function ProjectLogoField({ savedUrl, disabled }: { savedUrl: string | null; disabled: boolean }) {
+function ProjectLogoField({ boothId, savedUrl, disabled, onUploading }: {
+  boothId: number; savedUrl: string | null; disabled: boolean; onUploading: (value: boolean) => void;
+}) {
   const [selection, setSelection] = useState<{ file: File; url: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [broken, setBroken] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [resolved, setResolved] = useState<{ source: string; url: string } | null>(null);
+  const active = useRef(true);
+  const inFlight = useRef(false);
 
-  const previewUrl = selection?.url ?? savedUrl;
+  const previewUrl = selection?.url ?? (savedUrl && isManagedProjectLogo(savedUrl)
+    ? (resolved?.source === savedUrl ? resolved.url : null) : savedUrl);
+
+  useEffect(() => {
+    active.current = true;
+    return () => { active.current = false; };
+  }, []);
+
+  useEffect(() => {
+    if (!savedUrl || !isManagedProjectLogo(savedUrl)) return;
+    const controller = new AbortController();
+    let objectUrl: string | undefined;
+    void fetchProjectLogo(savedUrl, controller.signal).then((blob) => {
+      if (controller.signal.aborted) return;
+      objectUrl = URL.createObjectURL(blob);
+      setResolved({ source: savedUrl, url: objectUrl });
+    }).catch(() => {
+      if (!controller.signal.aborted) setError('현재 프로젝트 로고를 불러오지 못했습니다.');
+    });
+    return () => {
+      controller.abort();
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [savedUrl]);
 
   useEffect(() => {
     return () => {
@@ -72,8 +107,8 @@ function ProjectLogoField({ savedUrl, disabled }: { savedUrl: string | null; dis
 
   useEffect(() => setBroken(false), [previewUrl]);
 
-  function selectFile(file: File | undefined) {
-    if (!file) return;
+  async function selectFile(file: File | undefined) {
+    if (!file || disabled || inFlight.current) return;
     const validationError = validateProjectLogo(file);
     if (validationError) {
       setError(validationError);
@@ -81,6 +116,24 @@ function ProjectLogoField({ savedUrl, disabled }: { savedUrl: string | null; dis
     }
     setError(null);
     setSelection({ file, url: URL.createObjectURL(file) });
+    inFlight.current = true;
+    setUploading(true);
+    onUploading(true);
+    try {
+      const uploaded = await uploadProjectLogo(boothId, file);
+      if (active.current) updateField('thumbnailUrl', uploaded.thumbnailUrl);
+    } catch (cause) {
+      if (active.current) {
+        setSelection(null);
+        setError(cause instanceof Error ? cause.message : '이미지를 업로드하지 못했습니다. 다시 시도해 주세요.');
+      }
+    } finally {
+      inFlight.current = false;
+      if (active.current) {
+        setUploading(false);
+        onUploading(false);
+      }
+    }
   }
 
   return (
@@ -109,23 +162,21 @@ function ProjectLogoField({ savedUrl, disabled }: { savedUrl: string | null; dis
           <input
             type="file"
             accept={PROJECT_LOGO_ACCEPT}
-            disabled={disabled}
+            disabled={disabled || uploading}
             aria-label="프로젝트 로고 이미지 선택"
             onChange={(event) => {
-              selectFile(event.target.files?.[0]);
+              void selectFile(event.target.files?.[0]);
               event.target.value = '';
             }}
           />
         </label>
       </div>
-      <span className="sc-note">PNG, JPG, WebP · 미리보기 기준 5MB 이하</span>
+      <span className="sc-note">PNG, JPG, GIF, WebP · 5MB 이하 · 가로·세로 4096px 이하</span>
       {error && <span className="mg-field-error" role="alert">{error}</span>}
       <span className="mg-logo-contract-note" role="status">
-        {selection
-          ? `${selection.file.name}은 로컬 미리보기이며 아직 저장되지 않습니다.`
-          : PROJECT_LOGO_UPLOAD_AVAILABLE
-            ? '업로드할 이미지를 선택해 주세요.'
-            : '파일 업로드는 서버 연결 준비 중입니다.'}
+        {uploading ? '이미지를 업로드하고 확인하는 중입니다.' : selection
+          ? `${selection.file.name} 업로드 완료. 변경 저장을 누르면 프로젝트에 반영됩니다.`
+          : '업로드할 이미지를 선택해 주세요.'}
       </span>
     </div>
   );
@@ -134,10 +185,18 @@ function ProjectLogoField({ savedUrl, disabled }: { savedUrl: string | null; dis
 export function ProjectManagementPage() {
   const boothIdNum = useManagementBoothId();
   const state = useProjectEdit();
+  const [uploadingLogo, setUploadingLogo] = useState(false);
+  // 부가 링크(저장소·포트폴리오) 펼침 — 값 유무가 초기값이고, 사용자 토글이 덮어쓴다.
+  // 값 유무를 노출 조건에 OR 로 걸면 값이 있는 한 토글이 죽는다(펼침·접힘 둘 다 변화 없음).
+  const hasExtraValues =
+    (state.draft.gitUrl ?? '') !== '' || (state.draft.portfolioUrl ?? '') !== '';
+  const [extraForced, setExtraForced] = useState<boolean | null>(null);
+  const extraOpen = extraForced ?? hasExtraValues;
   // 저장 성공이 내 부스 관리창의 프로젝트 조회를 무효화하게 한다 (edit.ts saveProject 주석)
   const queryClient = useQueryClient();
 
   useEffect(() => {
+    setUploadingLogo(false);
     if (Number.isFinite(boothIdNum)) void loadProjectEdit(boothIdNum);
   }, [boothIdNum]);
 
@@ -219,7 +278,7 @@ export function ProjectManagementPage() {
           <button
             type="button"
             className="sc-btn sc-btn-primary"
-            disabled={saving || state.dirty.size === 0}
+            disabled={saving || uploadingLogo || state.dirty.size === 0}
             onClick={() => void saveProject(queryClient)}
           >
             {saving ? '저장 중...' : '변경 저장'}
@@ -233,7 +292,11 @@ export function ProjectManagementPage() {
             <span className="sc-section-title">기본 정보</span>
           </div>
           <div className="mg-project-identity">
-            <ProjectLogoField savedUrl={state.draft.thumbnailUrl} disabled={saving} />
+            <div>
+              <ProjectLogoField key={boothIdNum} boothId={boothIdNum} savedUrl={state.draft.thumbnailUrl}
+                disabled={saving} onUploading={setUploadingLogo} />
+              {state.fieldErrors.thumbnailUrl && <span role="alert" className="mg-field-error">{state.fieldErrors.thumbnailUrl}</span>}
+            </div>
             <div className="mg-project-copy">
               {BASIC_FIELDS.map(renderField)}
             </div>
@@ -241,11 +304,32 @@ export function ProjectManagementPage() {
         </section>
         {GROUPS.map((group) => (
           <section key={group.title} className="sc-card mg-group">
-            <div className="mg-group-head">
-              <span className="sc-section-title">{group.title}</span>
-              {group.note !== undefined && <span className="sc-note">{group.note}</span>}
+            {/* 부가 링크 토글은 섹션 머리 우측에선다 — 본문 아래에 있으면 서비스 주소와 무관한 버튼으로 읽힌다 */}
+            <div className={group.extraFields !== undefined ? 'mg-group-head mg-group-head-split' : 'mg-group-head'}>
+              <div className="mg-group-titles">
+                <span className="sc-section-title">{group.title}</span>
+                {group.note !== undefined && <span className="sc-note">{group.note}</span>}
+              </div>
+              {group.extraFields !== undefined && (
+                <button
+                  type="button"
+                  className="mg-extra-toggle"
+                  aria-expanded={extraOpen}
+                  onClick={() => setExtraForced(!extraOpen)}
+                >
+                  {group.extraLabel}
+                  <span className="mg-extra-chevron" aria-hidden="true">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M6 9l6 6 6-6" />
+                    </svg>
+                  </span>
+                </button>
+              )}
             </div>
             {group.fields.map(renderField)}
+            {group.extraFields !== undefined
+              && extraOpen
+              && group.extraFields.map(renderField)}
           </section>
         ))}
       </form>

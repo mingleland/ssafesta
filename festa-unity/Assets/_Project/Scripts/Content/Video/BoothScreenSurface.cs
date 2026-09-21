@@ -33,6 +33,8 @@ namespace Festa.Content
         static readonly Dictionary<string, Texture> TextureCache = new();
 
         bool _painted;
+        Material _screenMaterial;
+        readonly List<GameObject> _screenImages = new();
 
         /// <summary>이 오브젝트에 화면 내용을 붙인다. 이미 있으면 설정만 갱신한다.</summary>
         public static void Attach(GameObject target)
@@ -45,7 +47,14 @@ namespace Festa.Content
 
         async void FillAsync(int boothId)
         {
-            if (boothId <= 0) return;
+            // 조용히 돌아가면 화면은 검은 상자로 남고 원인은 어디에도 남지 않는다 (T-24). 이 경로는
+            // 붙인 오브젝트에 부스 번호가 들어오지 않았다는 뜻이라 데이터가 아니라 배선 문제다.
+            if (boothId <= 0)
+            {
+                Debug.LogWarning($"[BoothScreen] {name}: 부스 번호가 없어(BoothId={boothId}) 화면을 채우지 않는다 — " +
+                                 "BoothRuntimeObject.Init 이 먼저 불렸는지 확인하라.");
+                return;
+            }
 
             BoothProjectDto first = null;
             try
@@ -67,7 +76,15 @@ namespace Festa.Content
                 // 조용히 검은 화면으로 두지 않는다 — 로고를 등록했는데 안 뜨면 원인을 찾을 수 없다 (T-24).
                 Debug.LogWarning($"[BoothScreen] booth={boothId} 이미지 조회 실패: {e.Message}");
             }
-            if (texture == null || this == null || _painted) return;   // 셋 다 없으면 검은 화면 그대로
+            if (this == null || _painted) return;
+            if (texture == null)
+            {
+                // 사용자는 "로고를 넣었는데 안 뜬다" 로 겪는다. 무엇이 비어 있었는지 남겨야 데이터인지 배선인지 가른다.
+                Debug.LogWarning($"[BoothScreen] booth={boothId} 화면을 검은 채로 둔다 — 후보가 모두 비었다. " +
+                                 $"videoUrl='{first?.videoUrl}' thumbnailUrl='{first?.thumbnailUrl}' 전시={(first == null ? "없음" : "있음")}. " +
+                                 "부스 로고는 슬롯 목록의 facade.logoUrl 을 본다.");
+                return;
+            }
             Paint(texture);
         }
 
@@ -212,9 +229,9 @@ namespace Festa.Content
             float h = thin == 1 ? size.z : size.y;
             float half = size[thin] * 0.5f + SurfaceOffset;
 
-            var material = new Material(Shader.Find("Universal Render Pipeline/Unlit"));
-            material.SetTexture("_BaseMap", texture);
-            material.mainTexture = texture;
+            _screenMaterial = new Material(Shader.Find("Universal Render Pipeline/Unlit"));
+            _screenMaterial.SetTexture("_BaseMap", texture);
+            _screenMaterial.mainTexture = texture;
 
             // 화면이 아니라 **그 부모**에 붙인다. 화면은 두께 축이 얇게 눌려 있어
             // 자식으로 두면 판이 그 배율을 그대로 먹어 찌그러진다.
@@ -226,6 +243,7 @@ namespace Festa.Content
                 var dir = side == 0 ? normal : -normal;
                 var quad = GameObject.CreatePrimitive(PrimitiveType.Quad);
                 quad.name = $"ScreenImage_{side}";
+                _screenImages.Add(quad);
                 Destroy(quad.GetComponent<Collider>());   // 상호작용 판정에 끼어들면 안 된다
                 quad.transform.SetParent(anchor, true);
                 quad.transform.position = bounds.center + dir * half;
@@ -233,10 +251,23 @@ namespace Festa.Content
                 quad.transform.localScale = new Vector3(w * Inset / unit, h * Inset / unit, 1f);
 
                 var renderer = quad.GetComponent<MeshRenderer>();
-                renderer.sharedMaterial = material;
+                renderer.sharedMaterial = _screenMaterial;
                 renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
                 renderer.receiveShadows = false;
             }
+        }
+
+        void OnDestroy()
+        {
+            // 이미지는 BoothScreenSurface의 형제가 될 수 있어 컴포넌트 오브젝트를 없애도 자동으로
+            // 같이 사라지지 않는다. 게시 레이아웃 재구성마다 quad와 동적 Material이 남지 않게
+            // 만든 쪽에서 직접 거둔다 (S15P21A604-947).
+            foreach (var image in _screenImages)
+                if (image != null) Destroy(image);
+            _screenImages.Clear();
+
+            if (_screenMaterial != null) Destroy(_screenMaterial);
+            _screenMaterial = null;
         }
     }
 }

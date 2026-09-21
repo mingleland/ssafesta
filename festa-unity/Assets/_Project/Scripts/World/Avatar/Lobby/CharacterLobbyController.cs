@@ -483,9 +483,20 @@ namespace Festa.Avatar
             }
         }
 
-        static bool IsUsableAppearance(AvatarConfig config)
-            => config.headId != 0 && config.hairId != 0 && config.shoesId != 0
-               && (config.outfitId != 0 || (config.topId != 0 && config.bottomId != 0));
+        /// <summary>
+        /// 읽어 온 외형을 쓸 수 있는가. <b>얼굴만 본다.</b>
+        ///
+        /// <para>예전에는 헤어·신발과 상·하의까지 요구했다. 그런데 항목 그리드는 얼굴을 뺀 모든
+        /// 카테고리에 "없음" 버튼을 준다 — UI 가 허용해 저장까지 된 외형을 불러오기에서만 거부하는
+        /// 상태였다(GitLab #248). 이 게이트는 프리셋 칸뿐 아니라 저장 외형 복원·씬 핸드오프 복원·현재
+        /// 외형 승계도 함께 쓰므로, 같은 외형이 그 경로들에서도 조용히 버려졌다.</para>
+        ///
+        /// <para>얼굴에는 "없음" 이 없다. 그래서 <c>headId == 0</c> 은 사용자의 선택이 아니라 모듈러
+        /// 코드를 못 읽었다는 뜻이고, 그것만 거부하면 된다. 속옷 노출은 조립 단계의
+        /// <see cref="AvatarCatalog.EnsureRequiredClothing"/> 이 한벌옷이 없을 때 상·하의를 기본값으로
+        /// 채워 이미 막고 있다.</para>
+        /// </summary>
+        static bool IsUsableAppearance(AvatarConfig config) => config.headId != 0;
 
         /// <summary>
         /// 외형을 세 칸에 담아 두고 꺼내 쓴다 (QA 요청 2026-09-17, GitLab #237).
@@ -870,8 +881,20 @@ namespace Festa.Avatar
             _wardrobeTitle=Label(left,"한벌옷 설정",20,38,new Vector2(.06f,.78f),new Vector2(.94f,.83f));_wardrobeTitle.alignment=TextAnchor.MiddleLeft;_wardrobeTitle.color=UiText;
             _wardrobeGrid=ScrollGrid(left,new Vector2(.06f,.43f),new Vector2(.94f,.669f),2,new Vector2(158,148));_wardrobeItemScroll=(RectTransform)_wardrobeGrid.parent;
             _wardrobeColorTitle=Label(left,"의상 세부 색상",18,38,new Vector2(.06f,.45f),new Vector2(.94f,.50f));_wardrobeColorTitle.alignment=TextAnchor.MiddleLeft;_wardrobeColorTitle.color=UiTextMuted;
-            _wardrobeColorSlots=ColorList(left);Anchor(_wardrobeColorSlots,new Vector2(.06f,.10f),new Vector2(.94f,.35f));
-            var quickRow=Horizontal(left,740,new Vector2(.05f,1),new Vector2(.95f,1));quickRow.sizeDelta=new Vector2(0,52);
+            // 좌측 패널 아래쪽은 위에서부터 [의상 색상 줄] → [성별·무작위·초기화] → [적용/취소] 순으로 쌓인다.
+            //
+            // **겹쳤던 이유는 좌표계가 섞여 있었기 때문이다.** 색상 목록은 패널 높이의 비율(.10~.35)로
+            // 자리를 잡는데 버튼 줄만 "위에서 740px" 라는 절대 좌표였다. 그 절대 좌표는 패널 아래에서
+            // 108~160px 자리라 색상 목록 구간(90~315px) **안쪽**이다. 색상 줄은 위에서 아래로 쌓이므로
+            // 줄이 2개일 때는 닿지 않다가, 3개짜리 옷(겉감·후드 소매 배색·지퍼 끈 포켓)을 고르면
+            // 세 번째 줄이 버튼 줄 위로 내려와 글자를 가렸다 (사용자 지적 2026-09-18).
+            //
+            // 그래서 버튼 줄도 비율로 바꿔 서로 겹치지 않는 구간을 준다. 색상 줄은 최대 3개이고
+            // (RefreshWardrobeColors 의 area 0~2) 한 줄이 52px + 간격 5px + 위아래 여백 3px 이라
+            // 3줄에 172px 가 필요하다. 아래 구간은 패널 높이의 .20 = 180px 로 그만큼을 담는다.
+            _wardrobeColorSlots=ColorList(left);Anchor(_wardrobeColorSlots,new Vector2(.06f,.16f),new Vector2(.94f,.36f));
+            var quickRow=Horizontal(left,0,new Vector2(.05f,1),new Vector2(.95f,1));
+            Anchor(quickRow,new Vector2(.05f,.093f),new Vector2(.95f,.150f));
             Anchor(_wardrobeTitle.rectTransform,new Vector2(.06f,.684f),new Vector2(.94f,.739f));
             Anchor(_wardrobeColorTitle.rectTransform,new Vector2(.06f,.36f),new Vector2(.94f,.41f));
             Button(quickRow,"성별",()=>{CloseColorPopup();_config=_catalog.CreateDefault(_config.gender==AvatarGender.Female?AvatarGender.Male:AvatarGender.Female);Apply();RefreshAll();},90,46,UiCardSelected);

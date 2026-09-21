@@ -82,6 +82,8 @@ namespace Festa.Network
             useGUILayout = false;   // GUI.* 만 쓴다 — Layout 패스 제거로 OnGUI 호출·GC 절반 (QA #69)
         }
 
+        void OnDestroy() => ReleaseGuiTextures();
+
         public override void OnNetworkSpawn() => enabled = IsOwner;
 
         /// <summary>
@@ -271,7 +273,8 @@ namespace Festa.Network
         // 루프 이모트는 자동으로 끝나지 않는다 — 다시 선택하거나 이동하면 해제된다
         // (PlayerMovement 가 이동 시 EmoteId 를 None 으로 되돌린다).
         static bool IsLooping(PlayerEmoteId emote) =>
-            emote == PlayerEmoteId.SitGround || emote == PlayerEmoteId.Drink || Festa.World.LiePoseTable.IsLie(emote);
+            emote == PlayerEmoteId.SitGround || emote == PlayerEmoteId.Drink
+            || Festa.World.LiePoseTable.IsLie(emote) || Festa.World.SitPoseTable.IsSit(emote);
 
         // ── 원샷 이모트 종료 시점 ──────────────────────────────────
         // 클립 이름으로 길이를 찾을 수 없다. 애니메이터 상태 이름은 `Emote_{enum}` 규약이지만
@@ -377,11 +380,25 @@ namespace Festa.Network
                 normal = { textColor = new Color(1f, 0.78f, 0.28f) }
             };
 
+            // 창 크기·모니터 이동으로 UI 배율이 바뀌면 아래 텍스처 3장을 다시 굽는다. 이전 것은
+            // C# 참조만 덮어쓰면 네이티브 텍스처로 남는다. 소유자가 분명한 런타임 자원이므로
+            // 재생성 직전과 플레이어 despawn 때 직접 해제한다 (S15P21A604-947).
+            ReleaseGuiTextures();
             _ringTexture = BuildRing(new Color(0.05f, 0.07f, 0.11f, 0.80f),
                                      new Color(0.30f, 0.36f, 0.48f, 0.85f));
             _wedgeTexture = BuildWedge(new Color(0.95f, 0.62f, 0.14f, 1f));
             _hubTexture = BuildDisc(new Color(0.03f, 0.04f, 0.07f, 0.90f),
                                     new Color(0.45f, 0.52f, 0.66f, 0.9f));
+        }
+
+        void ReleaseGuiTextures()
+        {
+            if (_ringTexture != null) Destroy(_ringTexture);
+            if (_wedgeTexture != null) Destroy(_wedgeTexture);
+            if (_hubTexture != null) Destroy(_hubTexture);
+            _ringTexture = null;
+            _wedgeTexture = null;
+            _hubTexture = null;
         }
 
         /// <summary>가장자리 1.5px 를 부드럽게 — 절차적 텍스처의 계단을 없앤다.</summary>

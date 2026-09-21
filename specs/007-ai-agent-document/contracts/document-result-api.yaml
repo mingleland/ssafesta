@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Spring Document Result API for AI
-  version: 1.0.0
+  version: 1.1.0
   description: |
     FastAPI 워커가 만든 결과를 Spring 이 받는 계약이다 (S15P21A604-400, GitLab #119 §3).
     의미 경계는 `document-result-contract.md` 가 정본이고, 이 파일은 그 표의 경로·DTO 를 고정한다.
@@ -60,6 +60,9 @@ paths:
       summary: 적재된 Chunk 를 검증하고 공개
       description: |
         staging 개수·`chunkNo` 유일성·임베딩 모델 단일성·`sourceHash` 를 검증한 뒤
+        선택 `projectFacts`가 있으면 대상 사용자·사용 기술도 함께 반영하고(둘 다 `null` 이면 "없음" 으로
+        보고 무시한다 — 추출이 비었다고 공개를 막지 않는다. 프로젝트 없음·더 새로운 Job 값 존재도 무시.
+        빈 문자열·길이 초과만 `400`),
         **기존 Chunk 삭제 → staging 반영(`searchable = TRUE`) → staging 정리 →
         Job `SUCCEEDED` → Document `READY`** 를 한 트랜잭션으로 확정한다.
 
@@ -271,6 +274,15 @@ components:
         sourceHash: { type: string, pattern: '^[a-f0-9]{64}$' }
         totalChunkCount: { type: integer, minimum: 1 }
         embeddingModelId: { type: string, minLength: 1 }
+        projectFacts:
+          $ref: '#/components/schemas/ExtractedProjectFacts'
+    ExtractedProjectFacts:
+      type: object
+      additionalProperties: false
+      required: [targetAudience, techStack]
+      properties:
+        targetAudience: { type: [string, 'null'], maxLength: 1000 }
+        techStack: { type: [string, 'null'], maxLength: 1000 }
     HeartbeatRequest:
       type: object
       additionalProperties: false

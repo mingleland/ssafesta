@@ -437,7 +437,8 @@ stable `asset://`만 허용하고 `asset://local`, binary/base64, `data:`, `blob
 
 ```json
 {
-  "expectedRevision": 8
+  "expectedRevision": 8,
+  "machineId": "arcade-01"
 }
 ```
 
@@ -446,9 +447,15 @@ stable `asset://`만 허용하고 `asset://local`, binary/base64, `data:`, `blob
   "gameId": 123,
   "publishedVersion": 5,
   "publishedAt": "2026-08-23T13:22:00Z",
+  "arcadeMachineId": "arcade-01",
   "warnings": []
 }
 ```
+
+`machineId` 는 **선택**이다. 없으면 오락실에 걸지 않고 게시만 하며 `arcadeMachineId` 가 `null` 이다.
+빈 문자열은 400 `VALIDATION_FAILED` 다 — 없는 것과 같이 취급하면 "자리를 고른 줄 알았는데 안 걸렸다"
+가 조용히 성립한다. 응답의 `arcadeMachineId` 는 **이번 호출이 잡은 자리**이고, `null` 이라고 해서 이
+게임에 자리가 없다는 뜻은 아니다(이전에 잡아 둔 자리는 그대로다).
 
 Publish는 다음 순서를 **단일 DB 트랜잭션**으로 수행한다.
 
@@ -457,8 +464,12 @@ Draft read
 → schema/상한/참조/소유권/Dialogue·Asset 정책 재검증
 → game_published_versions append
 → games.published_version pointer update
+→ (machineId 가 있으면) 오락실 자리 배정
 → commit
 ```
+
+**자리 배정이 거절되면 게시도 남지 않는다.** 둘을 나누면 "게시는 됐는데 자리는 못 잡은" 상태가
+생기고, 그것이 프라임 자리에 검은 캐비닛이 서는 모양이다 (GitLab #256 · #238).
 
 검증 실패 시 Published 행과 포인터 변경을 남기지 않는다. 성공 후에도 `game_drafts`를 삭제하지 않아
 제작자가 현재 Draft에서 계속 편집할 수 있게 한다. 기존 Published Version은 update하지 않는다.
@@ -605,7 +616,30 @@ Cache-Control: no-store
 - **`boothId` 가 없다.** 월드 고정물이라 임대·소유권 판정이 없다 — `BOOTH_LEASE_EXPIRED` 계열도
   이 경로에서는 나오지 않는다. 부스 경로(위 절)와 갈리는 지점이다.
 - `publishedVersion` 은 `playable: true` 일 때만 값이 있다.
-- 바인딩 행은 v1 에서 **운영자 시드 데이터**다. 관리자 UI 는 범위 밖이고 쓰기 endpoint 가 없다.
+- 바인딩 행에는 **주인이 있을 수도, 없을 수도 있다**(`S15P21A604-942`). 주인이 없는 행은 운영자가
+  걸어 둔 고정물(광장 오락기)이고, 주인이 있는 행은 사용자가 게시하면서 잡은 오락실 자리다.
+  해석 응답은 둘을 구별하지 않는다 — 기계 앞에 선 사람에게는 같은 질문이다.
+
+### 자리 배정 (`S15P21A604-942`, GitLab #256)
+
+사용자는 **게시하면서** 오락실 캐비닛을 고른다. 별도의 claim endpoint 는 없다 — 위 §Publish 의
+`machineId` 가 그 경로다.
+
+- 고를 수 있는 캐비닛은 **서버 설정의 화이트리스트**(`app.arcade.machine-ids`, 오락실 20대)다.
+  목록의 정본은 여전히 씬이지만(FR-017), 자리 배정만은 **없는 자리를 거절해야** 한다 — 통과시키면
+  아무도 갈 수 없는 자리에 게임이 걸린 채 한도만 먹는다. 목록에 없으면 404 `MACHINE_NOT_FOUND` 다.
+- **공개 게임만 자리를 잡는다.** 비공개인 채로 게시할 수 있으므로(§공개 설정 변경) 따로 막는다 —
+  403 `GAME_NOT_PUBLIC`. 그러지 않으면 비공개 전환은 자리를 비우는데 비공개인 채로 잡는 것만
+  허용되는 꼴이 된다.
+- **1인 최대 2대**(`app.arcade.seats-per-user`). 초과는 409 `ARCADE_SEAT_LIMIT` 다. 한도는 게임이
+  아니라 **잡은 사람**에게 묶인다 — 게임 소유자를 타고 세면 양도할 때 셈이 흔들린다. 주인이 없는
+  운영자 고정물은 누구의 한도에도 들어가지 않는다.
+- 남이 잡은 자리는 409 `ARCADE_MACHINE_TAKEN` 이다. 같은 게임이 같은 자리로 다시 게시하는 것은
+  **멱등**이다 — 회차를 올릴 때마다 자리를 다시 잡아야 한다면 그 사이에 남이 채 갈 수 있다.
+- **자리 이사는 없다.** 이미 자리를 가진 게임이 다른 `machineId` 로 게시하면 409
+  `ARCADE_ALREADY_SEATED` 다. 옮기려면 내렸다 다시 올리며 고른다.
+- **내리면 해제된다.** v1 에 게시 취소 endpoint 가 없으므로 해제 지점은 `visibility` PRIVATE 전환과
+  소프트 삭제 둘이다. 휴지통 게임의 자리를 남겨 두면 비어 보이는데 잡으면 이미 점유인 자리가 된다.
 - 회원 탈퇴는 그 회원 게임에 걸린 바인딩을 함께 지운다 (FR-040). 기계는 월드에 남고, 운영자가
   다시 걸기 전까지 그 기계는 `MACHINE_NOT_FOUND` 로 답한다.
 

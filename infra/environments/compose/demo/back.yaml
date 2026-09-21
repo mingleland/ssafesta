@@ -1,4 +1,7 @@
-# demo Backend. POSTGRES_*·REDIS_*·ROOT_DOMAIN·WORLD_* 는 COMPONENT_ENV_FILE(demo-back.env)이 정본이다.
+# demo Backend. POSTGRES_*·REDIS_*·ROOT_DOMAIN 은 COMPONENT_ENV_FILE(demo-back.env)이 정본이다.
+# WORLD_* 는 아래 environment 가 정본이다 — env-file 의 WORLD_HOST(world.<root>) 는 Production World 라
+# Demo 토큰이 거기서 INVALID_TOKEN 으로 거절됐다 (2026-09-20 실측, Batch 1). Demo World 는 demo.<root> 의
+# 루트 WebSocket Upgrade 로 들어간다 (demo.conf.template). dev/back.yaml 과 같은 방식.
 # 내부 서비스 토큰만 Jenkins Credentials 에서 프로세스 환경으로 들어온다.
 services:
   back:
@@ -19,6 +22,9 @@ services:
       FESTA_ENVIRONMENT: demo
       SPRING_PROFILES_ACTIVE: infra
       AI_INTERNAL_BASE_URL: http://ai:8000
+      WORLD_SCHEME: wss
+      WORLD_HOST: demo.${ROOT_DOMAIN:?ROOT_DOMAIN is required}
+      WORLD_PORT: "443"
       INTERNAL_SPRING_TO_AI_TOKENS: ${INTERNAL_SPRING_TO_AI_TOKENS:?INTERNAL_SPRING_TO_AI_TOKENS is required}
       INTERNAL_AI_TO_SPRING_TOKENS: ${INTERNAL_AI_TO_SPRING_TOKENS:?INTERNAL_AI_TO_SPRING_TOKENS is required}
       INTERNAL_INFRA_TO_SPRING_TOKENS: ${INTERNAL_INFRA_TO_SPRING_TOKENS:?INTERNAL_INFRA_TO_SPRING_TOKENS is required}

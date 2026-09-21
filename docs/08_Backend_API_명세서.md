@@ -273,6 +273,22 @@ React 와 Unity 가 같은 Access Token 을 나눠 쓰기 때문이다 — 유�
 - Coin Transaction 생성
 - Booth 연결
 
+#### 관리자 예외 — 무상·영구 (2026-09-18, spec 004 FR-022 · `S15P21A604-905`)
+
+호출자가 관리자면 같은 endpoint가 아래만 다르게 처리한다. 요청·응답 모양은 같다.
+
+| 항목 | 일반 회원 | 관리자 |
+|---|---|---|
+| 코인 | `app.lease.price-coin`(50) 차감 | **차감 없음.** `LEASE_PAYMENT` 원장 행을 만들지 않는다 (0 Coin 행도 남기지 않는다) |
+| 만료 | `app.lease.duration`(24시간) 뒤 | **없음.** `endsAt`이 `app.lease.admin-ends-at`(`2099-12-31T00:00:00Z`)이다 |
+| 활성 임대 수 | 1건 (`ux_booth_leases_active_lessee`) | **슬롯 수만큼.** 슬롯마다 부스가 하나씩 생긴다 |
+| 부스 권한 | 소유자·스태프 | **관리자 권한.** 강등되면 그 다음 요청부터 막히고, 현재 관리자는 누구나 접근한다 (FR-023). **마스터 보호를 적용하지 않는다** — 마스터가 설치한 관리자 부스도 다른 관리자가 조작한다. 마스터 **개인** 부스의 보호는 그대로다 |
+| 반납 후 | 부스와 콘텐츠 **보존** (FR-010) | **부스가 삭제된다** (FR-024) |
+
+슬롯당 활성 임대 1건(`ux_booth_leases_active_slot`)은 관리자에게도 그대로 적용된다 — 관리자 둘이 같은 슬롯을 가질 수 없다. `DELETE`(조기 반납)는 슬롯을 지목하므로 여러 개를 든 관리자도 그대로 쓴다.
+
+> ⚠️ **관리자 부스 반납은 파괴적이다.** 부스 행과 레이아웃·AI 에이전트·문서·프로젝트·설문이 함께 지워지고, **방문자가 남긴 설문 응답·방문 계측·상담 기록도 같이 사라진다.** `booths` 를 참조하는 15개 외래키에 cascade 가 하나도 없어 그것들을 남기는 삭제는 애초에 실행될 수 없다. 관리자 임대는 만료되지 않으므로 이 경로는 조기 반납에서만 일어난다. 회원 부스는 종전대로 전부 보존된다.
+
 #### Response
 
 ```json
@@ -298,6 +314,8 @@ React 와 Unity 가 같은 Access Token 을 나눠 쓰기 때문이다 — 유�
 
 내 Booth와 현재 Lease 조회. 응답에 **`homepageUrl`**(spec 016 신설)이 포함되며, 이쪽은 공개 여부와 무관하게 **항상 저장값**이다 — 미공개 상태에서도 스튜디오 폼을 프리필해야 하기 때문이다. 미등록이면 `null`.
 
+**관리자 부스는 제외된다** (2026-09-18, spec 004 FR-022 · `S15P21A604-905`). 관리자는 슬롯마다 부스를 하나씩 들 수 있어 "내 부스 하나"인 이 응답 모양에 담기지 않는다 — 관리자가 자기 부스를 찾을 때는 `GET /booth-slots`에서 `mine`이 `true`인 칸을 읽는다(그 응답이 슬롯마다 `boothId`를 함께 준다). 관리자가 일반 회원으로서 따로 임대한 부스가 있으면 그것은 여기에 그대로 나온다. **응답 스키마는 바뀌지 않았다** — FE·Unity 계약에 변경이 없다.
+
 ### GET `/booths/{boothId}`
 
 공개 가능한 Booth 기본 정보 조회.
@@ -316,7 +334,8 @@ React 와 Unity 가 같은 Access Token 을 나눠 쓰기 때문이다 — 유�
     "logoUrl": null
   },
   "publishedLayoutVersion": 4,
-  "homepageUrl": "https://my-team-project.example.com"
+  "homepageUrl": "https://my-team-project.example.com",
+  "handoffEnabled": false
 }
 ```
 
@@ -324,6 +343,10 @@ React 와 Unity 가 같은 Access Token 을 나눠 쓰기 때문이다 — 유�
   - **등록값이 없으면 그 부스 프로젝트의 `deployUrl`(서비스 주소)로 폴백한다** (2026-09-14 결정). `booths.homepage_url`은 등록 endpoint만 있고 **화면이 없어** 실서비스에서는 늘 비어 있었고, 소유자가 실제로 주소를 입력하는 칸은 프로젝트 관리의 "서비스 주소" 하나다. 우선순위는 **등록값 > 프로젝트 `deployUrl`** — 폴백은 빈 자리만 메우므로 등록 화면이 생기면 저절로 사라진다.
   - 둘 다 없으면 `null`이라 FE는 여전히 `null` 하나로 "미등록/미공개" 안내 분기를 끝낸다.
   - `GET /booths/mine`(소유자 프리필)에는 **폴백을 적용하지 않는다** — 등록한 적 없는 값을 폼에 채우면 소유자가 그것을 다시 저장해 한 주소가 두 컬럼으로 복제된다.
+- `handoffEnabled`: 이 부스가 **사람 상담 연결을 받는가** (2026-09-18 신설, `S15P21A604-914` · GitLab #249). 방문자 FE 는 이 값으로 AI 채팅의 '사람 상담 요청' 버튼을 **누르기 전에** 감춘다. 값은 소유자용 `GET /booths/{boothId}/agents` 의 `handoffEnabled` 와 항상 같다.
+  - **AI 직원이 없는 부스는 `false`** — 상담을 넘겨받을 사람이 없다는 뜻이다.
+  - **`homepageUrl` 과 달리 published 게이트가 없다** — 미공개 부스도 저장된 값 그대로 내려간다. 방문자는 미공개 부스에 진입 자체가 불가능하고, 이 값은 밖으로 나가는 주소가 아니라 boolean 하나다.
+  - FE 계약은 optional 이다 — 값이 없으면(구버전 서버) 버튼을 **유지**하고, 명시적 `false` 일 때만 숨긴다.
 - ⚠️ **회차 필드명은 endpoint마다 다르고 합치지 않는다** (2026-08-26 리드 확정, #97). 이 Booth 상세는 **`publishedLayoutVersion`**, Layout Draft 조회·Publish 결과는 **`publishedVersion`**이다.
 
 ### DELETE `/booth-slots/{slotId}/leases/mine` — spec 004 신설 (D12, 2026-09-14)
@@ -1345,12 +1368,17 @@ STOMP 연결용 **5분짜리** 토큰(FR-019·FR-020, C-14). → `201 { token, e
 엔드포인트  wss://<host>/ws/consultation     native WebSocket + STOMP, SockJS 없음 (C-05)
 구독        /user/queue/consultation              방문자 — 내 요청의 상태 변화
 /user/queue/booth-lease-expiry                    부스 운영자 — 임대 만료 1시간 전 알림
+/user/queue/coin                                  본인 — 코인 지급 (S15P21A604-920)
             /topic/booths/{boothId}/consultation  직원 — 그 부스 대기열 변화
 SEND        없다 — P1 은 서버에서 클라이언트로 가는 단방향 알림이고 행동은 전부 REST 다 (C-12)
 봉투        { type, requestId, occurredAt, … }
 ```
 
 방문자 `accepted`·`expired`·`ended` / 직원 `requested`·`cancelled`·`expired`·`taken`·`ended`. 종료는 양쪽으로 가며 종료를 호출한 직원 본인도 받는다 (2026-09-14, GitLab #133).
+
+코인 지급 알림(`/user/queue/coin`)의 봉투는 `{ type: "granted", entryId, amount, balanceAfter, reasonType, referenceType, referenceId, occurredAt }` 이며, 지급 종류는 `reasonType` 으로 가른다(`INITIAL_GRANT` 최초 지급 · `DAILY_GRANT` 일일 접속 · `DAILY_MISSION` 미션 달성 — 어느 미션인지는 `referenceId`). 차감은 발행하지 않는다. 전체 표는 `docs/16` §8 이 정본이다.
+
+**이 큐는 저지연 힌트이고 정본은 원장이다** (S15P21A604-923). 구독 전에 발행된 지급은 도착하지 않는다 — 가입 지급(`INITIAL_GRANT`)은 항상, 일일 지급(`DAILY_GRANT`)은 그날 첫 접속에서 그렇다. 서버는 재전송하지 않으며 회수 경로는 `GET /api/v1/wallets/me/transactions` 다. 소비자는 **구독 → REST 조회 → 조회 중 도착분 버퍼링 → 원장 id 로 중복 제거** 순서를 지키고, 재연결 때도 반복한다. STOMP `entryId`(문자열)와 REST `id`(숫자)는 같은 항목이므로 문자열로 정규화해 비교한다. 자세한 계약은 `docs/16` §8 이다.
 
 > **이벤트 재전송은 P1 에 없다.** 끊긴 사이의 변화는 유실되고 클라이언트는 재연결 직후 대기열과 요청 상태를 REST 로 다시 읽는다. **정본은 REST 이고 STOMP 는 알림이다.**
 
@@ -1668,6 +1696,13 @@ Game Studio는 Unity 미니게임 API와 분리한다. Spring은 GameProject의 
 - Draft 저장은 구조·schema·상한을 검증하고, Publish는 참조·소유권·Asset·Dialogue 의미를 다시 검증한다.
 - Publish는 Draft read→검증→`game_published_versions` append→`games.published_version` 갱신을
   단일 트랜잭션으로 처리하며 Draft와 기존 발행본은 유지한다.
+- **Publish 요청은 `machineId`(선택)로 오락실 캐비닛을 함께 고를 수 있고, 응답이 `arcadeMachineId`
+  를 돌려준다** (`S15P21A604-942`, GitLab #256). 자리 배정도 같은 트랜잭션이라 자리가 거절되면
+  게시도 남지 않는다. 공개 게임만 자리를 잡고(403 `GAME_NOT_PUBLIC`), 1인 2대까지이며
+  (409 `ARCADE_SEAT_LIMIT`), 남의 자리는 409 `ARCADE_MACHINE_TAKEN`, 이미 자리를 가진 게임의
+  다른 자리 요청은 409 `ARCADE_ALREADY_SEATED`, 화이트리스트에 없는 캐비닛은 404
+  `MACHINE_NOT_FOUND` 다. `visibility` PRIVATE 전환과 소프트 삭제가 자리를 비운다. 계약 정본은
+  `specs/019-game-studio/contracts/game-api.md` §Publish · §Arcade Machine Resolution 이다.
 - GameProject에는 Asset binary·브라우저 임시 URL을 저장하지 않는다. builtin Asset catalog(`builtin://`)
   외에 **사용자 업로드(`asset://`)를 지원한다** — 아래 Asset Upload 절이 그 계약이다.
 - 사용자 Asset 업로드: `POST /api/v1/games/{gameId}/assets` (grant 발급) →
@@ -1732,11 +1767,21 @@ Asset 업로드는 [`contracts/game-asset-upload.md`](../specs/019-game-studio/c
 
 ### POST `/admin/booths/{boothId}/unpublish`
 
-부스의 현재 공개 배치 포인터를 즉시 해제한다 (`S15P21A604-742` #40). 본문은 `{ "reason": "사유" }`이며 사유는 1~500자로 필수다. → `204 No Content`.
+부스를 방문자에게서 내리고 **그 자리까지 회수한다** (`S15P21A604-742` #40, 회수는 `S15P21A604-927`). 본문은 `{ "reason": "사유" }`이며 사유는 1~500자로 필수다. → `204 No Content`.
 
-Draft와 공개 회차 이력은 삭제하지 않는다. 방문자·Unity 공개 배치 조회만 즉시 `404 LAYOUT_NOT_PUBLISHED`가 되며, 임대·코인·부스 콘텐츠에도 영향을 주지 않는다. 이미 비공개면 `204` no-op이고 감사 행도 더 만들지 않는다. 성공만 `admin_actions`에 `BOOTH_UNPUBLISH`·`BOOTH`·사유를 남긴다.
+**자리를 함께 비우는 이유** — 공개 포인터만 해제하면 임대가 살아 있어 `GET /booth-slots`가 그 슬롯을 계속 `OCCUPIED`로 보고한다. 관리자 화면이 그 목록을 읽으므로 조치를 해도 아무 변화가 보이지 않았다. 처리 직후 슬롯은 `AVAILABLE`이 되고, 임차인의 활성 임대 한도(D01)도 풀려 다른 자리를 바로 빌릴 수 있다. **엔드포인트는 이것 하나다** — 회수 전용 URL은 없다.
 
-오류: `400 VALIDATION_FAILED`(사유 누락·길이 초과) · `403 FORBIDDEN`(관리자 아님) · `403 MASTER_PROTECTED`(마스터 소유 부스) · `404 BOOTH_NOT_FOUND`.
+**부스 콘텐츠는 보존된다.** Draft·공개 회차 이력·프로젝트·설문·AI 문서가 그대로 남는다 — 임차인이 직접 반납한 것과 같은 경로이고 spec 004 FR-010 그대로다. 다시 임대하면 Draft부터 이어진다(D08). **관리자 자신이 임차한 부스만 예외로 삭제된다**(`S15P21A604-905` — 그 부스는 원래 반납과 함께 사라지는 구조다).
+
+**코인은 환불되지 않는다** (spec 004 D06을 이 경로까지 적용). 임차인의 잔액은 변하지 않는다.
+
+⚠️ **방문자 거절 사유가 바뀐다.** 이전에는 공개 배치 조회가 `404 LAYOUT_NOT_PUBLISHED`였다. 자리까지 비우므로 이제 **`409 BOOTH_LEASE_EXPIRED`**다 — 클라이언트는 둘 다 "입장 불가"로 처리한다.
+
+임대가 없는 부스(이미 만료됨)는 공개 포인터만 내린다. 이미 비공개이고 임대도 없으면 `204` no-op이고 감사 행도 더 만들지 않는다. 감사는 두 줄로 남는다: 게시본을 내렸으면 `BOOTH_UNPUBLISH`, 자리를 회수했으면 `BOOTH_LEASE_RELEASE` — 둘 다 `BOOTH`·대상 부스·사유다.
+
+마스터 계정 소유 부스는 `403 MASTER_PROTECTED`다. 단 **마스터가 설치한 관리자 부스는 대상이 된다** — 관리자 부스는 사람이 아니라 권한을 따라간다(`S15P21A604-905`).
+
+오류: `400 VALIDATION_FAILED`(사유 누락·길이 초과) · `403 FORBIDDEN`(관리자 아님) · `403 MASTER_PROTECTED`(마스터 개인 소유 부스) · `404 BOOTH_NOT_FOUND`.
 
 ### GET `/admin/event-surveys/{surveyKey}/entrants?page=0&size=20`
 
