@@ -223,6 +223,18 @@ grep -q 'intake-unity-release-bundle.sh' "${develop_pipeline}" \
   || fail "develop pipeline does not take game artifacts from the Unity Release Bundle"
 grep -q 'WAITING_FOR_UNITY_ARTIFACT' "${develop_pipeline}" \
   || fail "develop pipeline must wait (not build) when no game artifact exists"
+# 자동 탐색이 번들을 못 찾을 때 운영자가 source commit 을 지정하는 경로. 읽기만 하고 선언이 없으면 항상 빈 값이다 (#259).
+grep -q "params.UNITY_ARTIFACT_CANDIDATE" "${develop_pipeline}" \
+  || fail "develop pipeline does not accept an explicit Unity artifact candidate"
+grep -q "string(name: 'UNITY_ARTIFACT_CANDIDATE'" "${jenkinsfile}" \
+  || fail "Jenkinsfile does not declare the Unity artifact candidate parameter"
+# 배포를 유발한 push 가 실패하고 develop 이 그 앞으로 지나가면 game 배포 트리거가 사라진다 (#259).
+grep -q "booleanParam(name: 'DEPLOY_GAME_TO_DEMO'" "${jenkinsfile}" \
+  || fail "Jenkinsfile does not declare the explicit game deploy parameter"
+grep -q 'final boolean forceGameDeploy' "${develop_pipeline}" \
+  || fail "develop pipeline cannot open the game path without a fresh game diff"
+grep -q "final boolean deployGame = selectedDeploy.contains('game') || forceGameDeploy" "${develop_pipeline}" \
+  || fail "explicit game deploy must go through the same deployGame gate"
 grep -q 'image-transfer-init' "${agent_compose}" \
   || fail "shared image transfer volume has no ownership initializer"
 grep -q "branch != 'develop'" "${jenkinsfile}" \
