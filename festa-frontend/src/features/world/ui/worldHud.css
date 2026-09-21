@@ -86,8 +86,14 @@
   right: var(--festa-hud-margin-x);
 }
 /* 조작 안내 버튼 — 전체화면과 같은 규격(.world-hud-control)이고 자리만 우하단이다.
-   top 을 auto 로 끊지 않으면 base 의 top 이 이긴다. */
+   top 을 auto 로 끊지 않으면 base 의 top 이 이긴다.
+
+   `right` 를 여기서 직접 적는다. -911 리팩터 전에는 이 버튼이 `.world-hud-fullscreen` 을 함께
+   달아 그쪽 `right` 를 빌려 썼는데, 공통 규격을 `.world-hud-control` 로 빼면서 클래스가 갈렸고
+   그때 이 한 줄이 같이 떨어져 나갔다. 가로 자리를 아무도 안 정하면 absolute 요소는 static 위치,
+   즉 **왼쪽 끝**으로 간다 — 화면에서는 채팅 위를 덮는 모양이 된다. */
 .world-hud-guide {
+  right: var(--festa-hud-margin-x);
   top: auto;
   bottom: var(--festa-hud-margin-y);
 }
