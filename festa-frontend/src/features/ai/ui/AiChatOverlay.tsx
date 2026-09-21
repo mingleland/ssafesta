@@ -59,6 +59,10 @@ export function AiChatOverlay({ payload }: Props) {
   // 슬롯 번호처럼 읽힌다(S15P21A604-823). 방문자도 부를 수 있는 GET /booths/{id} 로 이름을 얻는다.
   // 실패하면 조용히 이름 없이 '부스'로만 둔다(제목 장식이라 대화 흐름을 막지 않는다).
   const [boothName, setBoothName] = useState<string | null>(null);
+  // 사람 상담 연결 허용 여부 (S15P21A604-910). handoffEnabled === false 인 부스에서만 상담 버튼을
+  // 숨긴다 — 값 로딩 전·undefined(구버전 서버)·getBooth 실패는 버튼을 유지한다(무해 degrade, -914 계약).
+  // 조용히 기본값으로 감추면 정상 부스에서 상담 진입이 사라진다(CLAUDE.md 실패처리 규칙).
+  const [handoffEnabled, setHandoffEnabled] = useState<boolean | undefined>(undefined);
   const [turns, setTurns] = useState<Turn[]>([]);
   const [draft, setDraft] = useState('');
   const [busy, setBusy] = useState(false);
@@ -95,7 +99,10 @@ export function AiChatOverlay({ payload }: Props) {
     void facadeApi
       .getBooth(payload.boothId)
       .then((booth) => {
-        if (alive) setBoothName(booth.name);
+        if (alive) {
+          setBoothName(booth.name);
+          setHandoffEnabled(booth.handoffEnabled);
+        }
       })
       .catch(() => {});
     return () => {
@@ -226,24 +233,28 @@ export function AiChatOverlay({ payload }: Props) {
       onClose={closeOverlay}
       status={
         <span className="ov-note">
-          {isMember
-            ? '원하는 답을 못 찾으면 사람 상담을 요청할 수 있습니다'
-            : 'AI 직원과의 대화는 소셜 로그인 회원만 이용할 수 있습니다'}
+          {!isMember
+            ? 'AI 직원과의 대화는 소셜 로그인 회원만 이용할 수 있습니다'
+            : handoffEnabled !== false
+              ? '원하는 답을 못 찾으면 사람 상담을 요청할 수 있습니다'
+              : ''}
         </span>
       }
       footer={
         isMember ? (
           <>
-            <Tooltip content={consultationInProgress ? '이미 진행 중인 상담이 있습니다' : null}>
-              <button
-                type="button"
-                className="ov-btn ai-escalate"
-                disabled={consultationInProgress}
-                onClick={escalateToHuman}
-              >
-                사람 상담 요청
-              </button>
-            </Tooltip>
+            {handoffEnabled !== false && (
+              <Tooltip content={consultationInProgress ? '이미 진행 중인 상담이 있습니다' : null}>
+                <button
+                  type="button"
+                  className="ov-btn ai-escalate"
+                  disabled={consultationInProgress}
+                  onClick={escalateToHuman}
+                >
+                  사람 상담 요청
+                </button>
+              </Tooltip>
+            )}
             <form
               className="ai-composer"
               onSubmit={(e) => {
