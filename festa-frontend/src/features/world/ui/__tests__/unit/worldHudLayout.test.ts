@@ -11,6 +11,11 @@ const chat = read('src/features/worldChat/ui/worldChat.css');
 const toast = read('src/shared/ui/toast/toast.css');
 const exit = read('src/features/world/ui/boothExitButton.css');
 
+// 선택자 하나의 블록만 떼어 본다. `hud` 전체에 대고 확인하면 **다른 규칙이 가진 값**으로도
+// 통과한다 — 조작 안내가 `right` 를 잃고 왼쪽 끝으로 갔을 때 이 파일이 green 이던 이유다.
+const blockOf = (css: string, selector: string) =>
+  css.slice(css.indexOf(selector + ' {')).split('}')[0];
+
 describe('World HUD layout contract', () => {
   // 조작 안내 카드는 2026-09-16 에 HUD 에서 걷었다(ESC 메뉴 오버레이로 이동). 좌하단은 채팅만
   // 쓰지만, 하단 중앙 Exit 은 여전히 채팅 높이를 피해야 하므로 그 연결은 그대로 잠근다.
@@ -23,10 +28,12 @@ describe('World HUD layout contract', () => {
 
   it('우상단은 상담·전체화면, 상단 중앙은 Toast, 하단 중앙은 클릭형 Exit으로 분리한다', () => {
     // 우상단은 한 줄이다 — 상담이 왼쪽 칸, 전체화면이 오른쪽 끝이다(2026-09-16)
-    expect(hud).toContain("right: var(--festa-hud-margin-x);");
-    // 조작 안내는 우하단이다 — 전체화면과 같은 규격, 자리만 아래다
-    expect(hud).toContain('.world-hud-guide');
-    expect(hud).toContain('bottom: var(--festa-hud-margin-y);');
+    expect(blockOf(hud, '.world-hud-fullscreen')).toContain('right: var(--festa-hud-margin-x);');
+    // 조작 안내는 우하단이다 — 가로·세로 **둘 다** 자기 블록에서 잡아야 한다. 하나라도 비면
+    // absolute 가 static 위치로 떨어져 왼쪽 끝에 붙는다.
+    const guide = blockOf(hud, '.world-hud-guide');
+    expect(guide).toContain('right: var(--festa-hud-margin-x);');
+    expect(guide).toContain('bottom: var(--festa-hud-margin-y);');
     expect(toast).toContain('.world-active .toast-host');
     expect(toast).toContain('left: 50%;');
     expect(exit).toContain('bottom: var(--festa-hud-context-bottom);');
