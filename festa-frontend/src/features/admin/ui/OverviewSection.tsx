@@ -23,7 +23,7 @@ export function OverviewSection() {
         <div className="ad-stats">
           <Stat to="/app/admin/shop" value={dash(pending, () => pending.data!.totalElements)} label="경품 지급 대기" />
           <Stat to="/app/admin/shop" value={dash(purchased, () => purchased.data!.totalElements)} label="구매 완료 · 미처리" />
-          <Stat to="/app/admin/booths" value={dash(booths, () => booths.data!.filter((b) => b.entryAvailable).length)} label="게시 중인 부스" />
+          <Stat to="/app/admin/booths" value={dash(booths, () => booths.data!.filter((b) => b.published).length)} label="공개 중인 관리자 부스" />
           <Stat to="/app/admin/surveys" value={dash(surveys, () => surveys.data!.reduce((n, s) => n + s.entrantCount, 0))} label="공식 설문 참여자" />
           <Stat to="/app/admin/admins" value={dash(admins, () => admins.data!.length)} label="관리자" />
         </div>

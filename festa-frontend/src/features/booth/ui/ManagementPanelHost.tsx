@@ -25,10 +25,15 @@ function PanelBody({ panel }: { panel: ManagementPanel }) {
   }
 }
 
-export function ManagementPanelHost({ panel, onClose }: { panel: ManagementPanel; onClose: () => void }) {
+export function ManagementPanelHost({ panel, onClose, chrome = 'overlay' }: {
+  panel: ManagementPanel;
+  onClose: () => void;
+  /** `inline` 은 이미 떠 있는 화면 안에 본문만 놓는다 — 관리자 콘솔이 쓴다 (S15P21A604-951) */
+  chrome?: 'overlay' | 'inline';
+}) {
   return (
-    <ManagementSurfaceProvider value={{ panel, onClose }}>
-      {/* 넷 다 ManagementScreen 이 OverlayFrame 을 씌운다 */}
+    <ManagementSurfaceProvider value={{ panel, onClose, chrome }}>
+      {/* 넷 다 ManagementScreen 이 표면에 맞는 껍데기를 씌운다 */}
       <PanelBody panel={panel} />
     </ManagementSurfaceProvider>
   );
