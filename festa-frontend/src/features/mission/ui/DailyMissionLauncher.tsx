@@ -3,10 +3,15 @@ import { useSession } from '../../auth/model/session';
 import { openMenuPanelScreen } from '../../world/model/worldScreen';
 import { Tooltip } from '../../../shared/ui/tooltip/Tooltip';
 
+// checklist 메모장형 — 확정 시안 A(2026-09-18). 메모 프레임 안에 체크 2줄 + 밑줄.
 const IcMission = (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-    <path d="M9 6h10M9 12h10M9 18h10" />
-    <path d="m3.5 6 1.5 1.5L7.5 5M3.5 12 5 13.5l2.5-2.5M3.5 18 5 19.5l2.5-2.5" />
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <rect x="4" y="3" width="16" height="18" rx="2" />
+    <path d="M7.5 7.2l1.3 1.3 2.2-2.3" />
+    <path d="M13.5 7h3" />
+    <path d="M7.5 12.2l1.3 1.3 2.2-2.3" />
+    <path d="M13.5 12h3" />
+    <path d="M7.5 17h9" />
   </svg>
 );
 
