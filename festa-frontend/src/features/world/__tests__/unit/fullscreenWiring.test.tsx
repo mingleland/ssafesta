@@ -3,7 +3,7 @@
 //
 // 월드 입장에서 자동으로 걸지 않는다. 요청하지 않은 전체화면은 화면이 갑자기 바뀌는 것으로만 보인다.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { act, cleanup, fireEvent, render } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { WorldHud } from '../../ui/WorldHud';
 import type { UnityInstance, UnityProgressListener } from '../../../../unity/host/types';
 
@@ -33,27 +33,27 @@ afterEach(() => {
 });
 
 describe('HUD 전체화면 토글 (-733)', () => {
-  function toggle(container: HTMLElement) {
-    return container.querySelector('.world-hud-fullscreen') as HTMLButtonElement;
+  function toggle() {
+    return screen.getByRole('button', { name: /전체화면/ });
   }
 
   it('우상단에 상시 있다 — 나갈 방법이 화면에 없으면 안 된다', () => {
-    const { container } = render(<WorldHud />);
-    expect(toggle(container)).not.toBeNull();
+    render(<WorldHud />);
+    expect(toggle()).not.toBeNull();
   });
 
   it('누르면 전체화면을 요청한다', () => {
-    const { container } = render(<WorldHud />);
-    fireEvent.click(toggle(container));
+    render(<WorldHud />);
+    fireEvent.click(toggle());
     expect(request).toHaveBeenCalledTimes(1);
   });
 
   it('아이콘 상태는 브라우저를 따라간다 — FE state 가 아니다', () => {
-    const { container } = render(<WorldHud />);
-    expect(toggle(container).getAttribute('aria-pressed')).toBe('false');
+    render(<WorldHud />);
+    expect(toggle().getAttribute('aria-pressed')).toBe('false');
     Object.defineProperty(document, 'fullscreenElement', { value: document.body, configurable: true });
     act(() => { document.dispatchEvent(new Event('fullscreenchange')); });
-    expect(toggle(container).getAttribute('aria-pressed')).toBe('true');
+    expect(toggle().getAttribute('aria-pressed')).toBe('true');
   });
 });
 

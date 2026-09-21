@@ -96,6 +96,24 @@ public class EventShopService {
         if (!prize.isActive()) {
             throw new ApiException(ErrorCode.EVENT_PRIZE_INACTIVE);
         }
+        // The deadline is enforced here, not only in the sweeper that flips `active`. The sweeper
+        // runs on an interval, so between the deadline and the next pass the prize is still
+        // active — without this check those seconds would sell entries into a closed raffle.
+        Instant now = Instant.now();
+        if (prize.isClosedAt(now)) {
+            throw new ApiException(ErrorCode.EVENT_PRIZE_CLOSED);
+        }
+        if (prize.isRaffle()) {
+            if (quantity != 1) {
+                throw ApiException.fieldInvalid("quantity", "응모는 1장만 가능합니다.");
+            }
+            // Safe as a plain check-then-act: wallets.lockOwner above serializes this member's
+            // requests, so a second concurrent entry cannot slip past between the read and the
+            // insert. Two *different* members racing is fine — they get separate rows.
+            if (purchases.existsByPrizeIdAndBuyerUserId(prizeId, userId)) {
+                throw new ApiException(ErrorCode.EVENT_PRIZE_ALREADY_ENTERED);
+            }
+        }
         if (!prize.reserve(quantity)) {
             throw new ApiException(ErrorCode.EVENT_PRIZE_OUT_OF_STOCK);
         }
@@ -104,7 +122,6 @@ public class EventShopService {
         LedgerResult result = wallets.spend(new CoinSpendCommand(userId, coinSpent, CoinReason.PRIZE_PURCHASE,
                 CoinReason.EVENT_PRIZE_REFERENCE_TYPE, prizeId.toString(), idempotencyKey));
 
-        Instant now = Instant.now();
         EventPurchase saved = purchases.save(new EventPurchase(prizeId, userId, quantity, coinSpent,
                 validRecipient, result.entryId(), idempotencyKey, now));
 
@@ -141,10 +158,15 @@ public class EventShopService {
         return CoinReason.PRIZE_PURCHASE + ":" + userId + ":" + operationId;
     }
 
-    public record PrizeView(Long prizeId, String name, int priceCoin, Integer stock, boolean active) {
+    /**
+     * {@code winnerCount} above zero marks an entry rather than a purchase — coins buy a chance and
+     * the draw happens after {@code closesAt}. The screen needs both to say so honestly.
+     */
+    public record PrizeView(Long prizeId, String name, int priceCoin, Integer stock, boolean active,
+                            Instant closesAt, int winnerCount) {
         static PrizeView of(EventPrize prize) {
             return new PrizeView(prize.getId(), prize.getName(), prize.getPriceCoin(), prize.getStock(),
-                    prize.isActive());
+                    prize.isActive(), prize.getClosesAt(), prize.getWinnerCount());
         }
     }
 

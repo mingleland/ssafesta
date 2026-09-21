@@ -6,7 +6,9 @@
 #   target: environment | game | ai | back | front | webgl
 #   environment 는 그 시점 demo 전체 조합(ai·back·front·game)을 한 번에 승격한다
 #   — 사람이 확인한 것은 컴포넌트 하나가 아니라 통합 상태다 (spec §Session 2026-09-18 규칙 4·9).
-#   expected-release-id 는 오타 방지용 이중 확인 — 지정하면 CURRENT 의 releaseId 와 일치해야 한다.
+#   expected-release-id 는 오타 방지용 이중 확인 — 컴포넌트 대상은 CURRENT 의 releaseId, environment 대상은
+#   조합의 batchId 와 일치해야 한다 (Batch 1: 컴포넌트별 releaseId 는 서로 달라도 되고, 조합의 canonical ID 는
+#   batchId 하나다. batchId 는 컴포넌트 identity 로부터 결정적으로 만들어지므로 같은 조합은 항상 같은 id 다).
 #
 # 환경변수:
 #   GAME_DEPLOY_STATE_DIR       game 대상일 때 필수 (예: /var/lib/festa-environments/demo/game)
@@ -90,6 +92,14 @@ if not components:
     raise SystemExit('승격할 CURRENT 조합이 없다')
 
 fingerprint = {name: value.get('imageRef') for name, value in components.items()}
+# 조합의 canonical ID. 컴포넌트 releaseId 가 서로 달라도(부분 배포) 조합 하나를 가리키는 값이며,
+# Production receipt 의 demoReleaseId 가 이것을 가리킨다.
+import hashlib
+batch_id = 'demo-env-' + hashlib.sha256('\n'.join(
+    f"{name}={components[name].get('imageRef')}@{components[name].get('contentId')}" for name in sorted(components)
+).encode('utf-8')).hexdigest()[:16]
+if expected and expected != batch_id:
+    raise SystemExit(f'batchId 불일치: expected={expected}, actual={batch_id}')
 
 # 같은 조합을 담은 이력 항목의 검증 상태를 올린다 (규칙 7). 이력은 retention 정리에서도 보호된다.
 approved_from = None
@@ -112,12 +122,10 @@ if history_root.is_dir():
             approved_from = meta.get('releaseId') or entry.name
             break
 
-if expected and approved_from and expected != approved_from:
-    raise SystemExit(f'releaseId 불일치: expected={expected}, history={approved_from}')
-
 document = {
     'schemaVersion': '1.0.0',
     'state': 'KNOWN_GOOD',
+    'batchId': batch_id,
     'approvedAt': datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0).isoformat().replace('+00:00', 'Z'),
     'approvedBy': approved_by or None,
     'approvedFromHistory': approved_from,
@@ -128,7 +136,7 @@ temporary.write_text(json.dumps(document, indent=2) + '\n', encoding='utf-8')
 temporary.replace(target_path)
 
 summary = ' '.join(f'{name}={value.get("imageRef")}' for name, value in sorted(components.items()))
-print(f'APPROVED_KNOWN_GOOD: target=environment {summary}')
+print(f'APPROVED_KNOWN_GOOD: target=environment batchId={batch_id} {summary}')
 PY
   exit 0
 fi

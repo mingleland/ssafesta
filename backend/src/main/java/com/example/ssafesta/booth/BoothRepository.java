@@ -1,6 +1,7 @@
 package com.example.ssafesta.booth;
 
 import jakarta.persistence.LockModeType;
+import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
@@ -47,6 +48,25 @@ public interface BoothRepository extends JpaRepository<Booth, Long> {
      * partial on the same predicate, so the database enforces exactly what this signature promises.
      */
     Optional<Booth> findByOwnerUserIdAndAdminOwnedFalse(Long ownerUserId);
+
+    /**
+     * Every administrator booth on the floor (S15P21A604-933).
+     *
+     * <p>Not scoped to one administrator: the booth follows the <b>role</b> rather than the person
+     * who set it up (FR-023), so the console shows them all and any administrator may take one over.
+     */
+    List<Booth> findByAdminOwnedTrue();
+
+    /**
+     * The administrator's most recently taken booth (S15P21A604-905 의 핫픽스).
+     *
+     * <p>{@code findFirst}, not {@code Optional} on the bare predicate: one administrator holds one
+     * per slot, so the plain derived query would throw exactly the way
+     * {@link #findByOwnerUserIdAndAdminOwnedFalse} explains. Newest first, because that is the booth
+     * they just leased and are looking at. The row only exists while the lease does — a returned
+     * administrator booth is deleted outright.
+     */
+    Optional<Booth> findFirstByOwnerUserIdAndAdminOwnedTrueOrderByIdDesc(Long ownerUserId);
 
     Optional<Booth> findByCurrentSlotId(Long currentSlotId);
 }

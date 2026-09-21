@@ -41,6 +41,23 @@
   color: rgba(234, 238, 251, 0.6);
 }
 
+/* 조작 안내 오버레이(ESC 메뉴) — 그룹 헤더 아래 2열 배치. 420px 프레임 안에서
+   [W][A][S][D] 이동 같은 넓은 항목도 한 칸에 들어오도록 minmax(0,1fr) 로 둔다. */
+.cg-root { display: flex; flex-direction: column; gap: 18px; }
+.cg-group { margin: 0; }
+.cg-title {
+  margin: 0 0 10px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: rgba(234, 238, 251, 0.55);
+}
+.cg-group .world-hud-keys {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px 16px;
+}
+
 .world-hud-fullscreen {
   position: absolute;
   /* 전체화면 토글 (S15P21A604-733). 상담 퀵액세스와 우상단 한 줄에 나란히 서고, 오른쪽 끝은
@@ -64,6 +81,12 @@
 .world-hud-fullscreen svg { width: 48%; height: 48%; }
 .world-hud-fullscreen:hover { background: rgba(20, 26, 52, 0.85); }
 .world-hud-fullscreen:focus-visible { outline: 2px solid rgba(255, 255, 255, 0.9); outline-offset: 2px; }
+/* 조작 안내 버튼 — 전체화면과 같은 규격(크기·모서리·테두리·배경은 위 클래스 그대로)이고
+   자리만 우하단이다. top 을 auto 로 끊지 않으면 위 클래스의 top 이 이긴다. */
+.world-hud-guide {
+  top: auto;
+  bottom: var(--festa-hud-margin-y);
+}
 @media (prefers-reduced-transparency: reduce) {
   .world-hud-fullscreen { background: #10142a; backdrop-filter: none; }
 }

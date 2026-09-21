@@ -29,6 +29,8 @@ export const MOCK_BOOTH_CLOSED = 4;
 export const MOCK_BOOTH_SUBMIT_FAIL = 5;
 /** 결과 조회가 실패하는 부스 */
 export const MOCK_BOOTH_RESULT_FAIL = 6;
+/** 설문이 아직 없는 부스 — 결과 탭이 404 SURVEY_NOT_FOUND 를 정상 상태로 다루는지 보는 시나리오 */
+export const MOCK_BOOTH_NO_SURVEY = 9;
 /** 보상이 걸린 설문 — 게스트 차단 안내 확인용 */
 export const MOCK_BOOTH_REWARDED = 7;
 /**
@@ -121,6 +123,7 @@ export const surveyMockPort: SurveyPort = {
   async getResult(boothId: number): Promise<SurveyResultSnapshot> {
     const surveyId = surveyIdOf(boothId);
     if (boothId === MOCK_BOOTH_RESULT_FAIL) throw apiError('UNKNOWN', '일시적인 오류입니다.');
+    if (boothId === MOCK_BOOTH_NO_SURVEY) throw apiError('SURVEY_NOT_FOUND', '설문을 찾을 수 없습니다.');
     if (boothId === MOCK_BOOTH_EMPTY || boothId === MOCK_BOOTH_NEW) {
       // 응답 0건이어도 문항은 다 실려 온다(계약 §7) — 빈 판정은 totalResponses 가 한다
       return {

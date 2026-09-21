@@ -19,6 +19,8 @@ from dataclasses import dataclass
 
 import httpx
 
+from app.services.context_service import ExtractedProjectFacts
+
 
 class SpringDocumentResultUnavailable(RuntimeError):
     """일시적 네트워크 실패이거나 예상치 못한 응답이다."""
@@ -114,15 +116,22 @@ class SpringDocumentResultClient:
         source_hash: str,
         total_chunk_count: int,
         embedding_model_id: str,
+        project_facts: ExtractedProjectFacts | None = None,
     ) -> None:
+        body: dict[str, object] = {
+            "attemptNo": attempt_no,
+            "sourceHash": source_hash,
+            "totalChunkCount": total_chunk_count,
+            "embeddingModelId": embedding_model_id,
+        }
+        if project_facts is not None:
+            body["projectFacts"] = {
+                "targetAudience": project_facts.target_audience,
+                "techStack": project_facts.tech_stack,
+            }
         await self._post(
             f"/document-jobs/{job_id}/finalize",
-            {
-                "attemptNo": attempt_no,
-                "sourceHash": source_hash,
-                "totalChunkCount": total_chunk_count,
-                "embeddingModelId": embedding_model_id,
-            },
+            body,
         )
 
     async def heartbeat(self, *, job_id: int, attempt_no: int) -> None:

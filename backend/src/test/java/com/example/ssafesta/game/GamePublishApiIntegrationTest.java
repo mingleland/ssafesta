@@ -96,7 +96,7 @@ class GamePublishApiIntegrationTest {
         Owner owner = ownerWithBrokenDraft("롤백");
 
         assertThrows(GameValidationFailedException.class,
-                () -> publishService.publish(owner.gameId(), owner.userId(), 1));
+                () -> publishService.publish(owner.gameId(), owner.userId(), 1, null));
 
         assertEquals(0, published.highestVersionNo(owner.gameId()));
         assertEquals(null, games.findById(owner.gameId()).orElseThrow().getPublishedVersion());

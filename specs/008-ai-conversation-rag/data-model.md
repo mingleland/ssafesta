@@ -42,6 +42,16 @@
 
 `documentId`, `chunkNo`, `pageNumber`, `section`, `originalFilename`, `content`, cosine `distance`를 가진다. Spring query와 FastAPI Context Builder가 Scope 일치를 각각 확인한다. `content`는 로그·SSE source에 기록하지 않는다.
 
+## ProjectFacts — Spring 영구 정보
+
+| 필드 | 형식 | 규칙 |
+|---|---|---|
+| `introduction` | string/null | Spring의 프로젝트 소개를 사용한다 |
+| `targetAudience` | string/null | 문서 처리 시 AI가 명시 근거에서 추출한다 |
+| `techStack` | string/null | 문서 처리 시 AI가 명시 근거에서 추출한다 |
+
+FastAPI는 값을 계산·소비할 뿐 영구 저장하지 않는다. 이전 Spring과의 순차 배포를 위해 Agent 설정 응답에서 `projectFacts` 자체가 없거나 `null`인 경우도 허용한다.
+
 ## StreamAttempt — 요청 수명 객체
 
 `requestId`, `conversationId`, `messageId`, `sequence`, `startedAt`, `firstTokenAt`, `terminalType`, `timeoutPhase`를 가진다. Redis에 실패 원문을 저장하지 않으며 관측에는 식별자·지연·오류 코드만 남긴다.

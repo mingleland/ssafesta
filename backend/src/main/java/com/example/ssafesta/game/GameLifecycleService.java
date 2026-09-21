@@ -27,8 +27,9 @@ public class GameLifecycleService {
     private final ArcadeMachineBindingRepository bindings;
     private final GameAccessGuard guard;
     private final GameProperties properties;
+    private final ArcadeSeatService seats;
 
-    public GameLifecycleService(GameRepository games, GameDraftRepository drafts,
+    public GameLifecycleService(ArcadeSeatService seats, GameRepository games, GameDraftRepository drafts,
                                 GamePublishedVersionRepository published, GameAssetRepository assets,
                                 ArcadeMachineBindingRepository bindings, GameAccessGuard guard,
                                 GameProperties properties) {
@@ -39,6 +40,7 @@ public class GameLifecycleService {
         this.bindings = bindings;
         this.guard = guard;
         this.properties = properties;
+        this.seats = seats;
     }
 
     /**
@@ -74,6 +76,12 @@ public class GameLifecycleService {
     public GameSummary changeVisibility(Long gameId, Long userId, GameVisibility next) {
         Game game = guard.requireOwnedLive(gameId, userId);
         game.changeVisibility(next);
+        if (next != GameVisibility.PUBLIC) {
+            // 내리면 자리가 풀린다 (S15P21A604-942). v1 에 게시 취소 엔드포인트가 없어서, 걸린
+            // 게임이 공개를 멈추는 길은 여기와 소프트 삭제 둘뿐이다. 자리를 쥔 채로 두면 오락실
+            // 프라임 칸에 아무도 못 켜는 캐비닛이 남는다 — 묶어 둔 이유가 그것이다.
+            seats.release(gameId);
+        }
         return GameSummary.of(games.save(game));
     }
 
@@ -104,6 +112,10 @@ public class GameLifecycleService {
                 return oldest.getId();
             });
         }
+
+        // 휴지통에 있는 게임의 바인딩은 목록에서 빠지므로 (S15P21A604-940) 자리를 쥔 채 두면
+        // 화면에는 비었는데 잡으려 하면 이미 점유인 자리가 된다.
+        seats.release(gameId);
 
         game.softDelete(Instant.now());
         games.save(game);

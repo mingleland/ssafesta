@@ -26,6 +26,13 @@ server {
     }
 
     location / {
+        # nginx 기본 한도는 1m 이고, 초과분은 앱에 닿기 전에 nginx 가 날것 413 을 돌려준다.
+        # Game Studio 초안 저장은 GameProjectJson.MAX_PROJECT_BYTES = 2,000,000 bytes 까지 허용하므로
+        # 기본값으로는 1,048,577 bytes 부터 저장이 막힌다 (GitLab #207 실측). 4m 은 그 상한의 두 배다 —
+        # 2m 으로 딱 맞추면 여유가 5% 미만이라 상한이 한 번 올라가는 순간 같은 증상이 조용히 돌아온다.
+        # 이 값을 바꿀 때는 MAX_PROJECT_BYTES 를 함께 본다. presigned PUT(AI 문서·게임 자산)은 R2 로
+        # 직행해 이 서버를 지나지 않으므로 여기 값과 무관하다.
+        client_max_body_size 4m;
         proxy_pass http://127.0.0.1:18081;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;

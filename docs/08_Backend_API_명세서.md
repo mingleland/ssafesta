@@ -1378,6 +1378,8 @@ SEND        없다 — P1 은 서버에서 클라이언트로 가는 단방향 �
 
 코인 지급 알림(`/user/queue/coin`)의 봉투는 `{ type: "granted", entryId, amount, balanceAfter, reasonType, referenceType, referenceId, occurredAt }` 이며, 지급 종류는 `reasonType` 으로 가른다(`INITIAL_GRANT` 최초 지급 · `DAILY_GRANT` 일일 접속 · `DAILY_MISSION` 미션 달성 — 어느 미션인지는 `referenceId`). 차감은 발행하지 않는다. 전체 표는 `docs/16` §8 이 정본이다.
 
+**이 큐는 저지연 힌트이고 정본은 원장이다** (S15P21A604-923). 구독 전에 발행된 지급은 도착하지 않는다 — 가입 지급(`INITIAL_GRANT`)은 항상, 일일 지급(`DAILY_GRANT`)은 그날 첫 접속에서 그렇다. 서버는 재전송하지 않으며 회수 경로는 `GET /api/v1/wallets/me/transactions` 다. 소비자는 **구독 → REST 조회 → 조회 중 도착분 버퍼링 → 원장 id 로 중복 제거** 순서를 지키고, 재연결 때도 반복한다. STOMP `entryId`(문자열)와 REST `id`(숫자)는 같은 항목이므로 문자열로 정규화해 비교한다. 자세한 계약은 `docs/16` §8 이다.
+
 > **이벤트 재전송은 P1 에 없다.** 끊긴 사이의 변화는 유실되고 클라이언트는 재연결 직후 대기열과 요청 상태를 REST 로 다시 읽는다. **정본은 REST 이고 STOMP 는 알림이다.**
 
 ### POST `/consultation/requests`
@@ -1694,6 +1696,13 @@ Game Studio는 Unity 미니게임 API와 분리한다. Spring은 GameProject의 
 - Draft 저장은 구조·schema·상한을 검증하고, Publish는 참조·소유권·Asset·Dialogue 의미를 다시 검증한다.
 - Publish는 Draft read→검증→`game_published_versions` append→`games.published_version` 갱신을
   단일 트랜잭션으로 처리하며 Draft와 기존 발행본은 유지한다.
+- **Publish 요청은 `machineId`(선택)로 오락실 캐비닛을 함께 고를 수 있고, 응답이 `arcadeMachineId`
+  를 돌려준다** (`S15P21A604-942`, GitLab #256). 자리 배정도 같은 트랜잭션이라 자리가 거절되면
+  게시도 남지 않는다. 공개 게임만 자리를 잡고(403 `GAME_NOT_PUBLIC`), 1인 2대까지이며
+  (409 `ARCADE_SEAT_LIMIT`), 남의 자리는 409 `ARCADE_MACHINE_TAKEN`, 이미 자리를 가진 게임의
+  다른 자리 요청은 409 `ARCADE_ALREADY_SEATED`, 화이트리스트에 없는 캐비닛은 404
+  `MACHINE_NOT_FOUND` 다. `visibility` PRIVATE 전환과 소프트 삭제가 자리를 비운다. 계약 정본은
+  `specs/019-game-studio/contracts/game-api.md` §Publish · §Arcade Machine Resolution 이다.
 - GameProject에는 Asset binary·브라우저 임시 URL을 저장하지 않는다. builtin Asset catalog(`builtin://`)
   외에 **사용자 업로드(`asset://`)를 지원한다** — 아래 Asset Upload 절이 그 계약이다.
 - 사용자 Asset 업로드: `POST /api/v1/games/{gameId}/assets` (grant 발급) →
@@ -1758,11 +1767,21 @@ Asset 업로드는 [`contracts/game-asset-upload.md`](../specs/019-game-studio/c
 
 ### POST `/admin/booths/{boothId}/unpublish`
 
-부스의 현재 공개 배치 포인터를 즉시 해제한다 (`S15P21A604-742` #40). 본문은 `{ "reason": "사유" }`이며 사유는 1~500자로 필수다. → `204 No Content`.
+부스를 방문자에게서 내리고 **그 자리까지 회수한다** (`S15P21A604-742` #40, 회수는 `S15P21A604-927`). 본문은 `{ "reason": "사유" }`이며 사유는 1~500자로 필수다. → `204 No Content`.
 
-Draft와 공개 회차 이력은 삭제하지 않는다. 방문자·Unity 공개 배치 조회만 즉시 `404 LAYOUT_NOT_PUBLISHED`가 되며, 임대·코인·부스 콘텐츠에도 영향을 주지 않는다. 이미 비공개면 `204` no-op이고 감사 행도 더 만들지 않는다. 성공만 `admin_actions`에 `BOOTH_UNPUBLISH`·`BOOTH`·사유를 남긴다.
+**자리를 함께 비우는 이유** — 공개 포인터만 해제하면 임대가 살아 있어 `GET /booth-slots`가 그 슬롯을 계속 `OCCUPIED`로 보고한다. 관리자 화면이 그 목록을 읽으므로 조치를 해도 아무 변화가 보이지 않았다. 처리 직후 슬롯은 `AVAILABLE`이 되고, 임차인의 활성 임대 한도(D01)도 풀려 다른 자리를 바로 빌릴 수 있다. **엔드포인트는 이것 하나다** — 회수 전용 URL은 없다.
 
-오류: `400 VALIDATION_FAILED`(사유 누락·길이 초과) · `403 FORBIDDEN`(관리자 아님) · `403 MASTER_PROTECTED`(마스터 소유 부스) · `404 BOOTH_NOT_FOUND`.
+**부스 콘텐츠는 보존된다.** Draft·공개 회차 이력·프로젝트·설문·AI 문서가 그대로 남는다 — 임차인이 직접 반납한 것과 같은 경로이고 spec 004 FR-010 그대로다. 다시 임대하면 Draft부터 이어진다(D08). **관리자 자신이 임차한 부스만 예외로 삭제된다**(`S15P21A604-905` — 그 부스는 원래 반납과 함께 사라지는 구조다).
+
+**코인은 환불되지 않는다** (spec 004 D06을 이 경로까지 적용). 임차인의 잔액은 변하지 않는다.
+
+⚠️ **방문자 거절 사유가 바뀐다.** 이전에는 공개 배치 조회가 `404 LAYOUT_NOT_PUBLISHED`였다. 자리까지 비우므로 이제 **`409 BOOTH_LEASE_EXPIRED`**다 — 클라이언트는 둘 다 "입장 불가"로 처리한다.
+
+임대가 없는 부스(이미 만료됨)는 공개 포인터만 내린다. 이미 비공개이고 임대도 없으면 `204` no-op이고 감사 행도 더 만들지 않는다. 감사는 두 줄로 남는다: 게시본을 내렸으면 `BOOTH_UNPUBLISH`, 자리를 회수했으면 `BOOTH_LEASE_RELEASE` — 둘 다 `BOOTH`·대상 부스·사유다.
+
+마스터 계정 소유 부스는 `403 MASTER_PROTECTED`다. 단 **마스터가 설치한 관리자 부스는 대상이 된다** — 관리자 부스는 사람이 아니라 권한을 따라간다(`S15P21A604-905`).
+
+오류: `400 VALIDATION_FAILED`(사유 누락·길이 초과) · `403 FORBIDDEN`(관리자 아님) · `403 MASTER_PROTECTED`(마스터 개인 소유 부스) · `404 BOOTH_NOT_FOUND`.
 
 ### GET `/admin/event-surveys/{surveyKey}/entrants?page=0&size=20`
 

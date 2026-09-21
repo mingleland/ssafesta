@@ -109,7 +109,7 @@ export function ConsultationOverlay(_props: Props) {
             <span className="ov-chip cs-live">연결됨</span>
           </div>
           <p className="ov-note">
-            대화 채널(WebSocket) 계약은 확정 전이라 이 화면에서는 연결 상태까지만 보여 줍니다.
+            직원과 연결되었습니다. 종료는 어느 쪽에서든 할 수 있습니다.
           </p>
         </div>
       )}

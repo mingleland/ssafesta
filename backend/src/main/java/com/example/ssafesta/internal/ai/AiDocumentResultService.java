@@ -94,6 +94,16 @@ public class AiDocumentResultService {
         int expected = positive(request.totalChunkCount(), "totalChunkCount");
         String modelId = required(request.embeddingModelId(), "embeddingModelId");
         String sourceHash = required(request.sourceHash(), "sourceHash");
+        // 선택 projectFacts (계약 document-result-api.yaml §finalize, S15P21A604-396/-597). AI 는 추출값을
+        // finalize 본문에 실어 보내므로 여기서 받는다 — 별도 /project-facts 경로도 그대로 둔다.
+        // 검증은 chunk 검증보다 먼저 한다: 값이 계약 밖이면 아무것도 바꾸지 않고 400 이다.
+        // 둘 다 비어 있으면 "없음" 으로 보고 무시한다 — 추출이 비었다고 문서 공개를 막을 이유가 없다.
+        String targetAudience = null;
+        String techStack = null;
+        if (request.projectFacts() != null) {
+            targetAudience = fact(request.projectFacts().targetAudience(), "projectFacts.targetAudience");
+            techStack = fact(request.projectFacts().techStack(), "projectFacts.techStack");
+        }
 
         JobRow job = locked(jobId, request.attemptNo());
         if (SUCCEEDED.equals(job.status())) {
@@ -131,6 +141,10 @@ public class AiDocumentResultService {
 
         jobs.replaceChunks(job);
         jobs.clearStaging(job.id());
+        if (targetAudience != null || techStack != null) {
+            // chunk 가 확정된 뒤, SUCCEEDED 로 표시하기 전이다. 같은 트랜잭션이라 어느 쪽도 반만 남지 않는다.
+            applyProjectFacts(job, jobId, targetAudience, techStack);
+        }
         jobs.markSucceeded(job.id(), staging.total());
         jobs.markDocumentReady(job.documentId());
         // 마지막이다. 이 문서가 실제로 READY 가 된 뒤라야 밀려난 원본을 물릴 수 있다 (FR-027a) —
@@ -217,6 +231,14 @@ public class AiDocumentResultService {
             throw ApiException.fieldInvalid("documentId", "Job 의 문서와 다릅니다.");
         }
 
+        applyProjectFacts(job, jobId, targetAudience, techStack);
+    }
+
+    /**
+     * 부스의 프로젝트에 추출값을 싣는다. 프로젝트가 없거나 더 새로운 Job 의 값이 이미 있으면 조용히
+     * 넘어간다 — 둘 다 보낸 쪽이 고칠 수 있는 잘못이 아니다. finalize 와 /project-facts 가 같은 규칙을 쓴다.
+     */
+    private void applyProjectFacts(JobRow job, long jobId, String targetAudience, String techStack) {
         Project project = projects.findByBoothId(job.boothId()).orElse(null);
         if (project == null || !project.factsAreOlderThan(jobId)) {
             return;
@@ -332,7 +354,10 @@ public class AiDocumentResultService {
                                String embeddingModelId, Integer pageNumber, String section) { }
 
     public record FinalizeRequest(Integer attemptNo, String sourceHash, Integer totalChunkCount,
-                                  String embeddingModelId) { }
+                                  String embeddingModelId, ExtractedProjectFacts projectFacts) { }
+
+    /** finalize 에 실려 오는 선택 추출값. 둘 다 null 이면 "없음" 이다 (계약 ExtractedProjectFacts). */
+    public record ExtractedProjectFacts(String targetAudience, String techStack) { }
 
     public record HeartbeatRequest(Integer attemptNo) { }
 

@@ -19,11 +19,13 @@ from app.clients.spring_document_result import SpringDocumentResultClient
 from app.providers.document_parser import DefaultDocumentParser
 from app.providers.embedding import EmbeddingProvider
 from app.providers.factory import create_object_storage
+from app.providers.llm import LLMProvider
 from app.services.document_processing_orchestrator import DocumentProcessingOrchestrator
 from app.services.document_processing_service import (
     DocumentEmbeddingService,
     ProcessingSnapshot,
 )
+from app.services.project_fact_extractor import ProjectFactExtractor
 from app.services.text_chunker import TikTokenCodec
 from app.workers.document_task_supervisor import (
     DocumentTaskSupervisor,
@@ -45,6 +47,7 @@ def build_document_processing_orchestrator(
     settings: Settings,
     spring_http_client: httpx.AsyncClient,
     embedding_provider: EmbeddingProvider,
+    llm_provider: LLMProvider,
 ) -> DocumentProcessingOrchestrator:
     """프로세스가 공유할 문서 처리 파이프라인을 한 번 조립한다."""
     result_client = SpringDocumentResultClient(
@@ -72,6 +75,7 @@ def build_document_processing_orchestrator(
         embedding_service=embedding_service,
         result_client=result_client,
         booth_access_client=booth_access_client,
+        project_fact_extractor=ProjectFactExtractor(llm_provider=llm_provider),
         heartbeat_interval_seconds=settings.job_heartbeat_seconds,
     )
 

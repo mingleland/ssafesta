@@ -17,7 +17,9 @@ import { getSessionSnapshot } from '../../auth/model/session';
 
 /** 서버와 같은 기준으로 센다 — `String.length` 는 UTF-16 단위라 이모지 하나가 2자가 된다 */
 export const MAX_CHAT_CODE_POINTS = 100;
-export const CHAT_COOLDOWN_MS = 3_000;
+// 보내기 전 최소 간격. 정본은 서버(WorldChatRateLimiter)다 — 0.8초와 같게 둔다 (S15P21A604-904, GitLab #223).
+// 창(10초 5회·60초 20회)·벌칙(5→10→30초)은 서버가 쥐고, 서버가 준 retryAfterMs 를 그대로 쓴다.
+export const CHAT_COOLDOWN_MS = 800;
 /** 저장이 없어 스크롤백이 없다. 화면이 들고 있을 이유가 없는 만큼만 남긴다 */
 export const MAX_BUFFERED_MESSAGES = 100;
 
@@ -64,7 +66,7 @@ export interface WorldChatState {
 
 export const CHAT_ERROR_MESSAGE: Record<string, string> = {
   VALIDATION_FAILED: '보낼 수 없는 내용입니다',
-  CHAT_TOO_FAST: '조금 빠릅니다. 3초 뒤에 다시 보내 주세요',
+  CHAT_TOO_FAST: '조금 빠릅니다. 잠시 뒤에 다시 보내 주세요',
   CHAT_UNAVAILABLE: '지금은 채팅을 보낼 수 없습니다. 잠시 뒤 다시 시도해 주세요',
   MEMBER_ONLY: '로그인한 회원만 채팅할 수 있습니다',
 };
@@ -106,6 +108,12 @@ export function countCodePoints(text: string): number {
   return [...text].length;
 }
 
+/** 코드 포인트 단위 절단 — `[...text]` 순회라 서러게이트 쌍이 반쪽으로 남지 않는다 */
+export function truncateToCodePoints(text: string, max: number): string {
+  if (countCodePoints(text) <= max) return text;
+  return [...text].slice(0, max).join('');
+}
+
 /** 회원만 연결이 선다 — WS 토큰이 회원에게만 발급된다. 게이트를 두 곳에 두지 않는다 */
 export function canUseWorldChat(): boolean {
   return getSessionSnapshot().kind === 'member';
@@ -127,7 +135,11 @@ export function useWorldChat(): WorldChatState {
 }
 
 export function setWorldChatDraft(draft: string): void {
-  set({ draft });
+  // 상한 초과는 **입력 단계에서 막는다**(2026-09-18 지적). 초과 입력을 두고 보내기만 막으면
+  // 카운터가 빨갛게 남고 "보낼 수 없습니다" 안내가 따로 필요하다 — 잘라 내면 초과 상태
+  // 자체가 없다. 붙여넣기 500자도 100자에 끊긴다. sendWorldChat 의 TOO_LONG 검사는
+  // 프로그램 경로(서버 재전송 등)를 위한 후방 선으로 남는다.
+  set({ draft: truncateToCodePoints(draft, MAX_CHAT_CODE_POINTS) });
 }
 
 export function openWorldChat(): void {
@@ -272,11 +284,21 @@ function pushMessage(raw: string): void {
 
 function pushError(raw: string): void {
   try {
-    const { code } = JSON.parse(raw) as { code: string; message: string };
+    const { code, retryAfterMs } = JSON.parse(raw) as { code: string; message: string; retryAfterMs?: unknown };
     setNotice(CHAT_ERROR_MESSAGE[code] ?? '채팅을 보내지 못했습니다');
+    // 서버가 지정한 대기가 우선이다 (S15P21A604-904) — 벌칙 단계·창 상태는 서버만 안다.
+    // 전송만 잠그고 draft·입력은 그대로 둔다. 값 없으면 기존 클라이언트 계산으로 떨어진다.
+    if (typeof retryAfterMs === 'number' && Number.isFinite(retryAfterMs) && retryAfterMs > 0) {
+      set({ cooldownUntil: Date.now() + retryAfterMs });
+    }
   } catch {
     setNotice('채팅을 보내지 못했습니다');
   }
+}
+
+/** 테스트 전용 — 서버 오류 수신 경로를 거치지 않고 오류 payload 를 넣는다 */
+export function __pushWorldChatErrorForTests(raw: string): void {
+  pushError(raw);
 }
 
 /**

@@ -436,13 +436,41 @@ describe('응모권 — 실 계약 전이라 mock으로 동작한다', () => {
     fillRecipientForm('응모');
 
     await waitFor(() => expect(enterRaffle).toHaveBeenCalledTimes(1));
-    const [raffleId, idempotencyKey, recipient] = enterRaffle.mock.calls[0] as [number, string, Record<string, string>];
-    expect(raffleId).toBe(103);
+    const [selected, idempotencyKey, recipient] = enterRaffle.mock.calls[0] as [
+      { raffleId: number },
+      string,
+      Record<string, string>,
+    ];
+    // raffleId만이 아니라 고른 응모권을 통째로 넘긴다 — 응답에 없는 추첨 시각을 여기서 들고 간다
+    expect(selected.raffleId).toBe(103);
     expect(idempotencyKey).toMatch(/^[0-9a-f-]{36}$/);
     expect(recipient).toEqual({ campus: '서울', teamName: 'A101', recipientName: '홍길동' });
 
     await screen.findByText('응모 완료');
     expect(screen.getByText('50 C 사용')).toBeTruthy();
     expect(screen.getByText(/추첨 9월 20일/)).toBeTruthy();
+  });
+});
+
+describe('응모권은 같은 prizes 목록에서 winnerCount로 갈린다', () => {
+  it('winnerCount > 0 인 상품은 즉시교환 카드로 그리지 않는다', async () => {
+    listPrizes.mockResolvedValue([
+      { prizeId: 1, name: '마이구미', priceCoin: 400, stock: 32, active: true, closesAt: null, winnerCount: 0 },
+      { prizeId: 103, name: '치킨', priceCoin: 50, stock: 21, active: true, closesAt: null, winnerCount: 1 },
+    ]);
+    // 응모권 카드는 entities/raffle(같은 목록의 winnerCount > 0 조각)이 만든다
+    listRaffles.mockResolvedValue([
+      { raffleId: 103, name: '치킨', priceCoin: 50, stock: 21, active: true, closesAt: null, drawAt: null },
+    ]);
+    resolveEventSurveyTarget.mockReturnValue(null);
+
+    const { container } = renderOverlay();
+
+    await screen.findByText('치킨');
+    const list = container.querySelector('[aria-label="이벤트 상점 상품 목록"]');
+    // 치킨이 구매 카드로 한 번 더 그려지면 3장이 된다
+    expect(list?.children.length).toBe(2);
+    expect(screen.queryByRole('button', { name: '구매' })?.closest('.ov-card')?.textContent).toContain('마이구미');
+    expect(screen.getByText('치킨').closest('.ov-card')?.querySelector('button')?.textContent).toBe('응모');
   });
 });

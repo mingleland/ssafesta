@@ -8,7 +8,9 @@ source "${script_dir}/../lib/assert.sh"
 site="${repo_root}/infra/environments/nginx/sites/demo.conf.template"
 
 assert_file "${site}"
-assert_contains "${site}" 'server_name demo\.\$\{ROOT_DOMAIN\};' 'demo must use the public web host'
+# Production cutover(2026-09-20) 이후 root domain 은 Production 소유다. Demo 는 demo.<root> 만 선언한다.
+assert_contains "${site}" 'server_name demo\.\$\{ROOT_DOMAIN\};' 'demo must serve demo.<root> only'
+assert_not_contains "${site}" 'server_name demo\.\$\{ROOT_DOMAIN\} \$\{ROOT_DOMAIN\};' 'demo must not claim the root domain after Production cutover'
 assert_not_contains "${site}" '^[[:space:]]*http2 on;' 'demo must remain compatible with the deployed Nginx version'
 assert_contains "${site}" 'location = /unity/manifest\.json' 'manifest must bypass the frontend SPA fallback'
 assert_contains "${site}" 'location /unity/Build/' 'hashed Unity build files need a dedicated location'
@@ -19,7 +21,10 @@ assert_contains "${site}" 'Content-Encoding br' 'Brotli Unity files must declare
 assert_contains "${site}" '\(br\|unityweb\)' 'Nginx must serve both native Brotli and Unity fallback-compressed suffixes'
 assert_contains "${site}" 'max-age=31536000, immutable' 'hashed Unity build files need immutable caching'
 assert_contains "${site}" 'Cache-Control "no-cache"' 'manifest and entry files must be revalidated'
-assert_contains "${site}" 'proxy_pass http://127\.0\.0\.1:18080;' 'frontend must remain loopback-only behind Nginx'
+# 루트는 Upgrade 헤더로 분기한다 — 일반 HTTPS 는 Front(18080), WebSocket Upgrade 는 Demo World(17777) (Batch 1).
+assert_contains "${site}" 'default[[:space:]]+http://127\.0\.0\.1:18080;' 'frontend must remain loopback-only behind Nginx'
+assert_contains "${site}" 'websocket[[:space:]]+http://127\.0\.0\.1:17777;' 'root WebSocket Upgrade must reach the Demo World'
+assert_contains "${site}" 'proxy_pass[[:space:]]+\$festa_demo_root_upstream;' 'root location must dispatch by Upgrade header'
 assert_contains "${site}" 'location /ai/v1/' 'AI must answer same-origin before the frontend fallback'
 assert_contains "${site}" 'proxy_pass http://127\.0\.0\.1:18082;' 'AI must remain loopback-only behind Nginx'
 assert_contains "${site}" 'Cache-Control "no-store"' 'AI responses must never be cached'

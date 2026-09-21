@@ -33,24 +33,28 @@ export interface TransactionPage {
   totalPages: number;
 }
 
-// 알려진 reasonType의 한글 라벨 — 003 시점 3종 + 004의 LEASE_PAYMENT
+// 알려진 reasonType의 한글 라벨 — BE CoinReason(s) 의 **전체 사본**이다.
 //
-// SURVEY_REWARD·PURCHASE 는 2026-09-08 회귀(S15P21A604-538)에서 빠진 것이 드러나 더했다.
-// 설문 보상은 -528 이 Survey 실 어댑터를 붙이면서 **처음 도달 가능해진 경로**라 그때 보였다 —
-// 화면에 `SURVEY_REWARD` 가 그대로 노출됐다(S15P21A604-543).
+// SURVEY_REWARD·PURCHASE 는 2026-09-08 회귀(S15P21A604-538)에서 빠진 것이 드러나 더했고,
+// DAILY_MISSION(#233)·SLOT_BET/SLOT_PAYOUT(#205)·PRIZE_PURCHASE(#217) 는 각 기능이
+// 원장에 도달하면서 화면에 코드가 그대로 노출돼 더했다(2026-09-18).
 //
-// 이 목록을 BE CoinReason 전체의 사본으로 만들지 않는다. 같은 열거가 두 곳에 생기면
-// 그 사본이 낡는 것을 아무도 못 잡고, 지금 고치는 것과 같은 종류의 문제가 하나 더 생긴다.
-// reason drift 자체를 막는 방법(BE 가 목록을 내려주거나 계약에 열거하고 그것을 근거로 삼는 것)은
-// 별도 후속이다.
+// 원래는 "BE 열거 전체의 사본을 만들지 마라"가 방침이었지만, 폴백(원문 노출)이 SC-005 위반이
+// 아니라 사용자 노출 결함으로 보이는 상태라 전수 매핑이 요구됐다. 사본이 낡는 drift 는
+// CoinReason 으로 검색해 새 reason 이 추가되면 이 표와 함께 고치는 수동 규칙으로 감수한다 —
+// 자동 대조는 BE 가 목록을 내려주는 계약 변경(별도 후속)에서 한다.
 const REASON_LABELS: Record<string, string> = {
   INITIAL_GRANT: '가입 지급',
   DAILY_GRANT: '일일 지급',
+  DAILY_MISSION: '일일 미션 보상',
   ADMIN_ADJUSTMENT: '운영자 조정',
   LEASE_PAYMENT: '부스 임대',
   SURVEY_REWARD: '설문 보상',
   PURCHASE: '아이템 구매',
   MINIGAME_REWARD: '미니게임 보상',
+  SLOT_BET: '슬롯 베팅',
+  SLOT_PAYOUT: '슬롯 당첨',
+  PRIZE_PURCHASE: '경품 구매',
 };
 
 // 모르는 reasonType은 원문 코드 그대로 반환 — 항목을 숨기면 SC-005 위반

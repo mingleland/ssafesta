@@ -1,0 +1,159 @@
+{
+  "version": 1,
+  "generatedAt": "2026-09-07T06:56:31.776Z",
+  "note": "Unity 원본에서 생성된 로컬 산출물. 벤더 에셋 재배포 확인 전까지 저장소·정적 배포에 넣지 않는다.",
+  "assets": [
+    {
+      "assetCode": "DECORATION_DEFAULT",
+      "objectType": "DECORATION",
+      "typeDefault": true,
+      "url": "assets/booth/DECORATION_DEFAULT.glb",
+      "bytes": 26140,
+      "triangles": 240,
+      "bounds": {
+        "min": [
+          -0.3,
+          0,
+          -0.3
+        ],
+        "max": [
+          0.3,
+          1.6085,
+          0.3
+        ]
+      },
+      "source": {
+        "kind": "fbx",
+        "fbx": "Stands/DisplayBox01.FBX",
+        "unitScale": 0.0254,
+        "upAxis": "zUp",
+        "rawBounds": {
+          "min": [
+            -11.811,
+            -11.811,
+            0
+          ],
+          "max": [
+            11.811,
+            11.811,
+            63.3274
+          ]
+        }
+      }
+    },
+    {
+      "assetCode": "FURNITURE_CHAIR01",
+      "objectType": "FURNITURE",
+      "typeDefault": true,
+      "url": "assets/booth/FURNITURE_CHAIR01.glb",
+      "bytes": 118164,
+      "triangles": 1212,
+      "bounds": {
+        "min": [
+          -0.1887,
+          0,
+          -0.1887
+        ],
+        "max": [
+          0.1887,
+          0.45,
+          0.1887
+        ]
+      },
+      "source": {
+        "kind": "fbx",
+        "fbx": "Furniture/Chair01.FBX",
+        "unitScale": 0.0254,
+        "upAxis": "zUp",
+        "rawBounds": {
+          "min": [
+            -7.4284,
+            -7.4284,
+            0
+          ],
+          "max": [
+            7.4284,
+            7.4284,
+            17.7165
+          ]
+        }
+      }
+    },
+    {
+      "assetCode": "SURVEY_KIOSK_DEFAULT",
+      "objectType": "SURVEY_KIOSK",
+      "typeDefault": true,
+      "url": "assets/booth/SURVEY_KIOSK_DEFAULT.glb",
+      "bytes": 35792,
+      "triangles": 286,
+      "bounds": {
+        "min": [
+          -0.31,
+          0,
+          -0.1598
+        ],
+        "max": [
+          0.31,
+          0.9255,
+          0.1598
+        ]
+      },
+      "source": {
+        "kind": "prefab",
+        "fbx": "SurveyKiosk.prefab",
+        "unitScale": 0.0254,
+        "upAxis": "yUp",
+        "rawBounds": {
+          "min": [
+            -0.31,
+            0,
+            -0.1595
+          ],
+          "max": [
+            0.31,
+            0.9255,
+            0.16
+          ]
+        }
+      }
+    },
+    {
+      "assetCode": "FURNITURE_CHAIR02_WHITE",
+      "objectType": "FURNITURE",
+      "typeDefault": false,
+      "url": "assets/booth/FURNITURE_CHAIR02_WHITE.glb",
+      "bytes": 150116,
+      "triangles": 1545,
+      "bounds": {
+        "min": [
+          -0.2633,
+          0,
+          -0.2965
+        ],
+        "max": [
+          0.2633,
+          0.789,
+          0.2965
+        ]
+      },
+      "source": {
+        "kind": "fbx",
+        "fbx": "Furniture/Chair02b.FBX",
+        "unitScale": 0.0254,
+        "upAxis": "zUp",
+        "rawBounds": {
+          "min": [
+            -10.3443,
+            -9.7997,
+            -0.0076
+          ],
+          "max": [
+            10.3897,
+            13.5478,
+            31.0556
+          ]
+        }
+      }
+    }
+  ]
+}

@@ -51,7 +51,7 @@ import {
   useGameClientUi,
 } from '../../features/world/model/gameClientUi';
 import { closeTopScreen, getWorldScreen, openManagement, openMenu, openMenuPanelScreen, openRental } from '../../features/world/model/worldScreen';
-import { hasUnityModal, resetWorldUiState } from '../../unity/bridge/worldUiState';
+import { getWorldUiState, hasUnityModal, resetWorldUiState, useWorldUiState } from '../../unity/bridge/worldUiState';
 import { getReadyUnityInstance } from '../../unity/host/sessionManager';
 import { requestExitWorldUi } from '../../unity/host/worldUiBridge';
 import './worldPage.css';
@@ -65,6 +65,9 @@ export function WorldPage() {
   // 훅은 항상 부른다 — `IS_MOCK_WORLD ||` 뒤에 두면 단축 평가로 호출이 건너뛰어진다
   const hostPhase = useHostPhase();
   const inWorld = IS_MOCK_WORLD || hostPhase === 'ready';
+  // 아바타 변경 화면(Unity) 중에는 HUD·채팅을 숨긴다 — 부팅 중과 같은 자리다 (S15P21A604-852).
+  // focus·minigame 은 묶지 않는다: 줌은 F 상호작용마다 오가고 미니게임 중 FE HUD 동작은 별건이다.
+  const unityAvatar = useWorldUiState().avatar;
   const [params, setParams] = useSearchParams();
   const [chatHeight, setChatHeight] = useState(0);
   const reportChatHeight = useCallback((height: number) => {
@@ -192,7 +195,8 @@ export function WorldPage() {
       const action = resolveEnterAction(e, {
         // 오버레이·관리·메뉴가 떠 있으면 Enter 는 그 화면의 것이다. 판정 시점에 읽는다 —
         // 이 리스너는 한 번만 등록되므로 렌더 시점 값을 가둬 두면 계속 'world' 로 굳는다.
-        worldOwnsScreen: getWorldScreen() === 'world',
+        // 아바타 화면 중 Enter 는 Unity 몫이다 — 채팅 모델만 open 으로 바뀌는 일을 막는다.
+        worldOwnsScreen: getWorldScreen() === 'world' && !getWorldUiState().avatar,
         open: chat.open,
         inputFocused: document.activeElement?.id === WORLD_CHAT_INPUT_ID,
         member: canUseWorldChat(),
@@ -249,9 +253,10 @@ export function WorldPage() {
       {/* World Layer 는 이 트리에 없다 — 라우트 밖 PersistentWorld 가 그린다 (S15P21A604-620).
           여기서 그리면 화면을 떠날 때 Unity 가 함께 죽어 돌아올 때마다 50~84초를 다시 기다린다. */}
       {/* React HUD — hud-decisions 가 허용한 것만 (조작 안내 · 상담 Quick Access) */}
-      {inWorld && <WorldHud />}
+      {inWorld && !unityAvatar && <WorldHud />}
       {/* 채팅 — HUD 밖이다. HUD 의 mousedown 차단이 입력창 focus 를 막는다 (S15P21A604-648) */}
-      {inWorld && <WorldChatLayer onHeightChange={reportChatHeight} />}
+      {/* WorldChatLayer 는 view-only 다: transport 구독(startWorldChat)은 위 Enter effect 가 쥐고 있다 */}
+      {inWorld && !unityAvatar && <WorldChatLayer onHeightChange={reportChatHeight} />}
       {/* DEV_ONLY — 제품 HUD 가 아니다. dev 빌드 + VITE_DEV_INTERACTION_BAR=true 에서만 뜬다 */}
       {IS_DEV_INTERACTION_BAR && <MockInteractionBar />}
       {/* Visitor Overlay Layer — Unity 상호작용이 연다 */}

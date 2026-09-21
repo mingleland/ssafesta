@@ -181,6 +181,20 @@ textarea,
   display: none;
 }
 
+/* 오버레이·메뉴의 포커스 링 (2026-09-18).
+ *
+ * ESC 메뉴·오버레이의 컨트롤은 자기 포커스 스타일이 없는 것이 많아 **UA 기본 링**이 나온다 —
+ * `color-scheme: light dark` 환경에서 그 링은 다크 위에 흰 테두리로 그려져(스크린샷 실측)
+ * 오버레이 어휘와 어울리지 않는다. 어두운 표면 계열에서는 라벤더 링으로 바꾼다.
+ *
+ * :where 는 특이도가 0 이라 각 컴포넌트가 정의한 포커스 스타일(`.ov-btn:focus-visible`·
+ * `.sc-btn:focus-visible` 등)은 그대로 이긴다. 링을 없애지 않고 색을 바꾸는 이유는
+ * 키보드 사용자가 지금 어디에 있는가가 필요하기 때문이다 — 대신 흰 테두리는 사라진다. */
+:where(.festa-overlay, .gm-root, .festa-screen, .world-scene) :where(*:focus-visible) {
+  outline: 2px solid rgba(125, 150, 255, 0.45);
+  outline-offset: 1px;
+}
+
 /* 이미지는 기본이 draggable=true 라 CSS 로 따로 꺼야 한다.
    Firefox 는 이 속성을 모르므로 dragstart 가드(app/providers)가 함께 막는다. */
 img {
@@ -198,4 +212,14 @@ select,
 .selectable {
   -webkit-user-select: text;
   user-select: text;
+}
+/* 폼 컨트롤 전역 font 리셋 (GitLab #246, S15P21A604-913).
+   input·button·select·textarea는 폰트를 상속하지 않아 규칙을 빠뜨리면 UA 기본 Arial 13.33px로 떨어진다.
+   컴포넌트별 font: inherit은 그대로 둬도 무해하다. */
+input,
+button,
+select,
+textarea,
+optgroup {
+  font: inherit;
 }

@@ -10,6 +10,10 @@
      열에는 배경이 없어 빈 공간이 보이지 않는다. */
   align-items: stretch;
 }
+
+/* 임대 전 빈 상태는 한 줄 안내라 xl(1180)이 휑하다. 좁혀서 중앙 안내처럼 읽히게 한다.
+   임대 중(미리보기+사이드 2열)은 xl 그대로 둔다. */
+.festa-overlay:has(.bm-width) .festa-overlay-frame { width: min(880px, 100%); }
 .bm-main { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
 .bm-side { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
 

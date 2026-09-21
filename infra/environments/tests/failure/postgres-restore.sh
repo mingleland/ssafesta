@@ -14,47 +14,131 @@ mkdir -p "$temp_dir/bin" "$temp_dir/bucket"
 cat >"$temp_dir/bin/aws" <<'SH'
 #!/usr/bin/env bash
 set -euo pipefail
-while [[ "$1" != cp && "$1" != put-object ]]; do shift; done
-operation="$1"; shift
-if [[ "$operation" == put-object ]]; then
-  while [[ $# -gt 0 ]]; do
-    case "$1" in
-      --key) key="$2"; shift 2 ;;
-      --body) source="$2"; shift 2 ;;
-      *) shift ;;
-    esac
-  done
-  destination="s3://${R2_BACKUP_BUCKET}/${key}"
-elif [[ "$operation" == delete-object ]]; then
-  while [[ $# -gt 0 ]]; do
-    case "$1" in
-      --key) key="$2"; shift 2 ;;
-      *) shift ;;
-    esac
-  done
-  target_file="${FAKE_BUCKET}/${key}"
-  rm -f "$target_file"
-  exit 0
-else
-  source="$1"; destination="$2"
-fi
+
+service=''
+
+# Real invocation:
+#   aws --endpoint-url <url> s3 ...
+#   aws --endpoint-url <url> s3api ...
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --endpoint-url)
+      shift 2
+      ;;
+    s3|s3api)
+      service="$1"
+      shift
+      break
+      ;;
+    *)
+      shift
+      ;;
+  esac
+done
+
+[[ -n "${service}" && $# -gt 0 ]] || exit 2
+
+operation="$1"
+shift
+
 map_path() {
-  if [[ "$1" == s3://* ]]; then
-    object="${1#s3://}"; printf '%s/%s\n' "$FAKE_BUCKET" "${object#*/}"
+  local value="$1"
+
+  if [[ "${value}" == s3://* ]]; then
+    local object="${value#s3://}"
+    printf '%s/%s\n' "${FAKE_BUCKET}" "${object#*/}"
   else
-    printf '%s\n' "$1"
+    printf '%s\n' "${value}"
   fi
 }
-if [[ "$operation" == ls ]]; then
-  target_prefix="${1#s3://${R2_BACKUP_BUCKET}/}"
-  target_dir="${FAKE_BUCKET}/${target_prefix}"
-  if [[ -d "${target_dir}" ]]; then
-    (cd "${FAKE_BUCKET}" && find "${target_prefix}" -type f -printf "2026-09-16 00:00:00 1234 %p\n")
-  fi
-  exit 0
-fi
-source="$(map_path "$source")"; destination="$(map_path "$destination")"
-mkdir -p "$(dirname "$destination")"; cp "$source" "$destination"
+
+case "${service}:${operation}" in
+  s3:cp)
+    source="${1:?source is required}"
+    destination="${2:?destination is required}"
+
+    source="$(map_path "${source}")"
+    destination="$(map_path "${destination}")"
+
+    mkdir -p "$(dirname "${destination}")"
+    cp "${source}" "${destination}"
+    ;;
+
+  s3:ls)
+    uri="${1:?URI is required}"
+    object="${uri#s3://}"
+    prefix="${object#*/}"
+    target="${FAKE_BUCKET}/${prefix}"
+
+    if [[ -f "${target}" ]]; then
+      relative="${target#${FAKE_BUCKET}/}"
+      printf '2026-09-16 00:00:00 1234 %s\n' "${relative}"
+    elif [[ -d "${target}" ]]; then
+      (
+        cd "${FAKE_BUCKET}"
+        find "${prefix}" -type f \
+          -printf '2026-09-16 00:00:00 1234 %p\n'
+      )
+    fi
+    ;;
+
+  s3api:put-object)
+    key=''
+    body=''
+
+    while [[ $# -gt 0 ]]; do
+      case "$1" in
+        --bucket)
+          shift 2
+          ;;
+        --key)
+          key="${2:-}"
+          shift 2
+          ;;
+        --body)
+          body="${2:-}"
+          shift 2
+          ;;
+        *)
+          shift
+          ;;
+      esac
+    done
+
+    [[ -n "${key}" && -n "${body}" ]] || exit 2
+
+    destination="${FAKE_BUCKET}/${key}"
+    mkdir -p "$(dirname "${destination}")"
+    cp "${body}" "${destination}"
+    ;;
+
+  s3api:delete-object)
+    key=''
+
+    while [[ $# -gt 0 ]]; do
+      case "$1" in
+        --bucket)
+          shift 2
+          ;;
+        --key)
+          key="${2:-}"
+          shift 2
+          ;;
+        *)
+          shift
+          ;;
+      esac
+    done
+
+    [[ -n "${key}" ]] || exit 2
+    rm -f "${FAKE_BUCKET}/${key}"
+    ;;
+
+  *)
+    echo "unsupported fake AWS operation: ${service}:${operation}" >&2
+    exit 2
+    ;;
+esac
 SH
 cat >"$temp_dir/bin/docker" <<'SH'
 #!/usr/bin/env bash
@@ -147,18 +231,24 @@ done
 
 # Run retention in dry-run mode
 dry_run_out="$(bash "$repo_root/infra/environments/postgres/backup/retention.sh" --environment demo --tier daily --dry-run)"
-assert_contains "$dry_run_out" '"tier":"daily"' 'retention reports daily tier'
-assert_contains "$dry_run_out" '"totalFound":10' 'retention finds all 10 manifests'
-assert_contains "$dry_run_out" '"kept":7' 'retention keeps 7 newest'
-assert_contains "$dry_run_out" '"deletedCount":6' 'retention plans deletion of 3 sets * 2 files = 6 objects'
-assert_contains "$dry_run_out" '"mode":"dry-run"' 'retention reports dry-run mode'
+dry_run_file="$retention_work/dry-run.out"
+printf '%s\n' "$dry_run_out" >"$dry_run_file"
+
+assert_contains "$dry_run_file" '"tier":"daily"' 'retention reports daily tier'
+assert_contains "$dry_run_file" '"totalFound":10' 'retention finds all 10 manifests'
+assert_contains "$dry_run_file" '"kept":7' 'retention keeps 7 newest'
+assert_contains "$dry_run_file" '"deletedCount":6' 'retention plans deletion of 3 sets * 2 files = 6 objects'
+assert_contains "$dry_run_file" '"mode":"dry-run"' 'retention reports dry-run mode'
 
 # Verify files still exist after dry-run
 assert_file "$temp_dir/bucket/postgresql/demo/daily/2026/09/01/demo-daily-20260901T000000Z/manifest.json"
 
 # Run retention in apply mode
 apply_out="$(bash "$repo_root/infra/environments/postgres/backup/retention.sh" --environment demo --tier daily --apply)"
-assert_contains "$apply_out" '"mode":"apply"' 'retention runs in apply mode'
+apply_file="$retention_work/apply.out"
+printf '%s\n' "$apply_out" >"$apply_file"
+
+assert_contains "$apply_file" '"mode":"apply"' 'retention runs in apply mode'
 
 # The oldest 3 sets (01, 02, 03) should be deleted
 if [[ -f "$temp_dir/bucket/postgresql/demo/daily/2026/09/01/demo-daily-20260901T000000Z/manifest.json" ]]; then
