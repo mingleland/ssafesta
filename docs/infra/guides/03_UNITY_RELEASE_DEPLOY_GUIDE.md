@@ -185,7 +185,7 @@ Registry 기존 version 검사
 ↓
 신규면 업로드
 ↓
-Jenkins Consumer 자동 trigger
+Jenkins develop Demo deploy 자동 trigger
 ```
 
 까지 수행합니다.
@@ -208,32 +208,23 @@ Jenkins Consumer 자동 trigger
 
 ---
 
-## 5. 수동 Registry 업로드가 필요한 경우
+## 5. 직접 Registry 업로드는 정상 경로가 아니다
 
-정본 runbook의 intake 위치:
+Registry intake 위치는 다음이지만 Unity 담당자가 API로 직접 업로드하지 않습니다.
 
 ```text
 GitLab Generic Package Registry
 unity-release-bundle/<8sha>
 ```
 
-4파일 모두 같은 version에 있어야 합니다.
-
-정확한 API base:
-
-```text
-https://lab.ssafy.com/api/v4/projects/1443023/packages/generic/unity-release-bundle/<8sha>
-```
-
-직접 업로드는 runbook의 curl 절차를 그대로 사용합니다.
-
-> 단, 현재 helper는 게시 마지막에 Jenkins Consumer까지 trigger하므로 일반적으로 helper 경로가 더 편합니다.
+직접 업로드는 GitLab 이벤트나 Jenkins 배포를 만들지 않습니다. `bundle.sha256`과 실제 Demo deploy trigger까지 책임지는
+`publish-unity-release-bundle.sh`만 정상 게시 경로입니다. 직접 API 업로드는 publisher 장애 시 Infra 담당자의 복구 절차로만 다룹니다.
 
 ---
 
 ## 6. 게시 후 Jenkins가 자동으로 하는 일
 
-Consumer는 다음 순서로 처리합니다.
+publisher가 시작한 `festa-gitlab-develop/develop`은 다음 순서로 처리합니다.
 
 ```text
 1. Release Bundle download
