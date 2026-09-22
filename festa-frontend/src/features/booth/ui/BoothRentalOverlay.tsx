@@ -15,6 +15,9 @@ import type { SlotView } from '../../../entities/booth/types';
 import { remainingMs } from '../../../entities/booth/remaining';
 import { openManagement } from '../../world/model/worldScreen';
 import { useLeaseSlot } from '../model/useLeaseSlot';
+import { useBoothPublish } from '../model/boothPublication';
+import { compose } from '../model/presentationComposer';
+import { showToast } from '../../../shared/ui/toast/toastStore';
 import { LeaseConfirmDialog } from './LeaseConfirmDialog';
 import { SlotMap } from './SlotMap';
 import { WalletBadge } from '../../wallet/ui/WalletBadge';
@@ -63,6 +66,12 @@ export function BoothRentalOverlay({ onClose }: { onClose: () => void }) {
   }, [alreadyLeasing]);
 
   const lease = useLeaseSlot();
+  // 임대와 게시를 한 동작으로 묶는다 (S15P21A604-959). 전에는 임대만 하면 자리는 잡히는데 월드에는
+  // 아무것도 보이지 않았고, 사용자는 관리창에서 "게시" 를 한 번 더 눌러야 그제서야 부스가 섰다.
+  //
+  // 게시 내용은 빈 전시다(`aiAgentId: null`) — 임대 시점에는 프로젝트도 AI 직원도 없다. 관리창에서
+  // 내용을 채운 뒤 "변경사항 적용" 이 같은 경로로 덮어쓴다.
+  const publish = useBoothPublish();
   const [selectedId, setSelectedId] = useState<number | null>(null);
   // 100코인은 환불이 없다(FR-013) — 버튼이 곧바로 요청하지 않는다
   const [confirming, setConfirming] = useState<SlotView | null>(null);
@@ -132,7 +141,17 @@ export function BoothRentalOverlay({ onClose }: { onClose: () => void }) {
             // 성공이든 실패든 모달은 닫는다 — 실패 사유는 오른쪽 패널이 그 자리에서 말한다.
             // 성공이면 이 화면에 남을 이유가 없다: 바로 관리 화면으로 넘어간다 (S15P21A604-855).
             lease.mutate(confirming.slotId, {
-              onSuccess: () => openManagement(),
+              // 임대가 되면 그 자리에서 게시까지 한다. 게시가 실패해도 관리 화면으로 보낸다 —
+              // 자리는 이미 내 것이고, 그 화면이 "게시" 버튼으로 남은 일을 정확히 말해 준다.
+              onSuccess: ({ boothId }, slotId) => {
+                publish.mutate(
+                  { boothId, slotId, presentation: compose({ aiAgent: null, published: null }) },
+                  {
+                    onError: () => showToast('자리는 잡았지만 공개하지 못했습니다. 관리 화면에서 게시해 주세요.', 'error'),
+                    onSettled: () => openManagement(),
+                  },
+                );
+              },
               onSettled: () => {
                 setConfirming(null);
                 queryClient.invalidateQueries({ queryKey: ['booth-slots'] });

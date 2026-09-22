@@ -17,7 +17,7 @@ export function fmtCoin(n: number): string {
 export function ErrorBanner({ error, onRetry }: { error: unknown; onRetry?: () => void }) {
   const view: AdminErrorView = describeAdminError(error);
   return (
-    <div className="ad-error" role="alert" data-code={view.code}>
+    <div className="ac-error" role="alert" data-code={view.code}>
       <strong>{view.title}</strong>
       {view.message !== '' && <span>{view.message}</span>}
       {onRetry !== undefined && view.retryable && (
@@ -29,7 +29,7 @@ export function ErrorBanner({ error, onRetry }: { error: unknown; onRetry?: () =
 
 export function Loading({ label = '불러오는 중...' }: { label?: string }) {
   return (
-    <div className="ad-state" role="status">
+    <div className="ac-state" role="status">
       <span className="sc-spinner" />
       {label}
     </div>
@@ -38,7 +38,7 @@ export function Loading({ label = '불러오는 중...' }: { label?: string }) {
 
 export function Empty({ title, hint }: { title: string; hint?: string }) {
   return (
-    <div className="ad-state">
+    <div className="ac-state">
       <strong>{title}</strong>
       {hint !== undefined && <span>{hint}</span>}
     </div>
@@ -48,7 +48,7 @@ export function Empty({ title, hint }: { title: string; hint?: string }) {
 export function Pager({ page, totalPages, onChange }: { page: number; totalPages: number; onChange: (next: number) => void }) {
   if (totalPages <= 1) return null;
   return (
-    <nav className="ad-pager" aria-label="페이지">
+    <nav className="ac-pager" aria-label="페이지">
       <button type="button" className="sc-btn sc-btn-sm" disabled={page <= 0} onClick={() => onChange(page - 1)}>이전</button>
       <span>{page + 1} / {totalPages}</span>
       <button type="button" className="sc-btn sc-btn-sm" disabled={page >= totalPages - 1} onClick={() => onChange(page + 1)}>다음</button>
@@ -64,7 +64,7 @@ export function statusLabel(status: string): string {
 }
 
 export function StatusChip({ status }: { status: string }) {
-  return <span className={`ad-chip ad-chip-${STATUS_TONE[status] ?? 'plain'}`}>{statusLabel(status)}</span>;
+  return <span className={`ac-chip ac-chip-${STATUS_TONE[status] ?? 'plain'}`}>{statusLabel(status)}</span>;
 }
 
 /**
@@ -74,16 +74,16 @@ export function StatusChip({ status }: { status: string }) {
 export function GatedButton({ gate, onClick, className = 'sc-btn', children }: { gate: string | null; onClick: () => void; className?: string; children: ReactNode }) {
   const [shown, setShown] = useState(false);
   return (
-    <span className="ad-gated">
+    <span className="ac-gated">
       <button
         type="button"
-        className={className + (gate !== null ? ' ad-gated-btn' : '')}
+        className={className + (gate !== null ? ' ac-gated-btn' : '')}
         aria-disabled={gate !== null || undefined}
         onClick={() => (gate === null ? onClick() : setShown(true))}
       >
         {children}
       </button>
-      {gate !== null && shown && <span className="ad-gate-note" role="note">{gate}</span>}
+      {gate !== null && shown && <span className="ac-gate-note" role="note">{gate}</span>}
     </span>
   );
 }
@@ -99,10 +99,10 @@ export function reasonProblem(value: string): string | null {
 export function ReasonField({ id, label, value, onChange, placeholder }: { id: string; label: string; value: string; onChange: (v: string) => void; placeholder?: string }) {
   const problem = value === '' ? null : reasonProblem(value);
   return (
-    <label className="ad-field" htmlFor={id}>
-      <span className="ad-label">{label} <em>{value.length}/{REASON_MAX}</em></span>
-      <textarea id={id} className="ad-textarea" value={value} maxLength={REASON_MAX + 50} placeholder={placeholder} onChange={(e) => onChange(e.target.value)} rows={3} />
-      {problem !== null && <span className="ad-field-error">{problem}</span>}
+    <label className="ac-field" htmlFor={id}>
+      <span className="ac-label">{label} <em>{value.length}/{REASON_MAX}</em></span>
+      <textarea id={id} className="ac-textarea" value={value} maxLength={REASON_MAX + 50} placeholder={placeholder} onChange={(e) => onChange(e.target.value)} rows={3} />
+      {problem !== null && <span className="ac-field-error">{problem}</span>}
     </label>
   );
 }
@@ -129,13 +129,13 @@ export function ConfirmDialog({ open, title, target, children, confirmLabel, bus
     }
   }, [open]);
   return (
-    <dialog ref={ref} className="ad-dialog" onCancel={(e) => { e.preventDefault(); if (!busy) onCancel(); }} aria-labelledby="ad-dialog-title">
-      <h2 id="ad-dialog-title">{title}</h2>
-      {target !== undefined && <p className="ad-dialog-target">{target}</p>}
+    <dialog ref={ref} className="ac-dialog" onCancel={(e) => { e.preventDefault(); if (!busy) onCancel(); }} aria-labelledby="ac-dialog-title">
+      <h2 id="ac-dialog-title">{title}</h2>
+      {target !== undefined && <p className="ac-dialog-target">{target}</p>}
       {children}
-      <div className="ad-dialog-actions">
+      <div className="ac-dialog-actions">
         <button type="button" className="sc-btn" disabled={busy} onClick={onCancel}>취소</button>
-        <button type="button" className={`sc-btn ${danger ? 'ad-btn-danger' : 'sc-btn-primary'}`} disabled={busy} onClick={onConfirm}>{busy ? '처리 중...' : confirmLabel}</button>
+        <button type="button" className={`sc-btn ${danger ? 'ac-btn-danger' : 'sc-btn-primary'}`} disabled={busy} onClick={onConfirm}>{busy ? '처리 중...' : confirmLabel}</button>
       </div>
     </dialog>
   );
@@ -143,7 +143,7 @@ export function ConfirmDialog({ open, title, target, children, confirmLabel, bus
 
 export function KeyValue({ rows }: { rows: [string, ReactNode][] }) {
   return (
-    <dl className="ad-kv">
+    <dl className="ac-kv">
       {rows.map(([k, v]) => (
         <div key={k}><dt>{k}</dt><dd>{v}</dd></div>
       ))}
