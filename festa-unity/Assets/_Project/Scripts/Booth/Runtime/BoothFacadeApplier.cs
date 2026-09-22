@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 
 namespace Festa.Booth
 {
@@ -21,6 +22,15 @@ namespace Festa.Booth
         // 우리가 만든 인스턴스 → 그 원본. 재적용 시 인스턴스를 원본으로 되돌려 키를 잡아야 한다.
         // 이게 없으면 두 번째 적용부터 인스턴스가 다시 원본이 되어 무한히 중첩된다.
         static readonly Dictionary<Material, Material> _instanceToSource = new();
+
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
+        static void InstallCacheCleanup()
+        {
+            SceneManager.sceneUnloaded -= OnSceneUnloaded;
+            SceneManager.sceneUnloaded += OnSceneUnloaded;
+        }
+
+        static void OnSceneUnloaded(Scene _) => ClearCache();
 
         readonly IReadOnlyList<string> _targetMaterialNames;
         readonly string _colorProperty;

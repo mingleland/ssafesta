@@ -24,6 +24,12 @@ namespace Festa.Integration
         public static IHighStrikerClient HighStriker { get; private set; }
         public static IAccessTokenProvider TokenProvider { get; private set; }
 
+        /// <summary>
+        /// 현재 Booth API가 실제로 쓰는 원본 URL. 서버가 발급한 상대 경로 자산을 같은 원본으로
+        /// 해석할 때만 쓴다. 소비자가 환경별 endpoint를 다시 추측하지 않게 한다.
+        /// </summary>
+        public static string SpringBaseUrl { get; private set; }
+
         public static bool IsMock { get; private set; }
 
         /// <summary>
@@ -52,6 +58,7 @@ namespace Festa.Integration
         public static void Init(bool useMock, string springBaseUrl, string aiBaseUrl)
         {
             IsMock = useMock;
+            SpringBaseUrl = (springBaseUrl ?? string.Empty).TrimEnd('/');
             // 실서버 경로는 WebGL 호스트가 SendMessage 로 밀어 넣은 Access Token 을 쓴다 (AuthBridge).
             // Mock 경로는 헤더를 붙이지 않는다 — Mock 서버는 인증을 요구하지 않는다.
             TokenProvider = useMock ? new EmptyAccessTokenProvider() : new HostAccessTokenProvider();
@@ -68,23 +75,23 @@ namespace Festa.Integration
             }
             else
             {
-                Booth = new HttpBoothApiClient(springBaseUrl, TokenProvider);
-                User = new HttpUserApiClient(springBaseUrl, TokenProvider);
+                Booth = new HttpBoothApiClient(SpringBaseUrl, TokenProvider);
+                User = new HttpUserApiClient(SpringBaseUrl, TokenProvider);
                 // TODO: SseAiAgentClient — spec 008 SSE 계약 확정 후 구현
                 Ai = new MockAiAgentClient();
                 Debug.LogWarning("[ApiServices] Ai HTTP 구현 전 — Mock으로 대체 중");
                 // 미니게임 판정 2종은 **서버 우선** — GitLab #134 에 게시한 계약대로 BE 에 먼저 묻고, BE 가 아직 경로를
                 // 만들지 않았을 때(404)만 Mock 대역으로 넘긴다. 폴백은 경고를 남기고 HUD 는 "체험판" 을 표시한다 —
                 // 조용한 대체가 아니다 (T-24). BE 가 붙는 순간 Unity 는 변경 없이 실판정으로 바뀐다 (S15P21A604-294·-439).
-                Game = new ServerFirstGameResultClient(new HttpGameResultClient(springBaseUrl, TokenProvider), new MockGameResultClient());
-                Wallet = new HttpWalletClient(springBaseUrl, TokenProvider);
+                Game = new ServerFirstGameResultClient(new HttpGameResultClient(SpringBaseUrl, TokenProvider), new MockGameResultClient());
+                Wallet = new HttpWalletClient(SpringBaseUrl, TokenProvider);
                 // 슬롯은 **서버 단일 경로**다 (2026-09-16). BE 가 spec 021 계약을 구현해 develop 에 올렸으므로
                 // 체험판 대역을 둘 이유가 없어졌다. 폴백을 남겨 두면 서버가 잠깐 죽거나 라우팅이 어긋난 순간에
                 // 가짜 판정이 나가 코인 원장과 화면이 갈라진다 — 실패는 그대로 사용자에게 보인다 (T-24).
-                Slot = new HttpSlotMachineClient(springBaseUrl, TokenProvider);
+                Slot = new HttpSlotMachineClient(SpringBaseUrl, TokenProvider);
                 // 하이 스트라이커도 같은 이유로 **서버 단일 경로**다 — Mock 으로 넘기면 "기록됐다" 는 로그만 남고
                 // 미션 진행도는 그대로여서 실패를 감추는 쪽이 된다. 경로가 없으면 한 번 경고하고 멈춘다 (#233).
-                HighStriker = new HttpHighStrikerClient(springBaseUrl, TokenProvider);
+                HighStriker = new HttpHighStrikerClient(SpringBaseUrl, TokenProvider);
             }
 
             Debug.Log($"[ApiServices] Init — mock={useMock} spring={springBaseUrl}");

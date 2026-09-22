@@ -6,6 +6,7 @@ import './index.css'
 import { AppProviders } from './app/providers'
 import { PersistentWorld } from './unity/host/PersistentWorld'
 import { router } from './app/router'
+import { RootFatalErrorBoundary } from './app/RootFatalErrorBoundary'
 import { installPreloadRecovery } from './shared/ui/preloadRecovery'
 
 // 배포 뒤 옛 chunk 요청 실패 → 한 번만 새로고침 (S15P21A604-847). 근거는 preloadRecovery.ts 에.
@@ -54,10 +55,14 @@ window.addEventListener('blur', releasePressing)
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <AppProviders>
-      {/* 라우트 트리 밖 — 화면이 바뀌어도 Unity 가 살아남는 자리다 (S15P21A604-620) */}
-      <PersistentWorld />
-      <RouterProvider router={router} />
-    </AppProviders>
+    {/* 최외곽 오류 경계 — provider·Unity·RouterProvider 자신이 던져도 흰 화면으로 끝나지 않게 한다.
+        라우터의 errorElement 는 라우트 트리 안만 덮는다. */}
+    <RootFatalErrorBoundary>
+      <AppProviders>
+        {/* 라우트 트리 밖 — 화면이 바뀌어도 Unity 가 살아남는 자리다 (S15P21A604-620) */}
+        <PersistentWorld />
+        <RouterProvider router={router} />
+      </AppProviders>
+    </RootFatalErrorBoundary>
   </StrictMode>,
 )

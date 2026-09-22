@@ -226,6 +226,28 @@ namespace Festa.World
                     r.gameObject.SetActive(true);
                 }
             }
+        }
+
+        /// <summary>전시가 바뀌거나 사라질 때 이전 다운로드 Texture 참조를 화면에서 끊는다.</summary>
+        public void ClearThumbnail()
+        {
+            if (cardRenderer != null && cardPivot != null)
+            {
+                var mat = cardRenderer.material;
+                mat.SetTexture("_BaseMap", null);
+                mat.mainTexture = null;
+                cardPivot.gameObject.SetActive(false);
+            }
+
+            if (photoFaces != null)
+                foreach (var r in photoFaces)
+                {
+                    if (r == null) continue;
+                    var mat = r.material;
+                    mat.SetTexture("_BaseMap", null);
+                    mat.SetTexture("_EmissionMap", null);
+                    r.gameObject.SetActive(false);
+                }
             if (photoPlaceholders != null)
                 foreach (var t in photoPlaceholders)
                     if (t != null) t.gameObject.SetActive(false);

@@ -25,6 +25,7 @@ namespace Festa.Network
         const string DefaultPath = "/var/lib/festa-world/used-grants.log";
 
         static readonly Dictionary<string, long> s_used = new Dictionary<string, long>();
+        static readonly List<string> s_expired = new List<string>();
         static string s_path;
         static bool s_loaded;
         static bool s_unusable;
@@ -36,6 +37,7 @@ namespace Festa.Network
         public static bool TryConsume(string jti, long expiresAtUnix, out string reason)
         {
             if (!s_loaded) Load();
+            PruneExpired();
 
             if (s_unusable)
             {
@@ -59,6 +61,19 @@ namespace Festa.Network
             s_used[jti] = expiresAtUnix;
             reason = null;
             return true;
+        }
+
+        /// <summary>
+        /// 입장 grant는 만료 뒤 서명 검사에서 이미 거부된다. 원장 파일은 재배포 간 재사용
+        /// 차단을 위해 보존하지만, 메모리 색인은 서버가 오래 떠 있을수록 계속 커질 이유가 없다.
+        /// </summary>
+        static void PruneExpired()
+        {
+            long now = WorldEntryToken.UnixNow();
+            s_expired.Clear();
+            foreach (var pair in s_used)
+                if (pair.Value < now) s_expired.Add(pair.Key);
+            foreach (var jti in s_expired) s_used.Remove(jti);
         }
 
         /// <summary>기동 시 한 번 호출해 원장을 열어두고, 못 열면 그 사실을 미리 드러낸다.</summary>
