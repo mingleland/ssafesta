@@ -10,7 +10,7 @@ import { MemberSearch } from './MemberSearch';
 
 export function MembersSection({ userId, onSelect }: { userId: number | null; onSelect: (userId: number | null) => void }) {
   return (
-    <div className="ad-split">
+    <div className="ac-split">
       <MemberSearch selectedUserId={userId} onSelect={onSelect} />
       {userId === null ? (
         <section className="sc-card"><Empty title="회원을 선택하세요" hint="왼쪽에서 검색해 고르면 상태·이력·지갑을 여기서 봅니다." /></section>
@@ -54,13 +54,13 @@ function MemberDetail({ userId }: { userId: number }) {
   const masterGate = m.master ? '마스터 계정은 변경할 수 없습니다.' : null;
 
   return (
-    <section className="sc-card ad-work" aria-label="회원 상세">
-      <div className="ad-head">
-        <h2>{m.nickname} <span className="ad-muted">#{m.userId}</span></h2>
-        <div className="ad-actions">
+    <section className="sc-card ac-work" aria-label="회원 상세">
+      <div className="ac-head">
+        <h2>{m.nickname} <span className="ac-muted">#{m.userId}</span></h2>
+        <div className="ac-actions">
           <StatusChip status={m.status} />
-          {m.master && <span className="ad-chip ad-chip-master">마스터</span>}
-          {m.admin && !m.master && <span className="ad-chip ad-chip-gold">관리자</span>}
+          {m.master && <span className="ac-chip ac-chip-master">마스터</span>}
+          {m.admin && !m.master && <span className="ac-chip ac-chip-gold">관리자</span>}
         </div>
       </div>
       <KeyValue rows={[
@@ -68,11 +68,11 @@ function MemberDetail({ userId }: { userId: number }) {
         ['로그인', m.providers.join(', ') || '—'],
         ['코인 잔액', balance.isSuccess ? `${balance.data.balance.toLocaleString('ko-KR')} 코인` : balance.isError ? '조회 실패' : '...'],
       ]} />
-      <div className="ad-actions">
+      <div className="ac-actions">
         {m.status === 'SUSPENDED' ? (
           <GatedButton gate={masterGate} onClick={() => setUnsuspendOpen(true)}>정지 해제</GatedButton>
         ) : (
-          <GatedButton gate={masterGate} className="sc-btn ad-btn-danger" onClick={() => setSuspendOpen(true)}>계정 정지</GatedButton>
+          <GatedButton gate={masterGate} className="sc-btn ac-btn-danger" onClick={() => setSuspendOpen(true)}>계정 정지</GatedButton>
         )}
         <Link className="sc-btn" to={`/app/admin/wallets?userId=${m.userId}`}>코인 조정</Link>
       </div>
@@ -85,14 +85,14 @@ function MemberDetail({ userId }: { userId: number }) {
       {history.isSuccess && history.data.content.length === 0 && <Empty title="이력이 없습니다" />}
       {history.isSuccess && history.data.content.length > 0 && (
         <>
-          <table className="ad-table">
+          <table className="ac-table">
             <thead><tr><th>시각</th><th>변경</th><th>사유</th><th>처리자</th></tr></thead>
             <tbody>
               {history.data.content.map((h, i) => (
                 <tr key={`${h.createdAt}-${i}`}>
                   <td>{fmtTime(h.createdAt)}</td>
                   <td><StatusChip status={h.previousStatus} /> → <StatusChip status={h.currentStatus} /></td>
-                  <td>{h.reason ?? <span className="ad-muted">—</span>}</td>
+                  <td>{h.reason ?? <span className="ac-muted">—</span>}</td>
                   <td className="num">{h.actorUserId === 0 ? '시스템' : `#${h.actorUserId}`}</td>
                 </tr>
               ))}
@@ -114,7 +114,7 @@ function MemberDetail({ userId }: { userId: number }) {
       >
         <p className="sc-note">정지되면 즉시 모든 요청이 거절되고 월드에서도 나갑니다. 사유는 이력과 감사 기록에 그대로 남습니다.</p>
         <ReasonField id="suspend-reason" label="정지 사유" value={reason} onChange={setReason} placeholder="예: 부스 내 욕설 신고 3건" />
-        {reason !== '' && reasonProblem(reason) !== null && <span className="ad-field-error">{reasonProblem(reason)}</span>}
+        {reason !== '' && reasonProblem(reason) !== null && <span className="ac-field-error">{reasonProblem(reason)}</span>}
       </ConfirmDialog>
       <ConfirmDialog
         open={unsuspendOpen}

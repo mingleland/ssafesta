@@ -31,21 +31,21 @@ export function AdminsSection() {
   const lastAdmin = admins.isSuccess && admins.data.length <= 1;
 
   return (
-    <div className="ad-split">
-      <section className="sc-card ad-work" aria-label="관리자 목록">
+    <div className="ac-split">
+      <section className="sc-card ac-work" aria-label="관리자 목록">
         <h3 className="sc-section-title">관리자 목록</h3>
         {admins.isPending && <Loading />}
         {admins.isError && <ErrorBanner error={admins.error} onRetry={() => void admins.refetch()} />}
         {admins.isSuccess && admins.data.length === 0 && <Empty title="관리자가 없습니다" hint="이 상태는 API 로 되돌릴 수 없습니다 — 마이그레이션이 필요합니다." />}
         {admins.isSuccess && admins.data.length > 0 && (
-          <table className="ad-table">
+          <table className="ac-table">
             <thead><tr><th>번호</th><th>닉네임</th><th>구분</th><th /></tr></thead>
             <tbody>
               {admins.data.map((a) => (
                 <tr key={a.userId}>
                   <td className="num">{a.userId}</td>
                   <td>{a.nickname}</td>
-                  <td>{a.master ? <span className="ad-chip ad-chip-master">마스터</span> : <span className="ad-chip ad-chip-gold">관리자</span>}</td>
+                  <td>{a.master ? <span className="ac-chip ac-chip-master">마스터</span> : <span className="ac-chip ac-chip-gold">관리자</span>}</td>
                   <td>
                     <GatedButton
                       className="sc-btn sc-btn-sm"
@@ -61,20 +61,20 @@ export function AdminsSection() {
         {demote.isError && <ErrorBanner error={demote.error} />}
       </section>
 
-      <section className="sc-card ad-work" aria-label="관리자 승격">
+      <section className="sc-card ac-work" aria-label="관리자 승격">
         <h3 className="sc-section-title">관리자 승격</h3>
         <p className="sc-note">관리자만 관리자를 만들 수 있습니다. 정지된 계정은 승격할 수 없고, 사유는 감사 기록에 그대로 남습니다.</p>
-        <form className="ad-form" onSubmit={(e) => { e.preventDefault(); if (userIdValid) promote.mutate(); }}>
-          <label className="ad-field" htmlFor="promote-user">
-            <span className="ad-label">회원 번호</span>
-            <input id="promote-user" className="ad-input" inputMode="numeric" value={userIdText} onChange={(e) => setUserIdText(e.target.value)} placeholder="회원 관리에서 찾은 번호" />
-            {userIdText !== '' && !userIdValid && <span className="ad-field-error">숫자만 입력합니다.</span>}
+        <form className="ac-form" onSubmit={(e) => { e.preventDefault(); if (userIdValid) promote.mutate(); }}>
+          <label className="ac-field" htmlFor="promote-user">
+            <span className="ac-label">회원 번호</span>
+            <input id="promote-user" className="ac-input" inputMode="numeric" value={userIdText} onChange={(e) => setUserIdText(e.target.value)} placeholder="회원 관리에서 찾은 번호" />
+            {userIdText !== '' && !userIdValid && <span className="ac-field-error">숫자만 입력합니다.</span>}
           </label>
-          <label className="ad-field" htmlFor="promote-note">
-            <span className="ad-label">사유 <em>선택</em></span>
-            <input id="promote-note" className="ad-input" value={note} maxLength={500} onChange={(e) => setNote(e.target.value)} placeholder="예: 운영 스태프 합류" />
+          <label className="ac-field" htmlFor="promote-note">
+            <span className="ac-label">사유 <em>선택</em></span>
+            <input id="promote-note" className="ac-input" value={note} maxLength={500} onChange={(e) => setNote(e.target.value)} placeholder="예: 운영 스태프 합류" />
           </label>
-          <div className="ad-actions">
+          <div className="ac-actions">
             <button type="submit" className="sc-btn sc-btn-primary" disabled={!userIdValid || promote.isPending}>{promote.isPending ? '처리 중...' : '승격'}</button>
           </div>
           {promote.isError && <ErrorBanner error={promote.error} />}

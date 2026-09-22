@@ -77,9 +77,13 @@ let adjustments = new Map<string, { signedAmount: number; result: AdjustmentResu
 
 // 관리자 부스는 상설 임대라 만료가 없다 — 만료 대신 언제부터 서 있는지를 든다 (S15P21A604-951).
 const ADMIN_BOOTH_SEED: AdminBoothView[] = [
-  { slotId: 1, slotCode: 'F11-R01', boothId: 11, name: 'AI 상담 부스', published: true, leaseStartedAt: at(-48), installedBy: '운영자 A' },
-  { slotId: 3, slotCode: 'F11-R03', boothId: 13, name: '싸피 프로젝트관', published: true, leaseStartedAt: at(-24), installedBy: '운영자 B' },
-  { slotId: 7, slotCode: 'F11-R07', boothId: 17, name: '관리자 부스 F11-R07', published: false, leaseStartedAt: at(-2), installedBy: null },
+  { slotId: 1, slotCode: 'F11-R01', boothId: 11, name: 'AI 상담 부스', published: true, leaseStartedAt: at(-48), installedBy: '운영자 A', adminOwned: true, leaseEndsAt: null },
+  { slotId: 3, slotCode: 'F11-R03', boothId: 13, name: '싸피 프로젝트관', published: true, leaseStartedAt: at(-24), installedBy: '운영자 B', adminOwned: true, leaseEndsAt: null },
+  { slotId: 7, slotCode: 'F11-R07', boothId: 17, name: '관리자 부스 F11-R07', published: false, leaseStartedAt: at(-2), installedBy: null, adminOwned: true, leaseEndsAt: null },
+  // 회원 부스 두 종 (#263) — 확인 대화문·통계 분기를 이 둘로 그대로 본다.
+  { slotId: 5, slotCode: 'F11-R05', boothId: 21, name: '구글 황덕 부스', published: true, leaseStartedAt: at(-6), installedBy: '구글 황덕', adminOwned: false, leaseEndsAt: at(18) },
+  // 임대가 끝나 자리 없이 콘텐츠만 남은 회원 부스 — slotId·slotCode 가 비고 정렬에서 맨 뒤로 간다.
+  { slotId: null, slotCode: null, boothId: 22, name: '만료된 회원 부스', published: false, leaseStartedAt: at(-72), installedBy: '카카오 라이언', adminOwned: false, leaseEndsAt: null },
 ];
 let booths: AdminBoothView[] = ADMIN_BOOTH_SEED.map((b) => ({ ...b }));
 /** 마스터 소유 부스 — 강제 비공개가 MASTER_PROTECTED 로 거절된다 */
