@@ -37,8 +37,16 @@ namespace Festa.Content.Arcade
         public string MachineId => _machineId;
 
         RetroArcadeGame _localGame;
-        BubbleShooterMiniGame _bubbleShooter;
+        MegaPackPongMiniGame _pong;
         MegaPackSpaceShooterMiniGame _megaShooter;
+        MegaPackGoldMinerMiniGame _goldMiner;
+        MegaPackMazeMiniGame _maze;
+        MegaPackCrossyMiniGame _crossy;
+        MegaPackBreakoutMiniGame _breakout;
+        MegaPackBugBonkMiniGame _bugBonk;
+        MegaPackNeonRacerMiniGame _neonRacer;
+        MegaPackNeonSnakeMiniGame _neonSnake;
+        MegaPackNeonStackMiniGame _neonStack;
 
         void Awake()
         {
@@ -49,18 +57,66 @@ namespace Festa.Content.Arcade
                 gameObject.AddComponent<BoxCollider>();
             if (GetComponent<BoothInteractionTarget>() == null)
                 gameObject.AddComponent<BoothInteractionTarget>();
-            if (_machineId == "arcade-01")
+            if (_machineId == "arcade-01" || _machineId == "arcade-11")
             {
                 // 1번 내장 게임은 화면 가장자리까지 읽을 수 있게 다른 기기보다 한 단계 더 줌인한다.
                 _cameraLocal = new Vector3(0f, 1.30f, 0.58f);
-                _bubbleShooter = GetComponent<BubbleShooterMiniGame>();
-                if (_bubbleShooter == null) _bubbleShooter = gameObject.AddComponent<BubbleShooterMiniGame>();
+                _pong = GetComponent<MegaPackPongMiniGame>();
+                if (_pong == null) _pong = gameObject.AddComponent<MegaPackPongMiniGame>();
             }
-            else if (_machineId == "arcade-02")
+            else if (_machineId == "arcade-02" || _machineId == "arcade-12")
             {
                 _cameraLocal = new Vector3(0f, 1.30f, 0.58f);
                 _megaShooter = GetComponent<MegaPackSpaceShooterMiniGame>();
                 if (_megaShooter == null) _megaShooter = gameObject.AddComponent<MegaPackSpaceShooterMiniGame>();
+            }
+            else if (_machineId == "arcade-03" || _machineId == "arcade-13")
+            {
+                _cameraLocal = new Vector3(0f, 1.30f, 0.58f);
+                _goldMiner = GetComponent<MegaPackGoldMinerMiniGame>();
+                if (_goldMiner == null) _goldMiner = gameObject.AddComponent<MegaPackGoldMinerMiniGame>();
+            }
+            else if (_machineId == "arcade-04" || _machineId == "arcade-14")
+            {
+                _cameraLocal = new Vector3(0f, 1.30f, 0.58f);
+                _maze = GetComponent<MegaPackMazeMiniGame>();
+                if (_maze == null) _maze = gameObject.AddComponent<MegaPackMazeMiniGame>();
+            }
+            else if (_machineId == "arcade-05" || _machineId == "arcade-15")
+            {
+                _cameraLocal = new Vector3(0f, 1.30f, 0.58f);
+                _crossy = GetComponent<MegaPackCrossyMiniGame>();
+                if (_crossy == null) _crossy = gameObject.AddComponent<MegaPackCrossyMiniGame>();
+            }
+            else if (_machineId == "arcade-06" || _machineId == "arcade-16")
+            {
+                _cameraLocal = new Vector3(0f, 1.30f, 0.58f);
+                _breakout = GetComponent<MegaPackBreakoutMiniGame>();
+                if (_breakout == null) _breakout = gameObject.AddComponent<MegaPackBreakoutMiniGame>();
+            }
+            else if (_machineId == "arcade-07" || _machineId == "arcade-17")
+            {
+                _cameraLocal = new Vector3(0f, 1.30f, 0.58f);
+                _bugBonk = GetComponent<MegaPackBugBonkMiniGame>();
+                if (_bugBonk == null) _bugBonk = gameObject.AddComponent<MegaPackBugBonkMiniGame>();
+            }
+            else if (_machineId == "arcade-08" || _machineId == "arcade-18")
+            {
+                _cameraLocal = new Vector3(0f, 1.30f, 0.58f);
+                _neonRacer = GetComponent<MegaPackNeonRacerMiniGame>();
+                if (_neonRacer == null) _neonRacer = gameObject.AddComponent<MegaPackNeonRacerMiniGame>();
+            }
+            else if (_machineId == "arcade-09" || _machineId == "arcade-19")
+            {
+                _cameraLocal = new Vector3(0f, 1.30f, 0.58f);
+                _neonSnake = GetComponent<MegaPackNeonSnakeMiniGame>();
+                if (_neonSnake == null) _neonSnake = gameObject.AddComponent<MegaPackNeonSnakeMiniGame>();
+            }
+            else if (_machineId == "arcade-10" || _machineId == "arcade-20")
+            {
+                _cameraLocal = new Vector3(0f, 1.30f, 0.58f);
+                _neonStack = GetComponent<MegaPackNeonStackMiniGame>();
+                if (_neonStack == null) _neonStack = gameObject.AddComponent<MegaPackNeonStackMiniGame>();
             }
             else
             {
@@ -87,8 +143,16 @@ namespace Festa.Content.Arcade
             }
 
             InteractionFocusCamera.Focus(transform, _cameraLocal, _lookLocal, true, false);
-            bool openedLocally = _bubbleShooter != null ? _bubbleShooter.Begin()
+            bool openedLocally = _pong != null ? _pong.Begin()
                 : _megaShooter != null ? _megaShooter.Begin()
+                : _goldMiner != null ? _goldMiner.Begin()
+                : _maze != null ? _maze.Begin()
+                : _crossy != null ? _crossy.Begin()
+                : _breakout != null ? _breakout.Begin()
+                : _bugBonk != null ? _bugBonk.Begin()
+                : _neonRacer != null ? _neonRacer.Begin()
+                : _neonSnake != null ? _neonSnake.Begin()
+                : _neonStack != null ? _neonStack.Begin()
                 : _localGame != null && _localGame.Begin();
             if (!openedLocally) BoothInteractBridge.SendArcadeInteract(_machineId);
             if (po != null) StartCoroutine(AlignToStandSpot(po.transform));
