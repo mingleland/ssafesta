@@ -475,7 +475,7 @@ namespace Festa.World
         [SerializeField] bool _hideWhenOccluded = true;
 
         /// <summary>가림 판정 간격(프레임). 사람이 많을수록 레이 수가 늘어나므로 매 프레임 쏘지 않는다.</summary>
-        const int OcclusionInterval = 3;
+        const int OcclusionInterval = 6;
         int _occlusionFrame = -100;
         bool _occluded;
 
