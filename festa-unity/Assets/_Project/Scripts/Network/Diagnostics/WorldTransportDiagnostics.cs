@@ -167,7 +167,8 @@ namespace Festa.Network
             string config = _utp == null
                 ? "transport=non-UTP"
                 : $"heartbeat={_utp.HeartbeatTimeoutMS}ms disconnect={_utp.DisconnectTimeoutMS}ms " +
-                  $"connect={_utp.ConnectTimeoutMS}ms attempts={_utp.MaxConnectAttempts}";
+                  $"connect={_utp.ConnectTimeoutMS}ms attempts={_utp.MaxConnectAttempts} " +
+                  $"maxSendQueue={_utp.MaxSendQueueSize}B";
 
             return $"role={(_manager.IsServer ? "server" : "client")} clientId={clientId} " +
                    $"endpoint={endpoint} rtt={rtt}ms {config}";
