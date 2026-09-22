@@ -11,7 +11,7 @@ import { useProfile } from '../../profile/model/profile';
 
 export function WalletsSection({ userId, onSelect }: { userId: number | null; onSelect: (userId: number | null) => void }) {
   return (
-    <div className="ad-split">
+    <div className="ac-split">
       <MemberSearch selectedUserId={userId} onSelect={onSelect} />
       {userId === null ? (
         <section className="sc-card"><Empty title="회원을 선택하세요" hint="잔액·거래 내역을 보고 코인을 조정합니다." /></section>
@@ -54,35 +54,35 @@ function WalletDetail({ userId }: { userId: number }) {
     : null;
 
   return (
-    <section className="sc-card ad-work" aria-label="지갑 상세">
-      <div className="ad-head">
-        <h2>{member.data?.nickname ?? `회원 #${userId}`} <span className="ad-muted">#{userId}</span></h2>
+    <section className="sc-card ac-work" aria-label="지갑 상세">
+      <div className="ac-head">
+        <h2>{member.data?.nickname ?? `회원 #${userId}`} <span className="ac-muted">#{userId}</span></h2>
         {balance.isSuccess && <strong>{balance.data.balance.toLocaleString('ko-KR')} 코인</strong>}
       </div>
       {balance.isError && <ErrorBanner error={balance.error} onRetry={() => void balance.refetch()} />}
 
       {draft === null ? (
-        <div className="ad-actions">
+        <div className="ac-actions">
           <GatedButton gate={masterGate} className="sc-btn sc-btn-primary" onClick={startDraft}>코인 조정 시작</GatedButton>
         </div>
       ) : (
-        <form className="ad-form" aria-label="코인 조정" onSubmit={(e) => { e.preventDefault(); if (problem === null && !conflict) adjust.mutate(draft); }}>
-          <KeyValue rows={[['요청 키', <code key="k" className="ad-muted">{draft.key}</code>]]} />
-          <label className="ad-field" htmlFor="adjust-amount">
-            <span className="ad-label">금액 <em>양수 지급 · 음수 회수</em></span>
-            <input id="adjust-amount" className="ad-input" inputMode="numeric" value={amountText} disabled={adjust.isSuccess}
+        <form className="ac-form" aria-label="코인 조정" onSubmit={(e) => { e.preventDefault(); if (problem === null && !conflict) adjust.mutate(draft); }}>
+          <KeyValue rows={[['요청 키', <code key="k" className="ac-muted">{draft.key}</code>]]} />
+          <label className="ac-field" htmlFor="adjust-amount">
+            <span className="ac-label">금액 <em>양수 지급 · 음수 회수</em></span>
+            <input id="adjust-amount" className="ac-input" inputMode="numeric" value={amountText} disabled={adjust.isSuccess}
               onChange={(e) => { setAmountText(e.target.value); setDraft(editDraft(draft, { signedAmount: Number(e.target.value) })); }} placeholder="예: 100 또는 -50" />
-            {amountText !== '' && problem !== null && <span className="ad-field-error">{problem}</span>}
+            {amountText !== '' && problem !== null && <span className="ac-field-error">{problem}</span>}
           </label>
-          <label className="ad-field" htmlFor="adjust-note">
-            <span className="ad-label">사유 <em>감사 기록에 남는다</em></span>
-            <input id="adjust-note" className="ad-input" value={draft.note} maxLength={500} disabled={adjust.isSuccess}
+          <label className="ac-field" htmlFor="adjust-note">
+            <span className="ac-label">사유 <em>감사 기록에 남는다</em></span>
+            <input id="adjust-note" className="ac-input" value={draft.note} maxLength={500} disabled={adjust.isSuccess}
               onChange={(e) => setDraft(editDraft(draft, { note: e.target.value }))} placeholder="예: 이벤트 보상 누락 보정" />
           </label>
-          <div className="ad-actions">
+          <div className="ac-actions">
             {adjust.isSuccess ? (
               <>
-                <span className="ad-ok">
+                <span className="ac-ok">
                   {adjust.data.alreadyApplied ? '이미 처리된 조정입니다 (같은 키 재요청).' : '반영됐습니다.'} 조정 후 잔액 {adjust.data.balanceAfter.toLocaleString('ko-KR')} 코인 · 원장 #{adjust.data.entryId}
                 </span>
                 <button type="button" className="sc-btn sc-btn-primary" onClick={startDraft}>새 조정 시작</button>
@@ -108,7 +108,7 @@ function WalletDetail({ userId }: { userId: number }) {
       {ledger.isSuccess && ledger.data.content.length === 0 && <Empty title="거래 내역이 없습니다" />}
       {ledger.isSuccess && ledger.data.content.length > 0 && (
         <>
-          <table className="ad-table">
+          <table className="ac-table">
             <thead><tr><th>시각</th><th>사유</th><th className="num">금액</th><th className="num">잔액</th><th>참조</th></tr></thead>
             <tbody>
               {ledger.data.content.map((e) => (
@@ -117,7 +117,7 @@ function WalletDetail({ userId }: { userId: number }) {
                   <td>{labelForReason(e.reasonType)}</td>
                   <td className="num">{fmtCoin(e.amount)}</td>
                   <td className="num">{e.balanceAfter.toLocaleString('ko-KR')}</td>
-                  <td className="ad-muted">{e.referenceType === null ? '—' : `${e.referenceType} ${e.referenceId ?? ''}`}</td>
+                  <td className="ac-muted">{e.referenceType === null ? '—' : `${e.referenceType} ${e.referenceId ?? ''}`}</td>
                 </tr>
               ))}
             </tbody>

@@ -5,7 +5,7 @@ import { adminApi } from '../../../entities/admin/api.select';
 import { ErrorBanner } from './common';
 
 function Stat({ to, value, label }: { to: string; value: string | number; label: string }) {
-  return <Link to={to} className="ad-stat"><strong>{value}</strong><span>{label}</span></Link>;
+  return <Link to={to} className="ac-stat"><strong>{value}</strong><span>{label}</span></Link>;
 }
 
 export function OverviewSection() {
@@ -17,13 +17,15 @@ export function OverviewSection() {
   const dash = (q: { isSuccess: boolean; data?: unknown }, pick: () => string | number) => (q.isSuccess ? pick() : '…');
 
   return (
-    <div className="ad-work">
-      <section className="sc-card ad-work">
+    <div className="ac-work">
+      <section className="sc-card ac-work">
         <h3 className="sc-section-title">지금 처리할 것</h3>
-        <div className="ad-stats">
+        <div className="ac-stats">
           <Stat to="/app/admin/shop" value={dash(pending, () => pending.data!.totalElements)} label="경품 지급 대기" />
           <Stat to="/app/admin/shop" value={dash(purchased, () => purchased.data!.totalElements)} label="구매 완료 · 미처리" />
-          <Stat to="/app/admin/booths" value={dash(booths, () => booths.data!.filter((b) => b.published).length)} label="공개 중인 관리자 부스" />
+          {/* 목록에 회원 부스도 오므로(#263) adminOwned 로 걸러야 실제 관리자 부스 수가 된다.
+              BE 가 필드를 싣기 전에는 전부 관리자 부스라 `?? true` 가 종전 값을 그대로 낸다. */}
+          <Stat to="/app/admin/booths" value={dash(booths, () => booths.data!.filter((b) => b.published && (b.adminOwned ?? true)).length)} label="공개 중인 관리자 부스" />
           <Stat to="/app/admin/surveys" value={dash(surveys, () => surveys.data!.reduce((n, s) => n + s.entrantCount, 0))} label="공식 설문 참여자" />
           <Stat to="/app/admin/admins" value={dash(admins, () => admins.data!.length)} label="관리자" />
         </div>
