@@ -37,6 +37,11 @@ namespace Festa.Content.Arcade
         int _score;
         int _lives;
         uint _rng;
+        float _catWorldX;
+        float _catCheckpoint;
+        float _catEnemyX;
+        float _catInvincibleUntil;
+        bool _catCleared;
 
         public string Title => Titles[_index];
 
@@ -80,7 +85,20 @@ namespace Festa.Content.Arcade
             _vx = ((_index & 1) == 0 ? 1f : -1f) * speed;
             _vy = speed * 0.72f;
             _nextTick = 0f;
+            if (_index == 0) ResetCatStage(false);
             DrawGame();
+        }
+
+        void ResetCatStage(bool keepCheckpoint)
+        {
+            if (!keepCheckpoint) { _catCheckpoint = 12f; _score = 0; _lives = 3; }
+            _catWorldX = _catCheckpoint;
+            _playerX = 28f;
+            _y = 15f;
+            _vy = 0f;
+            _catEnemyX = 205f;
+            _catInvincibleUntil = 0f;
+            _catCleared = false;
         }
 
         void Update()
@@ -97,6 +115,13 @@ namespace Festa.Content.Arcade
             if (Time.unscaledTime < _nextTick) return;
             float dt = Mathf.Min(0.1f, Time.unscaledDeltaTime + Tick);
             _nextTick = Time.unscaledTime + Tick;
+
+            if (_index == 0)
+            {
+                TickCatPlatformer(dt);
+                DrawGame();
+                return;
+            }
 
             float move = 0f;
             if (Input.GetKey(KeyCode.LeftArrow) || Input.GetKey(KeyCode.A)) move -= 1f;
@@ -140,16 +165,58 @@ namespace Festa.Content.Arcade
 
         void TickCatPlatformer(float dt)
         {
-            bool grounded = _y <= 14.1f;
-            if (grounded) { _y = 14f; if (_vy < 0f) _vy = 0f; }
-            if (grounded && (Input.GetKeyDown(KeyCode.Space) || Input.GetKeyDown(KeyCode.UpArrow) || Input.GetKeyDown(KeyCode.W))) _vy = 34f;
-            _vy -= 62f * dt;
+            if (_catCleared)
+            {
+                if (Input.GetKeyDown(KeyCode.R) || Input.GetKeyDown(KeyCode.Space)) ResetCatStage(false);
+                return;
+            }
+
+            float move = 0f;
+            if (Input.GetKey(KeyCode.LeftArrow) || Input.GetKey(KeyCode.A)) move--;
+            if (Input.GetKey(KeyCode.RightArrow) || Input.GetKey(KeyCode.D)) move++;
+            _catWorldX = Mathf.Clamp(_catWorldX + move * 38f * dt, 4f, 624f);
+
+            float ground = CatGroundAt(_catWorldX);
+            bool grounded = _y <= ground + 0.5f && _vy <= 0f;
+            if (grounded) { _y = ground; _vy = 0f; }
+            if (grounded && (Input.GetKeyDown(KeyCode.Space) || Input.GetKeyDown(KeyCode.UpArrow) || Input.GetKeyDown(KeyCode.W))) _vy = 39f;
+            _vy -= 74f * dt;
             _y += _vy * dt;
 
-            // 가운데 발판은 밟으면 꺼지고, 오른쪽 물음표 블록은 아래에서 치면 가시가 나온다.
-            bool trapOpen = ((int)Time.unscaledTime + _score) % 6 >= 4;
-            if (trapOpen && _playerX > 55f && _playerX < 72f && _y <= 15f) LoseLife();
-            if (_playerX > Width - 13f) { _score += 10; _playerX = 8f; _y = 14f; }
+            // 1) 첫 구덩이, 2) 접근하면 솟는 가시, 3) 움직이는 적, 4) 낙하 발판을 순서대로 넘는다.
+            bool risingSpikes = _catWorldX > 254f && _catWorldX < 292f;
+            if ((_y < 1f || risingSpikes && _y < 23f) && Time.unscaledTime >= _catInvincibleUntil) CatHit();
+
+            _catEnemyX = 205f + Mathf.PingPong(Time.unscaledTime * 18f, 34f);
+            if (Mathf.Abs(_catWorldX - _catEnemyX) < 9f && Mathf.Abs(_y - 14f) < 10f && Time.unscaledTime >= _catInvincibleUntil)
+            {
+                if (_vy < -8f && _y > 19f) { _score += 100; _vy = 28f; _catEnemyX = -1000f; }
+                else CatHit();
+            }
+
+            if (_catWorldX >= 318f && _catCheckpoint < 318f) { _catCheckpoint = 318f; _score += 250; }
+            if (_catWorldX >= 612f) { _catCleared = true; _score += 1000; }
+
+            float cameraX = Mathf.Clamp(_catWorldX - 28f, 0f, 512f);
+            _playerX = _catWorldX - cameraX;
+        }
+
+        float CatGroundAt(float x)
+        {
+            if (x > 80f && x < 116f || x > 370f && x < 414f || x > 505f && x < 536f) return -20f;
+            if (x > 145f && x < 183f) return 28f;
+            if (x > 430f && x < 468f) return 38f;
+            return 14f;
+        }
+
+        void CatHit()
+        {
+            _lives--;
+            if (_lives <= 0) { ResetCatStage(false); return; }
+            _catWorldX = _catCheckpoint;
+            _y = 18f;
+            _vy = 16f;
+            _catInvincibleUntil = Time.unscaledTime + 1.2f;
         }
 
         void TickDodge(float dt)
@@ -282,22 +349,18 @@ namespace Festa.Content.Arcade
 
             if (_index == 0)
             {
-                Rect(3, 7, Width - 6, 6, new Color32(95, 61, 39, 255));
-                for (int x = 4; x < Width - 4; x += 9) Rect(x, 13, 7, 3, new Color32(54, 190, 89, 255));
-                Rect(42, 34, 24, 5, new Color32(176, 106, 54, 255));
-                Rect(84, 48, 15, 15, new Color32(255, 190, 35, 255));
-                // 고양이 주인공: 귀·얼굴·몸·꼬리까지 읽히는 16비트 실루엣.
+                DrawCatStage(primary, accent);
                 int cx = (int)_playerX, cy = (int)_y;
-                Rect(cx - 5, cy, 10, 8, new Color32(255, 226, 166, 255));
-                Rect(cx - 6, cy + 7, 4, 5, new Color32(255, 190, 139, 255));
-                Rect(cx + 2, cy + 7, 4, 5, new Color32(255, 190, 139, 255));
-                Rect(cx - 4, cy - 5, 8, 6, new Color32(245, 211, 151, 255));
+                Color32 cat = Time.unscaledTime < _catInvincibleUntil && ((int)(Time.unscaledTime * 12f) & 1) == 0
+                    ? new Color32(255,255,255,90) : new Color32(255, 226, 166, 255);
+                Rect(cx - 5, cy, 10, 8, cat);
+                Rect(cx - 6, cy + 7, 4, 5, new Color32(255, 145, 70, 255));
+                Rect(cx + 2, cy + 7, 4, 5, new Color32(255, 145, 70, 255));
+                Rect(cx - 4, cy - 5, 8, 6, cat);
                 Rect(cx - 3, cy + 4, 2, 2, new Color32(33, 67, 91, 255));
                 Rect(cx + 2, cy + 4, 2, 2, new Color32(33, 67, 91, 255));
-                Rect(cx - 8, cy - 2, 4, 3, new Color32(255, 226, 166, 255));
-                bool trapOpen = ((int)Time.unscaledTime + _score) % 6 >= 4;
-                if (trapOpen) for (int x = 57; x < 72; x += 5) { Rect(x, 13, 3, 7, new Color32(255, 75, 82, 255)); Rect(x + 1, 20, 1, 4, Color.white); }
-                Rect(115, 16, 3, 24, accent); Rect(118, 34, 7, 5, primary);
+                Rect(cx - 8, cy - 2, 4, 3, cat);
+                if (_catCleared) { Rect(18,35,92,30,new Color32(4,8,24,235));Frame(18,35,92,30,primary);DrawText(30,52,"STAGE CLEAR",primary,2);DrawText(34,40,"SPACE AGAIN",Color.white,1); }
             }
             else
             {
@@ -325,6 +388,48 @@ namespace Festa.Content.Arcade
                 }
             }
             Upload();
+        }
+
+        void DrawCatStage(Color32 p, Color32 a)
+        {
+            float cameraX = Mathf.Clamp(_catWorldX - 28f, 0f, 512f);
+            // 하늘, 구름, 먼 산은 카메라보다 느리게 움직여 깊이를 만든다.
+            Rect(3,3,Width-6,Height-6,new Color32(20,36,78,255));
+            for(int i=0;i<5;i++){int x=(int)(i*41-cameraX*.18f)%180;Rect(x,65+(i%2)*9,22,5,new Color32(80,103,160,255));Rect(x+5,70+(i%2)*9,12,5,new Color32(80,103,160,255));}
+            for(int wx=0;wx<640;wx+=10){int sx=(int)(wx-cameraX);float gy=CatGroundAt(wx+5);if(gy>-10f){Rect(sx,3,10,(int)gy,new Color32(104,62,42,255));Rect(sx,(int)gy,10,3,new Color32(65,210,94,255));}}
+            DrawWorldRect(145,28,38,5,cameraX,new Color32(176,106,54,255));
+            DrawWorldRect(430,38,38,5,cameraX,new Color32(176,106,54,255));
+            // 접근하면 솟는 가시.
+            if(_catWorldX>235f)for(int wx=256;wx<292;wx+=7){int sx=(int)(wx-cameraX);Rect(sx,14,5,9,new Color32(255,70,86,255));Rect(sx+2,23,1,5,Color.white);}
+            // 순찰 적.
+            if(_catEnemyX>0f){int ex=(int)(_catEnemyX-cameraX);Rect(ex-6,14,12,7,new Color32(120,255,90,255));Rect(ex-4,21,3,3,Color.white);Rect(ex+2,21,3,3,Color.white);}
+            // 체크포인트와 골인 깃발.
+            DrawWorldRect(318,14,3,27,cameraX,p);DrawWorldRect(321,34,12,7,cameraX,new Color32(255,190,35,255));
+            DrawWorldRect(612,14,3,42,cameraX,Color.white);DrawWorldRect(615,48,12,8,cameraX,a);
+            // 첫 화면에는 조작법을 직접 표시한다.
+            if(_catWorldX<48f){DrawText(8,79,"A D MOVE",Color.white,1);DrawText(69,79,"SPACE JUMP",p,1);}
+            DrawText(5,88,"TRICKY CAT",p,1);
+        }
+
+        void DrawWorldRect(float wx,int y,int w,int h,float cameraX,Color32 c) => Rect((int)(wx-cameraX),y,w,h,c);
+
+        void DrawText(int x,int y,string text,Color32 color,int scale)
+        {
+            int cursor=x;
+            foreach(char ch in text){uint bits=Glyph(ch);for(int row=0;row<5;row++)for(int col=0;col<3;col++)if((bits&(1u<<(row*3+col)))!=0)Rect(cursor+col*scale,y-row*scale,scale,scale,color);cursor+=4*scale;}
+        }
+
+        static uint Glyph(char c)
+        {
+            return c switch
+            {
+                'A'=>0b010_101_111_101_101u,'C'=>0b111_100_100_100_111u,'D'=>0b110_101_101_101_110u,
+                'E'=>0b111_100_110_100_111u,'G'=>0b111_100_101_101_111u,'I'=>0b111_010_010_010_111u,
+                'J'=>0b001_001_001_101_111u,'L'=>0b100_100_100_100_111u,'M'=>0b101_111_111_101_101u,
+                'N'=>0b101_111_111_111_101u,'O'=>0b111_101_101_101_111u,'P'=>0b110_101_110_100_100u,
+                'R'=>0b110_101_110_101_101u,'S'=>0b111_100_111_001_111u,'T'=>0b111_010_010_010_010u,
+                'V'=>0b101_101_101_101_010u,'Y'=>0b101_101_010_010_010u,' '=>0u,_=>0b111_001_010_000_010u
+            };
         }
 
         void DrawRoad(Color32 p, Color32 a) { for (int y=5;y<90;y+=12) Rect(62,y,4,7,Color.white); Rect((int)_playerX-5,7,10,15,p); Rect((int)_x-6,(int)_y-6,12,12,a); }

@@ -25,7 +25,7 @@ namespace Festa.Content.Arcade
 
         [Header("초점 카메라 (게임기 로컬 좌표 — 스케일 포함)")]
         // 화면 실측: 중심 로컬 (0, 1.30, 0.30), 크기 0.50 × 0.40 m. 0.5 m 앞에서 보면 화면이 시야를 거의 채운다.
-        [SerializeField] Vector3 _cameraLocal = new(0f, 1.30f, 0.80f);
+        [SerializeField] Vector3 _cameraLocal = new(0f, 1.30f, 0.52f);
         [SerializeField] Vector3 _lookLocal = new(0f, 1.30f, 0.30f);
 
         [Header("조작 자리 (게임기 로컬 좌표 — 화면 정면이 +Z)")]
