@@ -2,6 +2,7 @@
 // 이 파일이 있는 이유: 좌석은 씬에 이미 놓여 있고 게시본과 무관하다. 게시 여부에 얽매이면
 // 임대 전 부스에서는 앉을 수 없게 되는데, 의자에 앉는 것은 부스 콘텐츠가 아니라 월드 가구다.
 using UnityEngine;
+using UnityEngine.SceneManagement;
 
 namespace Festa.World
 {
@@ -19,10 +20,15 @@ namespace Festa.World
     {
         const string ObjectName = "BoothChairBinder";
         const int InteriorCount = 12;
-        const int ScanInterval = 90;     // 프레임 — 1.5 초쯤
+        const int StartupScanInterval = 90;
+        const int SeatsPerInterior = 4;
 
         int _lastReported = -1;
+        int _lastSeatCount = -1;
+        int _nextStartupScan;
+        bool _initialScanComplete;
         Transform _root;
+        static bool s_rescanRequested;
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         static void AutoRegister()
@@ -35,39 +41,80 @@ namespace Festa.World
 
         void Update()
         {
-            if (Time.frameCount % ScanInterval != 0) return;
+            // 씬이 처음 설 때만 누락된 Studio를 짧게 재시도한다. 준비가 끝난 뒤에는
+            // WorldBoothPublishedBootstrap의 재구성 이벤트만 받는다 — 5초마다 12실을
+            // 전수 탐색하면 WebGL에서 배열 할당과 콜라이더 탐색이 계속 누적된다.
+            if (!s_rescanRequested && _initialScanComplete) return;
+            if (!s_rescanRequested && Time.frameCount < _nextStartupScan) return;
+            s_rescanRequested = false;
+            _nextStartupScan = Time.frameCount + StartupScanInterval;
 
             var root = ResolveRoot();
             if (root == null) return;
-            int attached = Scan(root);
+            int attached = Scan(root, out int seats, out int studios);
+            _initialScanComplete = studios == InteriorCount;
 
             // **한 번 붙이고 끝내지 않는다.** 처음에는 12부스를 다 붙이면 스스로 꺼졌는데, 인테리어가
             // 그 뒤에 다시 만들어지면서 붙여 둔 컴포넌트가 통째로 사라졌다 — 실측하니 48개가 0개가 됐고
             // 사용자 화면에서는 "어떤 의자만 앉힌다" 로 보였다 (2026-09-18).
-            // 다시 짓는 쪽을 쫓아다니는 대신 계속 지켜본다. 1.5 초에 한 번 Find 12회 + 컴포넌트 조회 48회라
-            // 비용이 무시할 수준이고, 무엇이 언제 다시 짓든 빠지지 않는다.
-            if (attached > 0 && attached != _lastReported)
+            // 다시 짓는 쪽을 쫓아다니되, 게시본 재구성 알림이면 즉시, 그 외에는 5초 안전망으로만 확인한다.
+            // 평상시 전수 탐색을 매 1.5초마다 반복해 WebGL GC를 자극하지 않으면서도 재생성은 놓치지 않는다.
+            if ((attached > 0 && attached != _lastReported) || seats != _lastSeatCount)
             {
                 _lastReported = attached;
-                Debug.Log($"[BoothChairBinder] 좌석 {attached}개에 착석을 붙였다");
+                _lastSeatCount = seats;
+                Debug.Log($"[BoothChairBinder] 착석 대상 {seats}개 중 새 연결 {attached}개");
+                if (seats > InteriorCount * 4)
+                    Debug.LogWarning($"[BoothChairBinder] 기대 좌석 수(48)를 넘는 {seats}개를 발견했다 — 저작 계층의 장식용 Chair/Stool 이름을 확인하라.");
             }
         }
 
-        int Scan(Transform root)
+        void OnEnable()
+        {
+            Festa.Booth.WorldBoothPublishedBootstrap.BoothsRebuilt += RequestRescan;
+            SceneManager.sceneLoaded += OnSceneLoaded;
+        }
+
+        void OnDisable()
+        {
+            Festa.Booth.WorldBoothPublishedBootstrap.BoothsRebuilt -= RequestRescan;
+            SceneManager.sceneLoaded -= OnSceneLoaded;
+        }
+
+        void OnSceneLoaded(Scene _, LoadSceneMode __)
+        {
+            _root = null;
+            _initialScanComplete = false;
+            _nextStartupScan = 0;
+        }
+        static void RequestRescan() => s_rescanRequested = true;
+
+        int Scan(Transform root, out int seats, out int studios)
         {
             int attachedNow = 0;
+            seats = 0;
+            studios = 0;
             for (int slot = 1; slot <= InteriorCount; slot++)
             {
                 var studio = root.Find($"Interior_{slot:00}/BoothSlot_{slot}/Studio");
                 if (studio == null) continue;
+                studios++;
 
                 // **이름 목록을 박아 두지 않는다.** 처음에는 Chair_L1·Stool_R1 네 개를 적어 뒀는데,
                 // 부스마다 좌석 이름이 Chair_1·Chair_2·Stool_1·Stool_2 로 제각각이라 12부스 중 한 곳만
                 // 앉을 수 있었다 (사용자 지적 2026-09-18 "파란 의자만 안 된다").
                 // Studio 바로 아래의 Chair*/Stool* 을 전부 잡는다.
+                int acceptedHere = 0;
                 foreach (Transform seat in studio)
                 {
                     if (!IsSeatName(seat.name)) continue;
+                    if (acceptedHere >= SeatsPerInterior)
+                    {
+                        Debug.LogWarning($"[BoothChairBinder] Interior_{slot:00}의 추가 좌석 후보 '{seat.name}'를 무시했다 — 설계 상한은 {SeatsPerInterior}개다.");
+                        continue;
+                    }
+                    acceptedHere++;
+                    seats++;
                     if (seat.GetComponent<BoothChairInteractable>() != null) continue;
                     var chair = seat.gameObject.AddComponent<BoothChairInteractable>();
                     chair.SetSeatHeightRatio(SeatRatioOf(seat));
