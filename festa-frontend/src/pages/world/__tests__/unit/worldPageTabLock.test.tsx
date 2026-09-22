@@ -56,11 +56,14 @@ afterEach(() => {
 
 async function renderWorld() {
   const { WorldPage } = await import('../../WorldPage');
-  return render(
+  const result = render(
     <MemoryRouter initialEntries={['/app/world']}>
       <WorldPage />
     </MemoryRouter>,
   );
+  // 진입 환영 안내(-599)를 걷고 시작한다 — 떠 있으면 월드가 주인이 아니라 Tab 판정이 달라진다.
+  act(() => { closeOverlay(); });
+  return result;
 }
 
 describe('Tab 키 잠금 (-450, -838)', () => {

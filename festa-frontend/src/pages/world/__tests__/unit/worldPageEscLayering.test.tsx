@@ -95,11 +95,14 @@ const unityModal = (patch: { focus?: boolean; minigame?: boolean; avatar?: boole
 
 async function renderWorld() {
   const { WorldPage } = await import('../../WorldPage');
-  return render(
+  const result = render(
     <MemoryRouter initialEntries={['/app/world']}>
       <WorldPage />
     </MemoryRouter>,
   );
+  // 진입 환영 안내(-599)를 걷고 시작한다 — 떠 있으면 ESC 가 그것부터 닫아 다른 것을 잰다.
+  act(() => { closeOverlay(); });
+  return result;
 }
 
 describe('WorldPage ESC 계층 (-450)', () => {
