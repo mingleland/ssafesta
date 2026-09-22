@@ -3,7 +3,6 @@ package com.example.ssafesta.mission;
 import com.example.ssafesta.booth.BoothVisitRepository;
 import com.example.ssafesta.common.ApiException;
 import com.example.ssafesta.common.ErrorCode;
-import com.example.ssafesta.consultation.ConsultationRepository;
 import com.example.ssafesta.minigame.HighStrikerService;
 import com.example.ssafesta.minigame.MinigameSessionRepository;
 import com.example.ssafesta.minigame.MinigameSessionStatus;
@@ -33,27 +32,25 @@ public class DailyMissionService {
 
     private static final String SLOT_REFERENCE_TYPE = "SLOT_SPIN";
 
-    private final ConsultationRepository consultations;
     private final SurveyResponseRepository surveyResponses;
     private final MinigameSessionRepository minigameSessions;
     private final BoothVisitRepository boothVisits;
     private final CoinLedgerEntryRepository ledger;
     private final WalletService wallets;
     private final WalletProperties walletProperties;
-    private final WorldMissionProgressService worldProgress;
+    private final DailyMissionMarkerService markers;
 
-    public DailyMissionService(ConsultationRepository consultations, SurveyResponseRepository surveyResponses,
+    public DailyMissionService(SurveyResponseRepository surveyResponses,
                                MinigameSessionRepository minigameSessions, BoothVisitRepository boothVisits,
                                CoinLedgerEntryRepository ledger, WalletService wallets,
-                               WalletProperties walletProperties, WorldMissionProgressService worldProgress) {
-        this.consultations = consultations;
+                               WalletProperties walletProperties, DailyMissionMarkerService markers) {
         this.surveyResponses = surveyResponses;
         this.minigameSessions = minigameSessions;
         this.boothVisits = boothVisits;
         this.ledger = ledger;
         this.wallets = wallets;
         this.walletProperties = walletProperties;
-        this.worldProgress = worldProgress;
+        this.markers = markers;
     }
 
     @Transactional(readOnly = true)
@@ -107,8 +104,7 @@ public class DailyMissionService {
         Instant from = date.atStartOfDay(zone()).toInstant();
         Instant to = date.plusDays(1).atStartOfDay(zone()).toInstant();
         return switch (mission) {
-            case AI_CONSULT -> asProgress(consultations
-                    .countByVisitorUserIdAndRequestedAtGreaterThanEqualAndRequestedAtLessThan(userId, from, to));
+            case AI_CONSULT -> markers.has(DailyMission.AI_CONSULT, userId, date) ? 1 : 0;
             case SURVEY_ANSWER -> asProgress(surveyResponses
                     .countByRespondentUserIdAndSubmittedAtGreaterThanEqualAndSubmittedAtLessThan(userId, from, to));
             case STRIKER_PLAY_3 -> asProgress(minigameSessions
@@ -124,7 +120,7 @@ public class DailyMissionService {
                     SLOT_REFERENCE_TYPE, from, to));
             case BOOTH_VISIT_3, BOOTH_VISIT_6 -> asProgress(
                     boothVisits.countDistinctBoothsVisitedByUserBetween(userId, from, to));
-            case WORLD_ENTER -> worldProgress.hasEntered(userId, date) ? 1 : 0;
+            case WORLD_ENTER -> markers.has(DailyMission.WORLD_ENTER, userId, date) ? 1 : 0;
         };
     }
 

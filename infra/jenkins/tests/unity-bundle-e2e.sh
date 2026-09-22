@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Unity Release Bundle publisher 의 멱등 계약과 E2E job 의 경계(fixture 는 demo 전용, canonical/Production 무오염)를 고정한다.
+# Unity Release Bundle publisher 의 멱등·Demo deploy trigger 계약과 수동 E2E job 경계를 고정한다.
 set -euo pipefail
 
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -12,7 +12,7 @@ fail() { echo "FAIL: $*" >&2; exit 1; }
 for path in "${publisher}" "${pipeline}" "${job}"; do [[ -f "${path}" ]] || fail "missing ${path}"; done
 
 # ── job/pipeline 계약
-grep -q "pipelineJob('festa-unity-bundle-e2e')" "${job}" || fail 'E2E job name is the trigger contract'
+grep -q "pipelineJob('festa-unity-bundle-e2e')" "${job}" || fail 'manual E2E job is missing'
 # 등록되지 않은 Job DSL 파일은 reload 해도 job 이 생기지 않는다 — 실제로 한 번 겪었다.
 grep -q 'gitlab-unity-bundle-e2e.groovy' "${repo_root}/infra/jenkins/casc/jobs.yaml" || fail 'E2E job must be registered in CasC jobs.yaml'
 grep -q "booleanParam('FIXTURE_MODE'" "${job}" || fail 'fixture mode must be an explicit parameter'
@@ -36,6 +36,10 @@ grep -q 'validate-game-release-set.sh' "${pipeline}" || fail 'artifact contract 
 # package-write 는 Secret text 다 — usernamePassword 로 묶으면 실행 중에 죽는다(빌드 #1).
 grep -q "string(credentialsId: writeCredentialId" "${pipeline}" || fail 'package write credential must bind as secret text'
 grep -q 'apiEnvironment' "${pipeline}" || fail 'apiEnvironment must be asserted'
+grep -q 'festa-gitlab-develop/job/develop' "${publisher}" || fail 'publisher must trigger the persistent develop Demo deploy'
+grep -q 'UNITY_ARTIFACT_CANDIDATE=' "${publisher}" || fail 'publisher must select the uploaded source commit'
+grep -q 'DEPLOY_GAME_TO_DEMO=true' "${publisher}" || fail 'publisher must request persistent Demo deployment'
+! grep -q 'JENKINS_BUNDLE_E2E_JOB' "${publisher}" || fail 'publisher must not trigger the temporary E2E job'
 
 # ── publisher 멱등 계약 (curl 스텁)
 work="$(mktemp -d)"
@@ -55,16 +59,22 @@ url=''
 out=''
 upload=''
 write_out=''
+data=''
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --output) out="$2"; shift 2 ;;
     --upload-file) upload="$2"; shift 2 ;;
     --write-out) write_out="$2"; shift 2 ;;
-    --header|--user|--data-urlencode|--cookie|--cookie-jar) shift 2 ;;
+    --data-urlencode) data="${data}${data:+ }$2"; shift 2 ;;
+    --header|--user|--cookie|--cookie-jar) shift 2 ;;
     http*) url="$1"; shift ;;
     *) shift ;;
   esac
 done
+if [[ "${url}" == *buildWithParameters ]]; then
+  printf 'TRIGGER %s %s\n' "${url}" "${data}" >>"${CURL_LOG}"
+  exit 0
+fi
 if [[ -n "${upload}" ]]; then
   printf 'UPLOAD %s\n' "${url}" >>"${CURL_LOG}"
   exit 0
@@ -86,6 +96,7 @@ chmod +x "${work}/curl"
 mkdir -p "${work}/bin"
 cat >"${work}/bin/validate-webgl-archive.sh" <<'STUB'
 #!/usr/bin/env bash
+[[ "${FAIL_WEBGL_VALIDATION:-0}" != 1 ]] || exit 65
 echo "WEBGL_ARCHIVE_OK 558d6624eb53e3ddcd72bef0bc8a2845e97d68b2 deadbeef"
 STUB
 cat >"${work}/bin/validate-game-image-archive.sh" <<'STUB'
@@ -119,5 +130,26 @@ if run_publish EXISTING_BUNDLE_SHA="${work}/other.sha256" >/dev/null 2>"${work}/
 fi
 grep -q 'BUNDLE_IDENTITY_COLLISION' "${work}/err" || fail "collision must say so: $(cat "${work}/err")"
 [[ ! -s "${work}/curl.log" ]] || fail 'collision must stop before uploading'
+
+# 정상 bundle 게시 완료는 임시 E2E 가 아니라 실제 develop Demo 배포를 시작한다.
+: >"${work}/curl.log"
+out="$(env GITLAB_PACKAGE_TOKEN=token CURL_BIN="${work}/curl" CURL_LOG="${work}/curl.log" \
+  EXISTING_BUNDLE_SHA="${work}/remote.sha256" JENKINS_URL=https://ci.example JENKINS_USER=user JENKINS_API_TOKEN=token \
+  bash "${work}/bin/publish-unity-release-bundle.sh" --bundle-dir "${bundle}" --source-commit "${commit}")"
+grep -q '^TRIGGERED_DEMO_DEPLOY:' <<<"${out}" || fail "publisher must report the Demo deploy trigger: ${out}"
+grep -q '/job/festa-gitlab-develop/job/develop/buildWithParameters' "${work}/curl.log" || fail 'publisher triggered the wrong Jenkins job'
+grep -q "UNITY_ARTIFACT_CANDIDATE=${commit}" "${work}/curl.log" || fail 'publisher did not pass the full source commit'
+grep -q 'DEPLOY_GAME_TO_DEMO=true' "${work}/curl.log" || fail 'publisher did not request Demo game deployment'
+
+# validator 가 거절하면 Registry upload 와 Jenkins trigger 모두 금지한다.
+: >"${work}/curl.log"
+set +e
+env FAIL_WEBGL_VALIDATION=1 GITLAB_PACKAGE_TOKEN=token CURL_BIN="${work}/curl" CURL_LOG="${work}/curl.log" \
+  JENKINS_URL=https://ci.example JENKINS_USER=user JENKINS_API_TOKEN=token \
+  bash "${work}/bin/publish-unity-release-bundle.sh" --bundle-dir "${bundle}" --source-commit "${commit}" >/dev/null 2>&1
+invalid_rc=$?
+set -e
+[[ "${invalid_rc}" -ne 0 ]] || fail 'invalid bundle must fail'
+[[ ! -s "${work}/curl.log" ]] || fail 'invalid bundle must stop before upload or Demo trigger'
 
 echo 'PASS: unity release bundle publisher and demo E2E boundaries'

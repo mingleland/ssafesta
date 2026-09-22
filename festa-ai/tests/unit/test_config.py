@@ -81,6 +81,7 @@ def test_valid_env_loads_with_documented_defaults(
     assert config.settings.conversation_ttl_seconds == 1800
     assert config.settings.spring_booth_access_timeout_seconds == 1.0
     assert config.settings.spring_agent_config_timeout_seconds == 1.0
+    assert config.settings.spring_mission_marker_timeout_seconds == 1.0
     assert config.settings.llm_ttft_timeout_seconds == 15.0
     assert config.settings.llm_total_timeout_seconds == 60.0
     assert config.settings.jwt_secret_key == base64.b64decode(_VALID_JWT_SECRET)

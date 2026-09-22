@@ -39,8 +39,8 @@ public enum ErrorCode {
     NOT_COMPLETED(HttpStatus.BAD_REQUEST, "아직 완료하지 않은 일일 미션입니다."),
     ALREADY_CLAIMED(HttpStatus.CONFLICT, "오늘 이미 수령한 일일 미션입니다."),
     DAILY_CAP_REACHED(HttpStatus.CONFLICT, "오늘의 일일 미션 보상 한도에 도달했습니다."),
-    WORLD_MISSION_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE,
-            "월드 입장 미션 진행도를 확인할 수 없습니다. 잠시 후 다시 시도해 주세요."),
+    MISSION_PROGRESS_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE,
+            "일일 미션 진행도를 확인할 수 없습니다. 잠시 후 다시 시도해 주세요."),
 
     // ── 관리자 (S15P21A604-742) ─────────────────────────────────────────────
     /**
