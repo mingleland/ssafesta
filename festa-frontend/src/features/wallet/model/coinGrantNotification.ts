@@ -43,10 +43,41 @@ export function isCoinGrantNotification(value: unknown): value is CoinGrantNotif
  */
 const SILENT_REASONS: ReadonlySet<string> = new Set(['SLOT_PAYOUT']);
 
+/**
+ * 월드에 들어서기 전까지 코인 토스트를 붙들어 둔다.
+ *
+ * 가입·일일 지급은 로그인 직후 한꺼번에 오는데 그때 화면은 아직 "게임을 준비하고 있어요" 로딩
+ * 판이다 — 토스트가 그 위에 떴다 혼자 사라져 사용자는 받은 줄을 모른다.
+ *
+ * **붙드는 것은 알림 한 줄뿐이다.** 잔액·내역 invalidate 와 워터마크는 종전대로 그 자리에서
+ * 간다 — SILENT_REASONS 와 같은 규칙이다. 미루는 것이지 버리는 것이 아니다.
+ *
+ * 붙드는 쪽은 `WorldPage` 다. "들어왔다" 를 아는 곳이 거기 하나이기 때문이고, 월드를 거치지
+ * 않는 화면(게임 목록·관리자 콘솔 등)에서는 아무도 붙들지 않으므로 종전대로 즉시 뜬다.
+ */
+let holdingToasts = false;
+const pendingToasts: string[] = [];
+
+export function holdCoinGrantToasts(): void {
+  holdingToasts = true;
+}
+
+/** 붙들기를 풀고 그동안 쌓인 것을 낸다. 입장 순간과 월드를 떠나는 순간 둘 다 여기로 온다. */
+export function releaseCoinGrantToasts(): void {
+  holdingToasts = false;
+  for (const message of pendingToasts) showToast(message, 'success');
+  pendingToasts.length = 0;
+}
+
 function announceGrant(amount: number, reasonType: string): void {
   if (SILENT_REASONS.has(reasonType)) return;
   const reasonText = labelForReason(reasonType);
-  showToast(`${reasonText} +${amount} 코인이 지급되었습니다.`, 'success');
+  const message = `${reasonText} +${amount} 코인이 지급되었습니다.`;
+  if (holdingToasts) {
+    pendingToasts.push(message);
+    return;
+  }
+  showToast(message, 'success');
 }
 
 /**
@@ -111,6 +142,12 @@ export function receiveCoinGrantNotification(raw: string): void {
  * 그중 최근에 놓친 가입·일일 지급은 토스트를 대신 띄운다.
  */
 export function startCoinGrantNotifications(): () => void {
+  // **여기서 바로 붙든다.** WorldPage 가 붙들기를 설치하기 전에 이 catch-up 이 먼저 끝나 버린다 —
+  // 로그인 처리(세션이 member 가 되는 순간)가 월드 라우트 진입보다 앞서기 때문이다. 그 경합에서
+  // 가입·일일 지급 토스트가 로딩 판 위로 새어 나갔다. 구독을 시작하는 이 자리가 catch-up 을
+  // 띄우는 자리와 같은 동기 호출 안이라, 여기서 켜면 새어 나갈 틈이 없다.
+  holdCoinGrantToasts();
+
   const stop = subscribeRealtime(COIN_QUEUE, receiveCoinGrantNotification);
 
   // S15P21A604-923/953: 구독 전에 발행된 지급(가입 INITIAL_GRANT, 첫 접속 DAILY_GRANT)은
@@ -139,5 +176,11 @@ export function startCoinGrantNotifications(): () => void {
     console.error('[coinGrantNotification] 실시간 연결 실패 —', error);
   });
 
-  return stop;
+  // 세션이 끝나면 붙들기와 대기분을 버린다. 남겨 두면 다음 로그인의 입장 순간에 **남의 계정**
+  // 토스트가 튀어나온다. 버려도 원장·잔액에는 그대로 남아 있다.
+  return () => {
+    stop();
+    pendingToasts.length = 0;
+    holdingToasts = false;
+  };
 }
