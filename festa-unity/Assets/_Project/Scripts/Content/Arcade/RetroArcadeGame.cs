@@ -42,6 +42,11 @@ namespace Festa.Content.Arcade
         float _catEnemyX;
         float _catInvincibleUntil;
         bool _catCleared;
+        PixelFrame[] _catIdle;
+        PixelFrame[] _catRun;
+        PixelFrame[] _catJumpUp;
+        PixelFrame[] _catJumpFall;
+        PixelFrame[] _catHurt;
 
         public string Title => Titles[_index];
 
@@ -62,7 +67,26 @@ namespace Festa.Content.Arcade
             }
             _index = Mathf.Clamp(parsed - 1, 0, Titles.Length - 1);
             _rng = (uint)(0x9E3779B9u + _index * 977u);
+            if (_index == 0 && _catIdle == null) LoadCatArt();
             if (_texture != null) DrawAttract();
+        }
+
+        void LoadCatArt()
+        {
+            _catIdle = LoadFrames("Arcade/TrickyCat/Sprites/01_Idle");
+            _catRun = LoadFrames("Arcade/TrickyCat/Sprites/02_Run");
+            _catJumpUp = LoadFrames("Arcade/TrickyCat/Sprites/03_Jump/01_Up");
+            _catJumpFall = LoadFrames("Arcade/TrickyCat/Sprites/03_Jump/02_Fall");
+            _catHurt = LoadFrames("Arcade/TrickyCat/Sprites/04_Hurt");
+        }
+
+        static PixelFrame[] LoadFrames(string path)
+        {
+            var textures = Resources.LoadAll<Texture2D>(path);
+            Array.Sort(textures, (a, b) => string.CompareOrdinal(a.name, b.name));
+            var frames = new PixelFrame[textures.Length];
+            for (int i = 0; i < textures.Length; i++) frames[i] = PixelFrame.Crop(textures[i]);
+            return frames;
         }
 
         public bool Begin()
@@ -316,6 +340,11 @@ namespace Festa.Content.Arcade
             _pixels = new Color32[Width * Height];
             _screenMaterial.SetTexture("_BaseMap", _texture);
             _screenMaterial.mainTexture = _texture;
+            // 캐비닛 모델의 화면 UV가 좌우 반전되어 있어 로컬 게임 텍스처만 보정한다.
+            _screenMaterial.SetTextureScale("_BaseMap", new Vector2(-1f, 1f));
+            _screenMaterial.SetTextureOffset("_BaseMap", new Vector2(1f, 0f));
+            _screenMaterial.mainTextureScale = new Vector2(-1f, 1f);
+            _screenMaterial.mainTextureOffset = new Vector2(1f, 0f);
         }
 
         void DrawAttract()
@@ -353,13 +382,15 @@ namespace Festa.Content.Arcade
                 int cx = (int)_playerX, cy = (int)_y;
                 Color32 cat = Time.unscaledTime < _catInvincibleUntil && ((int)(Time.unscaledTime * 12f) & 1) == 0
                     ? new Color32(255,255,255,90) : new Color32(255, 226, 166, 255);
-                Rect(cx - 5, cy, 10, 8, cat);
-                Rect(cx - 6, cy + 7, 4, 5, new Color32(255, 145, 70, 255));
-                Rect(cx + 2, cy + 7, 4, 5, new Color32(255, 145, 70, 255));
-                Rect(cx - 4, cy - 5, 8, 6, cat);
-                Rect(cx - 3, cy + 4, 2, 2, new Color32(33, 67, 91, 255));
-                Rect(cx + 2, cy + 4, 2, 2, new Color32(33, 67, 91, 255));
-                Rect(cx - 8, cy - 2, 4, 3, cat);
+                PixelFrame[] animation = Time.unscaledTime < _catInvincibleUntil ? _catHurt
+                    : _vy > 2f ? _catJumpUp : _vy < -2f ? _catJumpFall
+                    : (Input.GetKey(KeyCode.A) || Input.GetKey(KeyCode.D) || Input.GetKey(KeyCode.LeftArrow) || Input.GetKey(KeyCode.RightArrow)) ? _catRun : _catIdle;
+                if (animation != null && animation.Length > 0)
+                {
+                    int frame = Mathf.FloorToInt(Time.unscaledTime * 10f) % animation.Length;
+                    DrawSprite(animation[frame], cx, cy - 7, 27, Input.GetKey(KeyCode.LeftArrow) || Input.GetKey(KeyCode.A));
+                }
+                else Rect(cx - 8, cy, 16, 20, cat);
                 if (_catCleared) { Rect(18,35,92,30,new Color32(4,8,24,235));Frame(18,35,92,30,primary);DrawText(30,52,"STAGE CLEAR",primary,2);DrawText(34,40,"SPACE AGAIN",Color.white,1); }
             }
             else
@@ -407,7 +438,7 @@ namespace Festa.Content.Arcade
             DrawWorldRect(318,14,3,27,cameraX,p);DrawWorldRect(321,34,12,7,cameraX,new Color32(255,190,35,255));
             DrawWorldRect(612,14,3,42,cameraX,Color.white);DrawWorldRect(615,48,12,8,cameraX,a);
             // 첫 화면에는 조작법을 직접 표시한다.
-            if(_catWorldX<48f){DrawText(8,79,"A D MOVE",Color.white,1);DrawText(69,79,"SPACE JUMP",p,1);}
+            if(_catWorldX<48f){Rect(4,61,120,23,new Color32(3,8,24,220));DrawText(8,78,"A D MOVE",Color.white,1);DrawText(68,78,"SPACE JUMP",p,1);}
             DrawText(5,88,"TRICKY CAT",p,1);
         }
 
@@ -416,7 +447,49 @@ namespace Festa.Content.Arcade
         void DrawText(int x,int y,string text,Color32 color,int scale)
         {
             int cursor=x;
-            foreach(char ch in text){uint bits=Glyph(ch);for(int row=0;row<5;row++)for(int col=0;col<3;col++)if((bits&(1u<<(row*3+col)))!=0)Rect(cursor+col*scale,y-row*scale,scale,scale,color);cursor+=4*scale;}
+            foreach(char ch in text){uint bits=Glyph(ch);for(int row=0;row<5;row++)for(int col=0;col<3;col++)if((bits&(1u<<((4-row)*3+(2-col))))!=0)Rect(cursor+col*scale,y-row*scale,scale,scale,color);cursor+=4*scale;}
+        }
+
+        void DrawSprite(PixelFrame frame, int centerX, int bottomY, int targetHeight, bool flipX)
+        {
+            if (frame == null || frame.Width == 0 || frame.Height == 0) return;
+            int targetWidth = Mathf.Max(1, Mathf.RoundToInt(targetHeight * (float)frame.Width / frame.Height));
+            int left = centerX - targetWidth / 2;
+            for (int dy = 0; dy < targetHeight; dy++)
+            {
+                int sy = Mathf.Clamp(dy * frame.Height / targetHeight, 0, frame.Height - 1);
+                for (int dx = 0; dx < targetWidth; dx++)
+                {
+                    int sx = Mathf.Clamp(dx * frame.Width / targetWidth, 0, frame.Width - 1);
+                    if (flipX) sx = frame.Width - 1 - sx;
+                    Color32 color = frame.Pixels[sy * frame.Width + sx];
+                    if (color.a < 24) continue;
+                    int px = left + dx, py = bottomY + dy;
+                    if (px >= 0 && px < Width && py >= 0 && py < Height) _pixels[py * Width + px] = color;
+                }
+            }
+        }
+
+        sealed class PixelFrame
+        {
+            public readonly int Width;
+            public readonly int Height;
+            public readonly Color32[] Pixels;
+
+            PixelFrame(int width, int height, Color32[] pixels) { Width = width; Height = height; Pixels = pixels; }
+
+            public static PixelFrame Crop(Texture2D source)
+            {
+                var pixels = source.GetPixels32();
+                int minX = source.width, minY = source.height, maxX = -1, maxY = -1;
+                for (int y = 0; y < source.height; y++) for (int x = 0; x < source.width; x++)
+                    if (pixels[y * source.width + x].a >= 24) { minX = Mathf.Min(minX, x); minY = Mathf.Min(minY, y); maxX = Mathf.Max(maxX, x); maxY = Mathf.Max(maxY, y); }
+                if (maxX < minX || maxY < minY) return new PixelFrame(0, 0, Array.Empty<Color32>());
+                int width = maxX - minX + 1, height = maxY - minY + 1;
+                var cropped = new Color32[width * height];
+                for (int y = 0; y < height; y++) Array.Copy(pixels, (minY + y) * source.width + minX, cropped, y * width, width);
+                return new PixelFrame(width, height, cropped);
+            }
         }
 
         static uint Glyph(char c)

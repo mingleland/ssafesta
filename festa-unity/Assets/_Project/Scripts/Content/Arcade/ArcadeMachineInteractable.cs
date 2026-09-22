@@ -40,6 +40,9 @@ namespace Festa.Content.Arcade
 
         void Awake()
         {
+            // 기존 씬에 직렬화된 0.80 값이 코드 기본값을 덮으므로 런타임에서 화면 확대값을 고정한다.
+            _cameraLocal = new Vector3(0f, 1.30f, 0.48f);
+            _lookLocal = new Vector3(0f, 1.30f, 0.30f);
             if (GetComponentsInChildren<Collider>(true).Length == 0)
                 gameObject.AddComponent<BoxCollider>();
             if (GetComponent<BoothInteractionTarget>() == null)
