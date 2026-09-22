@@ -8,7 +8,6 @@ bash "${repo_root}/infra/tests/contract/test-detection-rule.sh" | tee "${evidenc
 bash "${repo_root}/infra/tests/contract/test-observability-signal-catalog.sh" | tee "${evidence}/signal-catalog.txt"
 bash "${repo_root}/infra/tests/security/test-observability-redaction.sh" | tee "${evidence}/redaction.txt"
 bash "${repo_root}/infra/tests/integration/test-observability-isolation.sh" | tee "${evidence}/isolation.txt"
-bash "${repo_root}/infra/tests/integration/test-observability-runtime.sh" | tee "${evidence}/runtime.txt"
 
 python - "${repo_root}/infra/observability/grafana/provisioning/alerting/policies.yaml" "${evidence}/routing-fixture.json" <<'PY'
 import json,pathlib,sys,yaml

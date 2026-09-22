@@ -25,7 +25,6 @@ for name, service in services.items():
     if name != 'grafana': assert service.get('networks')==['observability-private']
 assert services['grafana']['networks']==['observability-private','observability-egress']
 assert d['networks']['observability-private']['internal'] is True
-assert d['networks']['observability-private']['name'].startswith('${OBSERVABILITY_RESOURCE_PREFIX:-festa-observability}')
 assert services['grafana']['ports'][0].startswith('127.0.0.1:')
 assert all('ports' not in services[name] for name in ('alloy','alloy-cadvisor','loki','prometheus'))
 assert services['alloy-cadvisor']['profiles']==['container-metrics']

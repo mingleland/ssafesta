@@ -67,7 +67,7 @@ services:
       resources:
         limits: {cpus: "${LOKI_CPU_LIMIT:?approve after baseline}", memory: "${LOKI_MEMORY_LIMIT:?approve after baseline}"}
   loki-init:
-    image: ${LOKI_IMAGE:-grafana/loki:3.7.4}
+    image: alpine:3.21
     user: "0:0"
     network_mode: none
     restart: "no"
@@ -121,13 +121,13 @@ services:
         limits: {cpus: "${GRAFANA_CPU_LIMIT:?approve after baseline}", memory: "${GRAFANA_MEMORY_LIMIT:?approve after baseline}"}
 networks:
   observability-private:
-    name: "${OBSERVABILITY_RESOURCE_PREFIX:-festa-observability}-private"
+    name: festa-observability-private
     internal: true
   observability-egress:
-    name: "${OBSERVABILITY_RESOURCE_PREFIX:-festa-observability}-egress"
+    name: festa-observability-egress
 volumes:
-  alloy-data: {name: "${OBSERVABILITY_RESOURCE_PREFIX:-festa-observability}-alloy"}
-  alloy-cadvisor-data: {name: "${OBSERVABILITY_RESOURCE_PREFIX:-festa-observability}-alloy-cadvisor"}
-  loki-data: {name: "${OBSERVABILITY_RESOURCE_PREFIX:-festa-observability}-loki"}
-  prometheus-data: {name: "${OBSERVABILITY_RESOURCE_PREFIX:-festa-observability}-prometheus"}
-  grafana-data: {name: "${OBSERVABILITY_RESOURCE_PREFIX:-festa-observability}-grafana"}
+  alloy-data: {name: festa-observability-alloy}
+  alloy-cadvisor-data: {name: festa-observability-alloy-cadvisor}
+  loki-data: {name: festa-observability-loki}
+  prometheus-data: {name: festa-observability-prometheus}
+  grafana-data: {name: festa-observability-grafana}
