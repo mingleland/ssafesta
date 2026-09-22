@@ -61,6 +61,67 @@ namespace Festa.World
             if (labelBack != null) labelBack.text = wrapped;
         }
 
+        TextMeshPro _projectTitle;
+        TextMeshPro _projectTitleShadow;
+        Transform _projectTitleRoot;
+
+        /// <summary>부스 지붕 위에 게시 프로젝트명만 표시한다. 빈 이름이면 오브젝트 자체를 숨긴다.</summary>
+        public void SetProjectTitle(string text)
+        {
+            bool show = !string.IsNullOrWhiteSpace(text);
+            if (!show)
+            {
+                if (_projectTitleRoot != null) _projectTitleRoot.gameObject.SetActive(false);
+                return;
+            }
+            EnsureProjectTitle();
+            if (_projectTitleRoot == null) return;
+            string value = text.Trim();
+            _projectTitle.text = value;
+            _projectTitleShadow.text = value;
+            _projectTitleRoot.gameObject.SetActive(true);
+        }
+
+        void EnsureProjectTitle()
+        {
+            if (_projectTitleRoot != null || label == null || label.font == null) return;
+            var root = new GameObject("@ProjectTitle").transform;
+            root.SetParent(transform, false);
+            root.localPosition = new Vector3(0f, 38f, 0f);
+            _projectTitleRoot = root;
+            _projectTitleShadow = CreateTitleLayer(root, "Shadow", new Vector3(0.18f, -0.18f, 0.08f), new Color(0.02f, 0.08f, 0.16f, 0.95f));
+            _projectTitle = CreateTitleLayer(root, "Face", Vector3.zero, new Color(0.32f, 0.78f, 1f, 1f));
+        }
+
+        TextMeshPro CreateTitleLayer(Transform parent, string objectName, Vector3 offset, Color color)
+        {
+            var go = new GameObject(objectName, typeof(RectTransform));
+            go.transform.SetParent(parent, false);
+            go.transform.localPosition = offset;
+            var tmp = go.AddComponent<TextMeshPro>();
+            tmp.font = label.font;
+            tmp.fontSharedMaterial = label.fontSharedMaterial;
+            tmp.color = color;
+            tmp.fontSize = 18f;
+            tmp.alignment = TextAlignmentOptions.Center;
+            tmp.textWrappingMode = TextWrappingModes.NoWrap;
+            tmp.rectTransform.sizeDelta = new Vector2(85f, 24f);
+            var renderer = go.GetComponent<MeshRenderer>();
+            renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            renderer.receiveShadows = false;
+            return tmp;
+        }
+
+        void LateUpdate()
+        {
+            if (_projectTitleRoot == null || !_projectTitleRoot.gameObject.activeSelf) return;
+            var camera = Camera.main;
+            if (camera == null) return;
+            Vector3 direction = _projectTitleRoot.position - camera.transform.position;
+            direction.y = 0f;
+            if (direction.sqrMagnitude > 0.001f) _projectTitleRoot.rotation = Quaternion.LookRotation(direction.normalized, Vector3.up);
+        }
+
         /// <summary>표지판 한 판에 허용하는 최대 줄 수. 넘치면 글자가 작아진다(자동 축소).</summary>
         public const int MaxLines = 4;
 

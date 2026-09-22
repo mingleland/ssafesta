@@ -36,19 +36,24 @@ namespace Festa.Content.Arcade
 
         public string MachineId => _machineId;
 
+        RetroArcadeGame _localGame;
+
         void Awake()
         {
             if (GetComponentsInChildren<Collider>(true).Length == 0)
                 gameObject.AddComponent<BoxCollider>();
             if (GetComponent<BoothInteractionTarget>() == null)
                 gameObject.AddComponent<BoothInteractionTarget>();
+            _localGame = GetComponent<RetroArcadeGame>();
+            if (_localGame == null) _localGame = gameObject.AddComponent<RetroArcadeGame>();
+            _localGame.Configure(_machineId);
             BoothInteractionInput.Ensure();
         }
 
         /// <summary>호스트가 이 시간 안에 화면을 열지 않으면 초점을 스스로 푼다.</summary>
         const float HostResponseTimeout = 3f;
 
-public void Interact()
+        public void Interact()
         {
             if (InteractionFocusCamera.IsFocused) return;
 
@@ -61,9 +66,10 @@ public void Interact()
             }
 
             InteractionFocusCamera.Focus(transform, _cameraLocal, _lookLocal);
-            BoothInteractBridge.SendArcadeInteract(_machineId);
+            bool openedLocally = _localGame != null && _localGame.Begin();
+            if (!openedLocally) BoothInteractBridge.SendArcadeInteract(_machineId);
             if (po != null) StartCoroutine(AlignToStandSpot(po.transform));
-            StartCoroutine(ReleaseIfHostNeverAnswers());
+            if (!openedLocally) StartCoroutine(ReleaseIfHostNeverAnswers());
         }
 
         /// <summary>조작 자리로 세우는 시간. 순간이동은 끊겨 보인다는 지적(2026-09-18)을 반영한 값이다.</summary>
