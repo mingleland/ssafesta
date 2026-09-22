@@ -36,10 +36,12 @@ namespace Festa.Network
 
             if (string.IsNullOrEmpty(LastReason))
             {
-                // 사유가 비어 있는 것도 정보다 — 서버가 거부한 게 아니라 전송이 끊긴 쪽에 가깝다.
-                LastMessage = "서버와의 연결이 끊겼습니다.";
-                Debug.LogWarning("[Disconnect] 서버가 사유를 보내지 않았다 — 네트워크 단절이거나 " +
-                                 "서버가 응답하지 않는 상태일 수 있다.");
+                // UTP 송신 큐 포화처럼 transport 자체가 실패하면 NGO 사유 패킷도 보낼 수 없다.
+                // 빈 문자열을 단순 사용자 네트워크 문제로 단정하지 않고 운영자가 확인할 지점을 남긴다.
+                LastMessage = "서버와의 연결이 끊겼습니다. 잠시 후 다시 입장해 주세요.";
+                Debug.LogWarning("[Disconnect] 서버가 사유를 보내지 않았다 — 클라이언트 네트워크 단절뿐 아니라 " +
+                                 "서버 transport 송신 큐 포화/프로세스 응답 중단 여부도 확인해야 한다. " +
+                                 "서버의 [WorldTransport] 로그와 'send queue full'을 함께 조회한다.");
                 return;
             }
 
