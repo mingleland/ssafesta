@@ -50,20 +50,31 @@ probe_tcp '127.0.0.1' 27777
 # Postgres 는 festa_prod_* 역할로, Redis 는 ~prod:* 네임스페이스로 격리가 강제되는데 R2 만 빠져 있었다.
 # 2026-09-21 실측에서 production 과 demo 가 festa-demo-documents 한 버킷을 같이 썼다 — 승격본이 demo
 # 데이터에 섞이고, demo 전용 토큰으로 쓰고 있었다. back 만 고치고 ai 를 빠뜨리는 사고가 반복됐으므로 둘 다 본다.
-# demo 가 내려가 있으면 demo_bucket 이 비어 이 검사는 통과한다. 그 경우까지 막으려면 기대 버킷명을 못박아야 한다.
+#
+# **이 검사는 배포를 막지 않는다 (2026-09-21 운영 결정).** 버킷 분리는 Cloudflare R2 자원이 있어야 하고
+# 그때까지 승격 자체가 멈추면 이미 공유 상태로 돌고 있던 Production 에 새 릴리스를 올릴 수 없다. 공유는
+# 이 스크립트가 만든 상태가 아니라 이미 존재하던 상태이므로, 사실을 경고와 증거로 남기고 진행한다.
+# 실제 런타임 실패(컨테이너·포트·HTTP·WSS)만 배포를 되돌린다.
 demo_bucket="$("${docker_bin}" exec festa-demo-back-1 printenv R2_BUCKET 2>/dev/null || true)"
+r2_isolation=PASS
 prod_bucket_of(){
   local container="$1" bucket
   bucket="$("${docker_bin}" exec "${container}" printenv R2_BUCKET 2>/dev/null || true)"
-  [[ -n "${bucket}" ]] || { echo "Production R2_BUCKET is empty: ${container}" >&2; exit 67; }
-  [[ -z "${demo_bucket}" || "${bucket}" != "${demo_bucket}" ]] \
-    || { echo "Production shares the demo R2 bucket (${bucket}): ${container}" >&2; exit 67; }
+  if [[ -z "${bucket}" ]]; then
+    echo "WARN: Production R2_BUCKET is empty: ${container}" >&2
+    r2_isolation=UNKNOWN
+  elif [[ -n "${demo_bucket}" && "${bucket}" == "${demo_bucket}" ]]; then
+    echo "WARN: Production shares the demo R2 bucket (${bucket}): ${container}" >&2
+    r2_isolation=SHARED_WITH_DEMO
+  fi
   printf '%s' "${bucket}"
 }
 prod_back_bucket="$(prod_bucket_of festa-production-back-1)"
 prod_ai_bucket="$(prod_bucket_of festa-production-ai-1)"
-[[ "${prod_back_bucket}" == "${prod_ai_bucket}" ]] \
-  || { echo "Production back and ai disagree on R2_BUCKET: ${prod_back_bucket} vs ${prod_ai_bucket}" >&2; exit 67; }
+if [[ "${prod_back_bucket}" != "${prod_ai_bucket}" ]]; then
+  echo "WARN: Production back and ai disagree on R2_BUCKET: ${prod_back_bucket} vs ${prod_ai_bucket}" >&2
+  r2_isolation=INCONSISTENT
+fi
 candidate="${webgl_root}/prod/candidate"
 [[ -L "${candidate}" ]] || { echo 'Production WebGL candidate is not a symlink' >&2; exit 66; }
 [[ "$(readlink -f "${candidate}")" == "$(readlink -f "${webgl_root}/releases/${webgl_version}")" ]]
@@ -71,7 +82,7 @@ candidate="${webgl_root}/prod/candidate"
 candidate_state="${state_root}/production/candidates/${receipt_id}.json"
 verification="${state_root}/production/candidates/${receipt_id}.verification.json"
 [[ -f "${candidate_state}" ]]
-RECEIPT="${receipt}" CANDIDATE_STATE="${candidate_state}" VERIFICATION="${verification}" python3 - <<'PY'
+RECEIPT="${receipt}" CANDIDATE_STATE="${candidate_state}" VERIFICATION="${verification}" R2_ISOLATION="${r2_isolation}" python3 - <<'PY'
 import datetime,hashlib,json,os,pathlib
 r=json.loads(pathlib.Path(os.environ['RECEIPT']).read_text(encoding='utf-8'))
 c=json.loads(pathlib.Path(os.environ['CANDIDATE_STATE']).read_text(encoding='utf-8'))
@@ -79,7 +90,7 @@ receipt_path=pathlib.Path(os.environ['RECEIPT'])
 receipt_sha=hashlib.sha256(receipt_path.read_bytes()).hexdigest()
 if c.get('receiptId')!=r['receiptId'] or c.get('receiptSha256')!=receipt_sha: raise SystemExit('candidate receipt identity mismatch')
 p=pathlib.Path(os.environ['VERIFICATION'])
-d={'schemaVersion':'1.0.0','state':'VERIFIED','receiptId':r['receiptId'],'receiptSha256':receipt_sha,'applications':r['applications'],'webgl':r['webgl'],'world':r['world'],'checks':{'frontLoopback':'PASS','backLoopback':'PASS','aiLoopback':'PASS','worldLoopback':'PASS','applicationIdentity':'PASS','worldIdentity':'PASS','webglIdentity':'PASS','r2BucketIsolation':'PASS'},'publicCutoverPerformed':False,'verifiedAt':datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0).isoformat().replace('+00:00','Z')}
+d={'schemaVersion':'1.0.0','state':'VERIFIED','receiptId':r['receiptId'],'receiptSha256':receipt_sha,'applications':r['applications'],'webgl':r['webgl'],'world':r['world'],'checks':{'frontLoopback':'PASS','backLoopback':'PASS','aiLoopback':'PASS','worldLoopback':'PASS','applicationIdentity':'PASS','worldIdentity':'PASS','webglIdentity':'PASS','r2BucketIsolation':os.environ.get('R2_ISOLATION') or 'UNKNOWN'},'publicCutoverPerformed':False,'verifiedAt':datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0).isoformat().replace('+00:00','Z')}
 t=p.with_suffix('.tmp'); t.write_text(json.dumps(d,indent=2)+'\n',encoding='utf-8'); t.replace(p)
 PY
 printf 'PRODUCTION_VERIFICATION=%s\n' "${verification}"

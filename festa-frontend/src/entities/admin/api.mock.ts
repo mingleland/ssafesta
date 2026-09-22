@@ -19,6 +19,7 @@ import type {
   EventEntrantView,
   EventQuestionAggregate,
   EventResponseDetail,
+  FeedbackView,
   Page,
   PrizePurchaseView,
   PrizeView,
@@ -127,6 +128,11 @@ let responses: EventResponseDetail[] = [
   { responseId: 904, userId: 6, nickname: '부스주인', submittedAt: at(10), answers: [{ questionId: 1, prompt: questions[0].prompt, value: '3' }, { questionId: 2, prompt: questions[1].prompt, value: 'AI 상담' }, { questionId: 3, prompt: questions[2].prompt, value: '부스 배치 범위를 넓혀 주세요' }] },
 ];
 let surveyClosed = false;
+
+let feedbacks: FeedbackView[] = [
+  { feedbackId: 1, userId: 5, nickname: '싸피생', content: '미니게임 로딩이 느려요', firstFound: false, createdAt: at(9) },
+  { feedbackId: 2, userId: 7, nickname: '이벤트참여자', content: '슬롯머신 확률이 표시된 것과 달라요', firstFound: true, createdAt: at(8, 30) },
+];
 
 function requireUser(userId: number): MockUser {
   const user = users.find((u) => u.userId === userId);
@@ -349,6 +355,18 @@ export const adminApi: AdminRepository = {
     if (found === undefined) throw apiError('SURVEY_RESPONSE_NOT_FOUND', 404, '응답을 찾을 수 없습니다.');
     return { ...found, answers: found.answers.map((a) => ({ ...a })) };
   },
+
+  async listFeedback(page, size) {
+    const rows = [...feedbacks].sort((a, b) => b.feedbackId - a.feedbackId);
+    return paginate(rows, page, size);
+  },
+
+  async setFeedbackFirstFound(feedbackId, firstFound) {
+    const found = feedbacks.find((f) => f.feedbackId === feedbackId);
+    if (found === undefined) throw apiError('FEEDBACK_NOT_FOUND', 404, '피드백을 찾을 수 없습니다.');
+    found.firstFound = firstFound;
+    return { ...found };
+  },
 };
 
 /** 테스트·시나리오 전용 — 콘솔을 여는 사람의 권한을 바꾼다 (비관리자 화면 재현) */
@@ -370,4 +388,8 @@ export function __resetAdminMockForTests(): void {
   purchases = PURCHASE_SEED.map((p) => ({ ...p }));
   responses = responses.map((r) => ({ ...r }));
   surveyClosed = false;
+  feedbacks = [
+    { feedbackId: 1, userId: 5, nickname: '싸피생', content: '미니게임 로딩이 느려요', firstFound: false, createdAt: at(9) },
+    { feedbackId: 2, userId: 7, nickname: '이벤트참여자', content: '슬롯머신 확률이 표시된 것과 달라요', firstFound: true, createdAt: at(8, 30) },
+  ];
 }

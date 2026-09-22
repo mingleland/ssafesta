@@ -36,7 +36,7 @@ function descriptions(): string[] {
 }
 
 describe('조작 항목', () => {
-  it('사용자가 실제로 묻는 기본 8종이 있다 (우클릭·Enter 채팅 포함)', () => {
+  it('사용자가 실제로 묻는 기본 9종이 있다 (우클릭·휠·Enter 채팅 포함)', () => {
     render(<ControlGuideList />);
     expect(hasControl(['W', 'A', 'S', 'D'], '이동')).toBe(true);
     expect(hasControl(['Shift'], '달리기')).toBe(true);
@@ -45,6 +45,7 @@ describe('조작 항목', () => {
     expect(hasControl(['F'], '상호작용')).toBe(true);
     expect(hasControl(['Alt', '클릭'], '감정')).toBe(true);
     expect(hasControl(['우클릭'], '시야')).toBe(true);
+    expect(hasControl(['휠'], '확대')).toBe(true);
     expect(hasControl(['Esc'], '메뉴')).toBe(true);
   });
 
@@ -65,7 +66,7 @@ describe('tab 미니맵 안내 — 축제장(부스 밖)일 때만', () => {
     applyBoothContext(true, 1);
     render(<ControlGuideList />);
     expect(hasControl(['Tab'], '미니맵')).toBe(false);
-    expect(descriptions()).toHaveLength(8);
+    expect(descriptions()).toHaveLength(9);
   });
 });
 
@@ -73,8 +74,8 @@ describe('설명 길이', () => {
   it('설명이 한 단어다 — 이 조건이 깨지면 카드가 다시 복잡해진다', () => {
     render(<ControlGuideList />);
     const found = descriptions();
-    // 기본 8종 + 부스 밖에서만 보이는 Tab 미니맵
-    expect(found.length).toBe(9);
+    // 기본 9종 + 부스 밖에서만 보이는 Tab 미니맵
+    expect(found.length).toBe(10);
     for (const text of found) {
       expect(text).not.toBe('');
       expect(text.includes(' ')).toBe(false);

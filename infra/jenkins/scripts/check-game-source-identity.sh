@@ -27,19 +27,30 @@ git -C "${repo}" cat-file -e "${source_commit}^{commit}" 2>/dev/null \
   || { echo "SOURCE_NOT_IN_REPOSITORY: ${source_commit} is not a commit known to ${remote}" >&2; exit 65; }
 
 # unityInputId 검증: pipelineCommit 과 artifactSourceCommit 의 Unity build input 이 동일해야 한다 (Batch 2-C).
+# resolve-game-artifacts.sh 와 같은 식별자를 만든다 — 두 곳이 다르게 판정하면 gate 가 통과시킨 것을
+# resolve 가 거부한다. 내용 기준(unity-content-id.sh)이 실패하면 예전 tree hash 로 내려간다.
 compute_unity_input_id() {
-  local c="$1"
-  "${python_bin}" - "${repo}" "${c}" <<'INNER_PY'
-import hashlib, subprocess, sys
+  local c="$1" content_id=''
+  content_id="$(GIT_REPO_DIR="${repo}" PYTHON_BIN="${python_bin}" bash "${script_dir}/unity-content-id.sh" "${c}" 2>/dev/null || true)"
+  if [[ -z "${content_id}" ]]; then
+    echo "UNITY_CONTENT_ID_UNAVAILABLE: falling back to the git tree hash for ${c}" >&2
+  fi
+  UNITY_CONTENT_ID="${content_id}" "${python_bin}" - "${repo}" "${c}" <<'INNER_PY'
+import hashlib, os, subprocess, sys
 repo, commit = sys.argv[1:3]
+content_id = os.environ.get('UNITY_CONTENT_ID') or ''
 try:
-    tree = subprocess.check_output(['git', '-C', repo, 'rev-parse', f'{commit}:festa-unity'], stderr=subprocess.DEVNULL).decode().strip()
     proj = subprocess.check_output(['git', '-C', repo, 'show', f'{commit}:festa-unity/ProjectSettings/ProjectVersion.txt'], stderr=subprocess.DEVNULL).decode()
     v = [l.split(':')[1].strip() for l in proj.splitlines() if l.startswith('m_EditorVersion:')][0]
     r = [l.split('(')[1].split(')')[0] for l in proj.splitlines() if l.startswith('m_EditorVersionWithRevision:')][0]
+    if content_id:
+        source = f'content={content_id}'
+    else:
+        tree = subprocess.check_output(['git', '-C', repo, 'rev-parse', f'{commit}:festa-unity'], stderr=subprocess.DEVNULL).decode().strip()
+        source = f'tree={tree}'
 except Exception:
     sys.exit(1)
-raw = f'tree={tree}|unityVersion={v}|unityRevision={r}|buildProfile=release|apiEnvironment=Prod|artifactContract=manifest-1.0.0'
+raw = f'{source}|unityVersion={v}|unityRevision={r}|buildProfile=release|apiEnvironment=Prod|artifactContract=manifest-1.0.0'
 print(hashlib.sha256(raw.encode('utf-8')).hexdigest())
 INNER_PY
 }

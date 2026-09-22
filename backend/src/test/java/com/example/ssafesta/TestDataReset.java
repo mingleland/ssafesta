@@ -50,7 +50,7 @@ public class TestDataReset implements BeforeAllCallback {
             "avatar_presets", "booth_daily_metrics", "booth_layout_drafts",
             "booth_layout_published_versions", "booth_leases", "booth_staffs", "booth_visit_events",
             "booths", "coin_ledger_entries", "coin_reconciliation_runs", "consultation_messages",
-            "consultations", "event_prizes", "event_purchases", "game_asset_delete_queue",
+            "consultations", "event_prizes", "event_purchases", "feedback_submissions", "game_asset_delete_queue",
             "game_assets", "game_drafts", "game_published_versions", "games", "minigame_sessions",
             "oauth_identities", "project_likes", "project_logo_uploads", "projects",
             "staff_invitations", "storage_reconciliation_log", "survey_answer_options",

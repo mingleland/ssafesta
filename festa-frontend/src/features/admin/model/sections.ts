@@ -7,6 +7,7 @@ export const ADMIN_SECTIONS = [
   { id: 'shop', label: '이벤트 상점', hint: '경품 · 구매 · 지급' },
   { id: 'surveys', label: '이벤트 설문', hint: '참여 · 응답 · 집계' },
   { id: 'booths', label: '부스 관리', hint: '조회 · 강제 비공개' },
+  { id: 'feedback', label: '피드백', hint: '목록 · 최초 발견 표시' },
 ] as const;
 
 export type AdminSectionId = (typeof ADMIN_SECTIONS)[number]['id'];

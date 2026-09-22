@@ -32,6 +32,10 @@ export function ControlGuideList() {
             <span className="world-key">우클릭</span>
             시야
           </li>
+          <li>
+            <span className="world-key">휠</span>
+            확대·축소
+          </li>
         </ul>
       </section>
       <section className="cg-group">

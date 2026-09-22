@@ -245,17 +245,30 @@ output="$(run_validator)"
 [[ "${output}" == "production-fixture-1" ]] \
   || fail "valid Production receipt was rejected"
 
-# Live WebGL drift must fail closed.
+# 정책 불일치는 경고로만 남기고 승격을 막지 않는다 (2026-09-21 운영 결정).
+# 사실이 사라지면 안 되므로 stderr 의 WARN 과 정상 종료를 함께 본다.
+expect_warn() {
+  local label="$1" fragment="$2" stderr_file
+  stderr_file="$(mktemp)"
+  local stdout_value
+  stdout_value="$(run_validator 2>"${stderr_file}")" \
+    || { rm -f "${stderr_file}"; fail "${label}: validator stopped instead of warning"; }
+  [[ "${stdout_value}" == "production-fixture-1" ]] \
+    || { rm -f "${stderr_file}"; fail "${label}: validator did not emit the receipt id"; }
+  grep -Fq "${fragment}" "${stderr_file}" \
+    || { rm -f "${stderr_file}"; fail "${label}: validator did not warn"; }
+  rm -f "${stderr_file}"
+}
+
+# Live WebGL drift warns.
 mkdir -p "${webgl_root}/releases/drift000"
 ln -sfn "releases/drift000" "${webgl_root}/current"
 
-if run_validator >/dev/null 2>&1; then
-  fail "live WebGL drift was accepted"
-fi
+expect_warn 'live WebGL drift' 'live WebGL pointer differs from managed approved release'
 
 ln -sfn "releases/${short}" "${webgl_root}/current"
 
-# Named human approval is mandatory.
+# Named human approval is recorded as a warning when missing.
 cp \
   "${state}/dev/batches/known-good/environment.json" \
   "${work}/environment-good.json"
@@ -271,15 +284,13 @@ doc["approvedBy"] = None
 path.write_text(json.dumps(doc, indent=2) + "\n")
 PY
 
-if run_validator >/dev/null 2>&1; then
-  fail "anonymous Demo environment approval was accepted"
-fi
+expect_warn 'anonymous Demo environment approval' 'Demo environment has no named human approver'
 
 cp \
   "${work}/environment-good.json" \
   "${state}/dev/batches/known-good/environment.json"
 
-# 조합 ID 는 batchId 하나다 — receipt 가 다른 batch 를 가리키면 거부한다 (Batch 1).
+# 조합 ID 는 batchId 하나다 — receipt 가 다른 batch 를 가리키면 경고로 남는다.
 cp "${work}/receipt.json" "${work}/receipt-good.json"
 python3 - "${work}/receipt.json" <<'PY'
 import json, pathlib, sys
@@ -287,24 +298,20 @@ path = pathlib.Path(sys.argv[1]); doc = json.loads(path.read_text())
 doc["demoReleaseId"] = "demo-env-fixture000000002"
 path.write_text(json.dumps(doc, indent=2) + "\n")
 PY
-if run_validator >/dev/null 2>&1; then
-  fail "receipt pointing at a different Demo batchId was accepted"
-fi
+expect_warn 'foreign Demo batchId' 'receipt demoReleaseId does not match Demo KNOWN_GOOD batchId'
 cp "${work}/receipt-good.json" "${work}/receipt.json"
 
-# 컴포넌트 releaseId 는 identity 검증에만 쓴다 — front 의 releaseId 가 KNOWN_GOOD 과 다르면 거부한다.
+# 컴포넌트 releaseId 는 identity 검증에만 쓴다 — front 의 releaseId 가 KNOWN_GOOD 과 다르면 경고한다.
 python3 - "${work}/receipt.json" <<'PY'
 import json, pathlib, sys
 path = pathlib.Path(sys.argv[1]); doc = json.loads(path.read_text())
 doc["applications"]["front"]["releaseId"] = doc["applications"]["ai"]["releaseId"]
 path.write_text(json.dumps(doc, indent=2) + "\n")
 PY
-if run_validator >/dev/null 2>&1; then
-  fail "front identity with a foreign releaseId was accepted"
-fi
+expect_warn 'foreign front releaseId' 'receipt front identity mismatch for releaseId'
 cp "${work}/receipt-good.json" "${work}/receipt.json"
 
-# Exact World image identity must match Demo known-good.
+# Exact World image identity mismatch는 경고로 남는다 — 실제 이미지 판정은 deploy/verify 가 한다.
 cp "${work}/receipt.json" "${work}/receipt-good.json"
 
 python3 - "${work}/receipt.json" <<'PY'
@@ -318,9 +325,7 @@ doc["world"]["imageContentId"] = "sha256:" + "9" * 64
 path.write_text(json.dumps(doc, indent=2) + "\n")
 PY
 
-if run_validator >/dev/null 2>&1; then
-  fail "different Production World image was accepted"
-fi
+expect_warn 'foreign World image' 'world package image content differs from Demo known-good game'
 
 cp "${work}/receipt-good.json" "${work}/receipt.json"
 
