@@ -140,8 +140,8 @@ namespace Festa.Content
                 foreach (var slot in slots)
                     if (slot != null && slot.boothId == boothId && slot.facade != null)
                     {
-                        var logo = await LoadAsync(slot.facade.logoUrl, boothId, "부스 로고");
-                        if (logo != null) return logo;
+                        var slotLogo = await LoadAsync(slot.facade.logoUrl, boothId, "부스 로고");
+                        if (slotLogo != null) return slotLogo;
                         break;
                     }
 
