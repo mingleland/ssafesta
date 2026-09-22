@@ -25,6 +25,7 @@ from app.api.schemas.conversations import (
 )
 from app.api.schemas.documents import ErrorResponse
 from app.clients.spring_booth_access import SpringBoothAccessClient
+from app.clients.spring_mission import SpringMissionMarkerClient
 from app.clients.spring_chunk_search import SpringChunkSearchClient
 from app.core.auth import AuthenticatedMember, require_member
 from app.repositories.conversation_repository import ConversationRepository
@@ -58,11 +59,18 @@ async def get_conversation_service(request: Request) -> ConversationService:
         timeout_seconds=settings.spring_booth_access_timeout_seconds,
         client=request.app.state.spring_http_client,
     )
+    mission_client = SpringMissionMarkerClient(
+        base_url=settings.spring_internal_base_url,
+        service_token=settings.internal_ai_to_spring_tokens[0],
+        timeout_seconds=settings.spring_mission_marker_timeout_seconds,
+        client=request.app.state.spring_http_client,
+    )
     repository = ConversationRepository(
         request.app.state.redis, ttl_seconds=settings.conversation_ttl_seconds
     )
     return ConversationService(
         spring_client=spring_client,
+        mission_client=mission_client,
         repository=repository,
         ttl_seconds=settings.conversation_ttl_seconds,
     )

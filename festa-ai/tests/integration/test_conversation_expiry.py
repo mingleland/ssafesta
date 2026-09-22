@@ -33,6 +33,7 @@ from app.services.rag_service import NoReadyContextResult
 from app.services.stream_service import ConversationStreamService
 from tests.fakes.llm import FakeLLMProvider
 from tests.fakes.spring_booth_access import FakeSpringBoothAccessClient
+from tests.fakes.spring_mission import FakeSpringMissionMarkerClient
 from app.clients.spring_booth_access import BoothAccessResult
 
 _MEMBER = AuthenticatedMember(user_id=42)
@@ -83,6 +84,7 @@ def _harness(*, ttl_seconds: int = 1800, no_ready: bool = False):
     )
     conversation_service = ConversationService(
         spring_client=spring_client,
+        mission_client=FakeSpringMissionMarkerClient(),
         repository=repository,
         ttl_seconds=ttl_seconds,
         clock=lambda: _NOW,
