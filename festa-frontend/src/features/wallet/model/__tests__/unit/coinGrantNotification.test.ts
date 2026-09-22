@@ -29,9 +29,16 @@ vi.mock('../../../../../entities/wallet/api.select', () => ({
 }));
 
 import { ALLOWED_SUBSCRIBE_DESTINATIONS, COIN_QUEUE } from '../../../../../shared/realtime/destinations';
-import { startCoinGrantNotifications } from '../../coinGrantNotification';
+import {
+  holdCoinGrantToasts,
+  releaseCoinGrantToasts,
+  startCoinGrantNotifications,
+} from '../../coinGrantNotification';
 
 beforeEach(() => {
+  // 붙들기는 모듈 상태다 — 앞 테스트가 쌓아 둔 채 끝나면 여기서 풀린다. mock 을 지우기 **전에**
+  // 비워야 그 잔여 토스트가 다음 테스트의 호출로 세어지지 않는다.
+  releaseCoinGrantToasts();
   realtime.connect.mockResolvedValue(undefined);
   realtime.subscribe.mockReset();
   toasts.show.mockReset();
@@ -61,6 +68,8 @@ describe('coinGrantNotification', () => {
     });
 
     startCoinGrantNotifications();
+    // start 는 입장 전까지 붙든다 — 이 테스트가 보는 것은 붙들기가 아니라 토스트 내용이다.
+    releaseCoinGrantToasts();
 
     const payload = JSON.stringify({
       type: 'granted',
@@ -109,9 +118,10 @@ describe('coinGrantNotification', () => {
   it('구독 전에 발행된 가입·일일 지급을 catch-up REST 응답에서 찾아 토스트를 대신 띄운다 (S15P21A604-953)', async () => {
     const justNow = new Date().toISOString();
     wallet.getTransactions.mockResolvedValue({
+      // BE 는 createdAt desc, id desc 로 준다(CoinLedgerEntryRepository) — 실제 순서로 고정한다.
       content: [
-        { id: 12, entryType: 'CHARGE', amount: 200, balanceAfter: 200, reasonType: 'INITIAL_GRANT', referenceType: null, referenceId: null, createdAt: justNow },
         { id: 13, entryType: 'CHARGE', amount: 50, balanceAfter: 250, reasonType: 'DAILY_GRANT', referenceType: null, referenceId: null, createdAt: justNow },
+        { id: 12, entryType: 'CHARGE', amount: 200, balanceAfter: 200, reasonType: 'INITIAL_GRANT', referenceType: null, referenceId: null, createdAt: justNow },
       ],
       page: 0,
       size: 20,
@@ -123,9 +133,14 @@ describe('coinGrantNotification', () => {
     await Promise.resolve();
     await Promise.resolve();
 
-    expect(toasts.show).toHaveBeenCalledWith('가입 지급 +200 코인이 지급되었습니다.', 'success');
-    expect(toasts.show).toHaveBeenCalledWith('일일 지급 +50 코인이 지급되었습니다.', 'success');
+    // catch-up 은 입장 전에 끝나 큐에 쌓인다 — 입장 순간 이 순서 그대로 나가는지를 본다.
+    releaseCoinGrantToasts();
+
+    // 최신순 그대로 나간다 — 붙들기는 순서를 바꾸지 않는다.
+    expect(toasts.show).toHaveBeenNthCalledWith(1, '일일 지급 +50 코인이 지급되었습니다.', 'success');
+    expect(toasts.show).toHaveBeenNthCalledWith(2, '가입 지급 +200 코인이 지급되었습니다.', 'success');
   });
+
 
   it('이미 알린 거래는 재접속 catch-up에서 다시 토스트를 띄우지 않는다 (S15P21A604-953)', async () => {
     window.localStorage.setItem('festa.wallet.lastAnnouncedGrantId', '13');
@@ -197,5 +212,119 @@ describe('coinGrantNotification', () => {
     expect(toasts.show).not.toHaveBeenCalled();
     // 잔액·내역 갱신은 건너뛰지 않는다 — 감추는 것은 알림뿐이다.
     expect(query.invalidate).toHaveBeenCalledWith({ queryKey: ['wallet-balance'] });
+  });
+});
+
+// 로딩 판 위에서 떴다 사라지는 것을 막는다 — WorldPage 가 입장 전까지 붙들고, 입장 순간에 푼다.
+describe('입장 전 코인 토스트 붙들기', () => {
+  function receive(reasonType: string, amount: number) {
+    let handler: ((body: string) => void) | undefined;
+    realtime.subscribe.mockImplementation((_destination: string, next: (body: string) => void) => {
+      handler = next;
+      return vi.fn();
+    });
+    startCoinGrantNotifications();
+    handler?.(
+      JSON.stringify({
+        type: 'granted',
+        entryId: '777',
+        amount,
+        balanceAfter: 1000,
+        reasonType,
+        referenceType: null,
+        referenceId: null,
+        occurredAt: new Date().toISOString(),
+      }),
+    );
+  }
+
+  it('붙들고 있는 동안에는 토스트를 내지 않고 잔액·내역은 그대로 갱신한다', () => {
+    holdCoinGrantToasts();
+    receive('DAILY_GRANT', 50);
+
+    expect(toasts.show).not.toHaveBeenCalled();
+    expect(query.invalidate).toHaveBeenCalledWith({ queryKey: ['wallet-balance'] });
+  });
+
+  it('구독을 시작하는 순간부터 붙든다 — 월드 라우트보다 로그인 처리가 먼저다', () => {
+    // hold 를 부르지 않는다. start 자체가 켜야 catch-up 이 로딩 판 위로 새지 않는다.
+    receive('DAILY_GRANT', 50);
+
+    expect(toasts.show).not.toHaveBeenCalled();
+
+    releaseCoinGrantToasts();
+    expect(toasts.show).toHaveBeenCalledWith('일일 지급 +50 코인이 지급되었습니다.', 'success');
+  });
+
+  it('풀면 쌓인 것을 순서대로 낸다 — 미루는 것이지 버리는 것이 아니다', () => {
+    holdCoinGrantToasts();
+    receive('INITIAL_GRANT', 200);
+    receive('DAILY_GRANT', 50);
+    expect(toasts.show).not.toHaveBeenCalled();
+
+    releaseCoinGrantToasts();
+
+    expect(toasts.show).toHaveBeenNthCalledWith(1, '가입 지급 +200 코인이 지급되었습니다.', 'success');
+    expect(toasts.show).toHaveBeenNthCalledWith(2, '일일 지급 +50 코인이 지급되었습니다.', 'success');
+  });
+
+  it('입장 뒤에 온 지급은 그 자리에서 뜬다 — 붙들기는 입장 전까지다', () => {
+    let handler: ((body: string) => void) | undefined;
+    realtime.subscribe.mockImplementation((_destination: string, next: (body: string) => void) => {
+      handler = next;
+      return vi.fn();
+    });
+    startCoinGrantNotifications();
+    releaseCoinGrantToasts(); // 월드 입장
+
+    handler?.(
+      JSON.stringify({
+        type: 'granted',
+        entryId: '778',
+        amount: 15,
+        balanceAfter: 1015,
+        reasonType: 'DAILY_MISSION',
+        referenceType: null,
+        referenceId: null,
+        occurredAt: new Date().toISOString(),
+      }),
+    );
+
+    expect(toasts.show).toHaveBeenCalledWith('일일 미션 보상 +15 코인이 지급되었습니다.', 'success');
+  });
+
+  it('붙들어도 무음 사유는 쌓이지 않는다 — 풀 때 슬롯 당첨이 쏟아지지 않게', () => {
+    holdCoinGrantToasts();
+    receive('SLOT_PAYOUT', 300);
+
+    releaseCoinGrantToasts();
+
+    expect(toasts.show).not.toHaveBeenCalled();
+  });
+
+  it('세션이 끝나면 대기분을 버린다 — 다음 로그인에 남의 토스트가 튀지 않게', () => {
+    let handler: ((body: string) => void) | undefined;
+    realtime.subscribe.mockImplementation((_destination: string, next: (body: string) => void) => {
+      handler = next;
+      return vi.fn();
+    });
+    const stop = startCoinGrantNotifications();
+    handler?.(
+      JSON.stringify({
+        type: 'granted',
+        entryId: '779',
+        amount: 200,
+        balanceAfter: 200,
+        reasonType: 'INITIAL_GRANT',
+        referenceType: null,
+        referenceId: null,
+        occurredAt: new Date().toISOString(),
+      }),
+    );
+
+    stop(); // 로그아웃
+    releaseCoinGrantToasts(); // 다음 사용자가 월드에 입장
+
+    expect(toasts.show).not.toHaveBeenCalled();
   });
 });
