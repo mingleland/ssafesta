@@ -184,6 +184,9 @@ class Settings(BaseSettings):
     redis_url: str = Field(min_length=1, validation_alias="REDIS_URL")
     conversation_ttl_seconds: int = Field(default=1800, gt=0)
     spring_booth_access_timeout_seconds: float = Field(default=1.0, gt=0)
+    # 일일 미션 AI_CONSULT 마커 통보(S15P21A604-955) — best-effort 라 재시도가 없고,
+    # 대화 생성 경로에 붙으므로 짧게 끊는다.
+    spring_mission_marker_timeout_seconds: float = Field(default=1.0, gt=0)
     # 질문마다 검색 전에 호출하는 Agent 설정 snapshot. 재시도·캐시는 하지 않는다.
     spring_agent_config_timeout_seconds: float = Field(default=1.0, gt=0)
     # Spring 내부 검색 timeout이 3초이므로(spring-chunk-search-api.yaml) 여유를 둔다.

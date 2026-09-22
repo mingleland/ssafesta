@@ -5,6 +5,7 @@ script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"; repo_root="$(cd "${s
 evidence="${CI_EVIDENCE_DIR:-${repo_root}/infra/evidence/runtime/us5-observability}"
 mkdir -p "${evidence}"
 bash "${repo_root}/infra/tests/contract/test-detection-rule.sh" | tee "${evidence}/rule-validation.txt"
+bash "${repo_root}/infra/tests/contract/test-observability-signal-catalog.sh" | tee "${evidence}/signal-catalog.txt"
 bash "${repo_root}/infra/tests/security/test-observability-redaction.sh" | tee "${evidence}/redaction.txt"
 bash "${repo_root}/infra/tests/integration/test-observability-isolation.sh" | tee "${evidence}/isolation.txt"
 

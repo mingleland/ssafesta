@@ -74,7 +74,7 @@ describe('BoothsSection 강제 비공개', () => {
     });
 
     const confirmBtn = await waitFor(() => {
-      const btn = Array.from(document.querySelectorAll('dialog.ad-dialog button')).find(
+      const btn = Array.from(document.querySelectorAll('dialog.ac-dialog button')).find(
         (b) => b.textContent === '비공개',
       );
       expect(btn).toBeDefined();

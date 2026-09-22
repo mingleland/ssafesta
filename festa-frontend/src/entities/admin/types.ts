@@ -87,18 +87,29 @@ export interface AdjustmentResult {
  * 근사치로 썼다. 그 목록은 관리자 부스와 회원 부스를 구분하지 못했고, `published` 가 지금은
  * 서버가 직접 답하는 값이라 근사치가 필요 없다.
  *
- * `leaseEndsAt` 은 없다 — 관리자 부스는 만료가 없는 상설 임대다(S15P21A604-905). 대신 언제부터
- * 서 있는지를 `leaseStartedAt` 이 말한다.
+ * **회원 부스도 온다** (GitLab #263, S15P21A604-959). 관리자 권한은 원래부터 남의 부스에 열려
+ * 있었고(`BoothAccessGuard`, spec 004 FR-023) 막혀 있던 것은 목록 하나뿐이었다 — 목록을 여는 것은
+ * 새 권한이 아니라 이미 있던 권한의 나머지 반쪽이다.
  */
 export interface AdminBoothView {
   boothId: number;
-  slotId: number;
-  slotCode: string;
+  /** 자리를 회수당했거나 임대가 끝난 회원 부스는 자리가 없다 — 정렬에서 맨 뒤로 간다 */
+  slotId: number | null;
+  slotCode: string | null;
   name: string;
   published: boolean;
   leaseStartedAt: string;
   /** 설치한 관리자 닉네임. 운영 이력 추적용이라 비어 있을 수 있다 */
   installedBy: string | null;
+  /**
+   * 관리자 부스 여부 (#263).
+   *
+   * **없으면 참으로 읽는다** — BE 가 이 필드를 싣기 전까지 목록에 오는 것은 관리자 부스뿐이라,
+   * 그 사이에도 행마다 조치가 갈리는 분기가 사실대로 동작한다.
+   */
+  adminOwned?: boolean;
+  /** 회원 부스의 임대 만료. 관리자 부스는 상설 임대라 null 이고(-905), 만료된 회원 부스도 null 이다 */
+  leaseEndsAt?: string | null;
 }
 
 // ── 이벤트 상점 — BE AdminEventShopController 정본(S15P21A604-853 에 연결) ──────────────────

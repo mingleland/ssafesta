@@ -383,6 +383,35 @@ CI_FINISHED_AT=2026-09-09T03:35:43Z \
 rm -rf "${stage_summary_dir}"
 pass "nested stage summary artifact path"
 
+# write-stage-summary.sh 는 python3 가 없는 node 이미지(front CI)에서도 같은 JSON 을 내야 한다.
+# 두 구현이 갈라지면 front 의 stage summary 만 조용히 달라지므로 바이트 단위로 묶어 둔다.
+if command -v node >/dev/null 2>&1; then
+  parity_dir="$(mktemp -d)"
+  parity_shim="${parity_dir}/no-python"
+  mkdir -p "${parity_shim}"
+  printf '#!/bin/sh\nexit 1\n' > "${parity_shim}/python3"
+  cp "${parity_shim}/python3" "${parity_shim}/python"
+  chmod +x "${parity_shim}/python3" "${parity_shim}/python"
+  parity_env=(
+    CI_ARTIFACT_DIR="${parity_dir}"
+    CI_COMPONENT=front
+    CI_COMMIT_SHA=0123456789abcdef0123456789abcdef01234567
+    CI_STAGE=test
+    CI_STAGE_STATUS=SUCCEEDED
+    CI_STARTED_AT=2026-09-09T03:35:42Z
+    CI_FINISHED_AT=2026-09-09T03:35:43Z
+    CI_EVIDENCE_REFS=https://example.invalid/evidence
+  )
+  env "${parity_env[@]}" CI_STAGE_SUMMARY_PATH="${parity_dir}/python.json" \
+    "${repo_root}/infra/jenkins/scripts/write-stage-summary.sh" >/dev/null
+  env "${parity_env[@]}" CI_STAGE_SUMMARY_PATH="${parity_dir}/node.json" PATH="${parity_shim}:${PATH}" \
+    "${repo_root}/infra/jenkins/scripts/write-stage-summary.sh" >/dev/null
+  cmp -s "${parity_dir}/python.json" "${parity_dir}/node.json" \
+    || fail "stage summary differs between the python and node runtimes"
+  rm -rf "${parity_dir}"
+  pass "stage summary python/node parity"
+fi
+
 grep -q 'proxy_pass http://127.0.0.1:8080' "${nginx}" || fail "Nginx does not proxy to loopback Jenkins"
 ! grep -Eq 'listen[[:space:]]+(8080|3000|50000)' "${nginx}" || fail "Nginx publicly listens on a forbidden port"
 pass "reverse proxy public port policy"
