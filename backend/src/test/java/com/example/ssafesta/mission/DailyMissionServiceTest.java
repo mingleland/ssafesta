@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -12,7 +13,6 @@ import static org.mockito.Mockito.when;
 import com.example.ssafesta.booth.BoothVisitRepository;
 import com.example.ssafesta.common.ApiException;
 import com.example.ssafesta.common.ErrorCode;
-import com.example.ssafesta.consultation.ConsultationRepository;
 import com.example.ssafesta.minigame.MinigameSessionRepository;
 import com.example.ssafesta.survey.SurveyResponseRepository;
 import com.example.ssafesta.wallet.CoinLedgerEntry;
@@ -34,19 +34,17 @@ class DailyMissionServiceTest {
 
     @Test
     void allNineMissionFactsBecomeClaimable() {
-        ConsultationRepository consultations = mock(ConsultationRepository.class);
         SurveyResponseRepository surveys = mock(SurveyResponseRepository.class);
         MinigameSessionRepository minigames = mock(MinigameSessionRepository.class);
         BoothVisitRepository visits = mock(BoothVisitRepository.class);
         CoinLedgerEntryRepository ledger = mock(CoinLedgerEntryRepository.class);
         WalletService wallets = mock(WalletService.class);
-        WorldMissionProgressService world = mock(WorldMissionProgressService.class);
-        DailyMissionService service = service(consultations, surveys, minigames, visits, ledger, wallets, world);
+        DailyMissionMarkerService markers = mock(DailyMissionMarkerService.class);
+        DailyMissionService service = service(surveys, minigames, visits, ledger, wallets, markers);
 
         when(wallets.grantedOnDateFor(anyLong(), anyString(), any())).thenReturn(0);
         when(ledger.findByIdempotencyKey(anyString())).thenReturn(Optional.empty());
-        when(consultations.countByVisitorUserIdAndRequestedAtGreaterThanEqualAndRequestedAtLessThan(
-                anyLong(), any(), any())).thenReturn(1L);
+        when(markers.has(eq(DailyMission.AI_CONSULT), anyLong(), any())).thenReturn(true);
         when(surveys.countByRespondentUserIdAndSubmittedAtGreaterThanEqualAndSubmittedAtLessThan(
                 anyLong(), any(), any())).thenReturn(1L);
         when(minigames.countByUserIdAndGameTypeAndStartedAtGreaterThanEqualAndStartedAtLessThan(
@@ -56,7 +54,7 @@ class DailyMissionServiceTest {
         when(ledger.countSlotSpinsBetween(anyLong(), anyString(), anyString(), any(), any()))
                 .thenReturn(3L, 1L);
         when(visits.countDistinctBoothsVisitedByUserBetween(anyLong(), any(), any())).thenReturn(6L);
-        when(world.hasEntered(anyLong(), any())).thenReturn(true);
+        when(markers.has(eq(DailyMission.WORLD_ENTER), anyLong(), any())).thenReturn(true);
 
         DailyMissionService.DailyMissionsView result = service.findToday(42L);
 
@@ -71,18 +69,16 @@ class DailyMissionServiceTest {
 
     @Test
     void claimUsesTheDailyMissionLedgerKeyAndRejectsASecondClaim() {
-        ConsultationRepository consultations = mock(ConsultationRepository.class);
         SurveyResponseRepository surveys = mock(SurveyResponseRepository.class);
         MinigameSessionRepository minigames = mock(MinigameSessionRepository.class);
         BoothVisitRepository visits = mock(BoothVisitRepository.class);
         CoinLedgerEntryRepository ledger = mock(CoinLedgerEntryRepository.class);
         WalletService wallets = mock(WalletService.class);
-        WorldMissionProgressService world = mock(WorldMissionProgressService.class);
-        DailyMissionService service = service(consultations, surveys, minigames, visits, ledger, wallets, world);
+        DailyMissionMarkerService markers = mock(DailyMissionMarkerService.class);
+        DailyMissionService service = service(surveys, minigames, visits, ledger, wallets, markers);
         CoinLedgerEntry entry = mock(CoinLedgerEntry.class);
 
-        when(consultations.countByVisitorUserIdAndRequestedAtGreaterThanEqualAndRequestedAtLessThan(
-                anyLong(), any(), any())).thenReturn(1L);
+        when(markers.has(eq(DailyMission.AI_CONSULT), anyLong(), any())).thenReturn(true);
         when(wallets.grantedOnDateFor(anyLong(), anyString(), any())).thenReturn(0);
         when(ledger.findByIdempotencyKey(anyString())).thenReturn(Optional.empty(), Optional.of(entry));
         when(wallets.credit(any())).thenReturn(new LedgerResult(99L, 215, false));
@@ -105,17 +101,15 @@ class DailyMissionServiceTest {
 
     @Test
     void claimRejectsTheNinthRewardWhenTheDailyCapIsAlreadyReached() {
-        ConsultationRepository consultations = mock(ConsultationRepository.class);
         SurveyResponseRepository surveys = mock(SurveyResponseRepository.class);
         MinigameSessionRepository minigames = mock(MinigameSessionRepository.class);
         BoothVisitRepository visits = mock(BoothVisitRepository.class);
         CoinLedgerEntryRepository ledger = mock(CoinLedgerEntryRepository.class);
         WalletService wallets = mock(WalletService.class);
-        WorldMissionProgressService world = mock(WorldMissionProgressService.class);
-        DailyMissionService service = service(consultations, surveys, minigames, visits, ledger, wallets, world);
+        DailyMissionMarkerService markers = mock(DailyMissionMarkerService.class);
+        DailyMissionService service = service(surveys, minigames, visits, ledger, wallets, markers);
 
-        when(consultations.countByVisitorUserIdAndRequestedAtGreaterThanEqualAndRequestedAtLessThan(
-                anyLong(), any(), any())).thenReturn(1L);
+        when(markers.has(eq(DailyMission.AI_CONSULT), anyLong(), any())).thenReturn(true);
         when(ledger.findByIdempotencyKey(anyString())).thenReturn(Optional.empty());
         when(wallets.grantedOnDateFor(anyLong(), anyString(), any())).thenReturn(135);
 
@@ -124,11 +118,11 @@ class DailyMissionServiceTest {
         assertEquals(ErrorCode.DAILY_CAP_REACHED, error.errorCode());
     }
 
-    private DailyMissionService service(ConsultationRepository consultations, SurveyResponseRepository surveys,
+    private DailyMissionService service(SurveyResponseRepository surveys,
                                         MinigameSessionRepository minigames, BoothVisitRepository visits,
                                         CoinLedgerEntryRepository ledger, WalletService wallets,
-                                        WorldMissionProgressService world) {
-        return new DailyMissionService(consultations, surveys, minigames, visits, ledger, wallets,
-                new WalletProperties(200, 50, ZoneId.of("Asia/Seoul")), world);
+                                        DailyMissionMarkerService markers) {
+        return new DailyMissionService(surveys, minigames, visits, ledger, wallets,
+                new WalletProperties(200, 50, ZoneId.of("Asia/Seoul")), markers);
     }
 }
