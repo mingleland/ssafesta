@@ -222,12 +222,15 @@ namespace Festa.Content.Arcade
 
         void CreateScreen()
         {
+            var screenPower = GetComponent<ArcadeScreenPower>();
             foreach (var renderer in GetComponentsInChildren<MeshRenderer>(true))
             {
                 var shared = renderer.sharedMaterials;
                 for (int i = 0; i < shared.Length; i++)
                 {
-                    if (shared[i] == null || !shared[i].name.StartsWith(ArcadeScreenPower.ScreenMaterialName)) continue;
+                    if (shared[i] == null || (screenPower != null
+                            ? !screenPower.IsScreenMaterial(shared[i])
+                            : !shared[i].name.StartsWith(ArcadeScreenPower.ScreenMaterialName))) continue;
                     var materials = renderer.sharedMaterials;
                     _screenMaterial = new Material(shared[i]) { name = "RetroArcadeScreen_Runtime" };
                     materials[i] = _screenMaterial;
