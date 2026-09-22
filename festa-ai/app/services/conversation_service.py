@@ -10,11 +10,14 @@ repository, which puts it on every write.
 
 from __future__ import annotations
 
+import logging
 import uuid
 from collections.abc import Callable
 from datetime import datetime, timezone
 
 from app.clients.spring_booth_access import SpringBoothAccessUnavailable
+from app.clients.spring_mission import SpringMissionMarkerUnavailable
+from app.core.logging import log_event
 from app.models.conversation import Conversation
 from app.repositories.conversation_repository import ConversationRepository
 from app.services.stream_service import ConversationOwnershipMismatch
@@ -32,6 +35,9 @@ class ConversationCreationFailed(Exception):
     """Spring did not answer in time — Fail Closed per FR-025."""
 
 
+logger = logging.getLogger(__name__)
+
+
 def _default_id_factory() -> str:
     return f"conv_{uuid.uuid4().hex}"
 
@@ -45,12 +51,14 @@ class ConversationService:
         self,
         *,
         spring_client,
+        mission_client,
         repository: ConversationRepository,
         ttl_seconds: int,
         clock: Callable[[], datetime] = _default_clock,
         id_factory: Callable[[], str] = _default_id_factory,
     ) -> None:
         self._spring_client = spring_client
+        self._mission_client = mission_client
         self._repository = repository
         self._ttl_seconds = ttl_seconds
         self._clock = clock
@@ -79,6 +87,20 @@ class ConversationService:
             ttl_seconds=self._ttl_seconds,
         )
         await self._repository.save(conversation)
+        # 일일 미션 AI_CONSULT 의 유일한 사실 근거다 (spec 022 FR-003a). Booth Access 와 달리
+        # Fail Closed 가 아니다 — 마커 하나 때문에 대화를 막지 않는다 (FR-004a). 클라이언트가
+        # 던지는 예외를 하나로 모아 두었으므로 여기서 넓은 except 를 쓸 이유가 없다.
+        try:
+            await self._mission_client.mark_ai_consult(user_id=user_id)
+        except SpringMissionMarkerUnavailable:
+            log_event(
+                logger,
+                logging.WARNING,
+                "ai_consult_marker_undelivered",
+                conversation_id=conversation.conversation_id,
+                status="UNDELIVERED",
+                error_code="SPRING_MISSION_MARKER_UNAVAILABLE",
+            )
         return conversation
 
     async def close(self, *, conversation_id: str, user_id: int) -> None:
