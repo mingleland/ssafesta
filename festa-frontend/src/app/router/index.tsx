@@ -1,5 +1,6 @@
 // URL 경로와 화면을 연결하는 라우팅 규칙 정의
-import { Navigate, createBrowserRouter } from 'react-router-dom';
+import { Navigate, Outlet, createBrowserRouter } from 'react-router-dom';
+import { AppError, NotFound } from './ErrorScreens';
 import { LandingPage } from '../../pages/landing/LandingPage';
 import { ProfilePage } from '../../pages/profile/ProfilePage';
 import { ProjectManagementPage } from '../../pages/management/ProjectManagementPage';
@@ -18,7 +19,7 @@ import { RequireAuth } from './RequireAuth';
 // 거부·Published play 허용)이 확정되며 guest-allowed로 재분류했다(S15P21A604-115).
 // edit(저작)은 T087 그대로 member-only 유지.
 // 라우트 정의를 배열로 분리해 둔다 — createMemoryRouter 로 같은 정의를 테스트에서 쓴다.
-export const routes = [
+const appRoutes = [
   {
     // 도메인 루트 = 게임 타이틀 화면 (S15P21A604-379). 시작 클릭의 목적지는 World 다 —
     // 로그인 후 사용자가 상주하는 기본 상태이기 때문이다(D-08). 인증 판정은 그대로 가드에
@@ -162,6 +163,25 @@ export const routes = [
     // 떨어지지 않게 하기 위해서다. 목적지에서 WorldPage 가 `?panel` 을 읽어 오버레이를 연다.
     path: '/app/admin/*',
     element: <Navigate to="/app/world?panel=admin" replace />,
+  },
+];
+
+// 위 라우트 전부를 **pathless layout route** 하나로 감싼다.
+//
+// 목적은 `errorElement` 를 걸 자리를 만드는 것 하나다. 이것이 없으면 라우트 렌더 중 throw·lazy
+// chunk 로드 실패가 React Router 기본 화면("Unexpected Application Error!")으로 떨어진다 —
+// preloadRecovery.ts 가 "route errorElement 에 맡긴다" 고 적어 둔 그 자리가 실제로는 비어 있었다.
+//
+// 부모에 `path` 를 주지 않는 이유: pathless 부모는 자식의 절대 경로를 그대로 둔다. 경로 문자열을
+// 상대 경로로 고쳐 쓸 필요가 없어 기존 URL 계약이 한 글자도 바뀌지 않는다.
+//
+// 끝의 splat 은 어디에도 걸리지 않은 주소를 제품 404 로 보낸다. nginx 가 SPA fallback 으로 모든
+// 주소에 index.html 을 200 으로 주므로, 없는 주소 판정은 원래부터 여기서만 할 수 있었다.
+export const routes = [
+  {
+    element: <Outlet />,
+    errorElement: <AppError />,
+    children: [...appRoutes, { path: '*', element: <NotFound /> }],
   },
 ];
 
