@@ -95,6 +95,18 @@ mr-status:
     - bash infra/jenkins/scripts/secret-scan.sh ${CI_MERGE_REQUEST_DIFF_BASE_SHA:+--changed-since "$CI_MERGE_REQUEST_DIFF_BASE_SHA"} --path .
     - echo 'MR pipeline status only; component CI is selected by rules:changes'
 
+observability-runtime:
+  stage: test
+  image: docker:29.1.3-cli
+  rules:
+    - changes:
+        - infra/observability/**/*
+        - infra/tests/integration/test-observability-*.sh
+  before_script:
+    - apk add --no-cache bash
+  script:
+    - bash infra/tests/integration/test-observability-runtime.sh
+
 .front-changes:
   rules:
     # test 는 develop 과 파트 브랜치 대상 MR 모두에서 돈다 (workflow rules 주석, T-175). main 승격 MR 은 제외한다.

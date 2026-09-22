@@ -9,13 +9,23 @@ python - "${compose}" <<'PY'
 import pathlib,sys,yaml
 d=yaml.safe_load(pathlib.Path(sys.argv[1]).read_text(encoding='utf-8'))
 services=d['services']
-assert set(services)=={'alloy','alloy-cadvisor','loki','prometheus','grafana'}
+assert set(services)=={'alloy','alloy-cadvisor','loki','loki-init','prometheus','grafana'}
 for name, service in services.items():
-    assert not service.get('depends_on'), f'{name} must not gate on another observability service'
+    if name == 'loki-init':
+        assert service['user'] == '0:0'
+        assert service['network_mode'] == 'none'
+        assert service['restart'] == 'no'
+        continue
+    if name == 'loki':
+        assert service['user'] == '10001:10001'
+        assert service['depends_on'] == {'loki-init': {'condition': 'service_completed_successfully'}}
+    else:
+        assert not service.get('depends_on'), f'{name} must not gate on another observability service'
     assert 'healthcheck' in service and 'restart' in service
     if name != 'grafana': assert service.get('networks')==['observability-private']
 assert services['grafana']['networks']==['observability-private','observability-egress']
 assert d['networks']['observability-private']['internal'] is True
+assert d['networks']['observability-private']['name'].startswith('${OBSERVABILITY_RESOURCE_PREFIX:-festa-observability}')
 assert services['grafana']['ports'][0].startswith('127.0.0.1:')
 assert all('ports' not in services[name] for name in ('alloy','alloy-cadvisor','loki','prometheus'))
 assert services['alloy-cadvisor']['profiles']==['container-metrics']

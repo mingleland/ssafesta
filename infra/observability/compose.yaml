@@ -47,8 +47,12 @@ services:
   loki:
     image: ${LOKI_IMAGE:-grafana/loki:3.7.4}
     command: ["-config.file=/etc/loki/config.yaml", "-config.expand-env=true"]
+    user: "10001:10001"
     restart: unless-stopped
     networks: [observability-private]
+    depends_on:
+      loki-init:
+        condition: service_completed_successfully
     environment:
       LOKI_RETENTION_PERIOD: ${LOKI_RETENTION_PERIOD:?approve after baseline}
     volumes:
@@ -62,6 +66,15 @@ services:
     deploy:
       resources:
         limits: {cpus: "${LOKI_CPU_LIMIT:?approve after baseline}", memory: "${LOKI_MEMORY_LIMIT:?approve after baseline}"}
+  loki-init:
+    image: ${LOKI_IMAGE:-grafana/loki:3.7.4}
+    user: "0:0"
+    network_mode: none
+    restart: "no"
+    entrypoint: ["/bin/sh", "-ec"]
+    command: ["mkdir -p /var/lib/loki && chown -R 10001:10001 /var/lib/loki"]
+    volumes:
+      - loki-data:/var/lib/loki
   prometheus:
     image: ${PROMETHEUS_IMAGE:-prom/prometheus:v3.12.0}
     command:
@@ -108,13 +121,13 @@ services:
         limits: {cpus: "${GRAFANA_CPU_LIMIT:?approve after baseline}", memory: "${GRAFANA_MEMORY_LIMIT:?approve after baseline}"}
 networks:
   observability-private:
-    name: festa-observability-private
+    name: "${OBSERVABILITY_RESOURCE_PREFIX:-festa-observability}-private"
     internal: true
   observability-egress:
-    name: festa-observability-egress
+    name: "${OBSERVABILITY_RESOURCE_PREFIX:-festa-observability}-egress"
 volumes:
-  alloy-data: {name: festa-observability-alloy}
-  alloy-cadvisor-data: {name: festa-observability-alloy-cadvisor}
-  loki-data: {name: festa-observability-loki}
-  prometheus-data: {name: festa-observability-prometheus}
-  grafana-data: {name: festa-observability-grafana}
+  alloy-data: {name: "${OBSERVABILITY_RESOURCE_PREFIX:-festa-observability}-alloy"}
+  alloy-cadvisor-data: {name: "${OBSERVABILITY_RESOURCE_PREFIX:-festa-observability}-alloy-cadvisor"}
+  loki-data: {name: "${OBSERVABILITY_RESOURCE_PREFIX:-festa-observability}-loki"}
+  prometheus-data: {name: "${OBSERVABILITY_RESOURCE_PREFIX:-festa-observability}-prometheus"}
+  grafana-data: {name: "${OBSERVABILITY_RESOURCE_PREFIX:-festa-observability}-grafana"}
