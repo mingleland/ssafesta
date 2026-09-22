@@ -27,29 +27,29 @@ export function FeedbackSection() {
   }
 
   return (
-    <section className="sc-card ad-work" aria-label="피드백">
+    <section className="sc-card ac-work" aria-label="피드백">
       <p className="sc-note">최초 발견 보상은 여기서 지급하지 않습니다 — "코인 조정"으로 넘어가 해당 회원에게 직접 지급하세요.</p>
       {feedback.isPending && <Loading />}
       {feedback.isError && <ErrorBanner error={feedback.error} onRetry={() => void feedback.refetch()} />}
       {feedback.isSuccess && feedback.data.content.length === 0 && <Empty title="피드백이 없습니다" />}
       {feedback.isSuccess && feedback.data.content.length > 0 && (
         <>
-          <table className="ad-table">
+          <table className="ac-table">
             <thead><tr><th>작성자</th><th>내용</th><th>최초 발견</th><th>시각</th><th /></tr></thead>
             <tbody>
               {feedback.data.content.map((f) => (
                 <tr key={f.feedbackId}>
-                  <td>{f.nickname ?? '알 수 없음'} <span className="ad-muted">#{f.userId}</span></td>
+                  <td>{f.nickname ?? '알 수 없음'} <span className="ac-muted">#{f.userId}</span></td>
                   <td>{f.content}</td>
                   <td>
-                    <label className="ad-toggle">
+                    <label className="ac-toggle">
                       <input
                         type="checkbox"
                         checked={f.firstFound}
                         disabled={toggleFirstFound.isPending}
                         onChange={(e) => toggleFirstFound.mutate({ feedbackId: f.feedbackId, firstFound: e.target.checked })}
                       />
-                      {f.firstFound ? <span className="ad-chip ad-chip-gold">최초 발견</span> : <span className="ad-muted">표시</span>}
+                      {f.firstFound ? <span className="ac-chip ac-chip-gold">최초 발견</span> : <span className="ac-muted">표시</span>}
                     </label>
                   </td>
                   <td>{fmtTime(f.createdAt)}</td>
