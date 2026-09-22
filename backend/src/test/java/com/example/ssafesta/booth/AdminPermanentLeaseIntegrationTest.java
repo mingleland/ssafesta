@@ -158,13 +158,16 @@ class AdminPermanentLeaseIntegrationTest {
     }
 
     /**
-     * 관리자 콘솔의 부스 목록은 <b>관리자 부스만</b>, 그리고 <b>전부</b> 돌려준다 (S15P21A604-933).
+     * 콘솔의 부스 목록은 <b>관리자 부스와 회원 부스를 함께</b>, 그리고 <b>전부</b> 돌려준다
+     * (S15P21A604-933, S15P21A604-959).
      *
      * <p>호출한 사람의 것으로 좁히지 않는다 — 부스가 권한을 따라가는데 목록만 사람별로 갈라 있으면
-     * 자리를 비운 관리자의 부스는 아무도 못 본다.
+     * 자리를 비운 관리자의 부스는 아무도 못 본다. 회원 부스를 빼지도 않는다 — 관리자는 이미 남의
+     * 부스를 편집·강제 비공개할 수 있으므로, 목록에서 빼는 것은 권한을 막는 것이 아니라 그 권한을
+     * 쓸 `boothId` 만 감추는 것이었다.
      */
     @Test
-    void theAdminBoothListShowsEveryAdminBoothAndNoMemberBooth() throws Exception {
+    void theBoothListShowsEveryAdminBoothAndMemberBoothsToo() throws Exception {
         Long admin = administrator("목록주인");
         Long otherAdmin = administrator("다른운영자");
         Long member = createMemberWithWallet(users, wallets, "목록회원");
@@ -174,37 +177,67 @@ class AdminPermanentLeaseIntegrationTest {
         Long memberBooth = leaseService.lease(member, freeSlotId(), 1).lease().getBoothId();
 
         // 전체 개수로 단언하지 않는다. 이 스위트는 클래스 사이에 트랜잭션을 되돌리지 않아서 앞서
-        // 돈 클래스가 남긴 관리자 부스도 이 목록에 실린다 — 개수를 박으면 목록 계약이 아니라
+        // 돈 클래스가 남긴 부스도 이 목록에 실린다 — 개수를 박으면 목록 계약이 아니라
         // 실행 순서를 단언하게 된다 (S15P21A604-941 의 횡단 테스트가 들어오면서 드러났다).
-        // "관리자 부스만, 그리고 전부" 라는 계약은 아래 세 단언이 그대로 지킨다.
+        // "전부, 그리고 두 종류를 구분해서" 라는 계약은 아래 단언이 그대로 지킨다.
         String body = mockMvc.perform(get("/api/v1/admin/booths").header("Authorization", bearer(admin)))
                 .andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString();
 
         assertTrue(body.contains("\"boothId\":" + mine));
         assertTrue(body.contains("\"boothId\":" + theirs), "다른 관리자의 부스도 보여야 한다");
-        assertFalse(body.contains("\"boothId\":" + memberBooth), "회원 부스는 나오면 안 된다");
+        assertTrue(body.contains("\"boothId\":" + memberBooth), "회원 부스도 보여야 한다");
+    }
+
+    /**
+     * 두 종류가 한 목록에 섞이므로 <b>행이 자기가 어느 쪽인지 말해야 한다</b> (S15P21A604-959).
+     *
+     * <p>콘솔이 이 값으로 갈린다: 마스터 개인 부스는 조작이 {@code MASTER_PROTECTED} 로 거부되고,
+     * 강제 비공개가 회원 부스는 보존하고 관리자 부스는 삭제한다. {@code leaseEndsAt} 도 같은 이유로
+     * 갈린다 — 관리자 부스는 만료가 없어 {@code null} 이고, 회원 부스는 그 값이 운영 판단이다.
+     */
+    @Test
+    void eachRowSaysWhichKindOfBoothItIsAndOnlyMemberBoothsCarryAnExpiry() throws Exception {
+        Long admin = administrator("구분운영자");
+        Long member = createMemberWithWallet(users, wallets, "구분회원");
+
+        Long adminBooth = leaseService.lease(admin, freeSlotId(), 1).lease().getBoothId();
+        Long memberBooth = leaseService.lease(member, freeSlotId(), 1).lease().getBoothId();
+
+        mockMvc.perform(get("/api/v1/admin/booths").header("Authorization", bearer(admin)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath(row(adminBooth) + ".adminOwned").value(true))
+                .andExpect(jsonPath(row(adminBooth) + ".leaseEndsAt").value((Object) null))
+                .andExpect(jsonPath(row(memberBooth) + ".adminOwned").value(false))
+                .andExpect(jsonPath(row(memberBooth) + ".leaseEndsAt").exists());
     }
 
     /** 공개 여부는 콘솔이 행동을 가르는 값이라 값이 실제로 움직이는지까지 본다. 설치자 이름도 같이 온다. */
     @Test
-    void theAdminBoothListReportsPublicationAndWhoInstalledIt() throws Exception {
+    void theBoothListReportsPublicationAndWhoInstalledIt() throws Exception {
         Long admin = administrator("게시운영자");
         Long slotId = freeSlotId();
         Long boothId = leaseService.lease(admin, slotId, 1).lease().getBoothId();
 
+        // 자리로 정렬된 목록에서 이 부스가 몇 번째인지는 앞서 돈 테스트가 남긴 부스에 따라 달라진다.
+        // 자리 순 정렬은 위 목록 테스트가 보고, 여기서는 boothId 로 그 행만 집어 값을 본다.
         mockMvc.perform(get("/api/v1/admin/booths").header("Authorization", bearer(admin)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].boothId").value(boothId.intValue()))
-                .andExpect(jsonPath("$[0].slotId").value(slotId.intValue()))
-                .andExpect(jsonPath("$[0].published").value(false))
-                .andExpect(jsonPath("$[0].installedBy").value(users.findById(admin).orElseThrow().getNickname()));
+                .andExpect(jsonPath(row(boothId) + ".slotId").value(slotId.intValue()))
+                .andExpect(jsonPath(row(boothId) + ".published").value(false))
+                .andExpect(jsonPath(row(boothId) + ".installedBy")
+                        .value(users.findById(admin).orElseThrow().getNickname()));
 
         BoothLayoutTestSupport.publishLayout(mockMvc, boothId, bearer(admin));
 
         mockMvc.perform(get("/api/v1/admin/booths").header("Authorization", bearer(admin)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].published").value(true));
+                .andExpect(jsonPath(row(boothId) + ".published").value(true));
+    }
+
+    /** 목록에서 그 부스 행 하나만 집는다 — 앞서 돈 테스트가 남긴 부스가 순번을 밀기 때문이다. */
+    private static String row(Long boothId) {
+        return "$[?(@.boothId == " + boothId + ")]";
     }
 
     /** 관리자 전용 면이다 — 회원은 목록 자체를 보지 못한다. */
