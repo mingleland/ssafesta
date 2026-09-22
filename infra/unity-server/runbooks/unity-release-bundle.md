@@ -18,14 +18,20 @@ image-metadata.json                {"schemaVersion":"1.0.0","component":"game","
 repo 의 로컬 어댑터가 같은 형식을 만든다: `ci/build`(webgl → linux-server) → `festa-unity/ci/package`(결정적 zip + `.sha256` + `webgl-metadata.json`, image + `image-metadata.json`).
 `contentId` 는 `docker image inspect --format '{{.Id}}'` 값이다(containerd store 면 OCI index digest, legacy store 면 config digest — 둘 다 허용).
 
-업로드(유일한 intake 경로) — GitLab Generic Package Registry `unity-release-bundle/<8sha>`, 담당자 본인의 package write token 사용, token 은 어디에도 저장하지 않는다:
+게시·Demo 배포 시작의 유일한 경로는 저장소 helper 다. 담당자 본인의 package write token과 Demo deploy 권한이 있는 Jenkins API token을 환경변수로만 주입하며, token 은 어디에도 저장하지 않는다.
 
 ```bash
-B=https://lab.ssafy.com/api/v4/projects/1443023/packages/generic/unity-release-bundle/<8sha>
-for f in festa-webgl-release-<8sha>.zip festa-game-<8sha>.tar webgl-manifest.json image-metadata.json; do
-  curl --fail --header "PRIVATE-TOKEN: $GITLAB_PACKAGE_TOKEN" --upload-file "$f" "$B/$f"
-done
+GITLAB_PACKAGE_TOKEN=... \
+JENKINS_URL=https://ci.ssafesta.world \
+JENKINS_USER=... \
+JENKINS_API_TOKEN=... \
+infra/jenkins/scripts/publish-unity-release-bundle.sh \
+  --bundle-dir <4파일이_있는_디렉터리> \
+  --source-commit <40자리_Git_SHA>
 ```
+
+helper 는 로컬 계약 검증 → 4파일과 `bundle.sha256`의 멱등 게시 → `festa-gitlab-develop/develop` 실행
+(`UNITY_ARTIFACT_CANDIDATE=<SHA>`, `DEPLOY_GAME_TO_DEMO=true`)까지 한 번에 수행한다. Registry API에 4파일만 직접 올리면 Jenkins 이벤트가 생기지 않으므로 정상 게시 경로로 쓰지 않는다.
 
 ## 2. Jenkins 가 하는 일 (consumer, `festa-gitlab-develop/develop`, deploy agent)
 
@@ -52,7 +58,7 @@ Verify   validate-game-release-set.sh (zip sha · image contentId · 같은 comm
 Deploy   deploy-game.sh(candidate World) → game-readiness.sh(wss://demo.<root>/) → deploy-webgl-release.sh(current flip) → promote-game.sh
 ```
 
-bundle 이 아직 없으면 빌드는 `WAITING_FOR_UNITY_ARTIFACT` 로 끝난다. 담당자가 올린 뒤 **같은 commit** 을 Jenkins 에서 Rebuild 하면 이어진다.
+bundle 이 아직 없으면 빌드는 `WAITING_FOR_UNITY_ARTIFACT` 로 끝난다. 이후 publisher helper가 bundle을 게시하고 같은 source commit을 candidate로 지정한 develop Demo 배포를 자동 시작한다.
 VERIFIED(readiness) 전 실패는 `/srv/festa/webgl/current`·`dev/batches/current/*.json` 을 바꾸지 않는다; candidate World runtime 만
 `rollback-game.sh` 로 돌아온다. WebGL 활성화 실패는 `deploy-webgl-release.sh` 가 previous 로 되돌리고 파이프라인이 World 도 되돌린다.
 
@@ -72,6 +78,8 @@ BuildUrl/builderClass/publishedAt). 과거 12/40자 version, `test/0.0.1`, `ssaf
 
 ## 5. Historical / Fallback / 범위 밖
 
+- Registry API 직접 업로드와 develop job 수동 재실행은 publisher 장애 시 Infra 담당자가 사용하는 복구 절차일 뿐 정상 게시 경로가 아니다.
+- `festa-unity-bundle-e2e` 는 직전 Demo 상태로 반드시 복구하는 수동 검증 job이며 publisher가 호출하지 않는다.
 - `festa-webgl-package-deploy` 수동 실행과 `festa-world-package-publish` 수동 파라미터는 fallback 이다.
 - Jenkins unity agent 의 Unity Personal entitlement(T-169)는 CI 의 blocker 가 아니다. `festa-unity-mr-validation`(EditMode) 은 여전히 그 agent 를 쓰며 별건이다.
 - Unity Cloud Build / UBA / 별도 Unity 계정 자동화 / floating license 는 도입하지 않는다.
