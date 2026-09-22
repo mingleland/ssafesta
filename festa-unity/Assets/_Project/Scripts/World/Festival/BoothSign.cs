@@ -224,6 +224,7 @@ namespace Festa.World
                     m.SetTexture("_EmissionMap", texture);
                     m.SetColor("_EmissionColor", Color.white * 0.35f);
                     r.gameObject.SetActive(true);
+                }
             }
         }
 
@@ -247,7 +248,6 @@ namespace Festa.World
                     mat.SetTexture("_EmissionMap", null);
                     r.gameObject.SetActive(false);
                 }
-        }
             if (photoPlaceholders != null)
                 foreach (var t in photoPlaceholders)
                     if (t != null) t.gameObject.SetActive(false);
