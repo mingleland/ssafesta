@@ -30,6 +30,8 @@ namespace Festa.Network
         const string IntervalArg = "-serverMetricsInterval";
         const float DefaultIntervalSeconds = 10f;
         const float MinIntervalSeconds = 1f;
+        const float ClientDiagnosticsIntervalSeconds = 10f;
+        const float StarvedInterpolationGapMs = 100f;
 
         /// <summary>한 창에 담을 프레임 표본 상한. 넘치면 버린다 — 측정 때문에 서버가 메모리를 먹으면 본말전도다.</summary>
         const int MaxTickSamples = 8192;
@@ -54,6 +56,11 @@ namespace Festa.Network
         UnityTransport _utp;
         float _connectedAt = -1f;
         float _lastDataAt = -1f;
+        float _clientWindowStart = -1f;
+        float _clientGapTotalMs;
+        float _clientGapMaxMs;
+        int _clientGapCount;
+        int _clientStarvedGapCount;
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
         static void AutoRegister()
@@ -75,6 +82,7 @@ namespace Festa.Network
         {
             TrackManagerChange();
             if (_metricsEnabled) SampleMetrics();
+            else SampleClientTransportHealth();
         }
 
         void TrackManagerChange()
@@ -101,6 +109,8 @@ namespace Festa.Network
             _utp = null;
             _connectedAt = -1f;
             _lastDataAt = -1f;
+            _clientWindowStart = -1f;
+            ResetClientWindow();
         }
 
         void OnTransportEvent(NetworkEvent eventType, ulong clientId, ArraySegment<byte> payload, float receiveTime)
@@ -108,6 +118,14 @@ namespace Festa.Network
             float now = Time.realtimeSinceStartup;
             if (eventType == NetworkEvent.Data)
             {
+                if (_manager != null && _manager.IsClient && !_manager.IsServer && _lastDataAt >= 0f)
+                {
+                    float gapMs = (now - _lastDataAt) * 1000f;
+                    _clientGapTotalMs += gapMs;
+                    _clientGapMaxMs = Mathf.Max(_clientGapMaxMs, gapMs);
+                    _clientGapCount++;
+                    if (gapMs > StarvedInterpolationGapMs) _clientStarvedGapCount++;
+                }
                 _lastDataAt = now;
                 return;
             }
@@ -116,6 +134,8 @@ namespace Festa.Network
             {
                 _connectedAt = now;
                 _lastDataAt = now;
+                _clientWindowStart = now;
+                ResetClientWindow();
                 Debug.Log($"[WorldTransport] CONNECT {Context(clientId)}");
                 return;
             }
@@ -151,6 +171,47 @@ namespace Festa.Network
 
             return $"role={(_manager.IsServer ? "server" : "client")} clientId={clientId} " +
                    $"endpoint={endpoint} rtt={rtt}ms {config}";
+        }
+
+        /// <summary>
+        /// 원격 이동 끊김이 렌더 프레임이 아니라 transport 수신 공백에서 왔는지 구분한다.
+        /// Data 이벤트는 transform 전용이 아니므로 이 값만으로 원인을 단정하지 않되, 100ms 초과
+        /// 공백이 반복되면 기존 0.1초 보간 버퍼가 고갈될 조건이 실제로 있었다는 직접 증거가 된다.
+        /// </summary>
+        void SampleClientTransportHealth()
+        {
+            var nm = _manager;
+            if (nm == null || !nm.IsClient || nm.IsServer || !nm.IsConnectedClient) return;
+
+            float now = Time.realtimeSinceStartup;
+            if (_clientWindowStart < 0f) { _clientWindowStart = now; return; }
+            float window = now - _clientWindowStart;
+            if (window < ClientDiagnosticsIntervalSeconds) return;
+
+            long rtt = -1;
+            if (_utp != null)
+            {
+                try { rtt = (long)_utp.GetCurrentRtt(NetworkManager.ServerClientId); }
+                catch { /* 연결 전환 중에는 서버 endpoint가 먼저 사라질 수 있다. */ }
+            }
+
+            float averageGapMs = _clientGapCount > 0 ? _clientGapTotalMs / _clientGapCount : -1f;
+            float idleMs = _lastDataAt >= 0f ? (now - _lastDataAt) * 1000f : -1f;
+            Debug.Log(
+                $"[Festa/원격이동] rtt={rtt}ms dataGap avg={averageGapMs:F1} max={_clientGapMaxMs:F1}ms " +
+                $">100ms={_clientStarvedGapCount}/{_clientGapCount} idle={idleMs:F1}ms window={window:F1}s " +
+                "interpolation=250ms");
+
+            _clientWindowStart = now;
+            ResetClientWindow();
+        }
+
+        void ResetClientWindow()
+        {
+            _clientGapTotalMs = 0f;
+            _clientGapMaxMs = 0f;
+            _clientGapCount = 0;
+            _clientStarvedGapCount = 0;
         }
 
         // ────────────────────────────── 서버 부하 계측 (GitLab #229) ──────────────────────────────
