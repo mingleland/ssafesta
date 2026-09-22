@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Unity Release Bundle 4개 파일을 Registry(unity-release-bundle/<8sha>)에 올리고, 그 즉시 Consumer job 을 깨운다.
+# Unity Release Bundle 4개 파일을 Registry(unity-release-bundle/<8sha>)에 올리고, 그 즉시 develop Demo 배포를 깨운다.
 #
 # Registry 업로드 자체는 GitLab 이벤트를 만들지 않는다. 사람이 Jenkins 를 눌러야 한다면 "자동화" 라고 부를 수 없으므로
 # 업로드의 마지막 단계에서 job 을 호출하는 것까지가 이 스크립트의 책임이다.
@@ -76,10 +76,11 @@ case "${code}" in
 esac
 
 if (( trigger )); then
+  [[ "${fixture}" == false ]] || { echo 'fixture bundle publishing requires --no-trigger' >&2; exit 64; }
   : "${JENKINS_URL:?JENKINS_URL is required}"
   : "${JENKINS_USER:?JENKINS_USER is required}"
   : "${JENKINS_API_TOKEN:?JENKINS_API_TOKEN is required}"
-  job="${JENKINS_BUNDLE_E2E_JOB:-festa-unity-bundle-e2e}"
+  job="${JENKINS_DEVELOP_DEPLOY_JOB:-festa-gitlab-develop/job/develop}"
   # API token 이면 crumb 이 필요 없지만 비밀번호 인증이면 필요하다 — 있으면 붙이고 없으면 그냥 간다.
   crumb="$("${curl_bin}" --silent --show-error --cookie-jar "${work}/jenkins.cookie" \
     --user "${JENKINS_USER}:${JENKINS_API_TOKEN}" "${JENKINS_URL%/}/crumbIssuer/api/json" 2>/dev/null \
@@ -88,9 +89,9 @@ if (( trigger )); then
     --user "${JENKINS_USER}:${JENKINS_API_TOKEN}" \
     --cookie "${work}/jenkins.cookie" \
     ${crumb:+--header "${crumb}"} \
-    --data-urlencode "BUNDLE_VERSION=${release_id}" \
-    --data-urlencode "FIXTURE_MODE=${fixture}" \
-    --data-urlencode "TARGET=${target}" \
+    --data-urlencode "UNITY_ARTIFACT_CANDIDATE=${source_commit}" \
+    --data-urlencode 'DEPLOY_GAME_TO_DEMO=true' \
+    --data-urlencode 'CHANGE_BASE_SHA=' \
     "${JENKINS_URL%/}/job/${job}/buildWithParameters" >/dev/null
-  echo "TRIGGERED_BUNDLE_CONSUMER: ${job} BUNDLE_VERSION=${release_id} FIXTURE_MODE=${fixture} TARGET=${target}"
+  echo "TRIGGERED_DEMO_DEPLOY: ${job} UNITY_ARTIFACT_CANDIDATE=${source_commit} DEPLOY_GAME_TO_DEMO=true"
 fi

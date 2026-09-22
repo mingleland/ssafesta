@@ -128,6 +128,8 @@ validation_only_prefixes = (
     "infra/environments/tests/",
     "infra/environments/compose/dev/",
     "infra/deploy/compose/dev/",
+    # 독립 observability stack 설정·계약. Demo/Production 앱 이미지를 고르지 않는다.
+    "infra/observability/",
     # 운영자가 API 로 주입하는 데이터 정본. 어떤 이미지에도 들어가지 않는다.
     "infra/deploy/data/",
 )

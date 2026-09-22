@@ -112,22 +112,36 @@ public class BoothQueryService {
     }
 
     /**
-     * Every administrator booth, for the administrator console (S15P21A604-933).
+     * Every booth on the floor, for the administrator console (S15P21A604-933, S15P21A604-959).
      *
-     * <p><b>Not scoped to the caller.</b> An administrator booth follows the role rather than the
-     * person who set it up (FR-023, S15P21A604-905), so one console lists them all and any
+     * <p><b>Member booths are in here too</b> (S15P21A604-959). Every path the console drives
+     * already accepts an administrator on someone else's booth — {@link BoothAccessGuard} lets the
+     * admin role through its owner check (FR-023), and {@code POST /admin/booths/{id}/unpublish}
+     * only wants a {@code boothId}. The list was the one place still filtered, so the console had
+     * authority over member booths and no way to learn their ids. Listing them is not a new
+     * permission; it is the missing half of one that already existed.
+     *
+     * <p><b>Not scoped to the caller either.</b> An administrator booth follows the role rather than
+     * the person who set it up (FR-023, S15P21A604-905), so one console lists them all and any
      * administrator can act on any of them — otherwise a booth put up by someone who is away, or
      * since demoted, is a booth nobody can reach.
      *
+     * <p>{@code adminOwned} is what the console branches on, and the two kinds do not behave alike:
+     * a master's <b>personal</b> booth refuses admin action with {@code MASTER_PROTECTED}, and a
+     * forced unpublish preserves a member's content (spec 004 FR-010) while an administrator booth's
+     * release deletes it outright. A row that cannot say which it is cannot warn about either.
+     *
      * <p>Sorted by slot code so the list reads in floor order rather than in the order the booths
-     * happened to be taken.
+     * happened to be taken. A booth with no valid lease sorts last — for a member that is an
+     * expired booth whose content is still preserved, and it has no slot to sort by.
      */
-    // ponytail: 부스당 임대·자리·설치자를 따로 읽는다. 관리자 부스는 슬롯 수(현재 12)를 넘지 못해
-    // 상한이 작다 — 목록이 길어지면 슬롯 목록처럼 한 문장으로 읽는 조인 쿼리로 바꿄다.
+    // ponytail: 부스당 임대·자리·소유자를 따로 읽는다. 관리자 부스만 볼 때는 상한이 슬롯 수(현재
+    // 12)였지만 회원 부스는 임대가 끝나도 행이 남아 회원 수만큼 쌓인다 — 목록이 길어지면 슬롯
+    // 목록처럼 한 번에 읽는 조인 쿼리로 바꾼다.
     @Transactional(readOnly = true)
     public List<AdminBoothView> listAdminBooths() {
         Instant now = Instant.now();
-        return booths.findByAdminOwnedTrue().stream()
+        return booths.findAll().stream()
                 .map(booth -> {
                     BoothLease lease = leases.findValidByBoothId(booth.getId(), now).orElse(null);
                     BoothSlot slot = lease == null ? null : slots.findById(lease.getSlotId()).orElse(null);
@@ -137,7 +151,9 @@ public class BoothQueryService {
                             lease == null ? null : lease.getSlotId(),
                             slot == null ? null : slot.getSlotCode(),
                             booth.getName(), booth.isPublished(),
-                            lease == null ? null : lease.getStartsAt(), installedBy);
+                            lease == null ? null : lease.getStartsAt(), installedBy,
+                            booth.isAdminOwned(),
+                            lease == null || booth.isAdminOwned() ? null : lease.getEndsAt());
                 })
                 .sorted(Comparator.comparing(AdminBoothView::slotCode,
                         Comparator.nullsLast(Comparator.naturalOrder())))
@@ -276,18 +292,26 @@ public class BoothQueryService {
     }
 
     /**
-     * One row of the administrator console's booth list (S15P21A604-933).
+     * One row of the administrator console's booth list (S15P21A604-933, S15P21A604-959).
      *
-     * @param slotId       null only in the window where the booth exists without a valid lease.
-     *        A returned administrator booth is deleted outright, so in practice it is always set;
-     *        the console still has to render the row rather than drop a booth it cannot explain.
+     * @param slotId       null when the booth holds no valid lease. For an administrator booth that
+     *        is only a momentary window, since a returned one is deleted outright — but a member
+     *        booth outlives its lease with its content preserved (spec 004 FR-011), so an expired
+     *        member row is a normal, lasting state rather than something unexplainable.
      * @param published    whether visitors can see it right now — the one status the console acts on
      *        (강제 비공개)
-     * @param installedBy  the nickname of whoever leased it. <b>Not an owner</b>: the booth follows
-     *        the administrator role, and this only answers "who put it up".
+     * @param installedBy  the nickname of whoever leased it. <b>An owner only for a member booth</b>
+     *        — an administrator booth follows the administrator role, so there the name only
+     *        answers "who put it up".
+     * @param adminOwned   which kind of booth this row is, which decides what the console may do
+     *        with it (S15P21A604-959). See the class-level note on {@link #listAdminBooths()}.
+     * @param leaseEndsAt  when the lease runs out, {@code null} for an administrator booth because
+     *        that lease is permanent (S15P21A604-905) — and {@code null} for an unleased booth,
+     *        which is a member booth whose lease already ended
      */
     public record AdminBoothView(Long boothId, Long slotId, String slotCode, String name,
-                                 boolean published, Instant leaseStartedAt, String installedBy) {
+                                 boolean published, Instant leaseStartedAt, String installedBy,
+                                 boolean adminOwned, Instant leaseEndsAt) {
     }
 
     /**

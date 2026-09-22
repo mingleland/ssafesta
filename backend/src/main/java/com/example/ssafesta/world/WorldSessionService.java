@@ -2,7 +2,8 @@ package com.example.ssafesta.world;
 
 import com.example.ssafesta.common.ApiException;
 import com.example.ssafesta.common.ErrorCode;
-import com.example.ssafesta.mission.WorldMissionProgressService;
+import com.example.ssafesta.mission.DailyMission;
+import com.example.ssafesta.mission.DailyMissionMarkerService;
 import com.example.ssafesta.user.AccountStatus;
 import com.example.ssafesta.user.User;
 import com.example.ssafesta.user.UserRepository;
@@ -39,14 +40,14 @@ public class WorldSessionService {
     private final UserRepository users;
     private final WorldEntryTokenIssuer tokens;
     private final WorldProperties properties;
-    private final WorldMissionProgressService worldMissionProgress;
+    private final DailyMissionMarkerService missionMarkers;
 
     public WorldSessionService(UserRepository users, WorldEntryTokenIssuer tokens, WorldProperties properties,
-                               WorldMissionProgressService worldMissionProgress) {
+                               DailyMissionMarkerService missionMarkers) {
         this.users = users;
         this.tokens = tokens;
         this.properties = properties;
-        this.worldMissionProgress = worldMissionProgress;
+        this.missionMarkers = missionMarkers;
     }
 
     @Transactional(readOnly = true)
@@ -61,7 +62,7 @@ public class WorldSessionService {
         // GitLab #233 defines WORLD_ENTER as a successful world-session issuance. It is not the
         // daily-grant cache: only this endpoint may set the member's KST-day mission marker.
         if (MEMBER_ROLE.equals(identity.role())) {
-            worldMissionProgress.markEntered(Long.valueOf(identity.playerId()));
+            missionMarkers.mark(DailyMission.WORLD_ENTER, Long.valueOf(identity.playerId()));
         }
 
         // Never the grant itself, the secret, or the nickname (FR-023). The pair below is what an

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from datetime import datetime, timezone
 
 import fakeredis
@@ -17,12 +18,17 @@ from app.services.conversation_service import (
 )
 from app.services.stream_service import ConversationOwnershipMismatch
 from tests.fakes.spring_booth_access import FakeSpringBoothAccessClient
+from tests.fakes.spring_mission import FakeSpringMissionMarkerClient
 
 
-def _service(spring_client: FakeSpringBoothAccessClient) -> ConversationService:
+def _service(
+    spring_client: FakeSpringBoothAccessClient,
+    mission_client: FakeSpringMissionMarkerClient | None = None,
+) -> ConversationService:
     repository = ConversationRepository(fakeredis.FakeAsyncRedis(), ttl_seconds=1800)
     return ConversationService(
         spring_client=spring_client,
+        mission_client=mission_client or FakeSpringMissionMarkerClient(),
         repository=repository,
         ttl_seconds=1800,
         clock=lambda: datetime(2026, 9, 3, 11, 40, tzinfo=timezone.utc),
@@ -131,3 +137,40 @@ async def test_close_refuses_another_users_conversation_and_keeps_it() -> None:
         await service.close(conversation_id=conversation_id, user_id=99)
 
     assert await service._repository.get(conversation_id) is not None
+
+
+@pytest.mark.asyncio
+async def test_create_reports_the_ai_consult_mission_fact() -> None:
+    """대화를 시작했다는 사실이 Spring 에 닿아야 AI_CONSULT 미션이 오른다 (spec 022 FR-003a)."""
+    spring_client = FakeSpringBoothAccessClient()
+    spring_client.result = BoothAccessResult(
+        allowed=True, lease_ends_at="2026-09-03T12:00:00+00:00", denial_code=None
+    )
+    mission_client = FakeSpringMissionMarkerClient()
+    service = _service(spring_client, mission_client)
+
+    await service.create(user_id=42, booth_id=7, agent_id=3)
+
+    assert mission_client.calls == [42]
+
+
+@pytest.mark.asyncio
+async def test_create_survives_a_mission_marker_failure(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """마커가 죽어도 대화는 살아야 한다 — 그리고 조용히 사라지면 안 된다 (FR-004a)."""
+    spring_client = FakeSpringBoothAccessClient()
+    spring_client.result = BoothAccessResult(
+        allowed=True, lease_ends_at="2026-09-03T12:00:00+00:00", denial_code=None
+    )
+    mission_client = FakeSpringMissionMarkerClient()
+    mission_client.raise_unavailable = True
+    service = _service(spring_client, mission_client)
+
+    with caplog.at_level(logging.WARNING):
+        conversation = await service.create(user_id=42, booth_id=7, agent_id=3)
+
+    assert conversation.conversation_id == "conv_fixed"
+    assert await service._repository.get("conv_fixed") == conversation
+    record = next(r for r in caplog.records if getattr(r, "event", None) == "ai_consult_marker_undelivered")
+    assert record.status == "UNDELIVERED"

@@ -154,6 +154,7 @@
 **Independent Test**: 승인 rule만 Mattermost에 전달되고 observability stack을 중지해도 build·deploy·application health가 유지된다.
 
 - [ ] T035 [P] [US5] `infra/observability/BASELINE.md`에 EC2 실측 기반 retention, disk cap, scrape/evaluation interval, threshold 승인값을 기록한다
+- [X] T035A [P] [US5] `infra/observability/signal-catalog.json`에 운영·제품·개발 신호의 원천, 구현 상태, 개인정보 등급과 소비자를 기록하고 CI에서 PII·고카디널리티 label을 거부한다
 - [ ] T036 [US5] `infra/observability/grafana/provisioning/alerting/contact-points.yaml`의 Jenkins credential 참조와 Mattermost delivery를 실제 canary rule로 검증한다
 - [ ] T037 [US5] `infra/tests/acceptance/us5-observability.sh`에 운영 stack 중지 상태에서 CI/dev deploy가 판정 변경 없이 완료되는 실환경 evidence를 추가한다
 

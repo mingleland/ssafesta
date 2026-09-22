@@ -26,7 +26,10 @@ afterEach(() => { cleanup(); closeOverlay(); __resetGameClientUiForTests(); __re
 
 async function renderWorld() {
   const { WorldPage } = await import('../../WorldPage');
-  return render(<MemoryRouter initialEntries={['/app/world']}><WorldPage /></MemoryRouter>);
+  const result = render(<MemoryRouter initialEntries={['/app/world']}><WorldPage /></MemoryRouter>);
+  // 진입 환영 안내(-599)를 걷고 시작한다 — 이 파일이 재는 것은 그 뒤의 계층이다.
+  act(() => { closeOverlay(); });
+  return result;
 }
 
 const setUi = (patch: { focus?: boolean; minigame?: boolean; avatar?: boolean }) =>

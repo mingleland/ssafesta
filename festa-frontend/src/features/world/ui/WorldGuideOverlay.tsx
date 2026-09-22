@@ -1,4 +1,4 @@
-// 월드 이용 안내 Overlay (S15P21A604-599) — 첫 진입 환영 화면.
+// 월드 이용 안내 Overlay (S15P21A604-599) — 월드 진입 환영 화면.
 //
 // 세 동선(부스 → 콘텐츠 → 상담)을 카드로 보여 주고, 핵심 조작 4키와 참여 혜택을 요약한다.
 // 전체 조작표는 ESC 메뉴의 조작 안내 오버레이가 담당한다 — 달리기·점프 같은 확장 키는 여기 없다.
@@ -8,7 +8,6 @@
 // focus 반환이 전부 프레임을 따라온다 — 이 파일에는 그중 어느 것도 없다.
 import { closeOverlay } from '../../../shared/types/overlay';
 import { OverlayFrame } from '../../overlay/ui/OverlayFrame';
-import { markWorldGuideSeen } from '../model/worldGuide';
 import './worldGuide.css';
 
 function icon(path: string) {
@@ -41,9 +40,6 @@ const STEPS = [
 ] as const;
 
 export function WorldGuideOverlay() {
-  // 열렸다는 사실 자체가 "봤다" 이다 — 닫는 방법(배경·X·ESC)마다 따로 기록하면 하나를 빠뜨린다.
-  markWorldGuideSeen();
-
   return (
     <OverlayFrame
       title="SSAFESTA에 오신 걸 환영해요"
