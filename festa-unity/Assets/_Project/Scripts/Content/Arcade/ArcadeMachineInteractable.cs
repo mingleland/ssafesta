@@ -25,7 +25,7 @@ namespace Festa.Content.Arcade
 
         [Header("초점 카메라 (게임기 로컬 좌표 — 스케일 포함)")]
         // 화면 실측: 중심 로컬 (0, 1.30, 0.30), 크기 0.50 × 0.40 m. 0.5 m 앞에서 보면 화면이 시야를 거의 채운다.
-        [SerializeField] Vector3 _cameraLocal = new(0f, 1.30f, 0.52f);
+        [SerializeField] Vector3 _cameraLocal = new(0f, 1.30f, 0.72f);
         [SerializeField] Vector3 _lookLocal = new(0f, 1.30f, 0.30f);
 
         [Header("조작 자리 (게임기 로컬 좌표 — 화면 정면이 +Z)")]
@@ -37,19 +37,37 @@ namespace Festa.Content.Arcade
         public string MachineId => _machineId;
 
         RetroArcadeGame _localGame;
+        BubbleShooterMiniGame _bubbleShooter;
+        MegaPackSpaceShooterMiniGame _megaShooter;
 
         void Awake()
         {
-            // 기존 씬에 직렬화된 0.80 값이 코드 기본값을 덮으므로 런타임에서 화면 확대값을 고정한다.
-            _cameraLocal = new Vector3(0f, 1.30f, 0.48f);
-            _lookLocal = new Vector3(0f, 1.30f, 0.30f);
+            // 캐비닛 부모 스케일을 고려해 화면 면을 뚫지 않는 범위에서만 보정한다.
+            if (_cameraLocal.z < 0.68f || _cameraLocal.z > 0.82f)
+                _cameraLocal = new Vector3(0f, 1.30f, 0.72f);
             if (GetComponentsInChildren<Collider>(true).Length == 0)
                 gameObject.AddComponent<BoxCollider>();
             if (GetComponent<BoothInteractionTarget>() == null)
                 gameObject.AddComponent<BoothInteractionTarget>();
-            _localGame = GetComponent<RetroArcadeGame>();
-            if (_localGame == null) _localGame = gameObject.AddComponent<RetroArcadeGame>();
-            _localGame.Configure(_machineId);
+            if (_machineId == "arcade-01")
+            {
+                // 1번 내장 게임은 화면 가장자리까지 읽을 수 있게 다른 기기보다 한 단계 더 줌인한다.
+                _cameraLocal = new Vector3(0f, 1.30f, 0.58f);
+                _bubbleShooter = GetComponent<BubbleShooterMiniGame>();
+                if (_bubbleShooter == null) _bubbleShooter = gameObject.AddComponent<BubbleShooterMiniGame>();
+            }
+            else if (_machineId == "arcade-02")
+            {
+                _cameraLocal = new Vector3(0f, 1.30f, 0.58f);
+                _megaShooter = GetComponent<MegaPackSpaceShooterMiniGame>();
+                if (_megaShooter == null) _megaShooter = gameObject.AddComponent<MegaPackSpaceShooterMiniGame>();
+            }
+            else
+            {
+                _localGame = GetComponent<RetroArcadeGame>();
+                if (_localGame == null) _localGame = gameObject.AddComponent<RetroArcadeGame>();
+                _localGame.Configure(_machineId);
+            }
             BoothInteractionInput.Ensure();
         }
 
@@ -68,8 +86,10 @@ namespace Festa.Content.Arcade
                 return;
             }
 
-            InteractionFocusCamera.Focus(transform, _cameraLocal, _lookLocal);
-            bool openedLocally = _localGame != null && _localGame.Begin();
+            InteractionFocusCamera.Focus(transform, _cameraLocal, _lookLocal, true, false);
+            bool openedLocally = _bubbleShooter != null ? _bubbleShooter.Begin()
+                : _megaShooter != null ? _megaShooter.Begin()
+                : _localGame != null && _localGame.Begin();
             if (!openedLocally) BoothInteractBridge.SendArcadeInteract(_machineId);
             if (po != null) StartCoroutine(AlignToStandSpot(po.transform));
             if (!openedLocally) StartCoroutine(ReleaseIfHostNeverAnswers());

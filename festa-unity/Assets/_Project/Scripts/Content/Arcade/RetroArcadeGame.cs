@@ -28,6 +28,7 @@ namespace Festa.Content.Arcade
 
         Texture2D _texture;
         Color32[] _pixels;
+        Color32[] _uploadPixels;
         Material _screenMaterial;
         int _index;
         bool _active;
@@ -338,13 +339,10 @@ namespace Festa.Content.Arcade
                 wrapMode = TextureWrapMode.Clamp
             };
             _pixels = new Color32[Width * Height];
+            _uploadPixels = new Color32[Width * Height];
             _screenMaterial.SetTexture("_BaseMap", _texture);
             _screenMaterial.mainTexture = _texture;
             // 캐비닛 모델의 화면 UV가 좌우 반전되어 있어 로컬 게임 텍스처만 보정한다.
-            _screenMaterial.SetTextureScale("_BaseMap", new Vector2(-1f, 1f));
-            _screenMaterial.SetTextureOffset("_BaseMap", new Vector2(1f, 0f));
-            _screenMaterial.mainTextureScale = new Vector2(-1f, 1f);
-            _screenMaterial.mainTextureOffset = new Vector2(1f, 0f);
         }
 
         void DrawAttract()
@@ -532,7 +530,15 @@ namespace Festa.Content.Arcade
             int x1 = Mathf.Clamp(x + w, 0, Width), y1 = Mathf.Clamp(y + h, 0, Height);
             for (int py = y0; py < y1; py++) for (int px = x0; px < x1; px++) _pixels[py * Width + px] = c;
         }
-        void Upload() { _texture.SetPixels32(_pixels); _texture.Apply(false, false); }
+        void Upload()
+        {
+            // 캐비닛 메시 UV의 좌우 반전은 머티리얼 tiling이 아니라 최종 픽셀 버퍼에서 한 번만 보정한다.
+            for (int y = 0; y < Height; y++)
+                for (int x = 0; x < Width; x++)
+                    _uploadPixels[y * Width + (Width - 1 - x)] = _pixels[y * Width + x];
+            _texture.SetPixels32(_uploadPixels);
+            _texture.Apply(false, false);
+        }
 
         void OnDestroy()
         {
