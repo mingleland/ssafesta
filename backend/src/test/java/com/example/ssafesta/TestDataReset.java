@@ -47,6 +47,7 @@ public class TestDataReset implements BeforeAllCallback {
     private static final String[] TABLES = {
             "account_status_histories", "admin_actions", "ai_agents", "ai_document_chunk_staging",
             "ai_document_chunks", "ai_document_jobs", "ai_documents", "arcade_machine_bindings",
+            "arcade_score_records",
             "avatar_presets", "booth_daily_metrics", "booth_layout_drafts",
             "booth_layout_published_versions", "booth_leases", "booth_staffs", "booth_visit_events",
             "booths", "coin_ledger_entries", "coin_reconciliation_runs", "consultation_messages",
