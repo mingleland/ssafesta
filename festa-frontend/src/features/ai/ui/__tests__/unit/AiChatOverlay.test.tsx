@@ -60,10 +60,24 @@ function ask(question: string): void {
 
 function askFirstSuggestion(): void {
   renderOverlay({ boothId: 7, agentId: 3 });
-  fireEvent.click(screen.getByRole('button', { name: '어떤 프로젝트인가요?' }));
+  fireEvent.click(screen.getByRole('button', { name: '프로젝트 소개' }));
 }
 
 describe('AiChatOverlay 실서버 결선·SSE 렌더링', () => {
+  it.each(['프로젝트 소개', '대상 사용자', '기술 스택'])(
+    '정형 추천 질문 %s를 서버 화이트리스트 문구 그대로 전송한다',
+    async (question) => {
+      streamMessage.mockReturnValue(mockStreamSuccess());
+      renderOverlay({ boothId: 7, agentId: 3 });
+
+      fireEvent.click(screen.getByRole('button', { name: question }));
+
+      await waitFor(() =>
+        expect(streamMessage).toHaveBeenCalledWith('conv_1', question, expect.any(AbortSignal)),
+      );
+    },
+  );
+
   it('token 누적 답변을 done 뒤 표시하고 출처 문서명은 화면에 그리지 않는다', async () => {
     streamMessage.mockReturnValue(mockStreamSuccess());
     askFirstSuggestion();
