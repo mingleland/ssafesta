@@ -12,7 +12,7 @@
 //
 // Dispatcher 구독은 이 화면 생명주기에 종속시킨다 — 전역 상시 구독이면 월드 밖에서도 Unity
 // 이벤트가 오버레이를 열 수 있고 StrictMode에서 leak된다.
-import { useCallback, useEffect, useState, type CSSProperties } from 'react';
+import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { IS_MOCK_WORLD } from '../../features/world/ui/WorldSurface.select';
 import { useHostPhase } from '../../unity/host/hostPhase';
@@ -126,8 +126,21 @@ export function WorldPage() {
   //
   // 본 적 있는지를 더 이상 묻지 않는다. 축제 기간에 잠깐 들르는 방문자가 대상이라 "한 번 봤으니
   // 다음부터 없음" 은 다른 기기·다른 창에서 그대로 깨지고, 닫는 데 드는 것은 클릭 한 번이다.
+  //
+  // **라우트 복귀는 입장이 아니다.** Unity 는 라우트 밖(PersistentWorld)에 살아서, 관리 화면의
+  // "부스 임대하기" 처럼 `/app/booths` → `/app/world?panel=rental` 로 돌아오면 WorldPage 만 다시
+  // 마운트되고 월드는 이미 `ready` 다. 그걸 입장으로 읽으면 1.1초 뒤 안내가 뜨면서 방금 연 임대 창을
+  // 닫아 버린다. 그래서 이 마운트 동안 `ready` 로 **바뀐** 경우만 입장으로 친다.
+  const alreadyInWorldOnMount = useRef(inWorld);
   useEffect(() => {
-    if (!inWorld) return;
+    if (!inWorld) {
+      alreadyInWorldOnMount.current = false; // 재접속·재부팅 뒤 다시 ready 가 되면 그건 입장이다
+      return;
+    }
+    if (alreadyInWorldOnMount.current) {
+      releaseCoinGrantToasts();
+      return;
+    }
     if (getWorldUiState().avatar) return;
     const timer = window.setTimeout(() => {
       // 문이 다 열린 이 순간이 입장이다 — 붙들어 둔 코인 토스트를 여기서 낸다.
