@@ -60,6 +60,16 @@ namespace Festa.World
         /// <summary>지금부터 <paramref name="seconds"/> 동안 이 기계를 잠근다.</summary>
         public void BeginBusy(float seconds) => _busyUntil = Mathf.Max(_busyUntil, Time.time + seconds);
 
+        /// <summary>
+        /// 승인 전에 걸어 둔 잠금을 되돌린다. 서버가 스윙을 거절했을 때만 쓴다 (S15P21A604-967) —
+        /// 연출이 도는 중(<see cref="_running"/>)에는 아무 일도 하지 않는다.
+        /// </summary>
+        public void ClearBusy()
+        {
+            if (_running != null) return;
+            _busyUntil = 0f;
+        }
+
         /// <summary>임팩트 대기까지 포함한 한 스윙의 총 길이. 잠금 창을 이 값으로 연다.</summary>
         public float SequenceSeconds => _riseSeconds + _holdSeconds + _fallSeconds;
 

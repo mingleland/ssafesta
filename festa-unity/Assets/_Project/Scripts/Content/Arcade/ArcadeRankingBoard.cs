@@ -7,6 +7,7 @@ using Festa.Integration;
 using TMPro;
 using UnityEngine;
 using UnityEngine.Networking;
+using UnityEngine.SceneManagement;
 
 namespace Festa.Content.Arcade
 {
@@ -18,6 +19,25 @@ namespace Festa.Content.Arcade
         static readonly Dictionary<string, CacheEntry> Cache = new();
         static readonly HashSet<string> Fetching = new();
         static readonly Dictionary<int, int> ViewVersions = new();
+
+        /// <summary>
+        /// 씬이 내려가면 표시용 캐시를 버린다 (S15P21A604-970). <see cref="ViewVersions"/> 는 텍스트
+        /// 인스턴스 ID 를 키로 넣기만 해서, 정리하지 않으면 월드를 드나들 때마다 항목이 늘어난다.
+        /// 랭킹 본문도 어차피 30초 캐시라 버려도 잃는 것이 없다.
+        /// </summary>
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        static void Install()
+        {
+            SceneManager.sceneUnloaded -= OnSceneUnloaded;
+            SceneManager.sceneUnloaded += OnSceneUnloaded;
+        }
+
+        static void OnSceneUnloaded(Scene _)
+        {
+            Cache.Clear();
+            Fetching.Clear();
+            ViewVersions.Clear();
+        }
 
         [Serializable] sealed class RankEntry { public int rank; public string nickname; public int bestScore; }
         [Serializable] sealed class RankEntries { public RankEntry[] items; }

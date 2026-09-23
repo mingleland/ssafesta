@@ -212,7 +212,8 @@ namespace Festa.Content.Arcade
             float halfZ = _standAreaSize.y * 0.5f * scale;
             float centerY = StandPoint().y;
 
-            foreach (var p in FindObjectsByType<Festa.Network.NetworkPlayer>(FindObjectsInactive.Exclude, FindObjectsSortMode.None))
+            // 사람 목록은 프레임 단위로 공유한다 — 기계마다 씬을 다시 훑으면 20대가 20번 훑는다 (S15P21A604-970).
+            foreach (var p in Festa.Network.NetworkPlayerScan.All())
             {
                 if (p == null || (self != null && p.gameObject == self.gameObject)) continue;
 

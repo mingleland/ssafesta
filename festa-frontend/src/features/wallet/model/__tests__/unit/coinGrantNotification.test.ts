@@ -283,19 +283,21 @@ describe('입장 전 코인 토스트 붙들기', () => {
         entryId: '778',
         amount: 15,
         balanceAfter: 1015,
-        reasonType: 'DAILY_MISSION',
+        reasonType: 'ADMIN_ADJUSTMENT',
         referenceType: null,
         referenceId: null,
         occurredAt: new Date().toISOString(),
       }),
     );
 
-    expect(toasts.show).toHaveBeenCalledWith('일일 미션 보상 +15 코인이 지급되었습니다.', 'success');
+    expect(toasts.show).toHaveBeenCalledWith('운영자 조정 +15 코인이 지급되었습니다.', 'success');
   });
 
-  it('붙들어도 무음 사유는 쌓이지 않는다 — 풀 때 슬롯 당첨이 쏟아지지 않게', () => {
+  it('붙들어도 무음 사유는 쌓이지 않는다 — 풀 때 슬롯 당첨·미션 보상이 쏟아지지 않게', () => {
     holdCoinGrantToasts();
     receive('SLOT_PAYOUT', 300);
+    // 미션 보상은 미션 창이 받기 응답으로 이미 알린다 — 여기서 또 띄우면 두 줄로 겹친다.
+    receive('DAILY_MISSION', 15);
 
     releaseCoinGrantToasts();
 
