@@ -79,7 +79,7 @@ public class AiAgentConfigService {
      * 값이 없는 것을 빈 문자열로 채우면 받는 쪽이 "소개가 없는 부스" 와 "소개가 빈 문자열인 부스" 를
      * 구분하지 못한다.
      *
-     * @param introduction {@code projects.description} 이다. 운영자가 직접 쓴 프로젝트 소개
+     * @param introduction AI 생성 소개를 우선하고, 아직 없으면 운영자가 쓴 소개를 사용한다.
      */
     @JsonInclude(JsonInclude.Include.NON_NULL)
     public record ProjectFacts(String introduction, String targetAudience, String techStack) {
@@ -88,7 +88,9 @@ public class AiAgentConfigService {
             if (project == null) {
                 return null;
             }
-            return new ProjectFacts(project.getDescription(), project.getTargetAudience(),
+            String introduction = project.getAiIntroduction() != null
+                    ? project.getAiIntroduction() : project.getDescription();
+            return new ProjectFacts(introduction, project.getTargetAudience(),
                     project.getTechStack());
         }
     }

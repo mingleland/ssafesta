@@ -7,6 +7,8 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import java.time.Instant;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 /**
  * What a booth exhibits (spec 009 FR-001~FR-003).
@@ -70,6 +72,18 @@ public class Project {
     /** 무엇으로 만들었는가. AI 가 추출하기 전에는 {@code null} 이다. */
     @Column(name = "tech_stack", columnDefinition = "text")
     private String techStack;
+
+    /** READY 문서 전체를 RAG 검색해 만든 소개. 운영자가 쓰는 {@link #description}과 분리한다. */
+    @Column(name = "ai_introduction", columnDefinition = "text")
+    private String aiIntroduction;
+
+    /** 생성에 사용한 documentId/chunkId 배열. 운영 추적용이며 대화 응답에는 노출하지 않는다. */
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "facts_sources", columnDefinition = "jsonb")
+    private String factsSources;
+
+    @Column(name = "facts_generation_version", length = 50)
+    private String factsGenerationVersion;
 
     /** 지금 값이 어느 문서에서 나왔는가. 문서가 지워지면 {@code null} 이 되고 값은 남는다. */
     @Column(name = "facts_document_id")
@@ -141,6 +155,12 @@ public class Project {
 
     public String getTechStack() { return techStack; }
 
+    public String getAiIntroduction() { return aiIntroduction; }
+
+    public String getFactsSources() { return factsSources; }
+
+    public String getFactsGenerationVersion() { return factsGenerationVersion; }
+
     public Long getFactsDocumentId() { return factsDocumentId; }
 
     public Long getFactsJobId() { return factsJobId; }
@@ -188,8 +208,22 @@ public class Project {
     }
 
     /** AI 가 추출한 값으로 갈아끼운다. 출처를 함께 적어야 다음 결과의 최신성을 판정할 수 있다. */
-    public void applyFacts(String targetAudience, String techStack,
+    public void applyFacts(String aiIntroduction, String targetAudience, String techStack,
+                           String factsSources, String generationVersion,
                            Long documentId, long jobId, Instant now) {
+        this.aiIntroduction = aiIntroduction;
+        this.targetAudience = targetAudience;
+        this.techStack = techStack;
+        this.factsSources = factsSources;
+        this.factsGenerationVersion = generationVersion;
+        this.factsDocumentId = documentId;
+        this.factsJobId = jobId;
+        this.factsUpdatedAt = now;
+    }
+
+    /** 롤링 배포 중 구버전 AI 요청은 새 소개·근거 메타데이터를 지우지 않고 기존 두 값만 갱신한다. */
+    public void applyLegacyFacts(String targetAudience, String techStack,
+                                 Long documentId, long jobId, Instant now) {
         this.targetAudience = targetAudience;
         this.techStack = techStack;
         this.factsDocumentId = documentId;

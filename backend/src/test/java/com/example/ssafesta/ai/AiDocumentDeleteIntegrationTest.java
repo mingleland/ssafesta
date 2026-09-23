@@ -5,6 +5,7 @@ import static com.example.ssafesta.booth.BoothLayoutTestSupport.grantLease;
 import static com.example.ssafesta.booth.BoothTestSupport.createMemberWithWallet;
 import static com.example.ssafesta.booth.BoothTestSupport.releaseAllSlots;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -56,6 +57,15 @@ class AiDocumentDeleteIntegrationTest {
         long agentId = agent("소유자삭제");
         long documentId = seedDocument(agentId, "READY", "docs/owner-delete/" + agentId);
         seedSearchableChunk(documentId, agentId);
+        long projectId = jdbc.queryForObject("""
+                INSERT INTO projects (booth_id, name, description, ai_introduction,
+                    target_audience, tech_stack, facts_document_id, facts_job_id,
+                    facts_sources, facts_generation_version)
+                SELECT booth_id, '정형답변 프로젝트', '운영자 소개', 'AI 소개', '방문자', 'Spring',
+                       ?, 7, '[{"documentId":1,"chunkId":0}]'::jsonb, 'rag-v1'
+                  FROM ai_agents WHERE id = ?
+                RETURNING id
+                """, Long.class, documentId, agentId);
 
         mockMvc.perform(delete("/api/v1/documents/{id}", documentId)
                         .header("Authorization", bearer()))
@@ -69,6 +79,11 @@ class AiDocumentDeleteIntegrationTest {
         assertEquals(1, jdbc.queryForObject(
                 "SELECT COUNT(*) FROM game_asset_delete_queue WHERE object_key = ?",
                 Integer.class, "docs/owner-delete/" + agentId));
+        assertNull(jdbc.queryForObject(
+                "SELECT ai_introduction FROM projects WHERE id = ?", String.class, projectId));
+        assertEquals("운영자 소개", jdbc.queryForObject(
+                "SELECT description FROM projects WHERE id = ?", String.class, projectId),
+                "문서 삭제가 운영자 입력 소개까지 지우면 안 됩니다.");
     }
 
     @Test
