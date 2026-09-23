@@ -105,16 +105,19 @@ export function cancelWithdrawal(): void {
 
 // 확인(confirming)을 거친 뒤에만 호출된다 — BE 도 confirmed:true 를 요구한다(WITHDRAWAL_NOT_CONFIRMED).
 // 성공하면 세션을 종료한다. session.ts 가 토큰·kind 갱신의 유일한 진입점이므로 clearSession 을 부른다.
-export async function confirmWithdrawal(): Promise<void> {
-  if (state.withdrawal.phase !== 'confirming') return;
+// 반환값은 탈퇴 성공 여부다 — 호출부는 true 일 때만 화면을 떠난다(실패를 성공처럼 보내지 않는다).
+export async function confirmWithdrawal(): Promise<boolean> {
+  if (state.withdrawal.phase !== 'confirming') return false;
   setState({ withdrawal: { phase: 'submitting' } });
   try {
     await userApi.withdraw();
     state = initialState;
     emit();
     clearSession();
+    return true;
   } catch {
     setState({ withdrawal: { phase: 'error' } });
+    return false;
   }
 }
 
