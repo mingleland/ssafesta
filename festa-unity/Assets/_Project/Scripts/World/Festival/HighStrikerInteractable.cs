@@ -67,7 +67,11 @@ namespace Festa.World
 
             // 내 화면은 먼저 잠근다 — 서버 왕복을 기다리는 동안 연타되면 이모트만 여러 번 나간다.
             // 남들은 SwingClientRpc 를 받는 순간 잠긴다.
-            machine.BeginBusy(HighStrikerNetwork.ImpactDelay + machine.SequenceSeconds);
+            //
+            // **연출 길이가 아니라 승인 대기 시간만 잠근다** (S15P21A604-967). 승인되면 SwingClientRpc 가
+            // 실제 연출 길이로 늘리고, 거절되면 SwingRejectedClientRpc 가 즉시 푼다. 예전처럼 연출 길이로
+            // 미리 잠그면 거절된 입력 한 번이 화면을 2초 넘게 가려서 연타가 계속 씹히는 것으로 보였다.
+            machine.BeginBusy(HighStrikerNetwork.RequestLockTimeout);
             striker.RequestSwing(machine.MachineId);
         }
     }
