@@ -13,7 +13,7 @@ services:
       - /proc:/host/proc:ro
       - /sys:/host/sys:ro
     healthcheck:
-      test: ["CMD", "/bin/alloy", "fmt", "--test", "/etc/alloy/config.alloy"]
+      test: ["CMD", "/bin/alloy", "validate", "/etc/alloy/config.alloy"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -37,7 +37,7 @@ services:
       - /var/lib/docker:/var/lib/docker:ro
       - /dev/disk:/dev/disk:ro
     healthcheck:
-      test: ["CMD", "/bin/alloy", "fmt", "--test", "/etc/alloy/cadvisor.alloy"]
+      test: ["CMD", "/bin/alloy", "validate", "/etc/alloy/cadvisor.alloy"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -59,7 +59,7 @@ services:
       - ./loki/config.yaml:/etc/loki/config.yaml:ro
       - loki-data:/var/lib/loki
     healthcheck:
-      test: ["CMD-SHELL", "wget -q -O- http://127.0.0.1:3100/ready >/dev/null"]
+      test: ["CMD", "/usr/bin/loki", "-verify-config=true", "-config.file=/etc/loki/config.yaml", "-config.expand-env=true"]
       interval: 30s
       timeout: 10s
       retries: 5
