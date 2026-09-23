@@ -91,7 +91,7 @@ S3 호환 API 라서 Spring 은 AWS SDK(`S3Client`, `S3Presigner`)에 R2 endpoin
 | 항목 | 값 |
 |---|---|
 | 저장 대상 | AI 직원 원본 문서, Game Studio 이미지, 프로젝트 로고 |
-| 공개 여부 | 비공개 버킷. 내려받기는 서버가 권한을 확인한 뒤 중계하거나 짧은 서명 URL 을 준다 |
+| 공개 여부 | 비공개 버킷. 올릴 때만 presigned PUT 을 쓰고, 내려받기는 서버가 권한을 확인한 뒤 바이트를 중계한다 |
 | presigned URL 유효시간 | 15분 |
 | 환경변수 | `R2_ENDPOINT` `R2_BUCKET` `R2_ACCESS_KEY_ID` `R2_SECRET_ACCESS_KEY` |
 | 쓰기 대상 전환 | `AI_STORAGE_ACTIVE_WRITE_PROVIDER` (`R2` / `MINIO_LOCAL`) |
@@ -103,7 +103,7 @@ R2 에 장애가 나면 신규 업로드가 `503` 으로 거부되고, 이미 �
 
 ## 5. GitLab Generic Package Registry — Unity 릴리스 번들
 
-Unity 빌드는 라이선스가 있는 담당자 PC 에서만 굽는다. Jenkins 는 Unity 를 빌드하지 않고, 올라온 번들을 받아 검증한 뒤 배포만 한다.
+Unity 릴리스 빌드는 라이선스가 있는 담당자 PC 에서만 굽는다. Jenkins 는 릴리스 빌드를 하지 않고, 올라온 번들을 받아 검증한 뒤 배포만 한다.
 
 ```text
 PUT/GET https://lab.ssafy.com/api/v4/projects/1443023/packages/generic/{package}/{version}/{file}
@@ -130,4 +130,3 @@ Grafana Alerting 의 contact point `mattermost-approved-anomalies` 가 Slack 호
 | AWS EC2 | Nginx, Spring, FastAPI, Unity 전용 서버, Jenkins 실행 호스트 |
 
 상세는 [15_Infra_AWS_설계서](./15_Infra_AWS_설계서.md) 에 있다.
-
