@@ -43,36 +43,37 @@ server {
     location ~ ^/unity/Build/([^/]+\.wasm)$ {
         alias /srv/festa/webgl/current/Build/$1;
         default_type application/wasm;
-        add_header Cache-Control "public, max-age=31536000, immutable" always;
+        add_header Cache-Control "public, max-age=31536000, immutable";
     }
 
     location ~ ^/unity/Build/([^/]+\.wasm)\.(br|unityweb)$ {
         alias /srv/festa/webgl/current/Build/$1.$2;
         default_type application/wasm;
-        add_header Content-Encoding br always;
-        add_header Vary Accept-Encoding always;
-        add_header Cache-Control "public, max-age=31536000, immutable" always;
+        add_header Content-Encoding br;
+        add_header Vary Accept-Encoding;
+        add_header Cache-Control "public, max-age=31536000, immutable";
     }
 
     location ~ ^/unity/Build/([^/]+\.js)\.(br|unityweb)$ {
         alias /srv/festa/webgl/current/Build/$1.$2;
         default_type application/javascript;
-        add_header Content-Encoding br always;
-        add_header Vary Accept-Encoding always;
-        add_header Cache-Control "public, max-age=31536000, immutable" always;
+        add_header Content-Encoding br;
+        add_header Vary Accept-Encoding;
+        add_header Cache-Control "public, max-age=31536000, immutable";
     }
 
     location ~ ^/unity/Build/([^/]+\.data)\.(br|unityweb)$ {
         alias /srv/festa/webgl/current/Build/$1.$2;
         default_type application/octet-stream;
-        add_header Content-Encoding br always;
-        add_header Vary Accept-Encoding always;
-        add_header Cache-Control "public, max-age=31536000, immutable" always;
+        add_header Content-Encoding br;
+        add_header Vary Accept-Encoding;
+        add_header Cache-Control "public, max-age=31536000, immutable";
     }
 
+    # Build 헤더에는 always 를 쓰지 않는다 — 없는 해시의 404 에 immutable·br 이 붙으면 엣지가 그 404 를 1년 들고 간다 (LJH T-119).
     location /unity/Build/ {
         alias /srv/festa/webgl/current/Build/;
-        add_header Cache-Control "public, max-age=31536000, immutable" always;
+        add_header Cache-Control "public, max-age=31536000, immutable";
     }
 
     location /unity/ {

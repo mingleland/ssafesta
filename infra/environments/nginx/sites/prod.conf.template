@@ -11,11 +11,13 @@ server {
     location = /unity { return 301 /unity/; }
     location = /unity/manifest.json { alias /srv/festa/webgl/prod/current/manifest.json; default_type application/json; add_header Cache-Control "no-cache" always; }
     location = /unity/index.html { alias /srv/festa/webgl/prod/current/index.html; default_type text/html; add_header Cache-Control "no-cache" always; }
-    location ~ ^/unity/Build/([^/]+\.wasm)\.(br|unityweb)$ { alias /srv/festa/webgl/prod/current/Build/$1.$2; default_type application/wasm; add_header Content-Encoding br always; add_header Vary Accept-Encoding always; add_header Cache-Control "public, max-age=31536000, immutable" always; }
-    location ~ ^/unity/Build/([^/]+\.js)\.(br|unityweb)$ { alias /srv/festa/webgl/prod/current/Build/$1.$2; default_type application/javascript; add_header Content-Encoding br always; add_header Vary Accept-Encoding always; add_header Cache-Control "public, max-age=31536000, immutable" always; }
-    location ~ ^/unity/Build/([^/]+\.data)\.(br|unityweb)$ { alias /srv/festa/webgl/prod/current/Build/$1.$2; default_type application/octet-stream; add_header Content-Encoding br always; add_header Vary Accept-Encoding always; add_header Cache-Control "public, max-age=31536000, immutable" always; }
+    # Build 헤더에는 always 를 쓰지 않는다 — 없는 해시의 404 에 immutable·br 이 붙으면 엣지가 그 404 를 1년 들고 가고,
+    # 롤백으로 파일이 되살아나도 계속 404 를 돌려준다 (FE /assets/ 가 같은 이유로 always 를 뺐다 — LJH T-119).
+    location ~ ^/unity/Build/([^/]+\.wasm)\.(br|unityweb)$ { alias /srv/festa/webgl/prod/current/Build/$1.$2; default_type application/wasm; add_header Content-Encoding br; add_header Vary Accept-Encoding; add_header Cache-Control "public, max-age=31536000, immutable"; }
+    location ~ ^/unity/Build/([^/]+\.js)\.(br|unityweb)$ { alias /srv/festa/webgl/prod/current/Build/$1.$2; default_type application/javascript; add_header Content-Encoding br; add_header Vary Accept-Encoding; add_header Cache-Control "public, max-age=31536000, immutable"; }
+    location ~ ^/unity/Build/([^/]+\.data)\.(br|unityweb)$ { alias /srv/festa/webgl/prod/current/Build/$1.$2; default_type application/octet-stream; add_header Content-Encoding br; add_header Vary Accept-Encoding; add_header Cache-Control "public, max-age=31536000, immutable"; }
     # loader 처럼 위 정규식에 걸리지 않는 Build 산출물도 파일명이 content hash 라 immutable 이다 (demo.conf.template 과 같은 계약).
-    location /unity/Build/ { alias /srv/festa/webgl/prod/current/Build/; add_header Cache-Control "public, max-age=31536000, immutable" always; }
+    location /unity/Build/ { alias /srv/festa/webgl/prod/current/Build/; add_header Cache-Control "public, max-age=31536000, immutable"; }
     location /unity/ { alias /srv/festa/webgl/prod/current/; add_header Cache-Control "no-cache" always; }
     location ^~ /ws { proxy_pass http://127.0.0.1:28081; proxy_http_version 1.1; proxy_set_header Upgrade $http_upgrade; proxy_set_header Connection "upgrade"; proxy_set_header Host $host; proxy_set_header X-Forwarded-Proto https; proxy_read_timeout 180s; proxy_send_timeout 180s; proxy_buffering off; }
     # Game Studio 초안 저장은 2,000,000 bytes(GameProjectJson.MAX_PROJECT_BYTES)까지 허용하는데 nginx 기본 한도는
@@ -24,6 +26,6 @@ server {
     location /api/ { client_max_body_size 4m; proxy_pass http://127.0.0.1:28081; proxy_set_header Host $host; proxy_set_header X-Forwarded-Proto https; }
     location /oauth2/ { proxy_pass http://127.0.0.1:28081; proxy_set_header Host $host; proxy_set_header X-Forwarded-Proto https; }
     location /login/oauth2/ { proxy_pass http://127.0.0.1:28081; proxy_set_header Host $host; proxy_set_header X-Forwarded-Proto https; }
-    location /ai/v1/ { proxy_pass http://127.0.0.1:28082; proxy_buffering off; proxy_set_header Host $host; proxy_set_header X-Forwarded-Proto https; }
+    location /ai/v1/ { add_header Cache-Control "no-store" always; proxy_pass http://127.0.0.1:28082; proxy_buffering off; proxy_set_header Host $host; proxy_set_header X-Forwarded-Proto https; }
     location / { proxy_pass http://127.0.0.1:28080; proxy_set_header Host $host; proxy_set_header X-Forwarded-Proto https; }
 }
