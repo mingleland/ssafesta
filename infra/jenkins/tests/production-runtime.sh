@@ -83,6 +83,8 @@ grep -Fq 'alias /srv/festa/webgl/prod/current/' "${prod_template}"
 grep -Fq 'location /unity/Build/ { alias /srv/festa/webgl/prod/current/Build/; add_header Cache-Control "public, max-age=31536000, immutable"; }' "${prod_template}"
 # Build 헤더에 always 가 붙으면 404 까지 immutable 로 나가 엣지가 1년 들고 간다 — 롤백해도 404 가 남는다.
 if grep -Eq 'unity/Build.*immutable" always' "${prod_template}"; then fail 'Unity Build cache headers must not use always — a 404 would be cached as immutable'; fi
+# AI 응답(SSE 포함)은 어디에도 저장되면 안 된다 — demo 와 같은 계약이다.
+grep -Fq 'location /ai/v1/ { add_header Cache-Control "no-store" always;' "${prod_template}"
 grep -Fq 'proxy_pass http://127.0.0.1:27777' "${world_template}"
 # Demo World 는 demo.<root> 의 루트 WebSocket Upgrade 로 17777 에 들어간다. world.<root> 는 Production world-prod.conf 만 가진다 (Batch 1).
 demo_world_template="${repo_root}/infra/unity-server/nginx/world.conf.template"
