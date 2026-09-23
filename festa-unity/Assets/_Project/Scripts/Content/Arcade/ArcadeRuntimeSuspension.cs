@@ -1,6 +1,7 @@
 // 대기 중인 오락기 게임 본체를 재워 두고, 화면 갱신이 필요할 때만 잠시 깨워 한 프레임을 굽는다.
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 
 namespace Festa.Content.Arcade
 {
@@ -26,6 +27,19 @@ namespace Festa.Content.Arcade
 
         // 키는 그 게임의 오프스크린 카메라다 — 랭킹 보드는 카메라만 들고 있어서 이 쪽으로만 찾아올 수 있다.
         static readonly Dictionary<Camera, Entry> Suspended = new();
+
+        /// <summary>
+        /// 씬이 내려가면 기억을 버린다 (S15P21A604-970). 키가 파괴된 카메라, 값이 파괴된 오브젝트 목록인
+        /// 항목이 남으면 월드를 드나들 때마다 20대분이 그대로 쌓인다.
+        /// </summary>
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        static void Install()
+        {
+            SceneManager.sceneUnloaded -= OnSceneUnloaded;
+            SceneManager.sceneUnloaded += OnSceneUnloaded;
+        }
+
+        static void OnSceneUnloaded(Scene _) => Suspended.Clear();
 
         /// <summary>게임을 시작할 때 본체를 모두 깨운다. 이후 구성은 각 게임의 NewGame 이 맡는다.</summary>
         public static void Resume(IReadOnlyList<GameObject> objects)
