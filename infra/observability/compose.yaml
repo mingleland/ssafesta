@@ -13,7 +13,7 @@ services:
       - /proc:/host/proc:ro
       - /sys:/host/sys:ro
     healthcheck:
-      test: ["CMD", "/bin/alloy", "fmt", "--test", "/etc/alloy/config.alloy"]
+      test: ["CMD", "/bin/alloy", "validate", "/etc/alloy/config.alloy"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -37,7 +37,7 @@ services:
       - /var/lib/docker:/var/lib/docker:ro
       - /dev/disk:/dev/disk:ro
     healthcheck:
-      test: ["CMD", "/bin/alloy", "fmt", "--test", "/etc/alloy/cadvisor.alloy"]
+      test: ["CMD", "/bin/alloy", "validate", "/etc/alloy/cadvisor.alloy"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -47,21 +47,34 @@ services:
   loki:
     image: ${LOKI_IMAGE:-grafana/loki:3.7.4}
     command: ["-config.file=/etc/loki/config.yaml", "-config.expand-env=true"]
+    user: "10001:10001"
     restart: unless-stopped
     networks: [observability-private]
+    depends_on:
+      loki-init:
+        condition: service_completed_successfully
     environment:
       LOKI_RETENTION_PERIOD: ${LOKI_RETENTION_PERIOD:?approve after baseline}
     volumes:
       - ./loki/config.yaml:/etc/loki/config.yaml:ro
       - loki-data:/var/lib/loki
     healthcheck:
-      test: ["CMD-SHELL", "wget -q -O- http://127.0.0.1:3100/ready >/dev/null"]
+      test: ["CMD", "/usr/bin/loki", "-verify-config=true", "-config.file=/etc/loki/config.yaml", "-config.expand-env=true"]
       interval: 30s
       timeout: 10s
       retries: 5
     deploy:
       resources:
         limits: {cpus: "${LOKI_CPU_LIMIT:?approve after baseline}", memory: "${LOKI_MEMORY_LIMIT:?approve after baseline}"}
+  loki-init:
+    image: alpine:3.21
+    user: "0:0"
+    network_mode: none
+    restart: "no"
+    entrypoint: ["/bin/sh", "-ec"]
+    command: ["mkdir -p /var/lib/loki && chown -R 10001:10001 /var/lib/loki"]
+    volumes:
+      - loki-data:/var/lib/loki
   prometheus:
     image: ${PROMETHEUS_IMAGE:-prom/prometheus:v3.12.0}
     command:
@@ -93,7 +106,7 @@ services:
       GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:?GRAFANA_ADMIN_USER is required}
       GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?GRAFANA_ADMIN_PASSWORD is required}
       GF_USERS_ALLOW_SIGN_UP: "false"
-      MATTERMOST_WEBHOOK_URL: ${MATTERMOST_WEBHOOK_URL:-}
+      MATTERMOST_WEBHOOK_URL: ${MATTERMOST_WEBHOOK_URL:-http://127.0.0.1:9/disabled}
     volumes:
       - grafana-data:/var/lib/grafana
       - ./grafana/provisioning:/etc/grafana/provisioning:ro

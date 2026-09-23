@@ -14,6 +14,8 @@ server {
     location ~ ^/unity/Build/([^/]+\.wasm)\.(br|unityweb)$ { alias /srv/festa/webgl/prod/current/Build/$1.$2; default_type application/wasm; add_header Content-Encoding br always; add_header Vary Accept-Encoding always; add_header Cache-Control "public, max-age=31536000, immutable" always; }
     location ~ ^/unity/Build/([^/]+\.js)\.(br|unityweb)$ { alias /srv/festa/webgl/prod/current/Build/$1.$2; default_type application/javascript; add_header Content-Encoding br always; add_header Vary Accept-Encoding always; add_header Cache-Control "public, max-age=31536000, immutable" always; }
     location ~ ^/unity/Build/([^/]+\.data)\.(br|unityweb)$ { alias /srv/festa/webgl/prod/current/Build/$1.$2; default_type application/octet-stream; add_header Content-Encoding br always; add_header Vary Accept-Encoding always; add_header Cache-Control "public, max-age=31536000, immutable" always; }
+    # loader 처럼 위 정규식에 걸리지 않는 Build 산출물도 파일명이 content hash 라 immutable 이다 (demo.conf.template 과 같은 계약).
+    location /unity/Build/ { alias /srv/festa/webgl/prod/current/Build/; add_header Cache-Control "public, max-age=31536000, immutable" always; }
     location /unity/ { alias /srv/festa/webgl/prod/current/; add_header Cache-Control "no-cache" always; }
     location ^~ /ws { proxy_pass http://127.0.0.1:28081; proxy_http_version 1.1; proxy_set_header Upgrade $http_upgrade; proxy_set_header Connection "upgrade"; proxy_set_header Host $host; proxy_set_header X-Forwarded-Proto https; proxy_read_timeout 180s; proxy_send_timeout 180s; proxy_buffering off; }
     # Game Studio 초안 저장은 2,000,000 bytes(GameProjectJson.MAX_PROJECT_BYTES)까지 허용하는데 nginx 기본 한도는

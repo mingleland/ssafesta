@@ -52,6 +52,10 @@ namespace Festa.Content.Arcade
             _onMaterial.SetTexture("_BaseMap", texture);
         }
 
+        /// <summary>현재 기계에서 실제 화면으로 쓰는 머티리얼 슬롯인지 판정한다.</summary>
+        public bool IsScreenMaterial(Material material) =>
+            material != null && (material == _onMaterial || material.name.StartsWith(ScreenMaterialName));
+
         void Apply()
         {
             if (_onMaterial == null) return;
@@ -63,7 +67,7 @@ namespace Festa.Content.Arcade
                 for (int i = 0; i < mats.Length; i++)
                 {
                     if (mats[i] == null) continue;
-                    bool isScreenSlot = mats[i] == _onMaterial || mats[i].name.StartsWith(ScreenMaterialName);
+                    bool isScreenSlot = IsScreenMaterial(mats[i]);
                     if (!isScreenSlot) continue;
 
                     if (_powered)

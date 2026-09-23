@@ -44,7 +44,7 @@ BE가 소유하는 26개 작업이다. #48에서 `strdeok`가 구현을 진행�
 
 - [ ] T084 Implement/test `config_id` INTEGER mapping, Int32 boundaries, and whitelist deployment order
 - [x] T085 Encode unpublish, soft/hard delete, and Published-history policy in integration tests
-- [ ] T086 [P1] Define display-only score schema isolated from Coin/Reward/Inventory
+- [x] T086 Define display-only score schema isolated from Coin/Reward/Inventory — 2026-09-22 `S15P21A604-963`(GitLab #264)로 구현. `arcade_score_records`(V47), 키는 `(machine_id, user_id)`이고 FK는 `users` 하나다. 계약은 `../contracts/game-api.md` §Arcade Ranking
 - [x] T087 Verify Guest authoring denial and Published-play allowance
 - [x] T088 Verify invalid coordinates, unknown fields, and broken references are rejected without correction
 

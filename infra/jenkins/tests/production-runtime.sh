@@ -78,6 +78,9 @@ grep -Fq 'location /oauth2/' "${prod_template}"
 grep -Fq 'location /api/ { client_max_body_size 4m;' "${prod_template}"
 grep -Fq 'location /login/oauth2/' "${prod_template}"
 grep -Fq 'alias /srv/festa/webgl/prod/current/' "${prod_template}"
+# Build 산출물은 파일명이 content hash 다. 포괄 location 이 없으면 loader 같은 비압축 파일이
+# location /unity/ 로 떨어져 no-cache 로 나가고 엣지가 매번 오리진을 때린다 (S15P21A604-968).
+grep -Fq 'location /unity/Build/ { alias /srv/festa/webgl/prod/current/Build/; add_header Cache-Control "public, max-age=31536000, immutable" always; }' "${prod_template}"
 grep -Fq 'proxy_pass http://127.0.0.1:27777' "${world_template}"
 # Demo World 는 demo.<root> 의 루트 WebSocket Upgrade 로 17777 에 들어간다. world.<root> 는 Production world-prod.conf 만 가진다 (Batch 1).
 demo_world_template="${repo_root}/infra/unity-server/nginx/world.conf.template"

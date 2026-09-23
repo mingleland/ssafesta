@@ -23,15 +23,34 @@ namespace Festa.World
     public sealed class HighStrikerNetwork : NetworkBehaviour
     {
         const string MovementLockOwner = "HighStriker";
-        const float RequestLockTimeout = 1.5f;
+        /// <summary>서버 응답이 유실돼도 영구 잠금되지 않도록 두는 제한시간. 승인 전 선점 잠금도 이 길이만 쓴다.</summary>
+        public const float RequestLockTimeout = 1.5f;
         /// <summary>
         /// 망치 궤적의 접촉 시점. 실제 표시에서는 AvatarStrikeProp의 접촉 프레임을 기다린다.
         /// </summary>
         public const float StrikeSpeed = 1f;
         public const float ImpactDelay = AvatarStrikeProp.ImpactTime;
 
-        /// <summary>한 기계가 다시 받을 때까지. 연출(상승 0.45 + 유지 1.4 + 낙하 0.6)보다 길게 잡는다.</summary>
-        const float MachineCooldown = 3.2f;
+        /// <summary>
+        /// 한 기계가 다시 받을 때까지. <b>화면 연출이 끝나는 시점에 맞춘다</b> (S15P21A604-967).
+        ///
+        /// <para>예전에는 3.2초 고정이었는데 실제 연출은 임팩트 0.46 + 기계 1.64 = 2.10초에 끝났다. 그 1.1초 동안
+        /// 프롬프트는 이미 돌아와 있고 F 도 받는데 서버만 조용히 거절해서, 연타하면 계속 씹히는 것으로 보였다.</para>
+        ///
+        /// <para>기계마다 연출 길이가 다를 수 있으므로 서버가 그 기계를 찾아 실제 값으로 잰다. 씬에서 기계를
+        /// 못 찾으면 기본 연출 길이를 쓴다.</para>
+        /// </summary>
+        const float FallbackSequenceSeconds = 1.64f;
+
+        /// <summary>연출이 끝난 뒤 다음 스윙까지 두는 여유. 네트워크 지연 한 틱을 흡수할 정도만 둔다.</summary>
+        const float CooldownMargin = 0.1f;
+
+        static float CooldownFor(string machineId)
+        {
+            var machine = HighStrikerMachine.Find(machineId);
+            float sequence = machine != null ? machine.SequenceSeconds : FallbackSequenceSeconds;
+            return ImpactDelay + sequence + CooldownMargin;
+        }
 
         struct Record
         {
@@ -88,9 +107,14 @@ namespace Festa.World
 
             Record rec;
             bool known = s_records.TryGetValue(id, out rec);
-            if (known && Time.time - rec.LastSwingTime < MachineCooldown)
+            float cooldown = CooldownFor(id);
+            if (known && Time.time - rec.LastSwingTime < cooldown)
             {
-                Debug.Log($"[HighStriker] 쿨다운 중 — 무시 (machineId={id}, 남은 {(MachineCooldown - (Time.time - rec.LastSwingTime)):F1}s)");
+                // **거절을 삼키지 않는다.** 예전에는 서버 로그만 남겨서, 누른 사람 화면은 이동이 잠긴 채
+                // 아무 일도 일어나지 않았다 — 고장으로 읽힌다 (T-24 원칙, S15P21A604-967).
+                float remaining = cooldown - (Time.time - rec.LastSwingTime);
+                Debug.Log($"[HighStriker] 쿨다운 중 — 무시 (machineId={id}, 남은 {remaining:F1}s)");
+                SwingRejectedClientRpc(machineId, remaining, RpcTargetToSender());
                 return;
             }
 
@@ -128,6 +152,28 @@ namespace Festa.World
             if (IsOwner) ReportPlayForMissions(machineId.ToString(), score);
             // 스윙 애니메이션이 내려찍는 순간에 퍽이 튀어 오르게 — 받은 시점부터 임팩트까지 기다린다.
             StartCoroutine(PlayAtImpact(machine, hasVisual ? prop : null, power, score, nickname.ToString()));
+        }
+
+        /// <summary>요청한 클라이언트에게만 보낸다. 남들은 거절을 알 필요가 없다.</summary>
+        ClientRpcParams RpcTargetToSender() => new ClientRpcParams
+        {
+            Send = new ClientRpcSendParams { TargetClientIds = new[] { OwnerClientId } },
+        };
+
+        /// <summary>
+        /// 쿨다운으로 거절됐다 — 누른 사람 화면만 원래대로 되돌린다 (S15P21A604-967).
+        ///
+        /// <para>이동 잠금을 제한시간까지 기다리지 않고 즉시 풀고, 승인 전에 걸어 둔 기계 잠금도 푼다.
+        /// 그래야 프롬프트가 바로 돌아오고 "눌렀는데 아무 일도 없다" 가 사라진다.</para>
+        /// </summary>
+        [ClientRpc]
+        void SwingRejectedClientRpc(FixedString32Bytes machineId, float remainingSeconds, ClientRpcParams rpcParams = default)
+        {
+            if (!IsOwner) return;
+            ReleaseLocalInteractionLock();
+            var machine = HighStrikerMachine.Find(machineId.ToString()) ?? HighStrikerMachine.Any();
+            if (machine != null) machine.ClearBusy();
+            Festa.Content.BoothInteractionInput.Toast($"{Mathf.Max(0.1f, remainingSeconds):F1}초 뒤에 다시 칠 수 있어요", 1.2f);
         }
 
         /// <summary>

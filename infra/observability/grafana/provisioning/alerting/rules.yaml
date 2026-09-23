@@ -11,6 +11,7 @@ groups:
         data:
           - refId: A
             datasourceUid: festa-prometheus
+            relativeTimeRange: {from: 600, to: 0}
             model: {expr: "max(100 * (1 - node_filesystem_avail_bytes / node_filesystem_size_bytes))", refId: A}
           - refId: C
             datasourceUid: __expr__
