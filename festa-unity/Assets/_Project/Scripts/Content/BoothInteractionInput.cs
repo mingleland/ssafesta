@@ -193,11 +193,17 @@ namespace Festa.Content
             float currentDist = float.MaxValue;
             foreach (var t in Festa.Booth.BoothInteractionTarget.Active)
             {
-                if (t == null || !t.Interactive || TemporarilyBlocked(t)) continue;
+                if (t == null || !t.Interactive) continue;
                 // 표면 기준 — 피벗으로 재면 큰 오브젝트가 부당하게 멀게 잡힌다 (T-232).
                 float d = t.DistanceFrom(origin.Value);
-                if (t == current && d <= t.MaxDistance) currentDist = d;
-                if (d > t.MaxDistance || d >= bestDist) continue;
+
+                // **사거리 밖이면 점유 판정까지 가지 않는다** (S15P21A604-970). <see cref="TemporarilyBlocked"/> 는
+                // 오락기·의자마다 씬에서 사람을 전수로 훑는다. 거리보다 먼저 부르면 화면 반대편 게임기까지
+                // 매 프레임 세게 되고, 오락실 20대가 생긴 뒤로 그 비용이 프레임에 그대로 드러났다.
+                if (d > t.MaxDistance) continue;
+                if (TemporarilyBlocked(t)) continue;
+                if (t == current) currentDist = d;
+                if (d >= bestDist) continue;
                 best = t;
                 bestDist = d;
             }
