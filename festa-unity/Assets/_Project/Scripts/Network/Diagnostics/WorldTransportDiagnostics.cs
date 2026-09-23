@@ -33,6 +33,17 @@ namespace Festa.Network
         const float ClientDiagnosticsIntervalSeconds = 10f;
         const float StarvedInterpolationGapMs = 100f;
 
+        /// <summary>
+        /// 공백의 이 비율 이상을 메인 스레드 정지가 설명하면 네트워크가 아니라 프레임 기인으로 센다.
+        ///
+        /// <para><b>왜 나눠야 하는가.</b> transport 의 Data 이벤트는 메인 스레드 폴링에서 꺼내진다.
+        /// 그래서 화면이 600ms 멈추면 그 동안 큐에 쌓인 패킷이 한 프레임에 쏟아지고, 첫 패킷 하나가
+        /// 600ms 공백으로 찍힌다 — 회선은 멀쩡한데 네트워크 지연처럼 보인다. 실제로 이 값 하나를 두고
+        /// 인프라와 게임이 서로 다른 결론을 냈다 (2026-09-23). 공백이 벌어진 그 순간 메인 스레드가
+        /// 얼마나 쉬었는지 함께 재면 두 원인이 로그에서 갈린다.</para>
+        /// </summary>
+        const float FrameAttributionRatio = 0.7f;
+
         /// <summary>한 창에 담을 프레임 표본 상한. 넘치면 버린다 — 측정 때문에 서버가 메모리를 먹으면 본말전도다.</summary>
         const int MaxTickSamples = 8192;
 
@@ -49,7 +60,11 @@ namespace Festa.Network
         System.Reflection.PropertyInfo _counterValue;
         /// <summary>리플렉션 조회를 한 번만 한다 — 실패해도 매 프레임 다시 뒤지지 않는다.</summary>
         bool _metricsProbed;
+        /// <summary>송신 카운터를 실제로 잡았는가. 못 잡았으면 0 이 아니라 n/a 로 찍는다 (T-24).</summary>
+        bool _byteCountersAvailable;
         long _sentAccum, _recvAccum;
+        /// <summary>수신량은 리플렉션에 기대지 않고 transport payload 로 직접 센다 — 항상 맞는 값이다.</summary>
+        long _recvBytesObserved;
 
         NetworkManager _manager;
         NetworkTransport _transport;
@@ -61,6 +76,11 @@ namespace Festa.Network
         float _clientGapMaxMs;
         int _clientGapCount;
         int _clientStarvedGapCount;
+        int _clientFrameStalledGapCount;
+        int _clientNetworkGapCount;
+        float _clientWorstFrameMs;
+        /// <summary>마지막으로 Update 가 돈 시각. transport 이벤트 시점의 메인 스레드 정지 길이를 잰다.</summary>
+        float _lastUpdateAt = -1f;
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
         static void AutoRegister()
@@ -80,6 +100,15 @@ namespace Festa.Network
 
         void Update()
         {
+            // 프레임이 얼마나 길었는지 먼저 갱신한다 — 아래 계측과 transport 이벤트가 같이 쓴다.
+            float now = Time.realtimeSinceStartup;
+            if (_lastUpdateAt >= 0f)
+            {
+                float frameMs = (now - _lastUpdateAt) * 1000f;
+                if (frameMs > _clientWorstFrameMs) _clientWorstFrameMs = frameMs;
+            }
+            _lastUpdateAt = now;
+
             TrackManagerChange();
             if (_metricsEnabled) SampleMetrics();
             else SampleClientTransportHealth();
@@ -118,13 +147,24 @@ namespace Festa.Network
             float now = Time.realtimeSinceStartup;
             if (eventType == NetworkEvent.Data)
             {
+                // 수신량은 여기서 직접 센다 — 서버·클라이언트 모두 해당하고 리플렉션이 필요 없다.
+                _recvBytesObserved += payload.Count;
+
                 if (_manager != null && _manager.IsClient && !_manager.IsServer && _lastDataAt >= 0f)
                 {
                     float gapMs = (now - _lastDataAt) * 1000f;
                     _clientGapTotalMs += gapMs;
                     _clientGapMaxMs = Mathf.Max(_clientGapMaxMs, gapMs);
                     _clientGapCount++;
-                    if (gapMs > StarvedInterpolationGapMs) _clientStarvedGapCount++;
+                    if (gapMs > StarvedInterpolationGapMs)
+                    {
+                        _clientStarvedGapCount++;
+                        // 이 공백이 벌어지는 동안 메인 스레드가 쉰 시간. 이벤트는 프레임 앞단에서 꺼내지므로
+                        // 마지막 Update 이후 경과가 곧 그 프레임의 정지 길이다.
+                        float stallMs = _lastUpdateAt >= 0f ? (now - _lastUpdateAt) * 1000f : 0f;
+                        if (stallMs >= gapMs * FrameAttributionRatio) _clientFrameStalledGapCount++;
+                        else _clientNetworkGapCount++;
+                    }
                 }
                 _lastDataAt = now;
                 return;
@@ -200,7 +240,9 @@ namespace Festa.Network
             float idleMs = _lastDataAt >= 0f ? (now - _lastDataAt) * 1000f : -1f;
             Debug.Log(
                 $"[Festa/원격이동] rtt={rtt}ms dataGap avg={averageGapMs:F1} max={_clientGapMaxMs:F1}ms " +
-                $">100ms={_clientStarvedGapCount}/{_clientGapCount} idle={idleMs:F1}ms window={window:F1}s " +
+                $">100ms={_clientStarvedGapCount}/{_clientGapCount} " +
+                $"(네트워크 {_clientNetworkGapCount} / 프레임 {_clientFrameStalledGapCount}) " +
+                $"최악프레임={_clientWorstFrameMs:F1}ms idle={idleMs:F1}ms window={window:F1}s " +
                 "interpolation=250ms");
 
             _clientWindowStart = now;
@@ -213,6 +255,9 @@ namespace Festa.Network
             _clientGapMaxMs = 0f;
             _clientGapCount = 0;
             _clientStarvedGapCount = 0;
+            _clientFrameStalledGapCount = 0;
+            _clientNetworkGapCount = 0;
+            _clientWorstFrameMs = 0f;
         }
 
         // ────────────────────────────── 서버 부하 계측 (GitLab #229) ──────────────────────────────
@@ -258,10 +303,15 @@ namespace Festa.Network
                 ? nm.SpawnManager.SpawnedObjects.Count
                 : -1;
 
+            // 송신량을 못 재면 0 이 아니라 n/a 로 찍는다. 0.0 KB/s 는 "서버가 보낼 게 없다" 로 읽혀
+            // 실제로 대역폭을 원인에서 배제하는 근거로 쓰였다 (2026-09-23).
+            string sent = _byteCountersAvailable
+                ? (_sentAccum / 1024f / window).ToString("F1", CultureInfo.InvariantCulture)
+                : "n/a";
             Debug.Log(
                 $"{MetricsTag} utc={DateTime.UtcNow:yyyy-MM-ddTHH:mm:ss}Z clients={clients} " +
                 $"tick p50={p50:F1} p95={p95:F1} max={max:F1} ms | " +
-                $"net sent={_sentAccum / 1024f / window:F1} recv={_recvAccum / 1024f / window:F1} KB/s | " +
+                $"net sent={sent} recv={_recvBytesObserved / 1024f / window:F1} KB/s | " +
                 $"objects={objects} | heap={GC.GetTotalMemory(false) / 1048576}MB | window={window:F1}s");
 
             ResetWindow();
@@ -272,6 +322,7 @@ namespace Festa.Network
             _tickMs.Clear();
             _sentAccum = 0;
             _recvAccum = 0;
+            _recvBytesObserved = 0;
         }
 
         /// <summary>정렬된 표본에서 백분위. 표본이 적어도 범위를 벗어나지 않게 자른다.</summary>
@@ -304,10 +355,12 @@ namespace Festa.Network
                     .GetProperty("Value", BF);
                 if (_counterValue == null || _recvField == null)
                 {
-                    Debug.LogWarning($"{MetricsTag} NGO 바이트 카운터를 찾지 못했다 — " +
-                                     "net sent/recv 는 0 으로 남는다. NGO 판올림으로 내부 필드명이 바뀌었는지 확인해야 한다.");
+                    Debug.LogWarning($"{MetricsTag} NGO 송신 바이트 카운터를 찾지 못했다 — " +
+                                     "net sent 는 n/a 로 남는다 (recv 는 transport payload 로 직접 센다). " +
+                                     "Multiplayer Tools 패키지가 빠졌거나 NGO 판올림으로 내부 필드명이 바뀐 것이다.");
                     return;
                 }
+                _byteCountersAvailable = true;
             }
             if (_counterValue == null) return;
 
