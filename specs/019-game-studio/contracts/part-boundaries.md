@@ -51,7 +51,7 @@ AI(optional, P2)
 - FE Host 확정(#20): 같은 `festa-frontend` 배포, lazy route, same-origin Preview, 기존 인증/API client 재사용.
 - BE 확정(#21): Draft/Published 2테이블, revision 409, 단일 Publish transaction, Portal no-store.
 - AI 확정(#22): MVP 비의존, P2 candidate/patch, spec 007 Job 정책 재사용.
-- 제품 정책 확정(#33): 새 진입 REST 차단, loaded local session 완료 허용, 일반 soft/탈퇴 hard delete, 이력 유지, Ranking P1 절연.
+- 제품 정책 확정(#33): 새 진입 REST 차단, loaded local session 완료 허용, 일반 soft/탈퇴 hard delete, 이력 유지, ~~Ranking P1 절연~~ → **2026-09-22 개정(#264, `S15P21A604-963`): 표시 전용 오락기 랭킹 채택.** 경제 절연은 유지된다(FK는 `users` 하나). 파트 경계는 — 점수 등록·조회는 게임/FE가 BE REST(`/api/arcade/rankings/...`)를 직접 부르고, 랭킹 UI는 게임/FE 몫이며, BE는 순위판 표시 방식에 관여하지 않는다. 랭킹 조회 실패가 게임 진행을 막지 않게 하는 폴백도 클라이언트 쪽이다.
 - 교차 계약 확정(#34): signed Int32 `configId`, 별도 INTEGER 공개 ID, `GAME_PORTAL requiresConfig=true`, BE-first 배포.
 - Studio 내부 완료(#35): TOP_DOWN/PLATFORMER reference renderer, same-origin route Preview, builtin/local Asset resolver. 운영 Published parity는 #48·#55, Portal Host는 #56, 사용자 Asset의 stable `asset://` 승격은 #69에서 추적.
 - GameProject v1.1 FE candidate(#78): 점수·적 처치·생존 시간 목표와 ALL/ANY, RESPAWN/END_GAME을 Mock Runtime에 구현했다. BE validator와 AI candidate/patch 허용 목록은 공동 승인 전 API 정본으로 간주하지 않는다.

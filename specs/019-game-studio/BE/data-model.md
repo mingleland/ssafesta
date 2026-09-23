@@ -69,3 +69,15 @@ MEMBER_WITHDRAWAL → HARD_DELETED
 
 soft delete는 새 Published/Portal 진입을 차단하되 Published 이력을 보존한다. hard delete는 관련 데이터와
 파일/Asset/표시용 Score를 삭제한다.
+
+**Score는 두 종류다** (2026-09-22, `S15P21A604-963`). 위 문장의 "표시용 Score"는 Game 생명주기에 속하는
+가정이었으나, 실제로 구현된 오락기 랭킹은 Game이 아니라 **machineId에 귀속**된다.
+
+| | 귀속 | Game hard delete | 회원 탈퇴 |
+|---|---|---|---|
+| 오락기 랭킹 `arcade_score_records` (V47) | `(machine_id, user_id)` | **남는다** | 삭제 (`users` FK CASCADE) |
+
+캐비닛은 사용자가 게시할 때마다 주인이 바뀌므로(`arcade_machine_bindings`), 게임이 교체돼도 이전 게임에서
+딴 점수가 같은 순위표에 남는다. 그것이 "랭킹은 게임기의 것" 이라는 결정의 귀결이다 — 초기화가 필요해지면
+지점은 `ArcadeSeatService.claimOnPublish` 하나다. 이 표는 `games` 를 참조하지 않고 Coin·Reward·Inventory
+와도 FK 로 연결되지 않는다 — 외래키는 `users` 하나다.
