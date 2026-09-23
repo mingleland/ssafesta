@@ -62,12 +62,14 @@ namespace Festa.Content.Arcade
         float _nextWave;
         float _invincibleUntil;
         float _nextPlayerFrame;
+        float _worldY;
         int _playerFrameIndex;
         bool _active;
         bool _ended;
 
         void Awake()
         {
+            _worldY = GetComponent<ArcadeMachineInteractable>()?.MachineId == "arcade-12" ? WorldY + 5000f : WorldY;
             LoadAssets();
             CreateScreenTarget();
             BuildGame();
@@ -80,6 +82,8 @@ namespace Festa.Content.Arcade
         public bool Begin()
         {
             if (_camera == null || _screenMaterial == null || _playerSprite == null || _enemySprite == null) return false;
+            ArcadeRuntimeSuspension.Resume(_runtime);
+            ArcadeOverlayHudSuppressor.Acquire();
             NewGame();
             SetVisible(true);
             _active = true;
@@ -93,7 +97,7 @@ namespace Festa.Content.Arcade
             if (!InteractionFocusCamera.IsFocused) { HandleReleased(); return; }
             if (_ended)
             {
-                if (Input.GetKeyDown(KeyCode.Space) || Input.GetKeyDown(KeyCode.R)) NewGame();
+                if (ArcadeRetryInput.WasPressed()) NewGame();
                 return;
             }
 
@@ -145,7 +149,7 @@ namespace Festa.Content.Arcade
             _camera.aspect = 16f / 9f;
             _camera.clearFlags = CameraClearFlags.SolidColor;
             _camera.backgroundColor = new Color(0.018f, 0.025f, 0.09f);
-            _camera.transform.position = new Vector3(0f, WorldY, -10f);
+            _camera.transform.position = new Vector3(0f, _worldY, -10f);
             _target = new RenderTexture(640, 360, 16, RenderTextureFormat.ARGB32) { name = "MegaShooter_640x360", filterMode = FilterMode.Bilinear };
             _target.Create();
             _camera.targetTexture = _target;
@@ -220,7 +224,7 @@ namespace Festa.Content.Arcade
             _messageText.color = new Color(0.35f, 0.95f, 1f);
             _previewRankingPanel.SetActive(true);
             _previewRankingText.gameObject.SetActive(true);
-            _previewRankingText.text = "STAR DEFENDER\nTOP 5\n1  FESTA     28,600\n2  PILOT     21,300\n3  NOVA      17,900\n4  ARCADE    12,400\n5  GUEST      8,100\n[F] PLAY";
+            ArcadeRankingBoard.ShowPreview(this, _previewRankingText, _camera, "STAR DEFENDER");
             SetPreviewActors(true);
         }
 
@@ -299,7 +303,7 @@ namespace Festa.Content.Arcade
             bullet.Go.transform.position = ToWorld(p);
             if (Mathf.Abs(p.x) > 6f || Mathf.Abs(p.y) > 4.2f)
             {
-                Destroy(bullet.Go);
+                DestroyTracked(bullet.Go);
                 list.RemoveAt(index);
                 return false;
             }
@@ -313,7 +317,7 @@ namespace Festa.Content.Arcade
             {
                 if (b >= _playerBullets.Count || e >= _enemies.Count) continue;
                 if (Vector2.Distance(Local(_playerBullets[b].Go.transform.position), Local(_enemies[e].Go.transform.position)) > _playerBullets[b].Radius + _enemies[e].Radius) continue;
-                Destroy(_playerBullets[b].Go); _playerBullets.RemoveAt(b);
+                DestroyTracked(_playerBullets[b].Go); _playerBullets.RemoveAt(b);
                 _enemies[e].Hp--;
                 if (_enemies[e].Hp <= 0) RemoveEnemy(e, true);
                 break;
@@ -322,7 +326,7 @@ namespace Festa.Content.Arcade
             for (int i = _enemyBullets.Count - 1; i >= 0; i--)
             {
                 if (Vector2.Distance(Local(_enemyBullets[i].Go.transform.position), _playerPosition) > 0.42f) continue;
-                Destroy(_enemyBullets[i].Go); _enemyBullets.RemoveAt(i); DamagePlayer(); break;
+                DestroyTracked(_enemyBullets[i].Go); _enemyBullets.RemoveAt(i); DamagePlayer(); break;
             }
         }
 
@@ -338,7 +342,7 @@ namespace Festa.Content.Arcade
                 if (_explosionClip != null) _audio.PlayOneShot(_explosionClip, enemy.Boss ? 0.7f : 0.28f);
                 if (enemy.Boss && _bonusClip != null) _audio.PlayOneShot(_bonusClip, 0.7f);
             }
-            Destroy(enemy.Go); _enemies.RemoveAt(index);
+            DestroyTracked(enemy.Go); _enemies.RemoveAt(index);
             if (_enemies.Count == 0) _nextWave = Time.time + 0.85f;
             UpdateHud();
         }
@@ -355,8 +359,11 @@ namespace Festa.Content.Arcade
             {
                 _ended = true;
                 _player.SetActive(false);
-                _messageText.text = "GAME OVER\nSPACE TO RETRY";
-                _messageText.color = new Color(1f, 0.4f, 0.45f);
+                _messageText.text = string.Empty;
+                _previewRankingPanel.SetActive(true);
+                _previewRankingText.gameObject.SetActive(true);
+                ArcadeRankingBoard.ShowResult(this, _previewRankingText, _camera, "STAR DEFENDER", $"GAME OVER   SCORE {_score:N0}", _score);
+                _previewRankingText.color = Color.white;
             }
         }
 
@@ -375,7 +382,7 @@ namespace Festa.Content.Arcade
                 renderer.color = new Color(1f, 0.8f, 0.35f, 1f - t);
                 yield return null;
             }
-            if (go != null) Destroy(go);
+            if (go != null) DestroyTracked(go);
         }
 
         IEnumerator ClearMessageAfter(float seconds)
@@ -405,10 +412,17 @@ namespace Festa.Content.Arcade
             ClearList(_enemies); ClearList(_playerBullets); ClearList(_enemyBullets);
         }
 
-        static void ClearList(List<Actor> list)
+        void ClearList(List<Actor> list)
         {
-            foreach (var actor in list) if (actor.Go != null) Destroy(actor.Go);
+            foreach (var actor in list) if (actor.Go != null) DestroyTracked(actor.Go);
             list.Clear();
+        }
+
+        void DestroyTracked(GameObject go)
+        {
+            if (go == null) return;
+            _runtime.Remove(go);
+            Destroy(go);
         }
 
         Sprite CreateSolidSprite()
@@ -455,7 +469,7 @@ namespace Festa.Content.Arcade
             var canvasObject = Track(new GameObject("@MegaShooterPlayCanvas", typeof(RectTransform), typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster)));
             _playCanvas = canvasObject.GetComponent<Canvas>();
             _playCanvas.renderMode = RenderMode.ScreenSpaceOverlay;
-            _playCanvas.sortingOrder = 480;
+            _playCanvas.sortingOrder = 32000;
             var scaler = canvasObject.GetComponent<CanvasScaler>();
             scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
             scaler.referenceResolution = new Vector2(1920f, 1080f);
@@ -488,8 +502,8 @@ namespace Festa.Content.Arcade
         }
 
         GameObject Track(GameObject go) { go.transform.SetParent(null, false); _runtime.Add(go); return go; }
-        static Vector3 ToWorld(Vector2 p) => new(p.x, WorldY + p.y, 0f);
-        static Vector2 Local(Vector3 p) => new(p.x, p.y - WorldY);
+        Vector3 ToWorld(Vector2 p) => new(p.x, _worldY + p.y, 0f);
+        Vector2 Local(Vector3 p) => new(p.x, p.y - _worldY);
 
         void CreateScreenTarget()
         {
@@ -511,20 +525,21 @@ namespace Festa.Content.Arcade
 
         void SetVisible(bool visible)
         {
-            // 완성된 게임만 비활성 중에도 오락기 전용 프리뷰를 렌더링한다.
-            if (_camera != null) _camera.enabled = true;
             if (_playCanvas != null) _playCanvas.gameObject.SetActive(visible);
             if (_screenMaterial != null) _screenMaterial.SetTexture("_BaseMap", _target);
+            if (_camera != null) { _camera.enabled = visible; if (!visible) _camera.Render(); }
+            if (!visible) ArcadeRuntimeSuspension.Suspend(_runtime);
         }
 
         void HandleReleased()
         {
             if (!_active) return;
-            _active = false; PreparePreview(); SetVisible(false); enabled = false;
+            _active = false; StopAllCoroutines(); CancelInvoke(); ArcadeOverlayHudSuppressor.Release(); PreparePreview(); SetVisible(false); enabled = false;
         }
 
         void OnDestroy()
         {
+            if (_active) ArcadeOverlayHudSuppressor.Release();
             InteractionFocusCamera.Released -= HandleReleased;
             foreach (var go in _runtime) if (go != null) Destroy(go);
             if (_solidSprite != null) { var texture = _solidSprite.texture; Destroy(_solidSprite); if (texture != null) Destroy(texture); }

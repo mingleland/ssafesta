@@ -164,7 +164,9 @@ namespace Festa.Content.Arcade
 
         static void RenderIdle(Camera camera)
         {
-            if (camera != null && !camera.enabled) camera.Render();
+            // 대기 중인 게임은 본체가 재워져 있다 — 그대로 굽으면 빈 화면이 캐비닛을 덮는다.
+            if (camera == null || camera.enabled) return;
+            if (!ArcadeRuntimeSuspension.TryRenderIdle(camera)) camera.Render();
         }
     }
 }

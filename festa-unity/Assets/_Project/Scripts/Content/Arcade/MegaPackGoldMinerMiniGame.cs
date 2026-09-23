@@ -32,6 +32,7 @@ namespace Festa.Content.Arcade
         public bool Begin()
         {
             if (_camera == null || _screenMaterial == null || _miner == null || _hook == null || _gold == null) return false;
+            ArcadeRuntimeSuspension.Resume(_runtime);
             ArcadeOverlayHudSuppressor.Acquire(); NewGame(); Show(true); _active = true; enabled = true; return true;
         }
 
@@ -143,7 +144,7 @@ namespace Festa.Content.Arcade
         }
 
         void PreparePreview() { ClearPrizes(); _message.text = ""; _preview.gameObject.SetActive(true); ArcadeRankingBoard.ShowPreview(this, _preview, _camera, "GOLD RUSH"); }
-        void Show(bool playing) { if (_overlay != null) _overlay.gameObject.SetActive(playing); if (_screenMaterial != null) _screenMaterial.SetTexture("_BaseMap", _target); if (_preview != null) _preview.gameObject.SetActive(!playing); if (_camera != null) { _camera.enabled = playing; if (!playing) _camera.Render(); } }
+        void Show(bool playing) { if (_overlay != null) _overlay.gameObject.SetActive(playing); if (_screenMaterial != null) _screenMaterial.SetTexture("_BaseMap", _target); if (_preview != null) _preview.gameObject.SetActive(!playing); if (_camera != null) { _camera.enabled = playing; if (!playing) _camera.Render(); } if (!playing) ArcadeRuntimeSuspension.Suspend(_runtime); }
         void Released() { if (!_active) return; _active = false; ArcadeOverlayHudSuppressor.Release(); PreparePreview(); Show(false); enabled = false; }
 
         void CreateScreen()
