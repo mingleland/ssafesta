@@ -27,6 +27,10 @@ assert services['grafana']['networks']==['observability-private','observability-
 assert d['networks']['observability-private']['internal'] is True
 assert services['grafana']['ports'][0].startswith('127.0.0.1:')
 assert all('ports' not in services[name] for name in ('alloy','alloy-cadvisor','loki','prometheus'))
+assert services['alloy']['healthcheck']['test']==['CMD','/bin/alloy','validate','/etc/alloy/config.alloy']
+assert services['alloy-cadvisor']['healthcheck']['test']==['CMD','/bin/alloy','validate','/etc/alloy/cadvisor.alloy']
+loki_health=services['loki']['healthcheck']['test']
+assert loki_health==['CMD','/usr/bin/loki','-verify-config=true','-config.file=/etc/loki/config.yaml','-config.expand-env=true']
 assert services['alloy-cadvisor']['profiles']==['container-metrics']
 assert services['alloy-cadvisor']['privileged'] is True
 PY

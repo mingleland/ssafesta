@@ -8,11 +8,19 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 /**
  * 사용자가 자리를 잡을 수 있는 오락실 캐비닛 목록 (S15P21A604-942, GitLab #256).
  *
- * <p><b>조회에는 쓰이지 않는다.</b> {@code GET /arcade-machines} 는 바인딩된 기계만 돌려주고
- * {@code machineId} 의 정본은 여전히 Unity 씬이다 (spec 019 FR-017). 이 목록이 필요한 이유는
- * 하나뿐이다 — 자리 배정은 <b>없는 자리를 거절해야</b> 하는데, 바인딩 표만 보고는 {@code arcade-99}
- * 가 "아직 아무도 안 잡은 자리" 인지 "존재하지 않는 자리" 인지 구별할 수 없다. 그대로 두면 아무도
- * 갈 수 없는 자리에 게임이 걸린 채 한도만 먹는다.
+ * <p><b>오락기 해석에는 쓰이지 않는다.</b> {@code GET /arcade-machines} 는 바인딩된 기계만
+ * 돌려주고 {@code machineId} 의 정본은 여전히 Unity 씬이다 (spec 019 FR-017).
+ *
+ * <p>이 목록이 필요한 이유는 하나다 — <b>없는 자리를 거절해야</b> 하는데, 바인딩 표만 보고는
+ * {@code arcade-99} 가 "아직 아무도 안 잡은 자리" 인지 "존재하지 않는 자리" 인지 구별할 수 없다.
+ * 쓰는 곳은 둘이고 둘 다 그 구별을 필요로 한다:
+ *
+ * <ul>
+ *   <li>{@link ArcadeSeatService} — 통과시키면 아무도 갈 수 없는 자리에 게임이 걸린 채 한도만 먹는다.
+ *   <li>{@link ArcadeRankingService} — 통과시키면 아무도 갈 수 없는 자리에 순위표가 쌓인다
+ *       (S15P21A604-963). 랭킹은 게임기에 귀속돼 바인딩을 보지 않으므로, 빈 자리와 없는 자리를
+ *       가르는 것이 이 목록뿐이다.
+ * </ul>
  *
  * <p>광장 오락기({@code plaza-arcade-*})는 여기 없다. 그쪽은 운영자가 큐레이션하는 고정물이라
  * 사용자가 잡을 자리가 아니다.
