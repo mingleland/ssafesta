@@ -123,7 +123,12 @@ namespace Festa.World
 
             _signs.Clear();
             foreach (var s in found)
-                if (s.boothId >= 1 && s.boothId <= SlotCount) _signs[s.boothId] = s;
+                if (s.boothId >= 1 && s.boothId <= SlotCount)
+                {
+                    // 프로젝트 제목은 응답 전 숨긴다. 기존 입간판의 부스명은 그대로 유지한다.
+                    s.SetProjectTitle(string.Empty);
+                    _signs[s.boothId] = s;
+                }
 
             _started = true;
             _ = FillAllAsync();
@@ -203,6 +208,7 @@ namespace Festa.World
                 $"{sign.boothId}번 부스");
 
             sign.SetLabel(name);
+            sign.SetProjectTitle(project?.name);
             // 카드는 여기서 켜지 않는다 — 썸네일이 **실제로 로드됐을 때만** BoothSign.ShowThumbnail 이 켠다.
 
             // 지도가 읽어 갈 수 있게 남긴다. 썸네일은 나중에 오므로 이 시점에는 아직 null 이다.
