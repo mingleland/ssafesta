@@ -47,7 +47,8 @@ const IcAgent = (
   </svg>
 );
 
-const SUGGESTIONS = ['어떤 프로젝트인가요?', '누구를 대상으로 한 서비스인가요?', '기술 스택이 궁금해요'];
+// 서버의 정형답변 화이트리스트와 같은 문구를 보내 LLM 호출 없이 프로젝트 사실을 바로 받는다.
+const SUGGESTIONS = ['프로젝트 소개', '대상 사용자', '기술 스택'];
 
 export function AiChatOverlay({ payload }: Props) {
   const { kind } = useSession();
