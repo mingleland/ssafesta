@@ -261,7 +261,12 @@ namespace Festa.Content
         static bool TryResolveImageUrl(string url, int boothId, string label, out string resolvedUrl)
         {
             resolvedUrl = null;
-            if (System.Uri.TryCreate(url, System.UriKind.Absolute, out var absolute))
+            // 앞에 슬래시가 붙은 서버 상대 경로를 절대 URI 판정에 먼저 넣으면 안 된다. WebGL 런타임에서는
+            // 그 판정이 참으로 통과하면서 file 스킴을 만들고, https 가 아니라는 이유로 여기서 잘린다.
+            // 그러면 아래 상대경로 해석은 한 번도 실행되지 않는 죽은 코드가 되어 전시화면이 항상 검게
+            // 남는다 (S15P21A604-976).
+            bool serverRelative = !string.IsNullOrEmpty(url) && url[0] == '/';
+            if (!serverRelative && System.Uri.TryCreate(url, System.UriKind.Absolute, out var absolute) && absolute.IsAbsoluteUri)
             {
                 if (absolute.Scheme != System.Uri.UriSchemeHttps)
                 {
