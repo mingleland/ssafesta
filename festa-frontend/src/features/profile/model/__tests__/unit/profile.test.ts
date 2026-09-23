@@ -3,7 +3,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('../../../../../entities/user/api.select', async () => {
   const mockApi = await import('../../../../../entities/user/api.mock');
-  return { userApi: mockApi };
+  // 복사본을 넘긴다 — 모듈 namespace 는 spyOn 으로 바꿀 수 없다.
+  return { userApi: { ...mockApi } };
 });
 
 import {
@@ -17,6 +18,7 @@ import {
   submitNickname,
 } from '../../profile';
 import { __resetUserMockForTests } from '../../../../../entities/user/api.mock';
+import { userApi } from '../../../../../entities/user/api.select';
 import { getSessionSnapshot, setMemberSession, __resetSessionForTests } from '../../../../auth/model/session';
 
 beforeEach(() => {
@@ -79,7 +81,7 @@ describe('withdrawal', () => {
     await loadProfile();
     beginWithdrawal();
     expect(getProfileSnapshot().withdrawal.phase).toBe('confirming');
-    await confirmWithdrawal();
+    await expect(confirmWithdrawal()).resolves.toBe(true);
     expect(getProfileSnapshot()).toMatchObject({ status: 'idle', account: null });
     expect(getSessionSnapshot().kind).toBe('anonymous');
   });
@@ -88,5 +90,14 @@ describe('withdrawal', () => {
     beginWithdrawal();
     cancelWithdrawal();
     expect(getProfileSnapshot().withdrawal.phase).toBe('idle');
+  });
+
+  it('서버가 거절하면 false 를 돌려주고 세션을 유지한다 — 호출부가 로그인으로 보내지 않는다', async () => {
+    vi.spyOn(userApi, 'withdraw').mockRejectedValueOnce(new Error('500'));
+    setMemberSession('at', new Date(Date.now() + 60_000).toISOString());
+    beginWithdrawal();
+    await expect(confirmWithdrawal()).resolves.toBe(false);
+    expect(getProfileSnapshot().withdrawal.phase).toBe('error');
+    expect(getSessionSnapshot().kind).toBe('member');
   });
 });
