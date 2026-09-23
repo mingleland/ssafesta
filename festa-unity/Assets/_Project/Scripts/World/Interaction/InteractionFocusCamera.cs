@@ -42,6 +42,7 @@ namespace Festa.World
         bool _lockedByUs;
         bool _releasing;
         bool _hadFollow;
+        bool _showExitAffordance = true;
         readonly System.Collections.Generic.List<Renderer> _hiddenSelf = new();
 
         /// <summary>
@@ -49,10 +50,11 @@ namespace Festa.World
         /// <paramref name="anchor"/> 로컬 좌표(월드 단위 — 1 m ≈ 13.26).
         /// 이미 초점 중이면 대상만 바꾼다.
         /// </summary>
-        public static void Focus(Transform anchor, Vector3 cameraLocal, Vector3 lookLocal, bool lockInput = true)
+        public static void Focus(Transform anchor, Vector3 cameraLocal, Vector3 lookLocal, bool lockInput = true, bool showExitAffordance = true)
         {
             if (anchor == null) return;
             var inst = Ensure();
+            inst._showExitAffordance = showExitAffordance;
             inst.BeginFocus(anchor, cameraLocal, lookLocal, lockInput);
         }
 
@@ -91,6 +93,7 @@ namespace Festa.World
             Vector3 camPos = lookAt + dir * distance + Vector3.up * size * 0.45f;
 
             var inst = Ensure();
+            inst._showExitAffordance = true;
             inst.BeginFocusWorld(target.transform, camPos, lookAt, lockInput);
         }
 
@@ -135,6 +138,7 @@ namespace Festa.World
             dir.Normalize();
 
             var inst = Ensure();
+            inst._showExitAffordance = true;
             inst.BeginFocusWorld(surface.transform, b.center + dir * distance, b.center, lockInput);
         }
 
@@ -239,6 +243,7 @@ namespace Festa.World
         void OnGUI()
         {
             if (!_active) return;
+            if (!_showExitAffordance) return;
             if (Festa.World.UI.ControlsHintHud.HostProvidesUi) return;
             float ui = InteractPromptUI.UiScale();
             float h = Mathf.Round(44f * ui), cap = Mathf.Round(34f * ui), pad = Mathf.Round(14f * ui), gap = Mathf.Round(10f * ui);

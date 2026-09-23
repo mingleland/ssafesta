@@ -1727,7 +1727,24 @@ Game Studio는 Unity 미니게임 API와 분리한다. Spring은 GameProject의 
 - 공개 중단 전에 이미 GameProject를 로드한 무보상 로컬 세션은 완료까지 허용한다.
 - 일반 삭제는 soft delete, 회원 탈퇴는 Game·Draft·Published·Asset·Score hard delete다. Published 이력은 Game 존속 중 유지한다. Asset은 행을 지우고 객체는 삭제 큐로 넘긴다 — 저장소 장애가 탈퇴를 막지 않는다.
 - Portal 공개 `configId`는 signed Int32 `1..2147483647`; DB는 별도 `INTEGER UNIQUE NOT NULL CHECK (>0)`를 사용한다.
-- MVP 플레이 결과·보상·랭킹 API는 만들지 않는다.
+- ~~MVP 플레이 결과·보상·랭킹 API는 만들지 않는다.~~ → **2026-09-22 개정 — 표시 전용 랭킹만 예외로 구현했다** (GitLab #264, `S15P21A604-963`). 플레이 결과 정산과 보상 API는 여전히 없다.
+
+**오락기 랭킹** — 계약 정본은 `specs/019-game-studio/contracts/game-api.md` §Arcade Ranking 이다.
+
+```text
+POST /api/arcade/rankings/{machineId}/scores    # 회원. body {"score": 9800} → 200 {"updated":true,"bestScore":9800,"achievedAt":"...","rank":1}
+GET  /api/arcade/rankings/{machineId}?limit=5   # 게스트 가능. RankEntry[] (최대 5, 비면 [])
+GET  /api/arcade/rankings/{machineId}/me        # 회원. {"bestScore":9800,"achievedAt":"...","rank":3} · 기록 없으면 전 필드 null + 200
+```
+
+`RankEntry = {rank, nickname, bestScore, achievedAt}`. 셋 다 `Cache-Control: no-store`.
+
+- **랭킹은 게임기에 귀속된다** — 키가 `(machineId, userId)` 라서 캐비닛에 걸린 게임이 바뀌어도 이전 점수가 같은 순위표에 남는다. 표시 전용이며 Coin·Reward·Inventory 와 FK 로 연결되지 않는다(외래키는 `users` 하나).
+- 유효한 `machineId` 는 `app.arcade.machine-ids`(오락실 20대)다. 그 밖은 404 `MACHINE_NOT_FOUND`. 바인딩 유무·게임 공개 상태로는 막지 않는다.
+- 점수는 `0 ~ 100,000`. 벗어나면 400 `VALIDATION_FAILED`. 같거나 낮은 점수 재등록은 오류가 아니라 200 `updated:false` 다.
+- 정렬은 `bestScore DESC, achievedAt ASC, userId ASC` — 세 번째 키가 있어야 TOP 목록과 `/me` 순위가 어긋나지 않는다.
+- `limit` 은 1~5 로 clamp 한다(숫자가 아니면 400). 본문의 `userId` 는 무시하고 인증 주체를 쓴다.
+- 이 경로는 `/api/v1` 밖이라 `SecurityConfiguration` 의 CSRF 예외와 공개 경로에 **따로** 올라간다.
 - 오류 코드·`rule` 어휘와 생성·버전 목록 shape은 019 계약 문서가 소유한다 (`game-api.md` §오류 코드와 rule). `rule` 이름은 `contracts/fixtures/`의 reference validator가 정한 것을 그대로 쓰고, 서버가 새 어휘를 만들 때만 계약에 추가한다.
 
 상세 계약은 [`specs/019-game-studio/contracts/game-api.md`](../specs/019-game-studio/contracts/game-api.md)이고,

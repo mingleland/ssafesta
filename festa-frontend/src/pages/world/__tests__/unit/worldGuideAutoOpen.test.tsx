@@ -131,6 +131,16 @@ describe('이용 안내 자동 노출', () => {
     expect(guideOpen()).toBe(true);
   });
 
+  // 관리 화면의 "부스 임대하기" 가 /app/booths → /app/world?panel=rental 로 돌아올 때가 이 경우다.
+  // 월드는 이미 ready 이고 WorldPage 만 다시 선다 — 안내가 뜨면 방금 연 임대 창을 닫아 버린다.
+  it('이미 월드 안에서 라우트만 돌아오면 입장이 아니다 — 뜨지 않는다', () => {
+    act(() => setHostPhase('ready'));
+    renderWorld();
+    openDoors();
+
+    expect(guideOpen()).toBe(false);
+  });
+
   it('아바타 변경에서 돌아오는 것은 입장이 아니다 — 다시 뜨지 않는다', () => {
     renderWorld();
     act(() => setHostPhase('ready'));

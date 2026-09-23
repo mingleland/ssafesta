@@ -362,7 +362,8 @@ namespace Festa.World
                 new Vector3(b.center.x, b.min.y + OccupantHeight * 0.5f, b.center.z),
                 new Vector3(Mathf.Max(b.size.x, 4f), OccupantHeight, Mathf.Max(b.size.z, 4f)));
 
-            foreach (var p in FindObjectsByType<NetworkPlayer>(FindObjectsInactive.Exclude, FindObjectsSortMode.None))
+            // 사람 목록은 프레임 단위로 공유한다 — 의자마다 씬을 다시 훑으면 수십 번이 된다 (S15P21A604-970).
+            foreach (var p in NetworkPlayerScan.All())
             {
                 if (p == null || (self != null && p.gameObject == self.gameObject)) continue;
                 if (!SitPoseTable.IsSit(p.EmoteId.Value)) continue;
