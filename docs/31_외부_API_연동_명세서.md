@@ -48,7 +48,7 @@
 | 클라이언트 인증 | 기본 | `client_secret_post` | `client_secret_post` |
 | 환경변수 | `GOOGLE_CLIENT_ID` `GOOGLE_CLIENT_SECRET` `GOOGLE_REDIRECT_URI` | `KAKAO_REST_API_KEY` `KAKAO_CLIENT_SECRET` `KAKAO_REDIRECT_URI` | `SSAFY_CLIENT_ID` `SSAFY_CLIENT_SECRET` `SSAFY_REDIRECT_URI` |
 
-운영 콜백 주소는 `https://api.ssafesta.world/login/oauth2/code/{google|kakao|ssafy}` 이다. 콘솔 등록값과 한 글자라도 다르면 `redirect_uri_mismatch` 로 실패한다.
+콜백 주소는 production `https://ssafesta.world/login/oauth2/code/{google|kakao|ssafy}`, demo `https://api.ssafesta.world/login/oauth2/code/{google|kakao|ssafy}` 이다. 콘솔 등록값과 한 글자라도 다르면 `redirect_uri_mismatch` 로 실패한다.
 
 ### 2-3. 실패 처리
 
