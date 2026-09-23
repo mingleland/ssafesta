@@ -138,7 +138,8 @@ export function MyInfoBody() {
 
       <section className="sc-card pf-danger">
         <h2 className="sc-section-title">계정</h2>
-        {state.withdrawal.phase === 'idle' && (
+        {state.withdrawal.phase === 'error' && <p className="sc-alert">탈퇴하지 못했습니다. 잠시 후 다시 시도해 주세요.</p>}
+        {(state.withdrawal.phase === 'idle' || state.withdrawal.phase === 'error') && (
           <button type="button" className="sc-btn" onClick={beginWithdrawal}>
             탈퇴하기
           </button>
@@ -154,7 +155,9 @@ export function MyInfoBody() {
                 type="button"
                 className="sc-btn pf-btn-danger"
                 onClick={() => {
-                  void confirmWithdrawal().then(() => navigate('/login', { replace: true }));
+                  void confirmWithdrawal().then((ok) => {
+                    if (ok) navigate('/login', { replace: true });
+                  });
                 }}
               >
                 탈퇴 확인
@@ -163,7 +166,6 @@ export function MyInfoBody() {
           </div>
         )}
         {state.withdrawal.phase === 'submitting' && <p className="sc-note">탈퇴 처리 중...</p>}
-        {state.withdrawal.phase === 'error' && <p className="sc-alert">탈퇴하지 못했습니다. 잠시 후 다시 시도해 주세요.</p>}
       </section>
     </>
   );

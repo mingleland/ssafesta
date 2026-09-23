@@ -163,6 +163,41 @@ class AccountWithdrawalResourceCleanupIntegrationTest {
         assertEquals(0, count("SELECT count(*) FROM users WHERE id = ?", userId));
     }
 
+    /**
+     * 로고를 올린 회원, 남의 게임에 오락기 자리를 잡은 회원도 탈퇴할 수 있다 (S15P21A604-979).
+     *
+     * <p>두 표 모두 삭제 목록에 없어 FK 위반으로 탈퇴 전체가 500 이 되던 자리다. 로고 바이트는
+     * 다른 저장 객체와 같이 삭제 큐로 간다.
+     */
+    @Test
+    void withdrawingRemovesProjectLogoUploadsAndClaimedArcadeSeats() {
+        Long userId = member("로고탈퇴");
+        Long gameOwnerId = member("로고탈퇴게임주");
+        Long boothId = booths.save(new Booth(userId, "로고탈퇴 부스")).getId();
+        String logoKey = "withdraw/logo/" + UUID.randomUUID();
+        jdbc.update("""
+                INSERT INTO project_logo_uploads (booth_id, logo_id, status, declared_content_type,
+                    declared_byte_size, provider, storage_bucket, object_key, expires_at)
+                VALUES (?, ?, 'READY', 'image/png', 1024, 'R2', 'test-ai-documents', ?,
+                    now() + interval '10 minutes')
+                """, boothId, "l" + UUID.randomUUID().toString().replace("-", "").substring(0, 25), logoKey);
+        Long gameId = jdbc.queryForObject(
+                "INSERT INTO games (owner_user_id, title) VALUES (?, '남의 게임') RETURNING id",
+                Long.class, gameOwnerId);
+        String machineId = "withdraw-" + UUID.randomUUID();
+        jdbc.update("INSERT INTO arcade_machine_bindings (machine_id, game_id, owner_user_id, created_at, updated_at)"
+                + " VALUES (?, ?, ?, now(), now())", machineId, gameId, userId);
+
+        assertDoesNotThrow(() -> lifecycle.withdraw(userId));
+
+        assertEquals(0, count("SELECT count(*) FROM users WHERE id = ?", userId));
+        assertEquals(0, count("SELECT count(*) FROM project_logo_uploads WHERE booth_id = ?", boothId));
+        assertEquals(1, count("SELECT count(*) FROM game_asset_delete_queue WHERE object_key = ?", logoKey),
+                "로고의 좌표가 큐에 있어야 합니다.");
+        assertEquals(0, count("SELECT count(*) FROM arcade_machine_bindings WHERE machine_id = ?", machineId));
+        assertEquals(1, count("SELECT count(*) FROM games WHERE id = ?", gameId), "남의 게임은 남는다.");
+    }
+
     // ── 도우미 ──────────────────────────────────────────────────────────────
 
     /**
