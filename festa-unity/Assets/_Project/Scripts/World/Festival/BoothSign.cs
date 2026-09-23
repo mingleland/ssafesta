@@ -65,6 +65,17 @@ namespace Festa.World
         TextMeshPro _projectTitleShadow;
         Transform _projectTitleRoot;
 
+        /// <summary>
+        /// 프로젝트명 표지의 크기 기준. 표지판 로컬 스케일 위에서 쓰는 값이라 화면 크기와 직결된다 —
+        /// 초기값(글자 18, 박스 85x24)은 월드 시점에서 읽히지 않았다 (S15P21A604-978).
+        /// 세 값은 함께 움직인다. 글자만 키우면 박스를 넘고, 그림자만 그대로면 외곽선이 사라진다.
+        /// </summary>
+        const float TitleFontSize = 46f;
+        static readonly Vector2 TitleBoxSize = new(220f, 62f);
+        const float TitleShadowOffset = 0.46f;
+        /// <summary>지붕 위 높이. 글자가 커진 만큼 띄워야 지붕에 파묻히지 않는다.</summary>
+        const float TitleHeight = 44f;
+
         /// <summary>부스 지붕 위에 게시 프로젝트명만 표시한다. 빈 이름이면 오브젝트 자체를 숨긴다.</summary>
         public void SetProjectTitle(string text)
         {
@@ -87,9 +98,9 @@ namespace Festa.World
             if (_projectTitleRoot != null || label == null || label.font == null) return;
             var root = new GameObject("@ProjectTitle").transform;
             root.SetParent(transform, false);
-            root.localPosition = new Vector3(0f, 38f, 0f);
+            root.localPosition = new Vector3(0f, TitleHeight, 0f);
             _projectTitleRoot = root;
-            _projectTitleShadow = CreateTitleLayer(root, "Shadow", new Vector3(0.18f, -0.18f, 0.08f), new Color(0.02f, 0.08f, 0.16f, 0.95f));
+            _projectTitleShadow = CreateTitleLayer(root, "Shadow", new Vector3(TitleShadowOffset, -TitleShadowOffset, 0.08f), new Color(0.02f, 0.08f, 0.16f, 0.95f));
             _projectTitle = CreateTitleLayer(root, "Face", Vector3.zero, new Color(0.32f, 0.78f, 1f, 1f));
         }
 
@@ -102,10 +113,10 @@ namespace Festa.World
             tmp.font = label.font;
             tmp.fontSharedMaterial = label.fontSharedMaterial;
             tmp.color = color;
-            tmp.fontSize = 18f;
+            tmp.fontSize = TitleFontSize;
             tmp.alignment = TextAlignmentOptions.Center;
             tmp.textWrappingMode = TextWrappingModes.NoWrap;
-            tmp.rectTransform.sizeDelta = new Vector2(85f, 24f);
+            tmp.rectTransform.sizeDelta = TitleBoxSize;
             var renderer = go.GetComponent<MeshRenderer>();
             renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
             renderer.receiveShadows = false;
