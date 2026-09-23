@@ -14,13 +14,18 @@ python - "${repo_root}/infra/tests/security/fixtures/observability/raw.log" "${r
 import pathlib,re,sys
 text=pathlib.Path(sys.argv[1]).read_text(encoding='utf-8')
 patterns=[
- (r'(?i)(authorization\s*[:=]\s*(?:bearer|basic)\s+)[^\s,;]+',r'\1[REDACTED]'),
- (r'(?i)((?:password|passwd|api[_-]?key|access[_-]?token|refresh[_-]?token|token)\s*[:=]\s*)[^\s,;]+',r'\1[REDACTED]'),
- (r'(?i)((?:cookie|set-cookie)\s*[:=]\s*)[^\r\n]+',r'\1[REDACTED]'),
- (r'https?://[^\s/]+/(?:hooks|webhooks)/[^\s]+','[REDACTED]'),
- (r'[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}','[REDACTED]'),
- (r'(?:\+?82[- ]?)?0?1[016789][- ]?[0-9]{3,4}[- ]?[0-9]{4}','[REDACTED]')]
-for expression,replacement in patterns:text=re.sub(expression,replacement,text)
+ r'(?i)(?:authorization\s*[:=]\s*(?:bearer|basic)\s+)([^\s,;]+)',
+ r'(?i)(?:(?:password|passwd|api[_-]?key|access[_-]?token|refresh[_-]?token|token)\s*[:=]\s*)([^\s,;]+)',
+ r'(?i)(?:(?:cookie|set-cookie)\s*[:=]\s*)([^\r\n]+)',
+ r'(https?://[^\s/]+/(?:hooks|webhooks)/[^\s]+)',
+ r'([A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,})',
+ r'((?:\+?82[- ]?)?0?1[016789][- ]?[0-9]{3,4}[- ]?[0-9]{4})']
+def replace_capture(match):
+ start,end=match.span(1); offset=match.start()
+ return match.group(0)[:start-offset]+'[REDACTED]'+match.group(0)[end-offset:]
+for expression in patterns:
+ assert re.compile(expression).groups==1,expression
+ text=re.sub(expression,replace_capture,text)
 expected=pathlib.Path(sys.argv[2]).read_text(encoding='utf-8')
 assert text==expected,(text,expected)
 PY
