@@ -238,7 +238,7 @@ log_verify_failure() {
 log_verify_body() {
   local url="$1"
   local body; body="$(mktemp "${root}/.webgl-body.XXXXXX")"
-  curl --silent --location --max-time "${WEBGL_VERIFY_TIMEOUT_SECONDS:-20}" \
+  curl --silent --location --max-time "${WEBGL_VERIFY_TIMEOUT_SECONDS:-120}" \
     --user-agent "${VERIFY_USER_AGENT}" --max-filesize 65536 \
     --output "${body}" "${url}" 2>/dev/null || true
   if [[ -s "${body}" ]]; then
@@ -288,7 +288,10 @@ VERIFY_ACCEPT_ENCODING="${WEBGL_VERIFY_ACCEPT_ENCODING:-br, gzip}"
 request_and_check() {
   local url="$1" expected_type="$2" require_brotli="$3" expected_cache="$4" file="$5"
   : >"${file}"
-  curl --silent --show-error --location --max-time "${WEBGL_VERIFY_TIMEOUT_SECONDS:-20}" \
+  # 헤더만 보지만 본문은 끝까지 받는다(--output /dev/null). data 번들은 93 MB 고 엣지에서
+  # 초당 2~3 MB 로 오므로 20 초로는 끝나지 않는다 — caa1c60d 배포가 10/48/20 MB 에서
+  # 잘리고 세 번 모두 실패해 멀쩡한 배포물이 롤백됐다 (#601, 2026-09-23 실측).
+  curl --silent --show-error --location --max-time "${WEBGL_VERIFY_TIMEOUT_SECONDS:-120}" \
     --user-agent "${VERIFY_USER_AGENT}" --header "Accept-Encoding: ${VERIFY_ACCEPT_ENCODING}" \
     --dump-header "${file}" --output /dev/null "${url}" || return 1
   # --fail 을 뺐으므로 상태코드를 직접 본다 (--fail 은 본문·헤더를 버려 진단을 못 남긴다).
@@ -318,7 +321,7 @@ verify_origin() {
   local file; file="$(mktemp "${root}/.webgl-origin.XXXXXX")"
   local rc=1 curl_rc=0
   if curl --silent --show-error --location --insecure \
-      --max-time "${WEBGL_VERIFY_TIMEOUT_SECONDS:-20}" --resolve "${host}:${port}:${addr}" \
+      --max-time "${WEBGL_VERIFY_TIMEOUT_SECONDS:-120}" --resolve "${host}:${port}:${addr}" \
       --user-agent "${VERIFY_USER_AGENT}" --header "Accept-Encoding: ${VERIFY_ACCEPT_ENCODING}" \
       --dump-header "${file}" --output /dev/null "${base}/${path}" || { curl_rc=$?; false; }; then
     head -n 1 "${file}" | grep -Eq '^HTTP/[0-9.]+ 2[0-9][0-9]' \
