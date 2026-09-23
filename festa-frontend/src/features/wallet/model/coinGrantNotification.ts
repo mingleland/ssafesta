@@ -35,13 +35,16 @@ export function isCoinGrantNotification(value: unknown): value is CoinGrantNotif
  * 슬롯은 한 번 앉으면 수십 번 돌리는 기계라 당첨마다 알림이 뜨면 그 알림이 월드를 덮는다. 결과는
  * 슬롯 화면이 그 자리에서 이미 보여 주므로 여기서 한 번 더 말할 것이 없다.
  *
+ * 일일 미션 보상도 같다. 지급 경로가 미션 창의 "받기" 하나뿐이고, 그 창이 응답을 받아 "일일 미션
+ * 보상으로 N 코인을 받았습니다" 를 이미 띄운다. 여기서도 알리면 같은 지급이 토스트 두 줄로 겹친다.
+ *
  * **잔액·내역 갱신은 건너뛰지 않는다.** 감추는 것은 알림 한 줄뿐이고, HUD 잔액과 코인 사용 내역은
  * 종전대로 따라간다 — 원장에서 사라지면 그건 감사 기록을 지우는 것이다.
  *
  * 실시간 경로·catch-up 경로 둘 다 이 함수 하나를 거치게 해서(리뷰 지적, S15P21A604-953) 두 경로가
  * 각자 규칙을 들고 있다가 한쪽만 고치는 일을 막는다.
  */
-const SILENT_REASONS: ReadonlySet<string> = new Set(['SLOT_PAYOUT']);
+const SILENT_REASONS: ReadonlySet<string> = new Set(['SLOT_PAYOUT', 'DAILY_MISSION']);
 
 /**
  * 월드에 들어서기 전까지 코인 토스트를 붙들어 둔다.
