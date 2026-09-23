@@ -88,8 +88,15 @@ public class AccountDeletionService {
         // 오락기에 걸린 회원의 탈퇴가 FK 위반으로 실패한다. 기계 자체는 월드 고정물이라 남고,
         // 바인딩이 사라진 기계는 운영자가 다시 걸 때까지 MACHINE_NOT_FOUND 로 답한다.
         jdbc.update("DELETE FROM arcade_machine_bindings WHERE game_id IN (SELECT id FROM games WHERE owner_user_id = ?)", userId);
+        // 자리를 잡은 사람도 users 를 참조한다 (V45). 자리 주인과 게임 주인이 다를 수 있으니 따로 푼다.
+        jdbc.update("DELETE FROM arcade_machine_bindings WHERE owner_user_id = ?", userId);
         jdbc.update("DELETE FROM games WHERE owner_user_id = ?", userId);
         jdbc.update("DELETE FROM booth_leases WHERE booth_id IN (SELECT id FROM booths WHERE owner_user_id = ?) OR lessee_user_id = ?", userId, userId);
+        // 프로젝트 로고 업로드는 부스를 참조한다 (V42). 이 두 줄이 없으면 로고를 한 번이라도 올린
+        // 회원의 탈퇴가 project_logo_uploads_booth_id_fkey 로 실패한다 (S15P21A604-979).
+        // 바이트는 문서·게임 에셋과 같은 삭제 큐로 먼저 옮긴다.
+        jdbc.update("INSERT INTO game_asset_delete_queue (provider, storage_bucket, object_key) SELECT provider, storage_bucket, object_key FROM project_logo_uploads WHERE booth_id IN (SELECT id FROM booths WHERE owner_user_id = ?) ON CONFLICT (provider, storage_bucket, object_key) DO NOTHING", userId);
+        jdbc.update("DELETE FROM project_logo_uploads WHERE booth_id IN (SELECT id FROM booths WHERE owner_user_id = ?)", userId);
         jdbc.update("DELETE FROM booths WHERE owner_user_id = ?", userId);
         jdbc.update("DELETE FROM oauth_identities WHERE user_id = ?", userId);
         jdbc.update("DELETE FROM wallets WHERE user_id = ?", userId);
