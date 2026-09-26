@@ -468,6 +468,8 @@ fi
 cp "${work}/verification-good.json" "${prod_state}/production/candidates/production-fixture-1.verification.json"
 env "${common_env[@]}" "${repo_root}/infra/deploy/scripts/activate-production-release.sh" "${work}/receipt.json" >/dev/null
 [[ -f "${prod_state}/production/current.json" && ! -e "${prod_state}/production/known-good.json" ]] || fail 'CURRENT and KNOWN-GOOD were not separated'
+# T-295 — 월드 인증서를 따로 주지 않으면 지금과 같은 원본 인증서로 렌더된다.
+grep -Fq 'ssl_certificate /fixture/origin.crt;' "${work}/active-world.conf" || fail 'Production World vhost lost the origin certificate fallback'
 
 if APPROVED_BY=fixture env "${common_env[@]}" "${repo_root}/infra/deploy/scripts/approve-production-known-good.sh" production-fixture-1 >/dev/null 2>&1; then
   fail 'Production known-good was approved without external verification'

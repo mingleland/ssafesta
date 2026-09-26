@@ -3,9 +3,11 @@
 // 띄울 것을 찾는 순서가 화면마다 달라지지 않게 여기서만 정한다.
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using System.Text.RegularExpressions;
 using Festa.Booth;
 using UnityEngine;
 using UnityEngine.Networking;
+using UnityEngine.SceneManagement;
 
 namespace Festa.Content
 {
@@ -31,21 +33,59 @@ namespace Festa.Content
 
         /// <summary>같은 로고를 부스마다 다시 받지 않는다. 키는 URL 이다.</summary>
         static readonly Dictionary<string, Texture> TextureCache = new();
+        /// <summary>처음 진입 때 같은 URL을 여러 화면이 동시에 받는 경우도 한 요청으로 합친다.</summary>
+        static readonly Dictionary<string, Task<Texture>> TextureLoads = new();
+        static int s_cacheGeneration;
+        static readonly Regex ManagedProjectLogoPath = new(
+            @"^/api/v1/booths/[1-9]\d*/project-logos/[A-Za-z0-9_-]+/content$",
+            RegexOptions.CultureInvariant);
+
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
+        static void InstallCacheCleanup()
+        {
+            SceneManager.sceneUnloaded -= OnSceneUnloaded;
+            SceneManager.sceneUnloaded += OnSceneUnloaded;
+        }
+
+        static void OnSceneUnloaded(Scene _)
+        {
+            // 다운로드 텍스처는 Resources 소유가 아니다. 씬 전환 뒤 정적 캐시에 남겨 두면
+            // 로고 URL이 바뀔수록 WebGL 메모리가 회수되지 않는다.
+            s_cacheGeneration++;
+            foreach (var texture in TextureCache.Values)
+                if (texture != null) Destroy(texture);
+            TextureCache.Clear();
+            TextureLoads.Clear();
+        }
 
         bool _painted;
         Material _screenMaterial;
         readonly List<GameObject> _screenImages = new();
+        int _refreshVersion;
 
         /// <summary>이 오브젝트에 화면 내용을 붙인다. 이미 있으면 설정만 갱신한다.</summary>
         public static void Attach(GameObject target)
         {
             if (target == null) return;
-            if (target.GetComponent<BoothScreenSurface>() == null) target.AddComponent<BoothScreenSurface>();
+            var surface = target.GetComponent<BoothScreenSurface>();
+            if (surface == null) target.AddComponent<BoothScreenSurface>();
+            else surface.Refresh();
         }
 
-        void Start() => FillAsync(GetComponent<BoothRuntimeObject>().BoothId);
+        void Start() => Refresh();
 
-        async void FillAsync(int boothId)
+        /// <summary>
+        /// 게시본 재적용 뒤에도 같은 저작 패널은 살아 있다. Start 한 번에만 읽으면 로고를
+        /// 저장·게시한 뒤 월드를 새로 열기 전까지 검은 화면으로 남으므로 명시적으로 다시 채운다.
+        /// </summary>
+        void Refresh()
+        {
+            _refreshVersion++;
+            ClearPaintedSurface();
+            FillAsync(GetComponent<BoothRuntimeObject>().BoothId, _refreshVersion);
+        }
+
+        async void FillAsync(int boothId, int refreshVersion)
         {
             // 조용히 돌아가면 화면은 검은 상자로 남고 원인은 어디에도 남지 않는다 (T-24). 이 경로는
             // 붙인 오브젝트에 부스 번호가 들어오지 않았다는 뜻이라 데이터가 아니라 배선 문제다.
@@ -56,27 +96,25 @@ namespace Festa.Content
                 return;
             }
 
-            BoothProjectDto first = null;
-            try
-            {
-                Festa.Integration.ApiServices.EnsureInitialized();
-                var projects = await Festa.Integration.ApiServices.Booth.GetPublishedProjectsAsync(boothId);
-                if (projects?.projects != null && projects.projects.Length > 0) first = projects.projects[0];
-            }
-            catch (System.Exception e)
-            {
-                Debug.LogWarning($"[BoothScreen] booth={boothId} 전시 조회 실패: {e.Message}");
-            }
-            if (this == null) return;
-
             Texture texture = null;
-            try { texture = await ResolveImageAsync(boothId, first); }
-            catch (System.Exception e)
+            BoothProjectDto first = null;
+            for (int attempt = 0; attempt < 3 && texture == null; attempt++)
             {
-                // 조용히 검은 화면으로 두지 않는다 — 로고를 등록했는데 안 뜨면 원인을 찾을 수 없다 (T-24).
-                Debug.LogWarning($"[BoothScreen] booth={boothId} 이미지 조회 실패: {e.Message}");
+                try
+                {
+                    Festa.Integration.ApiServices.EnsureInitialized();
+                    var projects = await Festa.Integration.ApiServices.Booth.GetPublishedProjectsAsync(boothId);
+                    if (projects?.projects != null && projects.projects.Length > 0) first = projects.projects[0];
+                    texture = await ResolveImageAsync(boothId, first);
+                }
+                catch (System.Exception e)
+                {
+                    Debug.LogWarning($"[BoothScreen] booth={boothId} 이미지 조회 실패: {e.Message}");
+                }
+                if (texture == null && attempt < 2 && this != null && refreshVersion == _refreshVersion)
+                    await Awaitable.WaitForSecondsAsync(2f);
             }
-            if (this == null || _painted) return;
+            if (this == null || _painted || refreshVersion != _refreshVersion) return;
             if (texture == null)
             {
                 // 사용자는 "로고를 넣었는데 안 뜬다" 로 겪는다. 무엇이 비어 있었는지 남겨야 데이터인지 배선인지 가른다.
@@ -102,10 +140,17 @@ namespace Festa.Content
                 foreach (var slot in slots)
                     if (slot != null && slot.boothId == boothId && slot.facade != null)
                     {
-                        var logo = await LoadAsync(slot.facade.logoUrl, boothId, "부스 로고");
-                        if (logo != null) return logo;
+                        var slotLogo = await LoadAsync(slot.facade.logoUrl, boothId, "부스 로고");
+                        if (slotLogo != null) return slotLogo;
                         break;
                     }
+
+            // 슬롯 목록은 한 번에 12개를 읽는 최적화일 뿐 로고의 유일한 출처가 아니다.
+            // 토큰 교체 직후 목록만 일시 실패하면 화면이 영구히 검게 남던 경로를 끊는다.
+            var api = Festa.Integration.ApiServices.Booth;
+            var detail = api != null ? await api.GetBoothDetailAsync(boothId) : null;
+            var logo = await LoadAsync(detail?.facade?.logoUrl, boothId, "부스 로고(상세 폴백)");
+            if (logo != null) return logo;
             return null;
         }
 
@@ -187,15 +232,67 @@ namespace Festa.Content
         static async Task<Texture> LoadAsync(string url, int boothId, string label, bool quiet = false)
         {
             if (string.IsNullOrWhiteSpace(url)) return null;
-            if (TextureCache.TryGetValue(url, out var cached)) return cached;
+            if (!TryResolveImageUrl(url, boothId, label, out var resolvedUrl)) return null;
+            if (TextureCache.TryGetValue(resolvedUrl, out var cached)) return cached;
+            if (TextureLoads.TryGetValue(resolvedUrl, out var inFlight)) return await inFlight;
 
-            // https 만 계약이다. http 는 WebGL 에서 mixed content 로 브라우저가 막아 요청 자체가 안 나간다.
-            if (!url.StartsWith("https://"))
+            int cacheGeneration = s_cacheGeneration;
+            var load = DownloadAsync(resolvedUrl, boothId, label, quiet);
+            TextureLoads[resolvedUrl] = load;
+            try
             {
-                Debug.LogWarning($"[BoothScreen] booth={boothId} {label} 이 https 가 아니다 ('{url}') — 검은 화면으로 둔다.");
-                return null;
+                var texture = await load;
+                if (texture != null && cacheGeneration == s_cacheGeneration)
+                    TextureCache[resolvedUrl] = texture;
+                else if (texture != null)
+                {
+                    Destroy(texture);
+                    texture = null;
+                }
+                return texture;
+            }
+            finally
+            {
+                if (TextureLoads.TryGetValue(resolvedUrl, out var current) && current == load)
+                    TextureLoads.Remove(resolvedUrl);
+            }
+        }
+
+        static bool TryResolveImageUrl(string url, int boothId, string label, out string resolvedUrl)
+        {
+            resolvedUrl = null;
+            // 앞에 슬래시가 붙은 서버 상대 경로를 절대 URI 판정에 먼저 넣으면 안 된다. WebGL 런타임에서는
+            // 그 판정이 참으로 통과하면서 file 스킴을 만들고, https 가 아니라는 이유로 여기서 잘린다.
+            // 그러면 아래 상대경로 해석은 한 번도 실행되지 않는 죽은 코드가 되어 전시화면이 항상 검게
+            // 남는다 (S15P21A604-976).
+            bool serverRelative = !string.IsNullOrEmpty(url) && url[0] == '/';
+            if (!serverRelative && System.Uri.TryCreate(url, System.UriKind.Absolute, out var absolute) && absolute.IsAbsoluteUri)
+            {
+                if (absolute.Scheme != System.Uri.UriSchemeHttps)
+                {
+                    Debug.LogWarning($"[BoothScreen] booth={boothId} {label} 이 https 가 아니다 ('{url}') — 검은 화면으로 둔다.");
+                    return false;
+                }
+                resolvedUrl = absolute.AbsoluteUri;
+                return true;
             }
 
+            // 프로젝트 로고 업로드 API만 상대 경로를 계약으로 허용한다. 임의 상대 URL까지 열면
+            // 깨진 외부 주소를 같은 출처에 엉뚱하게 붙이므로 정확한 서버 발급 형태만 받는다.
+            if (!ManagedProjectLogoPath.IsMatch(url) ||
+                !System.Uri.TryCreate(Festa.Integration.ApiServices.SpringBaseUrl, System.UriKind.Absolute, out var apiBase) ||
+                apiBase.Scheme != System.Uri.UriSchemeHttps ||
+                !System.Uri.TryCreate(apiBase, url, out var managed))
+            {
+                Debug.LogWarning($"[BoothScreen] booth={boothId} {label} URL을 해석할 수 없다 ('{url}') — 검은 화면으로 둔다.");
+                return false;
+            }
+            resolvedUrl = managed.AbsoluteUri;
+            return true;
+        }
+
+        static async Task<Texture> DownloadAsync(string url, int boothId, string label, bool quiet)
+        {
             using var request = UnityWebRequestTexture.GetTexture(url);
             request.timeout = 10;
             await request.SendWebRequest();
@@ -207,9 +304,7 @@ namespace Festa.Content
                 return null;
             }
 
-            var texture = DownloadHandlerTexture.GetContent(request);
-            if (texture != null) TextureCache[url] = texture;
-            return texture;
+            return DownloadHandlerTexture.GetContent(request);
         }
 
         /// <summary>화면 앞뒤 면에 이미지 판을 한 장씩 덮는다. 원본 재질은 건드리지 않는다.</summary>
@@ -257,7 +352,7 @@ namespace Festa.Content
             }
         }
 
-        void OnDestroy()
+        void ClearPaintedSurface()
         {
             // 이미지는 BoothScreenSurface의 형제가 될 수 있어 컴포넌트 오브젝트를 없애도 자동으로
             // 같이 사라지지 않는다. 게시 레이아웃 재구성마다 quad와 동적 Material이 남지 않게
@@ -268,6 +363,9 @@ namespace Festa.Content
 
             if (_screenMaterial != null) Destroy(_screenMaterial);
             _screenMaterial = null;
+            _painted = false;
         }
+
+        void OnDestroy() => ClearPaintedSurface();
     }
 }

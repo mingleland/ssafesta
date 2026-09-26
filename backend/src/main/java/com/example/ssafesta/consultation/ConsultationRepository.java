@@ -11,9 +11,6 @@ import org.springframework.data.repository.query.Param;
 /** 상담 요청의 대기열·수락·만료 (spec 011 US1). */
 public interface ConsultationRepository extends JpaRepository<Consultation, Long> {
 
-    long countByVisitorUserIdAndRequestedAtGreaterThanEqualAndRequestedAtLessThan(
-            Long visitorUserId, Instant from, Instant to);
-
     /** 그 부스의 대기 중 요청 — 아직 시간이 남은 것만 (C-01). */
     @Query("""
             select c from Consultation c

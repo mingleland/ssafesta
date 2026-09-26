@@ -90,6 +90,43 @@ make_zip "${work}/dirty.zip" "${on_develop}" true; set +e; gate --source-commit 
 set +e; FAKE_LABEL_COMMIT="${local_only}" gate --source-commit "${on_develop}" --image-ref "${image_ref}" >/dev/null 2>&1; rc=$?; set -e; [[ "${rc}" -eq 65 ]] || fail 'gate rejects image with another source-commit'
 set +e; GIT_REPO_DIR="${work}/clone" "${scripts}/check-game-source-identity.sh" --source-commit "${on_develop}" --remote nowhere >/dev/null 2>&1; rc=$?; set -e; [[ "${rc}" -eq 69 ]] || fail 'gate reports fetch failure as 69'
 
+# --- Unity 입력 동일성은 표현이 아니라 내용으로 본다 (S15P21A604-939) --------------------------
+# 같은 바이트가 raw blob 으로도 LFS pointer 로도 커밋된다. tree hash 로 보면 둘이 다르고, 그래서
+# 내용이 같은 번들(509e0535)이 거부됐다. pointer 의 oid 는 원본 내용의 sha256 이므로 내용으로 모은다.
+content_id_of() { GIT_REPO_DIR="${work}/clone" bash "${scripts}/unity-content-id.sh" "$1"; }
+asset_bytes="$(printf 'FBX%.0s' {1..40})"
+asset_path="${work}/clone/festa-unity/Assets/big.fbx"
+mkdir -p "$(dirname "${asset_path}")"
+printf '%s' "${asset_bytes}" > "${asset_path}"
+git -C "${work}/clone" add . && git -C "${work}/clone" -c user.name=t -c user.email=t@t commit -q -m raw-asset
+raw_blob_sha="$(git -C "${work}/clone" rev-parse HEAD)"
+asset_oid="$(printf '%s' "${asset_bytes}" | sha256sum | awk '{print $1}')"
+printf 'version https://git-lfs.github.com/spec/v1\noid sha256:%s\nsize %s\n' "${asset_oid}" "${#asset_bytes}" > "${asset_path}"
+printf 'festa-unity/**/*.fbx filter=lfs diff=lfs merge=lfs -text\n' > "${work}/clone/.gitattributes"
+git -C "${work}/clone" -c core.safecrlf=false add . 2>/dev/null
+git -C "${work}/clone" -c user.name=t -c user.email=t@t commit -q -m lfs-pointer
+lfs_pointer_sha="$(git -C "${work}/clone" rev-parse HEAD)"
+[[ "$(git -C "${work}/clone" rev-parse "${raw_blob_sha}:festa-unity")" != "$(git -C "${work}/clone" rev-parse "${lfs_pointer_sha}:festa-unity")" ]] \
+  || fail 'fixture is not exercising the representation change (tree hashes are equal)'
+[[ "$(content_id_of "${raw_blob_sha}")" == "$(content_id_of "${lfs_pointer_sha}")" ]] \
+  || fail 'raw blob and its LFS pointer must be one Unity content id'
+gate --source-commit "${raw_blob_sha}" --head "${lfs_pointer_sha}" 2>&1 | grep -q '^GAME_SOURCE_OK' \
+  || fail 'gate accepts a bundle whose only difference is the LFS representation'
+
+# 실제 내용이 바뀌면 여전히 다른 입력이다.
+printf '%s' "${asset_bytes}X" > "${asset_path}"
+git -C "${work}/clone" add . && git -C "${work}/clone" -c user.name=t -c user.email=t@t commit -q -m asset-change
+changed_sha="$(git -C "${work}/clone" rev-parse HEAD)"
+[[ "$(content_id_of "${changed_sha}")" != "$(content_id_of "${lfs_pointer_sha}")" ]] \
+  || fail 'a changed Unity asset must change the content id'
+set +e; gate --source-commit "${lfs_pointer_sha}" --head "${changed_sha}" >/dev/null 2>&1; rc=$?; set -e
+[[ "${rc}" -eq 65 ]] || fail 'gate still rejects a real Unity content change'
+
+# content id 를 못 구하면 경고만 남기고 예전 tree hash 로 내려간다 — 새 경로가 깨져도 판정은 남는다.
+fallback_out="$(UNITY_TREE_PREFIX=nonexistent-tree gate --source-commit "${lfs_pointer_sha}" --head "${lfs_pointer_sha}" 2>&1)"
+grep -q 'UNITY_CONTENT_ID_UNAVAILABLE' <<<"${fallback_out}" || fail 'a failed content id must warn'
+grep -q '^GAME_SOURCE_OK' <<<"${fallback_out}" || fail 'the tree-hash fallback must still decide'
+
 # --- release set ------------------------------------------------------------------------------
 rs(){ "${scripts}/validate-game-release-set.sh" --source-commit "${sha}" --webgl-zip "${zip}" --webgl-sha256 "$1" --image-ref "${image_ref}" --content-id "$2"; }
 rs "${zip_sha}" "${content_id}" | grep -q '^GAME_RELEASE_SET_OK' || fail 'release set accepts'

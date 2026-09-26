@@ -55,17 +55,30 @@ variables:
     - export CI_RUN_ID="${CI_PIPELINE_ID}-${CI_JOB_ID}"
     - export CI_ARTIFACT_DIR="${CI_PROJECT_DIR}/artifacts/${CI_JOB_NAME}"
     - mkdir -p "$CI_ARTIFACT_DIR"
-  # 리포트를 올려 두고도 파싱하지 않으면 MR 화면의 test_report 가 빈 결과로 남는다. ai 가
-  # --junitxml 로 만들던 tests.xml 이 그 상태였다. 여기 한 곳에 걸어 back·ai 를 함께 덮는다.
-  # front·game 은 매칭되는 파일이 없어 경고만 뜨고 job 은 실패하지 않는다 (GitLab #190).
   artifacts:
     when: always
     paths:
       - artifacts/
+
+# 리포트를 올려 두고도 파싱하지 않으면 MR 화면의 test_report 가 빈 결과로 남는다. ai 가
+# --junitxml 로 만들던 tests.xml 이 그 상태였다 (GitLab #190). XML 을 만드는 back·ai 에만 건다 —
+# front 는 매칭되는 파일이 없어 job 마다 빈 glob 을 훑고 "No files to upload" 로 끝나고 있었다.
+.junit-report:
+  artifacts:
     reports:
       junit:
         - artifacts/*/TEST-*.xml
         - artifacts/*/tests.xml
+
+# node 이미지에는 python3 가 없어 job 마다 apt-get 으로 약 9초를 썼다. write-stage-summary.sh 가
+# node 로도 같은 JSON 을 만들므로 front 는 이미 들어 있는 런타임을 그대로 쓴다. python·maven
+# 이미지에는 node 가 없으니 back·ai 는 .component-ci 의 설치 경로를 그대로 둔다.
+.skip-python-bootstrap:
+  before_script:
+    - export CI_BRANCH="${CI_MERGE_REQUEST_SOURCE_BRANCH_NAME:-$CI_COMMIT_REF_NAME}"
+    - export CI_RUN_ID="${CI_PIPELINE_ID}-${CI_JOB_ID}"
+    - export CI_ARTIFACT_DIR="${CI_PROJECT_DIR}/artifacts/${CI_JOB_NAME}"
+    - mkdir -p "$CI_ARTIFACT_DIR"
 
 # A valid MR must always publish a successful pipeline status so protected
 # develop does not treat an infra/docs-only MR as a skipped pipeline.
@@ -101,12 +114,20 @@ mr-status:
     - *front-source-changed
 
 .front-npm-cache:
-  cache:
+  cache: &front-npm-cache
     key:
       files:
         - festa-frontend/package-lock.json
     paths:
       - festa-frontend/node_modules/
+
+# front-test 는 성공할 때마다 node_modules 6,600여 항목을 다시 압축하느라 약 13초를 썼다. 키가
+# package-lock.json 이라 같은 내용을 다시 쓰는 것뿐이므로 읽기만 하고, 쓰기는 develop 대상에서
+# 도는 front-build 가 맡는다.
+.front-npm-cache-pull:
+  cache:
+    <<: *front-npm-cache
+    policy: pull
 
 .back-changes:
   rules:
@@ -209,6 +230,7 @@ ai-test:
     - .component-ci
     - .ai-changes
     - .ai-pip-cache
+    - .junit-report
   stage: test
   image: python:3.13-slim
   variables:
@@ -221,6 +243,7 @@ ai-build:
     - .component-ci
     - .ai-changes-develop-only
     - .ai-pip-cache
+    - .junit-report
   stage: build
   image: python:3.13-slim
   variables:
@@ -234,7 +257,8 @@ front-test:
   extends:
     - .component-ci
     - .front-changes
-    - .front-npm-cache
+    - .front-npm-cache-pull
+    - .skip-python-bootstrap
   stage: test
   image: node:24-bookworm-slim
   variables:
@@ -247,6 +271,7 @@ front-build:
     - .component-ci
     - .front-changes-develop-only
     - .front-npm-cache
+    - .skip-python-bootstrap
   stage: build
   image: node:24-bookworm-slim
   variables:
@@ -261,6 +286,7 @@ back-test:
     - .component-ci
     - .back-changes
     - .back-maven-cache
+    - .junit-report
   stage: test
   image: maven:3.9-eclipse-temurin-21
   variables:
@@ -274,6 +300,7 @@ back-build:
     - .component-ci
     - .back-changes-develop-only
     - .back-maven-cache
+    - .junit-report
   stage: build
   image: maven:3.9-eclipse-temurin-21
   variables:

@@ -2,6 +2,10 @@
 # WORLD_* 는 아래 environment 가 정본이다 — env-file 의 WORLD_HOST(world.<root>) 는 Production World 라
 # Demo 토큰이 거기서 INVALID_TOKEN 으로 거절됐다 (2026-09-20 실측, Batch 1). Demo World 는 demo.<root> 의
 # 루트 WebSocket Upgrade 로 들어간다 (demo.conf.template). dev/back.yaml 과 같은 방식.
+# 월드 접속 주소만 world-demo.<root> 로 뺀다 (2026-09-26). demo.<root> 는 Cloudflare 프록시를 거쳐 KT 회선이
+# 산호세·LA 엣지로 붙으면 원격 이동이 1~2초씩 멈췄다. world-demo.<root> 는 DNS only 레코드 + Let's Encrypt 인증서로
+# EC2 nginx(world-demo.conf → 127.0.0.1:17777)에 직결된다. demo.<root> 의 WebSocket 분기는 그대로 살아 있어
+# readiness 검사와 되돌리기가 이 한 줄로 끝난다.
 # 내부 서비스 토큰만 Jenkins Credentials 에서 프로세스 환경으로 들어온다.
 services:
   back:
@@ -23,7 +27,7 @@ services:
       SPRING_PROFILES_ACTIVE: infra
       AI_INTERNAL_BASE_URL: http://ai:8000
       WORLD_SCHEME: wss
-      WORLD_HOST: demo.${ROOT_DOMAIN:?ROOT_DOMAIN is required}
+      WORLD_HOST: world-demo.${ROOT_DOMAIN:?ROOT_DOMAIN is required}
       WORLD_PORT: "443"
       INTERNAL_SPRING_TO_AI_TOKENS: ${INTERNAL_SPRING_TO_AI_TOKENS:?INTERNAL_SPRING_TO_AI_TOKENS is required}
       INTERNAL_AI_TO_SPRING_TOKENS: ${INTERNAL_AI_TO_SPRING_TOKENS:?INTERNAL_AI_TO_SPRING_TOKENS is required}

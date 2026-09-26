@@ -18,20 +18,20 @@ import { FeedbackSection } from './FeedbackSection';
 import { MembersSection } from './MembersSection';
 import { OverviewSection } from './OverviewSection';
 import { WalletsSection } from './WalletsSection';
-import './admin.css';
+import './console.css';
 
 export function AdminConsole() {
   const { section, userId, surveyKey, responseId } = useAdminConsole();
   const current = ADMIN_SECTIONS.find((s) => s.id === section) ?? ADMIN_SECTIONS[0];
 
   return (
-    <div className="ad-shell">
-      <nav className="ad-nav" aria-label="콘솔 섹션">
+    <div className="ac-shell">
+      <nav className="ac-nav" aria-label="콘솔 섹션">
         {ADMIN_SECTIONS.map((s) => (
           <button
             key={s.id}
             type="button"
-            className="ad-nav-item"
+            className="ac-nav-item"
             aria-current={s.id === section ? 'page' : undefined}
             onClick={() => openAdminSection(s.id)}
           >
@@ -40,8 +40,8 @@ export function AdminConsole() {
           </button>
         ))}
       </nav>
-      <div className="ad-work ad-workspace">
-        <div className="ad-head"><h2>{current.label}</h2><p>{current.hint}</p></div>
+      <div className="ac-work ac-workspace">
+        <div className="ac-head"><h2>{current.label}</h2><p>{current.hint}</p></div>
         {section === 'overview' && <OverviewSection />}
         {section === 'members' && <MembersSection userId={userId} onSelect={selectAdminUser} />}
         {section === 'admins' && <AdminsSection />}

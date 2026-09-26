@@ -492,6 +492,10 @@ game_portal_bindings
 - Game이 존속하는 동안 Published Version 이력을 유지한다.
 - 회원 탈퇴 hard delete는 Game, Draft, Published Version, Asset, Score를 모두 제거한다.
 - 표시 전용 Score가 P1에서 추가되더라도 Coin·Reward·Inventory와 FK로 연결하지 않는다.
+  → **2026-09-22 추가됨** (§Arcade Ranking, `S15P21A604-963`). 이 금지는 지켜진다 — 그 표의
+  외래키는 `users` 하나다. 다만 성격이 다르다: 오락기 랭킹은 Game이 아니라 **machineId에 귀속**돼
+  게임 삭제·교체 후에도 남고, 회원 탈퇴로만 사라진다. 위 줄의 "탈퇴 hard delete 대상 Score"에
+  들어가지만 Game hard delete 대상은 아니다.
 
 ## Runtime
 
@@ -658,6 +662,90 @@ Cache-Control: no-store
 - **`MACHINE_NOT_FOUND` 만 HTTP 404 + 봉투 `code`** 다. 등록되지 않은 `machineId` 이며, 200 으로
   보낼 수 없다 — 응답의 다른 필드를 채울 근거가 없다.
 
+## Arcade Ranking (`S15P21A604-963`, GitLab #264)
+
+> **표시 전용이다.** FR-021 은 클라이언트가 주장한 점수를 검증 없이 보상이나 랭킹에 쓰는 것을
+> 금지하지만, 2026-09-22 결정으로 **보상과 연결되지 않는 표시 전용 랭킹**은 그 금지에서 빠진다
+> (FR-021·FR-022 개정). 서버는 회원 토큰만 검증하고 점수 자체는 클라이언트 신고값을 그대로
+> 기록한다 — 조작 가능성을 감수한 것이고, 보상을 이 점수에 붙이려면 그때 서버 발급 플레이
+> 세션이 선행 조건이 된다. Coin·Reward·Inventory 와는 FK 로도 연결하지 않는다 (§Persistence
+> Boundary). 이 표의 외래키는 `users` 하나뿐이다.
+
+```text
+POST /api/arcade/rankings/{machineId}/scores    # 내 최고점 등록·갱신 (회원)
+GET  /api/arcade/rankings/{machineId}?limit=5   # 전 사용자 TOP 5 (게스트 가능)
+GET  /api/arcade/rankings/{machineId}/me        # 내 최고점과 순위 (회원)
+Cache-Control: no-store
+```
+
+**경로가 `/api/v1` 밖이다.** #264 초안을 그대로 채택했다 (2026-09-22). 그래서 이 prefix 는
+`SecurityConfiguration` 의 CSRF 예외 목록과 공개 경로 목록에 **따로** 올라간다 — `/api/v1/**`
+규칙이 덮어 주지 않는다.
+
+### 랭킹은 게임기의 것이다
+
+기록의 키는 `(machineId, userId)` 이고 `gameId` 를 담지 않는다. 오락실 캐비닛은 사용자가 게시할
+때마다 주인이 바뀌지만(§자리 배정) **랭킹은 기계에 남는다** — 같은 캐비닛에서 다른 게임으로 딴
+점수가 한 순위표에 섞인다. 2026-09-22 결정이며, 게임 단위 랭킹이 필요해지면 그때 별도 축이다.
+
+- 유효한 `machineId` 는 §자리 배정과 같은 화이트리스트(`app.arcade.machine-ids`, 오락실 20대)다.
+  목록에 없으면 세 경로 모두 404 `MACHINE_NOT_FOUND`. 광장 고정물(`plaza-arcade-*`)은 목록에
+  없으므로 랭킹 대상이 아니다.
+- **바인딩을 보지 않는다.** 게임이 걸리지 않은 빈 자리도 과거 기록을 들고 있고 조회된다.
+- **게임 공개 상태로 막지 않는다.** 클라이언트는 게임을 플레이한 뒤에야 점수를 올린다.
+- 회원 탈퇴는 그 회원의 기록을 함께 지운다 (FR-040). 표 정의의 `ON DELETE CASCADE` 가 그것이다.
+
+### 정렬 — 3키로 완결한다
+
+```text
+best_score DESC, achieved_at ASC, user_id ASC
+```
+
+동점이면 먼저 달성한 기록이 위다. **세 번째 키가 있어야 한다** — 두 요청의 `achieved_at` 이 같은
+시각으로 저장될 수 있고, 그러면 TOP 목록의 행 번호와 `/me` 의 순위 계산이 서로 다른 답을 낸다.
+TOP 조회·`/me`·인덱스 세 곳이 같은 순서를 쓴다.
+
+### 요청과 응답
+
+`RankEntry`:
+
+```json
+{ "rank": 1, "nickname": "덕", "bestScore": 9800, "achievedAt": "2026-09-22T10:11:12Z" }
+```
+
+**`POST /{machineId}/scores`**
+
+```json
+{ "score": 9800 }
+```
+
+| 경우 | 상태 | 본문 |
+|---|---|---|
+| 새 최고점 | 200 | `{ "updated": true, "bestScore": 9800, "achievedAt": "...", "rank": 1 }` |
+| 같거나 낮은 점수 | 200 | `{ "updated": false, ... }` — 기존 기록 그대로 |
+| `score` 누락·음수·상한 초과 | 400 | `VALIDATION_FAILED` |
+| 게스트·무토큰 | 403 / 401 | `MEMBER_ONLY` / `UNAUTHORIZED` |
+
+- **같거나 낮은 점수는 오류가 아니다.** 클라이언트가 같은 결과를 다시 보낼 수 있어야 한다 —
+  응답의 `updated` 가 무슨 일이 일어났는지 말한다. 본문에 `userId` 를 넣어도 무시하고 토큰
+  주체를 쓴다.
+- **점수 상한은 100,000** 이다 (2026-09-22 확정). 하한은 0.
+
+**`GET /{machineId}?limit=5`** — `RankEntry[]` 배열을 그대로 돌려준다. 최대 5건, 비면 `[]`.
+`limit` 은 **1~5 로 clamp** 한다 — `0`·음수·6 이상은 조용히 범위 안으로 당긴다. 숫자가 아닌
+값은 타입 변환에서 걸려 400 `VALIDATION_FAILED` 다. 토큰 없이 호출된다 (FR-023 과 같은 이유 —
+게스트도 플레이하는데 순위판만 못 볼 이유가 없다).
+
+**`GET /{machineId}/me`**
+
+| 경우 | 상태 | 본문 |
+|---|---|---|
+| 기록 있음 | 200 | `{ "bestScore": 9800, "achievedAt": "...", "rank": 3 }` |
+| 기록 없음 | 200 | `{ "bestScore": null, "achievedAt": null, "rank": null }` |
+
+기록이 없어도 **404 가 아니다.** 이 경로의 404 는 "그런 오락기가 없다" 하나여야 클라이언트가
+둘을 구별할 수 있다.
+
 ## 확정 기록
 
 이 문서의 미결 항목은 **2026-08-25에 전부 확정됐다.** 근거는 GitLab #104(①⑦)와 #48(★ 승인·②③④⑤⑥)이다.
@@ -679,7 +767,9 @@ Cache-Control: no-store
 ## MVP 제외
 
 - **Reward 지급.** 유료 **입장**은 2026-08-26 #81 리드 확정으로 범위에 들어왔지만(FR-022 개정, 구현은 보류 — `S15P21A604-598`) 게임 결과에 대한 코인 **지급**은 여전히 범위 밖이다. 서버가 검증할 수 없는 완료·점수를 정산 근거로 삼지 않는다는 같은 원칙의 두 면이다
-- 경쟁 Ranking과 MVP score endpoint. 표시 전용 Ranking은 P1 별도 범위
+- ~~경쟁 Ranking과 MVP score endpoint. 표시 전용 Ranking은 P1 별도 범위~~ → **2026-09-22 개정 —
+  표시 전용 Ranking은 범위에 들어왔다** (GitLab #264, `S15P21A604-963`, §Arcade Ranking). 오락기별
+  TOP 5 를 보여줄 뿐 보상과 연결되지 않는다. **경쟁 Ranking과 점수 기반 정산은 여전히 제외다**
 - 클라이언트 점수 기반 서버 정산
 - AI 생성 요청
 - 사용자 Asset upload·가공

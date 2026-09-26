@@ -25,7 +25,7 @@ namespace Festa.Content.Arcade
 
         [Header("초점 카메라 (게임기 로컬 좌표 — 스케일 포함)")]
         // 화면 실측: 중심 로컬 (0, 1.30, 0.30), 크기 0.50 × 0.40 m. 0.5 m 앞에서 보면 화면이 시야를 거의 채운다.
-        [SerializeField] Vector3 _cameraLocal = new(0f, 1.30f, 0.80f);
+        [SerializeField] Vector3 _cameraLocal = new(0f, 1.30f, 0.72f);
         [SerializeField] Vector3 _lookLocal = new(0f, 1.30f, 0.30f);
 
         [Header("조작 자리 (게임기 로컬 좌표 — 화면 정면이 +Z)")]
@@ -36,19 +36,101 @@ namespace Festa.Content.Arcade
 
         public string MachineId => _machineId;
 
+        RetroArcadeGame _localGame;
+        MegaPackPongMiniGame _pong;
+        MegaPackSpaceShooterMiniGame _megaShooter;
+        MegaPackGoldMinerMiniGame _goldMiner;
+        MegaPackMazeMiniGame _maze;
+        MegaPackCrossyMiniGame _crossy;
+        MegaPackBreakoutMiniGame _breakout;
+        MegaPackBugBonkMiniGame _bugBonk;
+        MegaPackNeonRacerMiniGame _neonRacer;
+        MegaPackNeonSnakeMiniGame _neonSnake;
+        MegaPackNeonStackMiniGame _neonStack;
+
         void Awake()
         {
+            // 캐비닛 부모 스케일을 고려해 화면 면을 뚫지 않는 범위에서만 보정한다.
+            if (_cameraLocal.z < 0.68f || _cameraLocal.z > 0.82f)
+                _cameraLocal = new Vector3(0f, 1.30f, 0.72f);
             if (GetComponentsInChildren<Collider>(true).Length == 0)
                 gameObject.AddComponent<BoxCollider>();
             if (GetComponent<BoothInteractionTarget>() == null)
                 gameObject.AddComponent<BoothInteractionTarget>();
+            if (_machineId == "arcade-01" || _machineId == "arcade-11")
+            {
+                // 1번 내장 게임은 화면 가장자리까지 읽을 수 있게 다른 기기보다 한 단계 더 줌인한다.
+                _cameraLocal = new Vector3(0f, 1.30f, 0.58f);
+                _pong = GetComponent<MegaPackPongMiniGame>();
+                if (_pong == null) _pong = gameObject.AddComponent<MegaPackPongMiniGame>();
+            }
+            else if (_machineId == "arcade-02" || _machineId == "arcade-12")
+            {
+                _cameraLocal = new Vector3(0f, 1.30f, 0.58f);
+                _megaShooter = GetComponent<MegaPackSpaceShooterMiniGame>();
+                if (_megaShooter == null) _megaShooter = gameObject.AddComponent<MegaPackSpaceShooterMiniGame>();
+            }
+            else if (_machineId == "arcade-03" || _machineId == "arcade-13")
+            {
+                _cameraLocal = new Vector3(0f, 1.30f, 0.58f);
+                _goldMiner = GetComponent<MegaPackGoldMinerMiniGame>();
+                if (_goldMiner == null) _goldMiner = gameObject.AddComponent<MegaPackGoldMinerMiniGame>();
+            }
+            else if (_machineId == "arcade-04" || _machineId == "arcade-14")
+            {
+                _cameraLocal = new Vector3(0f, 1.30f, 0.58f);
+                _maze = GetComponent<MegaPackMazeMiniGame>();
+                if (_maze == null) _maze = gameObject.AddComponent<MegaPackMazeMiniGame>();
+            }
+            else if (_machineId == "arcade-05" || _machineId == "arcade-15")
+            {
+                _cameraLocal = new Vector3(0f, 1.30f, 0.58f);
+                _crossy = GetComponent<MegaPackCrossyMiniGame>();
+                if (_crossy == null) _crossy = gameObject.AddComponent<MegaPackCrossyMiniGame>();
+            }
+            else if (_machineId == "arcade-06" || _machineId == "arcade-16")
+            {
+                _cameraLocal = new Vector3(0f, 1.30f, 0.58f);
+                _breakout = GetComponent<MegaPackBreakoutMiniGame>();
+                if (_breakout == null) _breakout = gameObject.AddComponent<MegaPackBreakoutMiniGame>();
+            }
+            else if (_machineId == "arcade-07" || _machineId == "arcade-17")
+            {
+                _cameraLocal = new Vector3(0f, 1.30f, 0.58f);
+                _bugBonk = GetComponent<MegaPackBugBonkMiniGame>();
+                if (_bugBonk == null) _bugBonk = gameObject.AddComponent<MegaPackBugBonkMiniGame>();
+            }
+            else if (_machineId == "arcade-08" || _machineId == "arcade-18")
+            {
+                _cameraLocal = new Vector3(0f, 1.30f, 0.58f);
+                _neonRacer = GetComponent<MegaPackNeonRacerMiniGame>();
+                if (_neonRacer == null) _neonRacer = gameObject.AddComponent<MegaPackNeonRacerMiniGame>();
+            }
+            else if (_machineId == "arcade-09" || _machineId == "arcade-19")
+            {
+                _cameraLocal = new Vector3(0f, 1.30f, 0.58f);
+                _neonSnake = GetComponent<MegaPackNeonSnakeMiniGame>();
+                if (_neonSnake == null) _neonSnake = gameObject.AddComponent<MegaPackNeonSnakeMiniGame>();
+            }
+            else if (_machineId == "arcade-10" || _machineId == "arcade-20")
+            {
+                _cameraLocal = new Vector3(0f, 1.30f, 0.58f);
+                _neonStack = GetComponent<MegaPackNeonStackMiniGame>();
+                if (_neonStack == null) _neonStack = gameObject.AddComponent<MegaPackNeonStackMiniGame>();
+            }
+            else
+            {
+                _localGame = GetComponent<RetroArcadeGame>();
+                if (_localGame == null) _localGame = gameObject.AddComponent<RetroArcadeGame>();
+                _localGame.Configure(_machineId);
+            }
             BoothInteractionInput.Ensure();
         }
 
         /// <summary>호스트가 이 시간 안에 화면을 열지 않으면 초점을 스스로 푼다.</summary>
         const float HostResponseTimeout = 3f;
 
-public void Interact()
+        public void Interact()
         {
             if (InteractionFocusCamera.IsFocused) return;
 
@@ -60,10 +142,21 @@ public void Interact()
                 return;
             }
 
-            InteractionFocusCamera.Focus(transform, _cameraLocal, _lookLocal);
-            BoothInteractBridge.SendArcadeInteract(_machineId);
+            InteractionFocusCamera.Focus(transform, _cameraLocal, _lookLocal, true, false);
+            bool openedLocally = _pong != null ? _pong.Begin()
+                : _megaShooter != null ? _megaShooter.Begin()
+                : _goldMiner != null ? _goldMiner.Begin()
+                : _maze != null ? _maze.Begin()
+                : _crossy != null ? _crossy.Begin()
+                : _breakout != null ? _breakout.Begin()
+                : _bugBonk != null ? _bugBonk.Begin()
+                : _neonRacer != null ? _neonRacer.Begin()
+                : _neonSnake != null ? _neonSnake.Begin()
+                : _neonStack != null ? _neonStack.Begin()
+                : _localGame != null && _localGame.Begin();
+            if (!openedLocally) BoothInteractBridge.SendArcadeInteract(_machineId);
             if (po != null) StartCoroutine(AlignToStandSpot(po.transform));
-            StartCoroutine(ReleaseIfHostNeverAnswers());
+            if (!openedLocally) StartCoroutine(ReleaseIfHostNeverAnswers());
         }
 
         /// <summary>조작 자리로 세우는 시간. 순간이동은 끊겨 보인다는 지적(2026-09-18)을 반영한 값이다.</summary>
@@ -119,7 +212,8 @@ public void Interact()
             float halfZ = _standAreaSize.y * 0.5f * scale;
             float centerY = StandPoint().y;
 
-            foreach (var p in FindObjectsByType<Festa.Network.NetworkPlayer>(FindObjectsInactive.Exclude, FindObjectsSortMode.None))
+            // 사람 목록은 프레임 단위로 공유한다 — 기계마다 씬을 다시 훑으면 20대가 20번 훑는다 (S15P21A604-970).
+            foreach (var p in Festa.Network.NetworkPlayerScan.All())
             {
                 if (p == null || (self != null && p.gameObject == self.gameObject)) continue;
 

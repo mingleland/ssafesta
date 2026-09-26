@@ -134,6 +134,35 @@ class SpringDocumentResultClient:
             body,
         )
 
+    async def project_facts(
+        self,
+        *,
+        job_id: int,
+        attempt_no: int,
+        document_id: int,
+        source_hash: str,
+        project_facts: ExtractedProjectFacts,
+    ) -> None:
+        await self._post(
+            f"/document-jobs/{job_id}/project-facts",
+            {
+                "attemptNo": attempt_no,
+                "documentId": document_id,
+                "sourceHash": source_hash,
+                "introduction": project_facts.introduction,
+                "targetAudience": project_facts.target_audience,
+                "techStack": project_facts.tech_stack,
+                "sources": [
+                    {
+                        "documentId": source.document_id,
+                        "chunkId": source.chunk_id,
+                    }
+                    for source in project_facts.sources
+                ],
+                "generationVersion": project_facts.generation_version,
+            },
+        )
+
     async def heartbeat(self, *, job_id: int, attempt_no: int) -> None:
         await self._post(
             f"/document-jobs/{job_id}/heartbeat", {"attemptNo": attempt_no}

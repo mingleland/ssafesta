@@ -328,7 +328,7 @@ namespace Festa.World
         }
 
         /// <summary>가림 판정 간격(프레임). 이름표(<see cref="WorldNameplate"/>)와 같다.</summary>
-        const int OcclusionInterval = 3;
+        const int OcclusionInterval = 6;
         int _occlusionFrame = -100;
         bool _occluded;
 

@@ -218,6 +218,73 @@ class AiProjectFactsApiIntegrationTest {
                 .andExpect(jsonPath("$.projectFacts.techStack").value("Unity, WebGL"));
     }
 
+    @Test
+    @DisplayName("RAG 후처리 결과는 AI 소개·근거·버전을 한 세트로 저장한다")
+    void ragEnrichmentReplacesTheWholeFactSet() throws Exception {
+        Job job = seedJob("RAG후처리");
+        Long projectId = seedProject(job.boothId(), "RAG 프로젝트");
+
+        mockMvc.perform(request(job, """
+                        {"attemptNo":0,"documentId":%d,"sourceHash":"%s",
+                         "introduction":"AI가 생성한 소개","targetAudience":"전시 방문자",
+                         "techStack":"FastAPI, Spring Boot",
+                         "sources":[{"documentId":%d,"chunkId":4}],
+                         "generationVersion":"rag-v1"}
+                        """.formatted(job.documentId(), job.sourceHash(), job.documentId())))
+                .andExpect(status().isNoContent());
+
+        assertEquals("AI가 생성한 소개", column(projectId, "ai_introduction"));
+        assertEquals("rag-v1", column(projectId, "facts_generation_version"));
+        assertEquals("[{\"chunkId\": 4, \"documentId\": %d}]".formatted(job.documentId()),
+                column(projectId, "facts_sources"));
+
+        mockMvc.perform(get("/internal/ai/agent-config")
+                        .param("boothId", String.valueOf(job.boothId()))
+                        .param("agentId", String.valueOf(job.agentId()))
+                        .header("Authorization", "Bearer " + SERVICE_TOKEN))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.projectFacts.introduction").value("AI가 생성한 소개"));
+    }
+
+    @Test
+    void aSuccessfulGroundedGenerationMayStoreNullableAnswers() throws Exception {
+        Job job = seedJob("근거없음");
+        Long projectId = seedProject(job.boothId(), "근거없음 프로젝트");
+        mockMvc.perform(facts(job, "기존 대상", "기존 기술")).andExpect(status().isNoContent());
+
+        Job later = seedJobIn(job.boothId(), job.agentId(), "근거없음2");
+        mockMvc.perform(request(later, """
+                        {"attemptNo":0,"documentId":%d,"sourceHash":"%s",
+                         "introduction":null,"targetAudience":null,"techStack":null,
+                         "sources":[{"documentId":%d,"chunkId":0}],
+                         "generationVersion":"rag-v1"}
+                        """.formatted(later.documentId(), later.sourceHash(), later.documentId())))
+                .andExpect(status().isNoContent());
+
+        assertNull(column(projectId, "target_audience"));
+        assertNull(column(projectId, "tech_stack"));
+        assertEquals("소개글", jdbc.queryForObject(
+                "SELECT description FROM projects WHERE id = ?", String.class, projectId));
+    }
+
+    @Test
+    void aLegacyRequestDoesNotEraseNewEnrichmentMetadata() throws Exception {
+        Job job = seedJob("구버전호환");
+        Long projectId = seedProject(job.boothId(), "구버전 호환 프로젝트");
+        jdbc.update("""
+                UPDATE projects
+                   SET ai_introduction = '보존할 AI 소개',
+                       facts_sources = '[{"documentId":1,"chunkId":0}]'::jsonb,
+                       facts_generation_version = 'rag-v1'
+                 WHERE id = ?
+                """, projectId);
+
+        mockMvc.perform(facts(job, "새 대상", "새 기술")).andExpect(status().isNoContent());
+
+        assertEquals("보존할 AI 소개", column(projectId, "ai_introduction"));
+        assertEquals("rag-v1", column(projectId, "facts_generation_version"));
+    }
+
     /**
      * 추출 전에는 {@code projectFacts} 가 소개만 들고 나온다.
      *

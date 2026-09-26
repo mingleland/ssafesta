@@ -12,7 +12,7 @@
 //
 // Dispatcher 구독은 이 화면 생명주기에 종속시킨다 — 전역 상시 구독이면 월드 밖에서도 Unity
 // 이벤트가 오버레이를 열 수 있고 StrictMode에서 leak된다.
-import { useCallback, useEffect, useState, type CSSProperties } from 'react';
+import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { IS_MOCK_WORLD } from '../../features/world/ui/WorldSurface.select';
 import { useHostPhase } from '../../unity/host/hostPhase';
@@ -28,6 +28,7 @@ import { OverlayHost } from '../../features/overlay/OverlayHost';
 import { initInteractionDispatcher } from '../../features/interaction/dispatcher';
 import { startBoothVisitTracking } from '../../features/world/model/boothVisitTracker';
 import { startBoothVisitReporting } from '../../features/world/model/boothVisitReporter';
+import { holdCoinGrantToasts, releaseCoinGrantToasts } from '../../features/wallet/model/coinGrantNotification';
 import { WorldChatLayer } from '../../features/worldChat/ui/WorldChatLayer';
 import {
   WORLD_CHAT_INPUT_ID,
@@ -50,11 +51,17 @@ import {
   resetGameClientUi,
   useGameClientUi,
 } from '../../features/world/model/gameClientUi';
-import { closeTopScreen, getWorldScreen, openManagement, openMenu, openMenuPanelScreen, openRental } from '../../features/world/model/worldScreen';
+import { closeTopScreen, getWorldScreen, openManagement, openMenu, openMenuPanelScreen, openRental, openVisitorOverlay } from '../../features/world/model/worldScreen';
 import { getWorldUiState, hasUnityModal, resetWorldUiState, useWorldUiState } from '../../unity/bridge/worldUiState';
 import { getReadyUnityInstance } from '../../unity/host/sessionManager';
 import { requestExitWorldUi } from '../../unity/host/worldUiBridge';
 import './worldPage.css';
+
+/**
+ * 엘리베이터 문이 다 열려 월드가 드러나기까지 — `WorldEntryGate.DoorSlideSeconds = 1.1f` 를
+ * 옮긴 값이다. Unity 가 그 시점(`HandOverToWorld`) 신호를 보내지 않아 FE 가 같은 길이를 센다.
+ */
+const GATE_DOOR_SLIDE_MS = 1100;
 
 export function WorldPage() {
   const ui = useGameClientUi();
@@ -87,6 +94,63 @@ export function WorldPage() {
     document.body.classList.add('world-active');
     return () => document.body.classList.remove('world-active');
   }, []);
+
+  // 코인 지급 토스트는 입장 전까지 붙들어 둔다 — 가입·일일 지급이 로딩 판 위에서 떴다 사라지면
+  // 받은 줄을 모른다(스크린샷). 미루는 것은 알림뿐이고 잔액·내역은 그대로 따라간다.
+  //
+  // 월드를 떠날 때 푸는 이유: 들어가지 못하고 나가는 경로(부팅 실패·뒤로가기)에서 쌓인 것이
+  // 갇히지 않게 한다. 의존성이 없어 입장 여부가 바뀌어도 다시 붙들지 않는다.
+  useEffect(() => {
+    holdCoinGrantToasts();
+    return releaseCoinGrantToasts;
+  }, []);
+
+  // 이용 안내 — 월드에 **들어설 때마다** 연다 (S15P21A604-599).
+  //
+  // 자동 노출을 이 화면이 갖는 이유는 "들어왔다" 를 판정하는 곳이 여기 하나이기 때문이다. 같은
+  // `inWorld` 가 HUD 를 띄우는 조건이라, 안내는 HUD 와 같은 순간에 뜬다 — 부팅·캐릭터 선택 중에
+  // 미리 떠서 혼자 사라지는 일이 없다.
+  //
+  // **`ready` 는 입장보다 한 박자 이르다.** Unity 는 엘리베이터 문을 *열기 시작할 때*
+  // `onWorldGateReady` 를 보내고(`WorldEntryGate.BeginOpen`), 화면이 실제로 월드로 바뀌는 것은
+  // 문이 다 열린 뒤 `HandOverToWorld` 다 — 그 주석이 "여기서부터 플레이어가 월드를 본다" 고
+  // 적은 지점이다. 사이는 `DoorSlideSeconds = 1.1f` 이고, 그동안 열면 안내가 엘리베이터 칸
+  // 위에 뜬다. `WorldEntryGate` 가 FE 로 보내는 신호는 gateReady 하나뿐이라 관측할 방법이 없어
+  // 같은 값을 여기 옮겨 둔다. Unity 가 handover 신호를 주면 이 타이머를 그것으로 바꾼다.
+  //
+  // **아바타는 의존성에 넣지 않는다.** 넣으면 아바타 변경에서 돌아오는 것을 입장으로 읽어 안내가
+  // 다시 뜬다 — 그건 월드 안의 상태 변화지 입장이 아니다. 들어서는 그 순간의 값만 한 번 본다.
+  //
+  // **회원·게스트를 가리지 않는다.** 이 안내가 말하는 것(부스·콘텐츠·상담·조작키)은 게스트도
+  // 그대로 하는 일이고, 처음 오는 쪽은 오히려 게스트다.
+  //
+  // 본 적 있는지를 더 이상 묻지 않는다. 축제 기간에 잠깐 들르는 방문자가 대상이라 "한 번 봤으니
+  // 다음부터 없음" 은 다른 기기·다른 창에서 그대로 깨지고, 닫는 데 드는 것은 클릭 한 번이다.
+  //
+  // **라우트 복귀는 입장이 아니다.** Unity 는 라우트 밖(PersistentWorld)에 살아서, 관리 화면의
+  // "부스 임대하기" 처럼 `/app/booths` → `/app/world?panel=rental` 로 돌아오면 WorldPage 만 다시
+  // 마운트되고 월드는 이미 `ready` 다. 그걸 입장으로 읽으면 1.1초 뒤 안내가 뜨면서 방금 연 임대 창을
+  // 닫아 버린다. 그래서 이 마운트 동안 `ready` 로 **바뀐** 경우만 입장으로 친다.
+  const alreadyInWorldOnMount = useRef(inWorld);
+  useEffect(() => {
+    if (!inWorld) {
+      alreadyInWorldOnMount.current = false; // 재접속·재부팅 뒤 다시 ready 가 되면 그건 입장이다
+      return;
+    }
+    if (alreadyInWorldOnMount.current) {
+      releaseCoinGrantToasts();
+      return;
+    }
+    if (getWorldUiState().avatar) return;
+    const timer = window.setTimeout(() => {
+      // 문이 다 열린 이 순간이 입장이다 — 붙들어 둔 코인 토스트를 여기서 낸다.
+      releaseCoinGrantToasts();
+      // 문이 열리는 동안 아바타 화면이 올라왔으면 그 위에 얹지 않는다.
+      if (getWorldUiState().avatar) return;
+      openVisitorOverlay('WORLD_GUIDE', {});
+    }, GATE_DOOR_SLIDE_MS);
+    return () => window.clearTimeout(timer);
+  }, [inWorld]);
 
   // 관리 상세에서 돌아왔다면(?panel=management) 관리 화면을 그 자리에 복원한다.
   // 모듈 상태의 "복귀 예약"이 아니라 URL 로 표현한다 — StrictMode 재mount 와 새로고침 양쪽에서

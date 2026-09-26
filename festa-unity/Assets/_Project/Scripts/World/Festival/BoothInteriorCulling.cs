@@ -64,9 +64,6 @@ namespace Festa.World.Festival
         /// <summary>부스 내용물이 새로 스폰된 뒤 부른다. 다음 판정에서 목록을 다시 만든다.</summary>
         public static void RequestRescan() => s_rescanRequested = true;
 
-        /// <summary>안전망. 명시적 요청을 놓쳐도 이 주기로 한 번은 따라잡는다.</summary>
-        const float SafetyRescanSeconds = 5f;
-        float _nextSafetyRescan;
 
         void Awake()
         {
@@ -102,11 +99,9 @@ namespace Festa.World.Festival
         void Update()
         {
             // 부스 집기가 새로 스폰됐으면 목록부터 다시 만든다 — 안 그러면 그것들은 영영 안 꺼진다.
-            if (s_rescanRequested || Time.unscaledTime >= _nextSafetyRescan)
+            if (s_rescanRequested)
             {
-                bool explicitAsk = s_rescanRequested;
                 s_rescanRequested = false;
-                _nextSafetyRescan = Time.unscaledTime + SafetyRescanSeconds;
 
                 int before = 0;
                 foreach (var r in _rooms) before += r.Renderers.Length;
@@ -115,8 +110,7 @@ namespace Festa.World.Festival
                 foreach (var r in _rooms) after += r.Renderers.Length;
 
                 if (after != before)
-                    Debug.Log($"[BoothInteriorCulling] 방 목록 갱신 — 렌더러 {before} → {after}" +
-                              (explicitAsk ? " (부스 스폰 알림)" : " (주기 확인)"));
+                    Debug.Log($"[BoothInteriorCulling] 방 목록 갱신 — 렌더러 {before} → {after} (부스 스폰 알림)");
                 Apply(force: true);
                 return;
             }

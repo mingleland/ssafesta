@@ -1,0 +1,117 @@
+/* 관리자 콘솔 — OverlayFrame 안에서 사는 좌측 내비 + 우측 작업 영역.
+   바깥 폭·스크롤은 프레임이 갖는다(festa-overlay-body). 여기서는 두 칸 배치만 정한다. */
+.ac-shell { display: grid; grid-template-columns: 172px minmax(0, 1fr); gap: 16px; align-items: start; }
+@media (max-width: 860px) { .ac-shell { grid-template-columns: 1fr; } .ac-nav { flex-direction: row; overflow-x: auto; } }
+
+.ac-nav { display: flex; flex-direction: column; gap: 4px; position: sticky; top: 0; }
+.ac-nav-item {
+  display: flex; flex-direction: column; gap: 1px; padding: 9px 11px; border-radius: 10px;
+  color: var(--festa-ink); border: 1px solid transparent; white-space: nowrap;
+  background: transparent; font: inherit; text-align: left; cursor: pointer;
+}
+.ac-nav-item:hover { background: rgba(255, 255, 255, 0.05); }
+.ac-nav-item[aria-current='page'] { background: rgba(77, 141, 255, 0.16); border-color: rgba(77, 141, 255, 0.35); }
+.ac-nav-item small { color: var(--sc-text-muted); font-size: 11.5px; }
+
+.ac-work { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.ac-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.ac-head h2 { margin: 0; font-size: 18px; }
+.ac-head p { margin: 0; color: var(--sc-text-muted); font-size: 13px; }
+
+/* 목록 → 선택 → 상세: 넓으면 나란히, 좁으면 위아래.
+   프레임 폭(xl, 1180px)에서 내비를 뺀 나머지를 둘로 가르므로 컨테이너 질의로 판단한다 —
+   화면 폭으로 재면 오버레이가 좁아도 두 칸을 유지해 표가 뭉갠다. */
+/* 컨테이너는 콘솔의 오른쪽 칸 하나다. `.ac-work` 는 섹션 카드도 함께 쓰는 배치 클래스라
+   거기에 걸면 @container 가 카드 자신을 기준으로 잡혀 판단이 뒤집힌다. */
+.ac-workspace { container-type: inline-size; }
+.ac-split { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 14px; align-items: start; }
+@container (max-width: 760px) { .ac-split { grid-template-columns: 1fr; } }
+
+.ac-toolbar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.ac-toolbar input, .ac-toolbar select { height: 36px; padding: 0 12px; border-radius: 10px; border: 1px solid var(--festa-line); background: rgba(255,255,255,0.05); color: var(--festa-ink); }
+.ac-toolbar input { min-width: 220px; }
+/* 선택 입력은 네이티브 `<select>` 를 쓰지 않는다 — OS 가 그리는 팝업이 이 다크 테마를 타지 않아
+   흰 바탕에 흰 글씨가 됐고, 색만 맞춰도 모서리·간격·강조색이 앱과 따로 놀았다. 목록을 직접 그리는
+   `shared/ui/select` 로 바꿨고, 폼 안에서 한 줄을 다 쓰는 자리만 여기서 너비를 준다. */
+.ac-select-block { display: block; width: 100%; }
+
+.ac-table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+.ac-table th, .ac-table td { padding: 9px 10px; text-align: left; border-bottom: 1px solid rgba(255,255,255,0.07); vertical-align: middle; }
+.ac-table th { color: var(--sc-text-muted); font-weight: 600; font-size: 12px; }
+.ac-table tr[data-selectable] { cursor: pointer; }
+.ac-table tr[data-selectable]:hover { background: rgba(255,255,255,0.04); }
+.ac-table tr[aria-selected='true'] { background: rgba(77, 141, 255, 0.12); }
+.ac-table td.num { text-align: right; font-variant-numeric: tabular-nums; }
+.ac-muted { color: var(--sc-text-muted); }
+
+.ac-chip { display: inline-flex; align-items: center; height: 22px; padding: 0 9px; border-radius: 999px; font-size: 12px; font-weight: 600; }
+.ac-chip-ok { background: rgba(95, 211, 155, 0.16); color: var(--sc-ok); }
+.ac-chip-bad { background: rgba(239, 93, 108, 0.16); color: #ffb3bb; }
+.ac-chip-gold { background: rgba(255, 206, 77, 0.16); color: var(--sc-gold); }
+.ac-chip-plain { background: rgba(255,255,255,0.08); color: var(--festa-ink); }
+.ac-chip-master { background: rgba(200, 120, 255, 0.18); color: #e2c2ff; }
+
+.ac-state { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 28px 12px; color: var(--sc-text-muted); text-align: center; }
+.ac-state strong { color: var(--festa-ink); }
+.ac-error { display: flex; flex-direction: column; gap: 6px; padding: 12px 14px; border-radius: var(--sc-radius-control); background: rgba(239, 93, 108, 0.12); border: 1px solid rgba(239, 93, 108, 0.35); color: #ffd4d9; font-size: 13.5px; }
+.ac-error strong { color: #ffb3bb; }
+.ac-ok { padding: 10px 13px; border-radius: var(--sc-radius-control); background: rgba(95, 211, 155, 0.12); border: 1px solid rgba(95, 211, 155, 0.35); color: #b9f0d2; font-size: 13.5px; }
+
+.ac-pager { display: flex; align-items: center; justify-content: center; gap: 12px; padding-top: 10px; color: var(--sc-text-muted); font-size: 13px; }
+
+.ac-form { display: flex; flex-direction: column; gap: 12px; }
+.ac-field { display: flex; flex-direction: column; gap: 5px; }
+.ac-label { font-size: 12.5px; font-weight: 600; color: rgba(234, 238, 251, 0.82); display: flex; justify-content: space-between; }
+.ac-label em { font-style: normal; color: var(--sc-text-muted); font-weight: 400; }
+.ac-input, .ac-textarea, .ac-select { width: 100%; padding: 9px 12px; border-radius: 10px; border: 1px solid var(--festa-line); background: rgba(255,255,255,0.05); color: var(--festa-ink); font: inherit; }
+.ac-textarea { resize: vertical; }
+.ac-field-error { color: #ffb3bb; font-size: 12.5px; }
+.ac-actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.ac-check { display: flex; align-items: center; gap: 8px; font-size: 13.5px; }
+.ac-btn-danger { background: rgba(239, 93, 108, 0.22); border-color: rgba(239, 93, 108, 0.5); color: #ffd4d9; }
+
+.ac-gated { display: inline-flex; flex-direction: column; gap: 4px; }
+.ac-gated-btn { opacity: 0.55; cursor: not-allowed; }
+.ac-gate-note { font-size: 12px; color: var(--sc-gold); }
+
+.ac-kv { display: grid; grid-template-columns: max-content 1fr; gap: 6px 14px; margin: 0; font-size: 13.5px; }
+.ac-kv div { display: contents; }
+.ac-kv dt { color: var(--sc-text-muted); }
+.ac-kv dd { margin: 0; }
+
+.ac-stats { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+.ac-stat { display: flex; flex-direction: column; gap: 3px; padding: 12px 14px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.08); background: rgba(255,255,255,0.04); text-decoration: none; color: inherit; }
+.ac-stat strong { font-size: 20px; }
+.ac-stat span { color: var(--sc-text-muted); font-size: 12.5px; }
+
+.ac-dialog { border: 1px solid var(--sc-border); border-radius: 14px; background: var(--sc-panel); color: var(--festa-ink); padding: 20px 22px; max-width: 460px; }
+.ac-dialog::backdrop { background: rgba(0,0,0,0.55); }
+.ac-dialog h2 { margin: 0 0 8px; font-size: 16px; }
+.ac-dialog-target { margin: 0 0 10px; padding: 8px 10px; border-radius: 8px; background: rgba(255,255,255,0.06); font-weight: 600; }
+.ac-dialog-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; }
+
+.ac-bar {
+  /* 라벨 폭을 고정해 트랙 시작·끝이 모든 행에서 같아진다 — flex + minWidth 는 라벨이
+     긴 행에서 트랙을 밀어 게이지 길이가 제각각이 됐다(2026-09-18 스크린샷). 긴 라벨은
+     말줄임으로 감수한다 */
+  display: grid;
+  grid-template-columns: minmax(0, 230px) minmax(0, 1fr) 36px;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+}
+.ac-bar-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: rgba(234, 238, 251, 0.85); }
+.ac-bar i { display: block; height: 8px; border-radius: 4px; background: rgba(77, 141, 255, 0.6); min-width: 2px; }
+.ac-bar-track { flex: 1; background: rgba(255,255,255,0.06); border-radius: 4px; }
+.ac-bar .num { text-align: right; font-variant-numeric: tabular-nums; color: var(--sc-text-muted); }
+
+/* 개별 응답의 답변 목록 — dt 가 질문 문장(긴 텍스트)이라 ac-kv 의 max-content 열을 쓰면
+   dd 가 한두 글자 폭으로 짜부러져 답변이 세로로 흘렀다(2026-09-18 스크린샷). 질문 위,
+   답변 아래로 쌓는 전용 배치다 */
+.ac-answers { display: flex; flex-direction: column; gap: 12px; margin: 0; font-size: 13.5px; }
+.ac-answers > div {
+  display: flex; flex-direction: column; gap: 4px;
+  padding-bottom: 10px; border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+.ac-answers dt { color: var(--sc-text-muted); line-height: 1.5; }
+.ac-answers dd { margin: 0; line-height: 1.55; overflow-wrap: anywhere; }

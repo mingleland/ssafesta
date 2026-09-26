@@ -18,10 +18,23 @@ namespace Festa.Network
         [SerializeField] ushort _defaultPort = 7777;
         [SerializeField] int _maxPlayers = 100;
 
+        [Header("Transport Capacity")]
+        [Tooltip("접속 직후 spawn/외형/grant/위치 복원 버스트를 버틸 UTP 송신 큐 바이트 수")]
+        [SerializeField] int _maxSendQueueSize = DefaultMaxSendQueueSize;
+
         public int MaxPlayers => _maxPlayers;
 
         /// <summary>NGO 비분할 메시지 상한(바이트). 연결 요청 payload(회원 grant 1.1 KB + JSON)가 들어가야 한다 (S15P21A604-457).</summary>
         public const int ConnectionRequestMtu = 4096;
+
+        /// <summary>
+        /// Production 에서 3명 동시 입장만으로도 기본 송신 큐가 포화됐다(GitLab #265).
+        /// 연결당 4 KB MTU 메시지와 spawn/외형 동기화가 한 틱에 겹치는 상황에 256개 패킷
+        /// 여유를 주는 1 MiB를 기본값으로 사용한다.
+        /// </summary>
+        public const int DefaultMaxSendQueueSize = 1024 * 1024;
+        const int MinMaxSendQueueSize = 64 * 1024;
+        const int MaxMaxSendQueueSize = 16 * 1024 * 1024;
 
         void Start()
         {
@@ -30,6 +43,14 @@ namespace Festa.Network
             // 브라우저는 UDP 소켓을 열 수 없으므로 WebSocket을 모든 환경에서 강제한다.
             // 배포 시 브라우저는 wss:// → ALB(TLS 종료) → ws:// 서버 순서로 연결된다.
             transport.UseWebSockets = true;
+
+            // MaxPacketQueueSize는 수신/이벤트 패킷 개수이고, 이 값은 UTP가 아직 전송하지 못한
+            // 바이트 큐다. Production 로그의 "send queue full"은 후자이므로 별도로 올려야 한다.
+            // 시작 뒤에는 이미 첫 연결 버스트가 큐에 들어갈 수 있어 반드시 Start* 전에 적용한다.
+            _maxSendQueueSize = ResolveMaxSendQueueSize(_maxSendQueueSize);
+            transport.MaxSendQueueSize = _maxSendQueueSize;
+            Debug.Log($"[NetworkBootstrap] UTP MaxSendQueueSize={transport.MaxSendQueueSize} B " +
+                      $"({transport.MaxSendQueueSize / 1024f:F0} KiB) — 접속 버스트 보호 (S15P21A604-966 / GitLab #265)");
 
             // 연결 요청(ConnectionData)은 분할되지 않는 메시지라 NGO 의 MTU(기본 1,296 → payload 약 1,114 B)가 상한이다.
             // Spring 의 회원 grant 는 1,094자(avatarCode 클레임 411자 포함)여서 JSON payload 가 1,172 B — 회원은 접속조차
@@ -154,6 +175,43 @@ namespace Festa.Network
                 Debug.LogWarning($"[NetworkBootstrap] WORLD_MAX_PLAYERS 값이 올바르지 않다 ('{env}') — 무시한다.");
             }
             return fallback;
+        }
+
+        /// <summary>
+        /// 송신 큐 크기를 정한다. CLI <c>-maxSendQueueSize</c>가 최우선이고,
+        /// <c>WORLD_MAX_SEND_QUEUE_SIZE</c>, 인스펙터 기본값 순서다. 단위는 바이트다.
+        /// 오타로 지나치게 작거나 큰 값을 넣으면 큐 포화 또는 메모리 폭증이 생기므로 범위를 제한한다.
+        /// </summary>
+        static int ResolveMaxSendQueueSize(int fallback)
+        {
+            var args = Environment.GetCommandLineArgs();
+            for (int i = 0; i < args.Length - 1; i++)
+            {
+                if (!string.Equals(args[i], "-maxSendQueueSize", StringComparison.OrdinalIgnoreCase)) continue;
+                if (TryValidateSendQueueSize(args[i + 1], out int cli)) return cli;
+                Debug.LogWarning($"[NetworkBootstrap] -maxSendQueueSize 값이 올바르지 않다 ('{args[i + 1]}') — " +
+                                 $"{MinMaxSendQueueSize}~{MaxMaxSendQueueSize} B 범위여야 한다. 기본값을 쓴다.");
+                break;
+            }
+
+            string env = Environment.GetEnvironmentVariable("WORLD_MAX_SEND_QUEUE_SIZE");
+            if (!string.IsNullOrWhiteSpace(env))
+            {
+                if (TryValidateSendQueueSize(env, out int fromEnv)) return fromEnv;
+                Debug.LogWarning($"[NetworkBootstrap] WORLD_MAX_SEND_QUEUE_SIZE 값이 올바르지 않다 ('{env}') — " +
+                                 $"{MinMaxSendQueueSize}~{MaxMaxSendQueueSize} B 범위여야 한다. 기본값을 쓴다.");
+            }
+
+            if (fallback >= MinMaxSendQueueSize && fallback <= MaxMaxSendQueueSize) return fallback;
+            Debug.LogWarning($"[NetworkBootstrap] Inspector MaxSendQueueSize={fallback} B가 범위를 벗어났다 — " +
+                             $"기본 {DefaultMaxSendQueueSize} B를 쓴다.");
+            return DefaultMaxSendQueueSize;
+        }
+
+        static bool TryValidateSendQueueSize(string raw, out int value)
+        {
+            return int.TryParse(raw, out value) &&
+                   value >= MinMaxSendQueueSize && value <= MaxMaxSendQueueSize;
         }
     }
 }

@@ -65,7 +65,10 @@ class SecurityConfiguration {
     SecurityFilterChain securityFilterChain(HttpSecurity http, OAuthLoginSuccessHandler successHandler,
                                             MemberSessionService sessions, ApiErrorWriter errors) throws Exception {
         return http.cors(Customizer.withDefaults())
-                .csrf(csrf -> csrf.ignoringRequestMatchers("/api/v1/**", "/ws/**"))
+                // "/api/arcade/**" 는 오락기 랭킹이다 (S15P21A604-963, GitLab #264). 경로가
+                // /api/v1 밖이라 위 패턴이 덮지 않는다 — 빠뜨리면 유효한 Bearer 토큰을 든 점수
+                // 등록 POST 가 CSRF 403 을 맞는다.
+                .csrf(csrf -> csrf.ignoringRequestMatchers("/api/v1/**", "/api/arcade/**", "/ws/**"))
                 .authorizeHttpRequests(requests -> requests
                         // The container's ERROR dispatch, not a route anyone calls. Refusing it
                         // replaced every failure that lands there with a misleading 401, and let it
@@ -104,6 +107,11 @@ class SecurityConfiguration {
                         // (S15P21A604-602).
                         .requestMatchers(HttpMethod.GET, "/api/v1/arcade-machines",
                                 "/api/v1/arcade-machines/*").permitAll()
+                        // 오락기 순위판도 같은 이유로 열려 있다 (S15P21A604-963, GitLab #264):
+                        // 게스트가 게임은 하는데 TOP 5 만 못 볼 이유가 없다. "*" 는 한 세그먼트라
+                        // "/{machineId}/me" 에 닿지 않고, 점수 등록 POST 도 이 matcher 가
+                        // GET 만 받으므로 둘 다 아래 authenticated() 로 떨어진다.
+                        .requestMatchers(HttpMethod.GET, "/api/arcade/rankings/*").permitAll()
                         // A published game's assets are read without a session: the play page
                         // resolves asset:// for a guest, and the filter runs before the service can
                         // decide anything (GitLab #69, 2026-08-28 — "필터에서는 경로를 열고 판정은

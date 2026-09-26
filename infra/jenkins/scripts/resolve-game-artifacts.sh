@@ -34,20 +34,33 @@ lookup() { # url out -> http code (200/404 만 정상)
   echo "${code}"
 }
 
-# unityInputId 산출 함수
+# unityInputId 산출 함수 — Unity 입력의 동일성은 **내용**으로 본다 (S15P21A604-939).
+#
+# 같은 파일이 raw blob 과 LFS pointer 로 번갈아 커밋되면 git tree hash 가 달라진다. 그것 때문에
+# 내용이 같은 번들이 거부되던 것을 unity-content-id.sh 가 없앤다. 그 계산이 실패하면 예전처럼
+# tree hash 로 내려간다 — 새 경로가 깨져도 판정이 느슨해지지는 않는다.
 compute_unity_input_id() {
-  local c="$1"
-  "${python_bin}" - "${repo_root}" "${c}" <<'INNER_PY'
-import hashlib, subprocess, sys
+  local c="$1" content_id=''
+  content_id="$(GIT_REPO_DIR="${repo_root}" PYTHON_BIN="${python_bin}" bash "${script_dir}/unity-content-id.sh" "${c}" 2>/dev/null || true)"
+  if [[ -z "${content_id}" ]]; then
+    echo "UNITY_CONTENT_ID_UNAVAILABLE: falling back to the git tree hash for ${c}" >&2
+  fi
+  UNITY_CONTENT_ID="${content_id}" "${python_bin}" - "${repo_root}" "${c}" <<'INNER_PY'
+import hashlib, os, subprocess, sys
 repo, commit = sys.argv[1:3]
+content_id = os.environ.get('UNITY_CONTENT_ID') or ''
 try:
-    tree = subprocess.check_output(['git', '-C', repo, 'rev-parse', f'{commit}:festa-unity'], stderr=subprocess.DEVNULL).decode().strip()
     proj = subprocess.check_output(['git', '-C', repo, 'show', f'{commit}:festa-unity/ProjectSettings/ProjectVersion.txt'], stderr=subprocess.DEVNULL).decode()
     v = [l.split(':')[1].strip() for l in proj.splitlines() if l.startswith('m_EditorVersion:')][0]
     r = [l.split('(')[1].split(')')[0] for l in proj.splitlines() if l.startswith('m_EditorVersionWithRevision:')][0]
+    if content_id:
+        source = f'content={content_id}'
+    else:
+        tree = subprocess.check_output(['git', '-C', repo, 'rev-parse', f'{commit}:festa-unity'], stderr=subprocess.DEVNULL).decode().strip()
+        source = f'tree={tree}'
 except Exception:
     sys.exit(1)
-raw = f'tree={tree}|unityVersion={v}|unityRevision={r}|buildProfile=release|apiEnvironment=Prod|artifactContract=manifest-1.0.0'
+raw = f'{source}|unityVersion={v}|unityRevision={r}|buildProfile=release|apiEnvironment=Prod|artifactContract=manifest-1.0.0'
 print(hashlib.sha256(raw.encode('utf-8')).hexdigest())
 INNER_PY
 }

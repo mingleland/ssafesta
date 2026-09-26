@@ -50,6 +50,7 @@ pipeline {
                     String worldHost = params.PRODUCTION_WORLD_HOST?.trim()
                     if (!(receiptId ==~ /[A-Za-z0-9][A-Za-z0-9_.-]{0,127}/)) { error('Invalid RECEIPT_ID') }
                     if (!worldHost) { error('PRODUCTION_WORLD_HOST is required') }
+                    if (!(worldHost ==~ /[a-z0-9]([a-z0-9.-]{0,251}[a-z0-9])?/)) { error('Invalid PRODUCTION_WORLD_HOST') }
                     if (!env.ROOT_DOMAIN?.trim()) { error('ROOT_DOMAIN is required') }
                     String stateRoot = env.ENVIRONMENT_STATE_DIR ?: '/var/lib/festa-environments'
                     env.ENVIRONMENT_STATE_DIR = stateRoot
@@ -60,6 +61,10 @@ pipeline {
                     env.PRODUCTION_WORLD_HOST_VALUE = worldHost
                     env.NGINX_ORIGIN_CERTIFICATE_FILE = env.NGINX_ORIGIN_CERTIFICATE_FILE ?: '/etc/nginx/tls/world-dev-origin.pem'
                     env.NGINX_ORIGIN_PRIVATE_KEY_FILE = env.NGINX_ORIGIN_PRIVATE_KEY_FILE ?: '/etc/nginx/tls/world-dev-origin.key'
+                    // T-295 — Cloudflare 프록시 뒤의 world.<root> 는 원본 인증서, 직결 호스트는 Let's Encrypt 인증서를 쓴다.
+                    boolean proxiedWorld = worldHost == "world.${env.ROOT_DOMAIN.trim()}"
+                    env.PRODUCTION_WORLD_CERTIFICATE_FILE = env.PRODUCTION_WORLD_CERTIFICATE_FILE ?: (proxiedWorld ? env.NGINX_ORIGIN_CERTIFICATE_FILE : "/etc/letsencrypt/live/${worldHost}/fullchain.pem")
+                    env.PRODUCTION_WORLD_PRIVATE_KEY_FILE = env.PRODUCTION_WORLD_PRIVATE_KEY_FILE ?: (proxiedWorld ? env.NGINX_ORIGIN_PRIVATE_KEY_FILE : "/etc/letsencrypt/live/${worldHost}/privkey.pem")
                     env.PRODUCTION_DATA_EVIDENCE_PATH = "${stateRoot}/production/data/bootstrap.json"
                     env.PRODUCTION_PUBLIC_BASE_URL = "https://${env.ROOT_DOMAIN}"
                     env.PRODUCTION_WORLD_PUBLIC_URL = "wss://${worldHost}/"
@@ -74,6 +79,8 @@ pipeline {
                       infra/jenkins/scripts/validate-production-promotion.sh >/dev/null
                     infra/deploy/scripts/validate-production-main-ancestry.sh \
                       "$PRODUCTION_RECEIPT_PATH" HEAD
+                    PRODUCTION_WORLD_HOST="$PRODUCTION_WORLD_HOST_VALUE" \
+                      infra/deploy/scripts/check-production-world-certificate.sh
                     python3 - "$PRODUCTION_DATA_EVIDENCE_PATH" <<'PY'
 import json,pathlib,sys
 d=json.loads(pathlib.Path(sys.argv[1]).read_text(encoding='utf-8'))

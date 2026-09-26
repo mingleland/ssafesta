@@ -61,6 +61,78 @@ namespace Festa.World
             if (labelBack != null) labelBack.text = wrapped;
         }
 
+        TextMeshPro _projectTitle;
+        TextMeshPro _projectTitleShadow;
+        Transform _projectTitleRoot;
+
+        /// <summary>
+        /// 프로젝트명 표지의 크기 기준. 표지판 로컬 스케일 위에서 쓰는 값이라 화면 크기와 직결된다 —
+        /// 초기값(글자 18, 박스 85x24)은 월드 시점에서 읽히지 않았다 (S15P21A604-978).
+        /// 세 값은 함께 움직인다. 글자만 키우면 박스를 넘고, 그림자만 그대로면 외곽선이 사라진다.
+        /// </summary>
+        const float TitleFontSize = 46f;
+        static readonly Vector2 TitleBoxSize = new(220f, 62f);
+        const float TitleShadowOffset = 0.46f;
+        /// <summary>지붕 위 높이. 글자가 커진 만큼 띄워야 지붕에 파묻히지 않는다.</summary>
+        const float TitleHeight = 44f;
+
+        /// <summary>부스 지붕 위에 게시 프로젝트명만 표시한다. 빈 이름이면 오브젝트 자체를 숨긴다.</summary>
+        public void SetProjectTitle(string text)
+        {
+            bool show = !string.IsNullOrWhiteSpace(text);
+            if (!show)
+            {
+                if (_projectTitleRoot != null) _projectTitleRoot.gameObject.SetActive(false);
+                return;
+            }
+            EnsureProjectTitle();
+            if (_projectTitleRoot == null) return;
+            string value = text.Trim();
+            _projectTitle.text = value;
+            _projectTitleShadow.text = value;
+            _projectTitleRoot.gameObject.SetActive(true);
+        }
+
+        void EnsureProjectTitle()
+        {
+            if (_projectTitleRoot != null || label == null || label.font == null) return;
+            var root = new GameObject("@ProjectTitle").transform;
+            root.SetParent(transform, false);
+            root.localPosition = new Vector3(0f, TitleHeight, 0f);
+            _projectTitleRoot = root;
+            _projectTitleShadow = CreateTitleLayer(root, "Shadow", new Vector3(TitleShadowOffset, -TitleShadowOffset, 0.08f), new Color(0.02f, 0.08f, 0.16f, 0.95f));
+            _projectTitle = CreateTitleLayer(root, "Face", Vector3.zero, new Color(0.32f, 0.78f, 1f, 1f));
+        }
+
+        TextMeshPro CreateTitleLayer(Transform parent, string objectName, Vector3 offset, Color color)
+        {
+            var go = new GameObject(objectName, typeof(RectTransform));
+            go.transform.SetParent(parent, false);
+            go.transform.localPosition = offset;
+            var tmp = go.AddComponent<TextMeshPro>();
+            tmp.font = label.font;
+            tmp.fontSharedMaterial = label.fontSharedMaterial;
+            tmp.color = color;
+            tmp.fontSize = TitleFontSize;
+            tmp.alignment = TextAlignmentOptions.Center;
+            tmp.textWrappingMode = TextWrappingModes.NoWrap;
+            tmp.rectTransform.sizeDelta = TitleBoxSize;
+            var renderer = go.GetComponent<MeshRenderer>();
+            renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            renderer.receiveShadows = false;
+            return tmp;
+        }
+
+        void LateUpdate()
+        {
+            if (_projectTitleRoot == null || !_projectTitleRoot.gameObject.activeSelf) return;
+            var camera = Camera.main;
+            if (camera == null) return;
+            Vector3 direction = _projectTitleRoot.position - camera.transform.position;
+            direction.y = 0f;
+            if (direction.sqrMagnitude > 0.001f) _projectTitleRoot.rotation = Quaternion.LookRotation(direction.normalized, Vector3.up);
+        }
+
         /// <summary>표지판 한 판에 허용하는 최대 줄 수. 넘치면 글자가 작아진다(자동 축소).</summary>
         public const int MaxLines = 4;
 
@@ -226,6 +298,28 @@ namespace Festa.World
                     r.gameObject.SetActive(true);
                 }
             }
+        }
+
+        /// <summary>전시가 바뀌거나 사라질 때 이전 다운로드 Texture 참조를 화면에서 끊는다.</summary>
+        public void ClearThumbnail()
+        {
+            if (cardRenderer != null && cardPivot != null)
+            {
+                var mat = cardRenderer.material;
+                mat.SetTexture("_BaseMap", null);
+                mat.mainTexture = null;
+                cardPivot.gameObject.SetActive(false);
+            }
+
+            if (photoFaces != null)
+                foreach (var r in photoFaces)
+                {
+                    if (r == null) continue;
+                    var mat = r.material;
+                    mat.SetTexture("_BaseMap", null);
+                    mat.SetTexture("_EmissionMap", null);
+                    r.gameObject.SetActive(false);
+                }
             if (photoPlaceholders != null)
                 foreach (var t in photoPlaceholders)
                     if (t != null) t.gameObject.SetActive(false);

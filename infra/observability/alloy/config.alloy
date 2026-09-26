@@ -24,10 +24,23 @@ discovery.docker "containers" {
 
 discovery.relabel "container_logs" {
   targets = discovery.docker.containers.targets
-  rule { source_labels = ["__meta_docker_container_name"]; regex = "/(.*)"; target_label = "container" }
-  rule { source_labels = ["__meta_docker_container_label_com_docker_compose_service"]; target_label = "service" }
-  rule { source_labels = ["__meta_docker_container_label_com_docker_compose_project"]; target_label = "environment" }
-  rule { replacement = "single-ec2"; target_label = "host" }
+  rule {
+    source_labels = ["__meta_docker_container_name"]
+    regex         = "/(.*)"
+    target_label  = "container"
+  }
+  rule {
+    source_labels = ["__meta_docker_container_label_com_docker_compose_service"]
+    target_label  = "service"
+  }
+  rule {
+    source_labels = ["__meta_docker_container_label_com_docker_compose_project"]
+    target_label  = "environment"
+  }
+  rule {
+    replacement  = "single-ec2"
+    target_label = "host"
+  }
 }
 
 redaction.sanitize "before_storage" {

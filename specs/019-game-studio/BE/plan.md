@@ -136,8 +136,12 @@ backend/src/test/resources/game/fixtures/                     # 계약 fixture �
 
 - 일반 게임 삭제는 `deleted_at` soft delete다.
 - 회원 탈퇴는 Game, Draft, Published Version, Asset, Score까지 hard delete한다.
+  오락기 랭킹(`arcade_score_records`)도 그 Score에 포함된다 — `users` FK의 `ON DELETE CASCADE`가 지운다.
 - Published Version 이력은 Game이 존속하는 동안 유지하고 hard delete 때 제거한다.
-- 랭킹은 P1 표시 전용 후보이며 Coin/Reward/Inventory와 FK도 연결하지 않는다.
+- ~~랭킹은 P1 표시 전용 후보이며~~ → **2026-09-22 채택** (GitLab #264, `S15P21A604-963`). 표시 전용
+  랭킹을 구현하며 Coin/Reward/Inventory와 FK도 연결하지 않는다는 조건은 그대로다. 귀속은 Game이
+  아니라 **machineId**다 — 캐비닛 주인이 바뀌어도 기록은 기계에 남는다. 계약은
+  `contracts/game-api.md` §Arcade Ranking, 표는 `arcade_score_records`(V47).
 - 공개 중단은 신규 REST 조회만 차단한다. 진행 중 로컬 세션을 끊는 소켓은 만들지 않는다.
 - 공개 `config_id`는 `INTEGER UNIQUE NOT NULL CHECK (config_id > 0)`, 전용 sequence는 1부터 시작한다.
   - 이 항목은 `game_portal_bindings`와 함께 #56(PR-2, V14) 몫이다 — 이 PR 범위 밖이다.

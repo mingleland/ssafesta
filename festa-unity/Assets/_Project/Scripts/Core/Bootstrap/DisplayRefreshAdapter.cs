@@ -176,6 +176,24 @@ namespace Festa.Core
         const float HzProbeSettle = 4f;
         float _hzProbeStaleUntil;
 
+        // ── 프로브 입력 검증 (S15P21A604-971) ─────────────────────────
+        /// <summary>
+        /// 화면 주사율로 인정할 하한(Hz). <b>30·40Hz 는 디스플레이가 아니라 로딩 산물이다.</b>
+        ///
+        /// <para>배포본 실측에서 진입 직후 30 → 40 → 60 → 120Hz 로 오르며 판정이 세 번 리셋됐다.
+        /// 로딩 중에는 메인 스레드가 포화돼 <b>모든</b> rAF 간격이 25~33ms 로 늘어나고, 하위 10% 분위마저
+        /// 그 값이 되어 30·40Hz 로 읽힌다. 이 하한은 그런 판독을 입력 단계에서 버린다 —
+        /// 하한에 걸려 <see cref="_hz"/> 가 정해지지 않으면 적응기는 아무것도 하지 않고 기다린다.</para>
+        /// </summary>
+        const int MinPlausibleHz = 50;
+
+        /// <summary>첫 판독을 받기 전에 확인할 프레임 상한(ms). 이보다 무거우면 프로브가 화면 틱을 못 본다.</summary>
+        const float ProbeTrustFrameMs = 20f;
+        /// <summary>최근 프레임 중 <see cref="ProbeTrustFrameMs"/> 를 넘은 비율이 이보다 크면 프로브를 믿지 않는다.</summary>
+        const float ProbeTrustMissRate = 0.20f;
+        /// <summary>신뢰 판정에 쓰는 최근 프레임 수.</summary>
+        const int ProbeTrustFrames = 120;
+
         void ResolveRefreshRate()
         {
             // **우리가 방금 리듬을 바꿨으면 주사율을 다시 읽지 않는다.**
@@ -191,7 +209,7 @@ namespace Festa.Core
             if (Time.unscaledTime < _hzProbeStaleUntil) return;
 
             int raw = FestaDisplayRefreshHz();
-            if (raw < 30 || raw > 400) return;
+            if (raw < MinPlausibleHz || raw > 400) return;
 
             int snapped = raw;
             foreach (var c in CommonHz)
@@ -200,6 +218,17 @@ namespace Festa.Core
             if (snapped == _hz) return;
             // 현재 값과 10% 안이면 같은 화면이다 — rAF 지터(7.75ms → 129Hz)를 모니터 교체로 읽지 않는다. 진짜 교체(120→144)는 20%.
             if (_hz > 0 && Mathf.Abs(snapped - _hz) <= _hz * 0.10f) return;
+
+            // **첫 판독에도 같은 잣대를 댄다** (S15P21A604-971). 아래 하향 가드는 `_hz > 0` 일 때만 걸려서,
+            // 기준선 자체는 품질 검사 없이 잡혔다. 로딩 중 첫 판독이 그대로 화면 주사율이 되면 그 뒤의
+            // 상향 판독(상향은 항상 수락된다)이 올 때마다 판정이 리셋된다 — 30 → 40 → 60 → 120 램프의 정체다.
+            // 프레임이 가벼워 프로브가 믿을 만할 때만 기준선을 잡는다.
+            if (_hz <= 0 && MissRateAgainst(ProbeTrustFrameMs, ProbeTrustFrames) > ProbeTrustMissRate)
+            {
+                if (now_LogThrottle(snapped))
+                    Debug.Log($"[DisplayRefreshAdapter] 첫 판독 {snapped}Hz 보류 — 최근 프레임이 무거워 프로브를 믿을 수 없다. 가벼워지면 다시 읽는다");
+                return;
+            }
 
             // **내려가는 변화는 우리가 무거울 때는 믿지 않는다.** 프로브는 메인 스레드가 비어야 화면 틱을
             // 볼 수 있다. 프레임이 18ms 씩 걸리면 rAF 간격도 16.7ms 배수로만 찍혀 120Hz 화면을 60Hz 로

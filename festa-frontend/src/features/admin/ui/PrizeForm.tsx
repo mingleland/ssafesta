@@ -56,39 +56,39 @@ export function PrizeForm({ prize, busy, onSubmit, onCancel }: PrizeFormProps) {
 
   return (
     <form
-      className="ad-form"
+      className="ac-form"
       onSubmit={(e) => {
         e.preventDefault();
         if (problem === null) onSubmit({ name: name.trim(), priceCoin, stock, active, closesAt: fromLocalInput(closesAt), winnerCount });
       }}
     >
-      <label className="ad-field" htmlFor="prize-name">
-        <span className="ad-label">경품 이름</span>
-        <input id="prize-name" className="ad-input" value={name} maxLength={200} onChange={(e) => setName(e.target.value)} placeholder="예: 치킨 응모권" />
+      <label className="ac-field" htmlFor="prize-name">
+        <span className="ac-label">경품 이름</span>
+        <input id="prize-name" className="ac-input" value={name} maxLength={200} onChange={(e) => setName(e.target.value)} placeholder="예: 치킨 응모권" />
       </label>
-      <label className="ad-field" htmlFor="prize-price">
-        <span className="ad-label">가격(코인)</span>
-        <input id="prize-price" className="ad-input" inputMode="numeric" value={priceText} onChange={(e) => setPriceText(e.target.value)} />
+      <label className="ac-field" htmlFor="prize-price">
+        <span className="ac-label">가격(코인)</span>
+        <input id="prize-price" className="ac-input" inputMode="numeric" value={priceText} onChange={(e) => setPriceText(e.target.value)} />
       </label>
-      <label className="ad-field" htmlFor="prize-stock">
-        <span className="ad-label">재고 <em>비우면 무제한 · 응모형이면 응모권 수</em></span>
-        <input id="prize-stock" className="ad-input" inputMode="numeric" value={stockText} onChange={(e) => setStockText(e.target.value)} placeholder="무제한" />
+      <label className="ac-field" htmlFor="prize-stock">
+        <span className="ac-label">재고 <em>비우면 무제한 · 응모형이면 응모권 수</em></span>
+        <input id="prize-stock" className="ac-input" inputMode="numeric" value={stockText} onChange={(e) => setStockText(e.target.value)} placeholder="무제한" />
       </label>
-      <label className="ad-field" htmlFor="prize-winners">
-        <span className="ad-label">당첨자 수 <em>0 이면 즉시교환 상품</em></span>
-        <input id="prize-winners" className="ad-input" inputMode="numeric" value={winnerText} onChange={(e) => setWinnerText(e.target.value)} />
+      <label className="ac-field" htmlFor="prize-winners">
+        <span className="ac-label">당첨자 수 <em>0 이면 즉시교환 상품</em></span>
+        <input id="prize-winners" className="ac-input" inputMode="numeric" value={winnerText} onChange={(e) => setWinnerText(e.target.value)} />
       </label>
-      <label className="ad-field" htmlFor="prize-closes">
-        <span className="ad-label">응모 마감 <em>비우면 마감 없음</em></span>
-        <input id="prize-closes" className="ad-input" type="datetime-local" value={closesAt} onChange={(e) => setClosesAt(e.target.value)} />
+      <label className="ac-field" htmlFor="prize-closes">
+        <span className="ac-label">응모 마감 <em>비우면 마감 없음</em></span>
+        <input id="prize-closes" className="ac-input" type="datetime-local" value={closesAt} onChange={(e) => setClosesAt(e.target.value)} />
       </label>
-      <label className="ad-check" htmlFor="prize-active">
+      <label className="ac-check" htmlFor="prize-active">
         <input id="prize-active" type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} />
         판매 중
       </label>
 
-      {problem !== null && <p className="ad-muted" role="alert">{problem}</p>}
-      <div className="ad-actions">
+      {problem !== null && <p className="ac-muted" role="alert">{problem}</p>}
+      <div className="ac-actions">
         <button type="submit" className="sc-btn sc-btn-primary" disabled={busy || problem !== null}>
           {prize === null ? '등록' : '저장'}
         </button>

@@ -78,7 +78,19 @@ grep -Fq 'location /oauth2/' "${prod_template}"
 grep -Fq 'location /api/ { client_max_body_size 4m;' "${prod_template}"
 grep -Fq 'location /login/oauth2/' "${prod_template}"
 grep -Fq 'alias /srv/festa/webgl/prod/current/' "${prod_template}"
+# Build 산출물은 파일명이 content hash 다. 포괄 location 이 없으면 loader 같은 비압축 파일이
+# location /unity/ 로 떨어져 no-cache 로 나가고 엣지가 매번 오리진을 때린다 (S15P21A604-968).
+grep -Fq 'location /unity/Build/ { alias /srv/festa/webgl/prod/current/Build/; add_header Cache-Control "public, max-age=31536000, immutable"; }' "${prod_template}"
+# Build 헤더에 always 가 붙으면 404 까지 immutable 로 나가 엣지가 1년 들고 간다 — 롤백해도 404 가 남는다.
+if grep -Eq 'unity/Build.*immutable" always' "${prod_template}"; then fail 'Unity Build cache headers must not use always — a 404 would be cached as immutable'; fi
+# AI 응답(SSE 포함)은 어디에도 저장되면 안 된다 — demo 와 같은 계약이다.
+grep -Fq 'location /ai/v1/ { add_header Cache-Control "no-store" always;' "${prod_template}"
 grep -Fq 'proxy_pass http://127.0.0.1:27777' "${world_template}"
+# T-295 — 월드 WSS 인증서는 사이트 인증서와 분리되고, 전환 전에 호스트·만료를 검사한다.
+grep -Fq 'ssl_certificate ${PRODUCTION_WORLD_CERTIFICATE_FILE};' "${world_template}" || fail 'Production World vhost must use its own certificate variable'
+grep -Fq 'check-production-world-certificate.sh' "${pipeline}" || fail 'Production promotion must check the World certificate before cutover'
+grep -Fq 'location /.well-known/acme-challenge/ { root /var/www/certbot; }' "${world_template}" || fail 'Production World vhost must keep the Lets Encrypt renewal path'
+bash -n "${repo_root}/infra/deploy/scripts/check-production-world-certificate.sh"
 # Demo World 는 demo.<root> 의 루트 WebSocket Upgrade 로 17777 에 들어간다. world.<root> 는 Production world-prod.conf 만 가진다 (Batch 1).
 demo_world_template="${repo_root}/infra/unity-server/nginx/world.conf.template"
 if grep -Fq 'world.${ROOT_DOMAIN}' "${demo_world_template}"; then fail 'dedicated Demo world vhost template still claims the Production World host'; fi
@@ -88,7 +100,8 @@ grep -Fq 'default   http://127.0.0.1:18080;' "${demo_template}" || fail 'demo si
 if grep -Fq 'websocket http://127.0.0.1:27777' "${demo_template}"; then fail 'demo site must not route to the Production World'; fi
 grep -Fq 'proxy_pass $festa_demo_root_upstream;' "${demo_template}" || fail 'demo root location must dispatch by Upgrade header'
 grep -Fq 'DEMO_WORLD_HOST: ${DEMO_WORLD_HOST:-demo.${ROOT_DOMAIN' "${agents}" || fail 'deploy agent must inject DEMO_WORLD_HOST'
-grep -Fq 'WORLD_HOST: demo.${ROOT_DOMAIN' "${repo_root}/infra/environments/compose/demo/back.yaml" || fail 'Demo back must issue demo.<root> world tokens'
+# S15P21A604-958 — demo 월드 WSS 는 Cloudflare 를 거치지 않는 world-demo.<root> 직결로 발급한다 (T-295).
+grep -Fq 'WORLD_HOST: world-demo.${ROOT_DOMAIN' "${repo_root}/infra/environments/compose/demo/back.yaml" || fail 'Demo back must issue world-demo.<root> world tokens'
 grep -Fq 'WORLD_PUBLIC_HOST=${env.DEMO_WORLD_HOST}' "${repo_root}/infra/jenkins/pipelines/develop.groovy" || fail 'develop pipeline must pass the Demo World host to readiness'
 if grep -Eq 'proxy_pass[[:space:]]+http://127\.0\.0\.1:28(080|081|082)' "${maintenance_template}"; then fail 'maintenance config exposes candidate ports'; fi
 work="$(mktemp -d)"; trap 'rm -rf "${work}"' EXIT

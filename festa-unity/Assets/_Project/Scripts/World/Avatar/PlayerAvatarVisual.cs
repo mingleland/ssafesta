@@ -50,6 +50,9 @@ namespace Festa.World
         MeshRenderer _groundShadowRenderer;
         Material _groundShadowMaterial;
         Texture2D _groundShadowTexture;
+        float _nextGroundShadowProbe;
+        float _groundShadowY;
+        bool _hasGroundShadowY;
         Animator _animator;
         CharacterController _controller;
         string _appliedEncoded;
@@ -792,6 +795,9 @@ namespace Festa.World
             // 복구되지 않는다 (T-183). 이제 `LateUpdate` 가 매 프레임 바닥을 다시 찾아
             // 위치를 맞추고 보이기/숨기기를 결정한다.
             bool groundFound = TryFindGroundHeight(out var groundY);
+            _groundShadowY = groundY;
+            _hasGroundShadowY = groundFound;
+            _nextGroundShadowProbe = Time.time + GroundShadowProbeInterval;
 
             var shadow = GameObject.CreatePrimitive(PrimitiveType.Quad);
             shadow.name = "AvatarGroundShadow";
@@ -878,7 +884,15 @@ namespace Festa.World
             HoldFeetOnGround();
             if (_groundShadow == null || _groundShadowRenderer == null) return;
 
-            if (!TryFindGroundHeight(out var groundY))
+            // 그림자는 평면 위에서 매 프레임 위치만 따라가면 된다. 바닥을 다시 찾는 물리 질의는
+            // 10Hz로 제한해 원격 아바타 수만큼 매 프레임 Raycast 하던 비용을 없앤다.
+            if (Time.time >= _nextGroundShadowProbe)
+            {
+                _nextGroundShadowProbe = Time.time + GroundShadowProbeInterval;
+                _hasGroundShadowY = TryFindGroundHeight(out _groundShadowY);
+            }
+
+            if (!_hasGroundShadowY)
             {
                 _groundShadowRenderer.enabled = false;   // 바닥이 없으면 숨긴다
                 return;
@@ -886,15 +900,19 @@ namespace Festa.World
 
             _groundShadowRenderer.enabled = true;
             _groundShadow.transform.position = new Vector3(
-                _visualRoot.position.x, groundY + 0.025f, _visualRoot.position.z);
+                _visualRoot.position.x, _groundShadowY + 0.025f, _visualRoot.position.z);
             // 회전은 고정한다 — 부모(플레이어)가 돌아도 그림자는 바닥에 누워 있어야 한다.
             _groundShadow.transform.rotation = Quaternion.Euler(90f, 0f, 0f);
         }
+
+        const float GroundShadowProbeInterval = 0.1f;
 
         void DestroyGroundShadow()
         {
             var trackedShadow = _groundShadow;
             _groundShadowRenderer = null;
+            _hasGroundShadowY = false;
+            _nextGroundShadowProbe = 0f;
             if (_groundShadow != null)
             {
                 Destroy(_groundShadow);

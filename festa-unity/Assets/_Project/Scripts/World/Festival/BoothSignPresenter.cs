@@ -4,6 +4,7 @@ using Festa.Booth;
 using Festa.Integration;
 using UnityEngine;
 using UnityEngine.Networking;
+using UnityEngine.SceneManagement;
 
 namespace Festa.World
 {
@@ -65,6 +66,8 @@ namespace Festa.World
         // 조회 결과를 여기 남긴다. **지도가 따로 부르지 않게** 하려는 것이다 — 지도가 같은 것을
         // 다시 물으면 요청이 그대로 두 배가 된다. 키는 **칸 번호**다(간판·포털과 같은 번호).
         static readonly Dictionary<int, BoothInfo> Cache = new();
+        static readonly HashSet<Texture> CachedTextures = new();
+        static int s_cacheGeneration;
 
         /// <summary>그 칸에 대해 조회가 끝났으면 true. 아직 안 왔으면 false. 키는 칸 번호(1~12)다.</summary>
         public static bool TryGetInfo(int slotId, out BoothInfo info) => Cache.TryGetValue(slotId, out info);
@@ -72,10 +75,27 @@ namespace Festa.World
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         static void Install()
         {
+            SceneManager.sceneUnloaded -= OnSceneUnloaded;
+            SceneManager.sceneUnloaded += OnSceneUnloaded;
             if (!Enabled || _instance != null) return;
             var go = new GameObject("@BoothSignPresenter");
             DontDestroyOnLoad(go);
             _instance = go.AddComponent<BoothSignPresenter>();
+        }
+
+        static void OnSceneUnloaded(Scene _)
+        {
+            s_cacheGeneration++;
+            foreach (var texture in CachedTextures)
+                if (texture != null) Destroy(texture);
+            CachedTextures.Clear();
+            Cache.Clear();
+            if (_instance != null)
+            {
+                _instance._signs.Clear();
+                _instance._slots.Clear();
+                _instance._started = false;
+            }
         }
 
         /// <summary>부스 한 칸을 다시 읽는다. 스튜디오에서 고치고 돌아온 경우를 위한 것이다.</summary>
@@ -103,7 +123,12 @@ namespace Festa.World
 
             _signs.Clear();
             foreach (var s in found)
-                if (s.boothId >= 1 && s.boothId <= SlotCount) _signs[s.boothId] = s;
+                if (s.boothId >= 1 && s.boothId <= SlotCount)
+                {
+                    // 프로젝트 제목은 응답 전 숨긴다. 기존 입간판의 부스명은 그대로 유지한다.
+                    s.SetProjectTitle(string.Empty);
+                    _signs[s.boothId] = s;
+                }
 
             _started = true;
             _ = FillAllAsync();
@@ -183,10 +208,12 @@ namespace Festa.World
                 $"{sign.boothId}번 부스");
 
             sign.SetLabel(name);
+            sign.SetProjectTitle(project?.name);
             // 카드는 여기서 켜지 않는다 — 썸네일이 **실제로 로드됐을 때만** BoothSign.ShowThumbnail 이 켠다.
 
             // 지도가 읽어 갈 수 있게 남긴다. 썸네일은 나중에 오므로 이 시점에는 아직 null 이다.
-            Cache[sign.boothId] = new BoothInfo(name, null, project != null);
+            sign.ClearThumbnail();
+            SetCachedInfo(sign.boothId, new BoothInfo(name, null, project != null));
         }
 
         // 인자는 **칸 번호**다. 로그에 "부스 N" 으로 적으면 부스 식별자로 읽혀서, 이 파일이 방금 고친
@@ -202,6 +229,7 @@ namespace Festa.World
                 return;
             }
 
+            int cacheGeneration = s_cacheGeneration;
             using var req = UnityWebRequestTexture.GetTexture(url);
             req.timeout = 10;
             await req.SendWebRequest();
@@ -214,11 +242,27 @@ namespace Festa.World
             }
 
             var tex = DownloadHandlerTexture.GetContent(req);
-            if (tex == null || sign == null) return;
+            if (tex == null) return;
+            if (sign == null || cacheGeneration != s_cacheGeneration)
+            {
+                Destroy(tex);
+                return;
+            }
             sign.ShowThumbnail(tex);
 
             if (Cache.TryGetValue(slotId, out var prev))
-                Cache[slotId] = new BoothInfo(prev.Name, tex, prev.HasProject);
+                SetCachedInfo(slotId, new BoothInfo(prev.Name, tex, prev.HasProject));
+        }
+
+        static void SetCachedInfo(int slotId, BoothInfo info)
+        {
+            if (Cache.TryGetValue(slotId, out var previous) && previous.Thumbnail != null && previous.Thumbnail != info.Thumbnail)
+            {
+                CachedTextures.Remove(previous.Thumbnail);
+                Destroy(previous.Thumbnail);
+            }
+            if (info.Thumbnail != null) CachedTextures.Add(info.Thumbnail);
+            Cache[slotId] = info;
         }
 
         static string FirstNonBlank(params string[] values)

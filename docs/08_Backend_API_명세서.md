@@ -1727,7 +1727,24 @@ Game Studio는 Unity 미니게임 API와 분리한다. Spring은 GameProject의 
 - 공개 중단 전에 이미 GameProject를 로드한 무보상 로컬 세션은 완료까지 허용한다.
 - 일반 삭제는 soft delete, 회원 탈퇴는 Game·Draft·Published·Asset·Score hard delete다. Published 이력은 Game 존속 중 유지한다. Asset은 행을 지우고 객체는 삭제 큐로 넘긴다 — 저장소 장애가 탈퇴를 막지 않는다.
 - Portal 공개 `configId`는 signed Int32 `1..2147483647`; DB는 별도 `INTEGER UNIQUE NOT NULL CHECK (>0)`를 사용한다.
-- MVP 플레이 결과·보상·랭킹 API는 만들지 않는다.
+- ~~MVP 플레이 결과·보상·랭킹 API는 만들지 않는다.~~ → **2026-09-22 개정 — 표시 전용 랭킹만 예외로 구현했다** (GitLab #264, `S15P21A604-963`). 플레이 결과 정산과 보상 API는 여전히 없다.
+
+**오락기 랭킹** — 계약 정본은 `specs/019-game-studio/contracts/game-api.md` §Arcade Ranking 이다.
+
+```text
+POST /api/arcade/rankings/{machineId}/scores    # 회원. body {"score": 9800} → 200 {"updated":true,"bestScore":9800,"achievedAt":"...","rank":1}
+GET  /api/arcade/rankings/{machineId}?limit=5   # 게스트 가능. RankEntry[] (최대 5, 비면 [])
+GET  /api/arcade/rankings/{machineId}/me        # 회원. {"bestScore":9800,"achievedAt":"...","rank":3} · 기록 없으면 전 필드 null + 200
+```
+
+`RankEntry = {rank, nickname, bestScore, achievedAt}`. 셋 다 `Cache-Control: no-store`.
+
+- **랭킹은 게임기에 귀속된다** — 키가 `(machineId, userId)` 라서 캐비닛에 걸린 게임이 바뀌어도 이전 점수가 같은 순위표에 남는다. 표시 전용이며 Coin·Reward·Inventory 와 FK 로 연결되지 않는다(외래키는 `users` 하나).
+- 유효한 `machineId` 는 `app.arcade.machine-ids`(오락실 20대)다. 그 밖은 404 `MACHINE_NOT_FOUND`. 바인딩 유무·게임 공개 상태로는 막지 않는다.
+- 점수는 `0 ~ 100,000`. 벗어나면 400 `VALIDATION_FAILED`. 같거나 낮은 점수 재등록은 오류가 아니라 200 `updated:false` 다.
+- 정렬은 `bestScore DESC, achievedAt ASC, userId ASC` — 세 번째 키가 있어야 TOP 목록과 `/me` 순위가 어긋나지 않는다.
+- `limit` 은 1~5 로 clamp 한다(숫자가 아니면 400). 본문의 `userId` 는 무시하고 인증 주체를 쓴다.
+- 이 경로는 `/api/v1` 밖이라 `SecurityConfiguration` 의 CSRF 예외와 공개 경로에 **따로** 올라간다.
 - 오류 코드·`rule` 어휘와 생성·버전 목록 shape은 019 계약 문서가 소유한다 (`game-api.md` §오류 코드와 rule). `rule` 이름은 `contracts/fixtures/`의 reference validator가 정한 것을 그대로 쓰고, 서버가 새 어휘를 만들 때만 계약에 추가한다.
 
 상세 계약은 [`specs/019-game-studio/contracts/game-api.md`](../specs/019-game-studio/contracts/game-api.md)이고,
@@ -1764,6 +1781,25 @@ Asset 업로드는 [`contracts/game-asset-upload.md`](../specs/019-game-studio/c
 관리자 강등. `?note=` 로 사유를 남긴다. → `204`
 
 관리자가 아닌 회원을 강등하면 아무 일도 없이 `204` 다(요청이 바라는 상태가 이미 참이다). **마지막 관리자는 강등할 수 없다**(`409 ADMIN_LAST_ONE`) — 승격 API 자체가 관리자 전용이라 0명이 되면 API 로 되돌릴 수 없다.
+
+### GET `/admin/booths`
+
+콘솔의 부스 운영 목록 (`S15P21A604-933`, 회원 부스 포함은 `S15P21A604-959`). 관리자 전용이며 비관리자는 `403`.
+
+```json
+[{
+  "boothId": 12, "slotId": 3, "slotCode": "A-03", "name": "황덕 부스",
+  "published": true, "leaseStartedAt": "2026-09-22T05:00:00Z",
+  "installedBy": "구글 황덕", "adminOwned": false,
+  "leaseEndsAt": "2026-09-23T05:00:00Z"
+}]
+```
+
+**관리자 부스와 회원 부스를 함께 준다** (`S15P21A604-959`). 관리자는 원래부터 남의 부스를 편집·운영할 수 있었다(§17B 부스 권한, spec 004 FR-023) — 목록만 관리자 부스로 좁혀져 있어서 회원 부스의 `boothId` 를 얻을 경로가 없었다. 목록을 여는 것은 새 권한이 아니라 이미 있던 권한의 나머지 반쪽이다. **호출한 사람의 것만도 아니다** — 관리자 부스는 사람이 아니라 권한을 따라가므로(`S15P21A604-905`) 어느 관리자든 전부 본다.
+
+`adminOwned` 가 두 종류를 가른다. 콘솔은 이 값으로 갈려야 한다 — 마스터 **개인** 부스는 관리자 조작이 `MASTER_PROTECTED` 로 거부되고, 강제 비공개가 회원 부스는 콘텐츠를 보존하지만 관리자 부스는 그 반납이 곧 삭제다.
+
+`leaseEndsAt` 은 회원 부스에만 있다. 관리자 부스는 상설 임대라 만료가 없어 `null` 이고(`S15P21A604-905`), 임대가 이미 끝난 회원 부스도 `null` 이다 — 그 부스는 자리 없이 콘텐츠만 보존된 상태라(spec 004 FR-011) `slotId`·`slotCode` 도 비어 있고 자리 순 정렬에서 맨 뒤로 간다.
 
 ### POST `/admin/booths/{boothId}/unpublish`
 

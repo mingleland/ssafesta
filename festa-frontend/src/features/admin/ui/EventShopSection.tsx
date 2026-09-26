@@ -47,6 +47,12 @@ export function EventShopSection() {
     },
   });
 
+  // 경품 목록의 winnerCount 로 각 구매가 응모권인지 구매권인지 가른다 — 구매 응답엔 그 정보가 없다.
+  // 경품을 못 찾으면(이례적) won 결과 유무로 근사한다: 결과가 있으면 응모였던 것이다.
+  const raffleByPrize = new Map<number, boolean>();
+  (prizes.data ?? []).forEach((p) => raffleByPrize.set(p.prizeId, p.winnerCount > 0));
+  const isRafflePurchase = (p: PrizePurchaseView): boolean => raffleByPrize.get(p.prizeId) ?? p.won !== null;
+
   const [target, setTarget] = useState<PrizePurchaseView | null>(null);
   const [next, setNext] = useState<PrizeFulfillmentStatus | ''>('');
   const [note, setNote] = useState('');
@@ -56,9 +62,9 @@ export function EventShopSection() {
   });
 
   return (
-    <div className="ad-work">
+    <div className="ac-work">
       <section className="sc-card">
-        <div className="ad-head">
+        <div className="ac-head">
           <h3 className="sc-section-title">경품</h3>
           {editing === null && (
             <button type="button" className="sc-btn sc-btn-sm sc-btn-primary" onClick={() => { savePrize.reset(); setEditing('new'); }}>경품 등록</button>
@@ -83,25 +89,25 @@ export function EventShopSection() {
             {prizes.isError && <ErrorBanner error={prizes.error} onRetry={() => void prizes.refetch()} />}
             {prizes.isSuccess && prizes.data.length === 0 && <Empty title="등록된 경품이 없습니다" />}
             {prizes.isSuccess && prizes.data.length > 0 && (
-              <table className="ad-table">
+              <table className="ac-table">
                 <thead><tr><th>경품</th><th className="num">가격</th><th className="num">재고</th><th>종류</th><th>마감</th><th>판매</th><th /></tr></thead>
                 <tbody>
                   {prizes.data.map((p) => (
                     <tr key={p.prizeId}>
-                      <td>{p.name} <span className="ad-muted">#{p.prizeId}</span></td>
+                      <td>{p.name} <span className="ac-muted">#{p.prizeId}</span></td>
                       <td className="num">{p.priceCoin.toLocaleString('ko-KR')}</td>
                       <td className="num">{p.stock === null ? '무제한' : p.stock.toLocaleString('ko-KR')}</td>
                       <td>
                         {isRaffle(p)
-                          ? <span className="ad-chip ad-chip-plain">응모형 · {p.winnerCount}명 당첨</span>
-                          : <span className="ad-muted">즉시교환</span>}
+                          ? <span className="ac-chip ac-chip-plain">응모형 · {p.winnerCount}명 당첨</span>
+                          : <span className="ac-muted">즉시교환</span>}
                       </td>
                       <td>
-                        {p.closesAt === null ? <span className="ad-muted">없음</span> : fmtTime(p.closesAt)}
+                        {p.closesAt === null ? <span className="ac-muted">없음</span> : fmtTime(p.closesAt)}
                         {/* 추첨 완료는 되돌릴 수 없는 사건이라 마감 시각과 나란히 둔다 */}
-                        {p.drawnAt !== null && <div className="ad-muted" style={{ fontSize: 12 }}>추첨 완료 {fmtTime(p.drawnAt)}</div>}
+                        {p.drawnAt !== null && <div className="ac-muted" style={{ fontSize: 12 }}>추첨 완료 {fmtTime(p.drawnAt)}</div>}
                       </td>
-                      <td>{p.active ? <span className="ad-chip ad-chip-ok">판매 중</span> : <span className="ad-chip ad-chip-plain">판매 종료</span>}</td>
+                      <td>{p.active ? <span className="ac-chip ac-chip-ok">판매 중</span> : <span className="ac-chip ac-chip-plain">판매 종료</span>}</td>
                       <td><button type="button" className="sc-btn sc-btn-sm" onClick={() => { savePrize.reset(); setEditing(p); }}>수정</button></td>
                     </tr>
                   ))}
@@ -112,10 +118,10 @@ export function EventShopSection() {
         )}
       </section>
 
-      <section className="sc-card ad-work" aria-label="구매 내역">
-        <div className="ad-head">
+      <section className="sc-card ac-work" aria-label="구매 내역">
+        <div className="ac-head">
           <h3 className="sc-section-title">구매 내역</h3>
-          <div className="ad-toolbar">
+          <div className="ac-toolbar">
             <Select
               aria-label="처리 상태 필터"
               value={filter}
@@ -136,23 +142,24 @@ export function EventShopSection() {
         {purchases.isSuccess && purchases.data.content.length === 0 && <Empty title="구매 내역이 없습니다" />}
         {purchases.isSuccess && purchases.data.content.length > 0 && (
           <>
-            <table className="ad-table">
-              <thead><tr><th>구매</th><th>구매자</th><th>경품</th><th className="num">수량</th><th className="num">코인</th><th>캠퍼스</th><th>조</th><th>받는 분</th><th>코인 차감</th><th>지급 상태</th><th>응모</th><th>시각</th><th /></tr></thead>
+            <table className="ac-table">
+              <thead><tr><th>구매</th><th>구매자</th><th>경품</th><th>구분</th><th className="num">수량</th><th className="num">코인</th><th>캠퍼스</th><th>조</th><th>받는 분</th><th>코인 차감</th><th>지급 상태</th><th>응모</th><th>시각</th><th /></tr></thead>
               <tbody>
                 {purchases.data.content.map((p) => (
                   <tr key={p.purchaseId}>
                     <td className="num">#{p.purchaseId}</td>
-                    <td>{p.buyerNickname} <span className="ad-muted">#{p.buyerUserId}</span></td>
+                    <td>{p.buyerNickname} <span className="ac-muted">#{p.buyerUserId}</span></td>
                     <td>{p.prizeName}</td>
+                    <td>{isRafflePurchase(p) ? <span className="ac-chip ac-chip-gold">응모권</span> : <span className="ac-chip ac-chip-plain">구매권</span>}</td>
                     <td className="num">{p.quantity}</td>
                     <td className="num">{p.coinSpent.toLocaleString('ko-KR')}</td>
                     <td>{p.campus ?? '-'}</td>
                     <td>{p.teamName ?? '-'}</td>
                     <td>{p.recipientName ?? '-'}</td>
-                    <td>{p.ledgerEntryId === null ? <span className="ad-chip ad-chip-bad">미확인</span> : <span className="ad-chip ad-chip-ok">원장 #{p.ledgerEntryId}</span>}</td>
-                    <td><StatusChip status={p.fulfillment} />{p.note !== null && <div className="ad-muted" style={{ fontSize: 12 }}>{p.note}</div>}</td>
+                    <td>{p.ledgerEntryId === null ? <span className="ac-chip ac-chip-bad">미확인</span> : <span className="ac-chip ac-chip-ok">원장 #{p.ledgerEntryId}</span>}</td>
+                    <td><StatusChip status={p.fulfillment} />{p.note !== null && <div className="ac-muted" style={{ fontSize: 12 }}>{p.note}</div>}</td>
                     {/* null 은 추첨 전과 비응모형을 함께 가리킨다 — 둘 다 아직 말할 결과가 없어 구분하지 않는다 */}
-                    <td>{p.won === null ? <span className="ad-muted">-</span> : p.won ? <span className="ad-chip ad-chip-gold">당첨</span> : <span className="ad-muted">낙첨</span>}</td>
+                    <td>{p.won === null ? <span className="ac-muted">-</span> : p.won ? <span className="ac-chip ac-chip-gold">당첨</span> : <span className="ac-muted">낙첨</span>}</td>
                     <td>{fmtTime(p.purchasedAt)}</td>
                     <td>
                       <button type="button" className="sc-btn sc-btn-sm" disabled={nextFulfillmentOptions(p.fulfillment).length === 0}
@@ -178,12 +185,12 @@ export function EventShopSection() {
         onConfirm={() => { if (target !== null && next !== '') update.mutate(target); }}
       >
         {target !== null && (
-          <div className="ad-form">
-            <label className="ad-field" htmlFor="fulfill-next">
-              <span className="ad-label">다음 상태 <em>현재: {statusLabel(target.fulfillment)}</em></span>
+          <div className="ac-form">
+            <label className="ac-field" htmlFor="fulfill-next">
+              <span className="ac-label">다음 상태 <em>현재: {statusLabel(target.fulfillment)}</em></span>
               <Select
                 id="fulfill-next"
-                className="ad-select-block"
+                className="ac-select-block"
                 value={next}
                 options={nextFulfillmentOptions(target.fulfillment).map((s) => ({ value: s, label: statusLabel(s) }))}
                 onChange={setNext}
@@ -194,9 +201,9 @@ export function EventShopSection() {
                 {next === 'CANCELLED' ? '취소' : '지급 완료'}는 되돌릴 수 없습니다. 코인 환불은 이 화면이 하지 않습니다 — 지갑 관리에서 따로 조정합니다.
               </p>
             )}
-            <label className="ad-field" htmlFor="fulfill-note">
-              <span className="ad-label">메모 <em>선택</em></span>
-              <input id="fulfill-note" className="ad-input" value={note} maxLength={500} onChange={(e) => setNote(e.target.value)} placeholder="예: 현장 수령 완료" />
+            <label className="ac-field" htmlFor="fulfill-note">
+              <span className="ac-label">메모 <em>선택</em></span>
+              <input id="fulfill-note" className="ac-input" value={note} maxLength={500} onChange={(e) => setNote(e.target.value)} placeholder="예: 현장 수령 완료" />
             </label>
             {update.isError && <ErrorBanner error={update.error} />}
           </div>
