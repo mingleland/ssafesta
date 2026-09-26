@@ -255,6 +255,26 @@ same_identity(
 
 world = receipt["world"]
 
+# T-299 — 손으로 만든 receipt 의 자리표시(전부 0)·형식 오류 체크섬은 maintenance(503) 안에서
+# 아티팩트를 받아 비교할 때에야 드러난다. 반드시 실패할 값이라 정책 경고가 아니라 여기서 멈춘다.
+def malformed_checksum(value):
+    digest = str(value or "")
+    if digest.startswith("sha256:"):
+        digest = digest[len("sha256:"):]
+    return len(digest) != 64 or any(c not in "0123456789abcdef" for c in digest) or set(digest) == {"0"}
+
+checksum_fields = [
+    ("world.archiveSha256", world.get("archiveSha256")),
+    ("world.imageContentId", world.get("imageContentId")),
+    ("webgl.artifactSha256", receipt["webgl"].get("artifactSha256")),
+] + [
+    (f"applications.{name}.contentId", item.get("contentId"))
+    for name, item in sorted(receipt["applications"].items())
+]
+for label, value in checksum_fields:
+    if malformed_checksum(value):
+        raise SystemExit(f"production promotion aborted: receipt {label} is a placeholder or malformed checksum")
+
 if world["sourceCommit"] != known_good_game.get("sourceCommit"):
     deny("world package sourceCommit differs from Demo known-good game")
 
