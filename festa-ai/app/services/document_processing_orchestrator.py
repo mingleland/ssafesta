@@ -36,7 +36,6 @@ from app.services.document_processing_service import (
     EmbeddedChunk,
     ProcessingSnapshot,
 )
-from app.services.context_service import ExtractedProjectFacts
 from app.services.failure_policy import classify_failure, describe_failure
 from app.services.project_fact_extractor import ProjectFactExtractor
 
@@ -73,8 +72,8 @@ class DocumentProcessingOrchestrator:
         try:
             await self._ensure_lease_active(snapshot)
             chunks = await self._embedding_service.compute_embedded_chunks(snapshot)
-            project_facts = await self._extract_project_facts(snapshot, chunks)
-            await self._send_and_finalize(snapshot, chunks, project_facts)
+            await self._send_and_finalize(snapshot, chunks)
+            await self._enrich_project_facts(snapshot)
         except _ATTEMPT_LOST_ERRORS:
             log_event(
                 logger,
@@ -120,7 +119,6 @@ class DocumentProcessingOrchestrator:
         self,
         snapshot: ProcessingSnapshot,
         chunks: tuple[EmbeddedChunk, ...],
-        project_facts: ExtractedProjectFacts | None,
     ) -> None:
         for batch_seq, batch in enumerate(self._split_into_batches(chunks)):
             await self._result_client.chunk_batch(
@@ -137,19 +135,23 @@ class DocumentProcessingOrchestrator:
             "total_chunk_count": len(chunks),
             "embedding_model_id": chunks[0].embedding_model_id,
         }
-        if project_facts is not None:
-            finalize_arguments["project_facts"] = project_facts
         await self._result_client.finalize(**finalize_arguments)
 
-    async def _extract_project_facts(
-        self,
-        snapshot: ProcessingSnapshot,
-        chunks: tuple[EmbeddedChunk, ...],
-    ) -> ExtractedProjectFacts | None:
+    async def _enrich_project_facts(self, snapshot: ProcessingSnapshot) -> None:
         if self._project_fact_extractor is None:
-            return None
+            return
         try:
-            return await self._project_fact_extractor.extract(chunks)
+            facts = await self._project_fact_extractor.extract(
+                booth_id=snapshot.booth_id,
+                agent_id=snapshot.agent_id,
+            )
+            await self._result_client.project_facts(
+                job_id=snapshot.job_id,
+                attempt_no=snapshot.attempt_no,
+                document_id=snapshot.document_id,
+                source_hash=snapshot.source_hash,
+                project_facts=facts,
+            )
         except Exception:  # noqa: BLE001 — 최적화 실패가 문서 READY를 막아서는 안 된다
             log_event(
                 logger,
@@ -163,7 +165,7 @@ class DocumentProcessingOrchestrator:
                 status="SKIPPED",
                 error_code="PROJECT_FACT_EXTRACTION_FAILED",
             )
-            return None
+            return
 
     async def _report_failure(
         self, snapshot: ProcessingSnapshot, exc: Exception

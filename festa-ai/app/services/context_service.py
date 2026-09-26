@@ -125,14 +125,32 @@ class ProjectFacts:
 
 @dataclass(frozen=True, slots=True)
 class ExtractedProjectFacts:
-    """문서 처리 attempt가 Spring finalize에 전달할 AI 추출 결과다."""
+    """READY 문서 검색 후 Spring에 원자적으로 저장할 AI 생성 정형 정보다."""
 
-    target_audience: str | None
-    tech_stack: str | None
+    introduction: str | None = None
+    target_audience: str | None = None
+    tech_stack: str | None = None
+    sources: tuple[ProjectFactSource, ...] = ()
+    generation_version: str = "rag-v1"
 
     def __post_init__(self) -> None:
+        _validate_optional_fact("introduction", self.introduction)
         _validate_optional_fact("target_audience", self.target_audience)
         _validate_optional_fact("tech_stack", self.tech_stack)
+        if not self.generation_version.strip():
+            raise ValueError("generation_version은 비어 있을 수 없습니다.")
+
+
+@dataclass(frozen=True, slots=True)
+class ProjectFactSource:
+    """정형답변 생성에 사용한 READY 문서 청크 식별자다."""
+
+    document_id: int
+    chunk_id: int
+
+    def __post_init__(self) -> None:
+        if self.document_id <= 0 or self.chunk_id < 0:
+            raise ValueError("정형답변 출처 식별자가 올바르지 않습니다.")
 
 
 @dataclass(frozen=True, slots=True)

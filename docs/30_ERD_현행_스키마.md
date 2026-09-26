@@ -1,7 +1,7 @@
 # SSAFY FESTA ERD — 현행 스키마
 
-> **기준**: `develop` `caa1c60d` (2026-09-23) · Flyway `V1` ~ `V47` (V19 결번) · PostgreSQL 17 + pgvector
-> **만든 방법**: 마이그레이션 46개를 빈 PostgreSQL 에 순서대로 적용한 뒤 `information_schema`·`pg_constraint` 에서 테이블·컬럼·외래 키·유일 인덱스를 뽑았다. 손으로 옮겨 적은 부분이 없다.
+> **기준**: `develop` + S15P21A604-981 (2026-09-23) · Flyway `V1` ~ `V48` (V19 결번) · PostgreSQL 17 + pgvector
+> **만든 방법**: 마이그레이션 47개를 빈 PostgreSQL 에 순서대로 적용한 뒤 `information_schema`·`pg_constraint` 에서 테이블·컬럼·외래 키·유일 인덱스를 뽑았다. 관계와 기존 컬럼은 자동 추출했고, V48 신규 컬럼을 반영했다.
 > **다른 문서와의 관계**: [09_DB_ERD_DB_설계서](./09_DB_ERD_DB_설계서.md) 는 착수 전 설계 초안(Draft)이다. 설계 원칙과 결정 배경은 그 문서가, 지금 DB 에 실제로 있는 구조는 이 문서가 기준이다.
 
 | 항목 | 값 |
@@ -383,6 +383,9 @@ erDiagram
         timestamptz updated_at
         text target_audience
         text tech_stack
+        text ai_introduction
+        jsonb facts_sources
+        varchar facts_generation_version
         bigint facts_document_id FK
         bigint facts_job_id
         timestamptz facts_updated_at

@@ -16,6 +16,7 @@ from app.api.schemas.documents import (
 )
 from app.clients.spring_booth_access import SpringBoothAccessClient
 from app.clients.spring_document_result import SpringDocumentResultClient
+from app.clients.spring_chunk_search import SpringChunkSearchClient
 from app.providers.document_parser import DefaultDocumentParser
 from app.providers.embedding import EmbeddingProvider
 from app.providers.factory import create_object_storage
@@ -27,6 +28,7 @@ from app.services.document_processing_service import (
 )
 from app.services.project_fact_extractor import ProjectFactExtractor
 from app.services.text_chunker import TikTokenCodec
+from app.services.vector_search_service import VectorSearchService
 from app.workers.document_task_supervisor import (
     DocumentTaskSupervisor,
     SupervisorClosedError,
@@ -71,11 +73,24 @@ def build_document_processing_orchestrator(
         codec=TikTokenCodec(),
         embedding_batch_size=settings.embedding_batch_size,
     )
+    chunk_search_client = SpringChunkSearchClient(
+        base_url=settings.spring_internal_base_url,
+        service_token=settings.internal_ai_to_spring_tokens[0],
+        timeout_seconds=settings.spring_chunk_search_timeout_seconds,
+        client=spring_http_client,
+    )
     return DocumentProcessingOrchestrator(
         embedding_service=embedding_service,
         result_client=result_client,
         booth_access_client=booth_access_client,
-        project_fact_extractor=ProjectFactExtractor(llm_provider=llm_provider),
+        project_fact_extractor=ProjectFactExtractor(
+            llm_provider=llm_provider,
+            vector_search=VectorSearchService(
+                embedding_provider=embedding_provider,
+                chunk_search_client=chunk_search_client,
+            ),
+            top_k=settings.retrieval_top_k,
+        ),
         heartbeat_interval_seconds=settings.job_heartbeat_seconds,
     )
 

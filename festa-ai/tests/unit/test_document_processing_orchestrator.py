@@ -68,8 +68,8 @@ class _FakeProjectFactExtractor:
         self._error = error
         self.calls = []
 
-    async def extract(self, chunks):
-        self.calls.append(chunks)
+    async def extract(self, **kwargs):
+        self.calls.append(kwargs)
         if self._error is not None:
             raise self._error
         return self._result
@@ -81,6 +81,7 @@ class _FakeResultClient:
         self.finalize_calls: list[dict] = []
         self.heartbeats: list[tuple[int, int]] = []
         self.failed_calls: list[dict] = []
+        self.project_fact_calls: list[dict] = []
         self._batch_error = batch_error
         self._failed_error = failed_error
 
@@ -91,6 +92,9 @@ class _FakeResultClient:
 
     async def finalize(self, **kwargs):
         self.finalize_calls.append(kwargs)
+
+    async def project_facts(self, **kwargs):
+        self.project_fact_calls.append(kwargs)
 
     async def heartbeat(self, *, job_id, attempt_no):
         self.heartbeats.append((job_id, attempt_no))
@@ -153,7 +157,7 @@ async def test_run_sends_one_batch_and_finalizes_on_success() -> None:
 
 
 @pytest.mark.asyncio
-async def test_run_extracts_project_facts_once_and_publishes_with_finalize() -> None:
+async def test_run_extracts_project_facts_after_finalize_and_reports_them() -> None:
     chunks = tuple(_chunk(i) for i in range(3))
     facts = ExtractedProjectFacts(target_audience="교육생", tech_stack="FastAPI")
     extractor = _FakeProjectFactExtractor(result=facts)
@@ -168,8 +172,14 @@ async def test_run_extracts_project_facts_once_and_publishes_with_finalize() -> 
 
     await orchestrator.run(_snapshot())
 
-    assert extractor.calls == [chunks]
-    assert result_client.finalize_calls[0]["project_facts"] == facts
+    assert extractor.calls == [{"booth_id": 7, "agent_id": 3}]
+    assert result_client.project_fact_calls == [{
+        "job_id": 501,
+        "attempt_no": 0,
+        "document_id": 9001,
+        "source_hash": "a" * 64,
+        "project_facts": facts,
+    }]
 
 
 @pytest.mark.asyncio
@@ -188,7 +198,7 @@ async def test_run_logs_extraction_failure_and_still_finalizes_without_facts(cap
         await orchestrator.run(_snapshot())
 
     assert len(result_client.finalize_calls) == 1
-    assert "project_facts" not in result_client.finalize_calls[0]
+    assert result_client.project_fact_calls == []
     assert result_client.failed_calls == []
     assert any(record.getMessage() == "project_fact_extraction_failed" for record in caplog.records)
     assert raw_error not in caplog.text

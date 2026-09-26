@@ -20,7 +20,7 @@ from app.clients.spring_document_result import (
     SpringDocumentResultUnavailable,
     SpringDocumentResultValidationFailed,
 )
-from app.services.context_service import ExtractedProjectFacts
+from app.services.context_service import ExtractedProjectFacts, ProjectFactSource
 
 
 def _client(handler) -> SpringDocumentResultClient:
@@ -112,6 +112,36 @@ async def test_finalize_includes_extracted_project_facts_when_available() -> Non
         project_facts=ExtractedProjectFacts(
             target_audience="프로젝트를 전시하고 싶은 교육생",
             tech_stack="FastAPI, Spring Boot, React, Unity",
+        ),
+    )
+
+
+@pytest.mark.asyncio
+async def test_project_facts_posts_generated_answers_and_sources() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.url.path == "/internal/ai/document-jobs/501/project-facts"
+        assert json.loads(request.content) == {
+            "attemptNo": 0,
+            "documentId": 9001,
+            "sourceHash": "a" * 64,
+            "introduction": "프로젝트 소개",
+            "targetAudience": "교육생",
+            "techStack": "FastAPI",
+            "sources": [{"documentId": 9001, "chunkId": 4}],
+            "generationVersion": "rag-v1",
+        }
+        return httpx.Response(204)
+
+    await _client(handler).project_facts(
+        job_id=501,
+        attempt_no=0,
+        document_id=9001,
+        source_hash="a" * 64,
+        project_facts=ExtractedProjectFacts(
+            introduction="프로젝트 소개",
+            target_audience="교육생",
+            tech_stack="FastAPI",
+            sources=(ProjectFactSource(document_id=9001, chunk_id=4),),
         ),
     )
 

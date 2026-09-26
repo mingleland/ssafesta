@@ -14,6 +14,8 @@ import java.util.List;
 import java.util.Set;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.json.JsonMapper;
 
 /**
  * Receives a worker's results and decides whether they still count (S15P21A604-400, GitLab #119 §3,
@@ -58,13 +60,18 @@ public class AiDocumentResultService {
 
     /** 프롬프트에 실릴 값이다. 넘치면 조용히 자르지 않고 400 으로 답한다. */
     private static final int MAX_FACT_LENGTH = 2000;
+    private static final int MAX_FACT_SOURCES = 30;
+    private static final int MAX_GENERATION_VERSION_LENGTH = 50;
 
     private final AiDocumentJobRepository jobs;
     private final ProjectRepository projects;
+    private final JsonMapper jsonMapper;
 
-    AiDocumentResultService(AiDocumentJobRepository jobs, ProjectRepository projects) {
+    AiDocumentResultService(AiDocumentJobRepository jobs, ProjectRepository projects,
+                            JsonMapper jsonMapper) {
         this.jobs = jobs;
         this.projects = projects;
+        this.jsonMapper = jsonMapper;
     }
 
     @Transactional
@@ -143,7 +150,7 @@ public class AiDocumentResultService {
         jobs.clearStaging(job.id());
         if (targetAudience != null || techStack != null) {
             // chunk 가 확정된 뒤, SUCCEEDED 로 표시하기 전이다. 같은 트랜잭션이라 어느 쪽도 반만 남지 않는다.
-            applyProjectFacts(job, jobId, targetAudience, techStack);
+            applyLegacyProjectFacts(job, jobId, targetAudience, techStack);
         }
         jobs.markSucceeded(job.id(), staging.total());
         jobs.markDocumentReady(job.documentId());
@@ -211,9 +218,13 @@ public class AiDocumentResultService {
     public void acceptProjectFacts(long jobId, String rawBody) {
         ProjectFactsRequest request = StrictJsonReader.read(rawBody, ProjectFactsRequest.class);
         String sourceHash = required(request.sourceHash(), "sourceHash");
+        String introduction = fact(request.introduction(), "introduction");
         String targetAudience = fact(request.targetAudience(), "targetAudience");
         String techStack = fact(request.techStack(), "techStack");
-        if (targetAudience == null && techStack == null) {
+        String generationVersion = optionalVersion(request.generationVersion());
+        List<ProjectFactSource> sources = validatedSources(request.sources(), generationVersion);
+        if (introduction == null && targetAudience == null && techStack == null
+                && generationVersion == null) {
             // 빈 요청이 기존 값을 지우는 것을 막는다. 정말 둘 다 없는 문서라면 보내지 않으면 된다.
             throw ApiException.fieldInvalid("targetAudience", "둘 중 하나는 값이 있어야 합니다.");
         }
@@ -231,19 +242,89 @@ public class AiDocumentResultService {
             throw ApiException.fieldInvalid("documentId", "Job 의 문서와 다릅니다.");
         }
 
-        applyProjectFacts(job, jobId, targetAudience, techStack);
+        if (generationVersion == null) {
+            applyLegacyProjectFacts(job, jobId, targetAudience, techStack);
+        } else {
+            applyProjectFacts(job, jobId, introduction, targetAudience, techStack,
+                    serializeSources(sources), generationVersion);
+        }
     }
 
     /**
      * 부스의 프로젝트에 추출값을 싣는다. 프로젝트가 없거나 더 새로운 Job 의 값이 이미 있으면 조용히
      * 넘어간다 — 둘 다 보낸 쪽이 고칠 수 있는 잘못이 아니다. finalize 와 /project-facts 가 같은 규칙을 쓴다.
      */
-    private void applyProjectFacts(JobRow job, long jobId, String targetAudience, String techStack) {
+    private void applyProjectFacts(JobRow job, long jobId, String introduction,
+                                   String targetAudience, String techStack,
+                                   String sources, String generationVersion) {
         Project project = projects.findByBoothId(job.boothId()).orElse(null);
         if (project == null || !project.factsAreOlderThan(jobId)) {
             return;
         }
-        project.applyFacts(targetAudience, techStack, job.documentId(), jobId, Instant.now());
+        project.applyFacts(introduction, targetAudience, techStack, sources, generationVersion,
+                job.documentId(), jobId, Instant.now());
+    }
+
+    private void applyLegacyProjectFacts(JobRow job, long jobId,
+                                         String targetAudience, String techStack) {
+        Project project = projects.findByBoothId(job.boothId()).orElse(null);
+        if (project == null || !project.factsAreOlderThan(jobId)) {
+            return;
+        }
+        project.applyLegacyFacts(targetAudience, techStack, job.documentId(), jobId, Instant.now());
+    }
+
+    private static String optionalVersion(String value) {
+        if (value == null) {
+            return null;
+        }
+        String trimmed = required(value, "generationVersion").trim();
+        if (trimmed.length() > MAX_GENERATION_VERSION_LENGTH) {
+            throw ApiException.fieldInvalid("generationVersion",
+                    MAX_GENERATION_VERSION_LENGTH + "자 이하여야 합니다.");
+        }
+        return trimmed;
+    }
+
+    private static List<ProjectFactSource> validatedSources(
+            List<ProjectFactSource> sources, String generationVersion) {
+        if (generationVersion == null) {
+            if (sources != null) {
+                throw ApiException.fieldInvalid("sources",
+                        "generationVersion 없이 보낼 수 없습니다.");
+            }
+            return null;
+        }
+        if (sources == null || sources.isEmpty()) {
+            throw ApiException.fieldInvalid("sources", "한 개 이상의 생성 근거가 필요합니다.");
+        }
+        if (sources.size() > MAX_FACT_SOURCES) {
+            throw ApiException.fieldInvalid("sources", MAX_FACT_SOURCES + "개 이하여야 합니다.");
+        }
+        Set<String> seen = new HashSet<>();
+        for (int index = 0; index < sources.size(); index++) {
+            ProjectFactSource source = sources.get(index);
+            if (source == null || source.documentId() == null || source.documentId() <= 0
+                    || source.chunkId() == null || source.chunkId() < 0) {
+                throw ApiException.fieldInvalid("sources[" + index + "]",
+                        "documentId는 양수, chunkId는 0 이상이어야 합니다.");
+            }
+            if (!seen.add(source.documentId() + ":" + source.chunkId())) {
+                throw ApiException.fieldInvalid("sources[" + index + "]", "중복된 근거입니다.");
+            }
+        }
+        return List.copyOf(sources);
+    }
+
+    private String serializeSources(List<ProjectFactSource> sources) {
+        if (sources == null) {
+            return null;
+        }
+        try {
+            return jsonMapper.writeValueAsString(sources);
+        } catch (JacksonException exception) {
+            throw new IllegalStateException("정형답변 생성 근거를 직렬화하지 못했습니다.", exception);
+        }
     }
 
     /**
@@ -368,7 +449,11 @@ public class AiDocumentResultService {
      *        모두 {@code sourceHash} 라 이름을 맞췄다 (AI 파트 확인 필요)
      */
     public record ProjectFactsRequest(Integer attemptNo, Long documentId, String sourceHash,
-                                      String targetAudience, String techStack) { }
+                                      String introduction, String targetAudience, String techStack,
+                                      List<ProjectFactSource> sources,
+                                      String generationVersion) { }
+
+    public record ProjectFactSource(Long documentId, Integer chunkId) { }
 
     /** {@code message} 는 선택이다 — 코드가 분기의 근거이고 문장은 사람이 읽을 것이다. */
     public record FailedRequest(Integer attemptNo, String failureCode, Boolean retryable,

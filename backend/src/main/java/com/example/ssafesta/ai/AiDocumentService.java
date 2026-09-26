@@ -550,6 +550,15 @@ public class AiDocumentService {
                         """, document.getStorageProvider(), document.getStorageBucket(),
                         document.getObjectKey());
             }
+            // 정형답변은 여러 READY 문서를 검색해 만든 스냅샷이다. 어느 문서든 빠지면 근거 집합이
+            // 달라지므로 기존 값을 유지하지 않는다. 다음 대화는 일반 RAG로 안전하게 폴백한다.
+            jdbc.update("""
+                    UPDATE projects
+                    SET ai_introduction = NULL, target_audience = NULL, tech_stack = NULL,
+                        facts_document_id = NULL, facts_job_id = NULL, facts_updated_at = NULL,
+                        facts_sources = NULL, facts_generation_version = NULL
+                    WHERE booth_id = ?
+                    """, document.getBoothId());
             documents.delete(document);
         });
     }
