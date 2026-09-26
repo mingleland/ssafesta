@@ -45,7 +45,7 @@ describe('AiChatOverlay 회원 접근 UI', () => {
     expect(screen.queryByText('로그인이 필요합니다')).not.toBeNull();
     expect(screen.queryByText('로그인하러 가기')).not.toBeNull();
     expect(screen.queryByPlaceholderText('부스에 대해 물어보세요')).toBeNull();
-    expect(screen.queryByText('기술 스택이 궁금해요')).toBeNull();
+    expect(screen.queryByText('기술 스택')).toBeNull();
   });
 
   it('로그인 버튼은 현재 경로를 저장하고 로그인 화면으로 이동한다', () => {
