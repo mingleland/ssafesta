@@ -39,10 +39,13 @@ privileged_write_file(){
     install -m 0644 "${src}" "${dest}"
   fi
 }
+# 월드 WSS 인증서 — activate-production-release.sh 와 같은 기본값을 쓴다 (T-295).
+export PRODUCTION_WORLD_CERTIFICATE_FILE="${PRODUCTION_WORLD_CERTIFICATE_FILE:-${NGINX_ORIGIN_CERTIFICATE_FILE:-}}"
+export PRODUCTION_WORLD_PRIVATE_KEY_FILE="${PRODUCTION_WORLD_PRIVATE_KEY_FILE:-${NGINX_ORIGIN_PRIVATE_KEY_FILE:-}}"
 render(){ python3 - "$1" "$2" <<'PY'
 import os,pathlib,sys
 text=pathlib.Path(sys.argv[1]).read_text(encoding='utf-8')
-for key in ('ROOT_DOMAIN','PRODUCTION_WORLD_HOST','NGINX_ORIGIN_CERTIFICATE_FILE','NGINX_ORIGIN_PRIVATE_KEY_FILE'): text=text.replace('${'+key+'}',os.environ.get(key,''))
+for key in ('ROOT_DOMAIN','PRODUCTION_WORLD_HOST','NGINX_ORIGIN_CERTIFICATE_FILE','NGINX_ORIGIN_PRIVATE_KEY_FILE','PRODUCTION_WORLD_CERTIFICATE_FILE','PRODUCTION_WORLD_PRIVATE_KEY_FILE'): text=text.replace('${'+key+'}',os.environ.get(key,''))
 if '${' in text: raise SystemExit('unresolved rollback Nginx template variable')
 pathlib.Path(sys.argv[2]).write_text(text,encoding='utf-8')
 PY

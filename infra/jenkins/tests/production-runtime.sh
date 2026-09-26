@@ -86,6 +86,10 @@ if grep -Eq 'unity/Build.*immutable" always' "${prod_template}"; then fail 'Unit
 # AI 응답(SSE 포함)은 어디에도 저장되면 안 된다 — demo 와 같은 계약이다.
 grep -Fq 'location /ai/v1/ { add_header Cache-Control "no-store" always;' "${prod_template}"
 grep -Fq 'proxy_pass http://127.0.0.1:27777' "${world_template}"
+# T-295 — 월드 WSS 인증서는 사이트 인증서와 분리되고, 전환 전에 호스트·만료를 검사한다.
+grep -Fq 'ssl_certificate ${PRODUCTION_WORLD_CERTIFICATE_FILE};' "${world_template}" || fail 'Production World vhost must use its own certificate variable'
+grep -Fq 'check-production-world-certificate.sh' "${pipeline}" || fail 'Production promotion must check the World certificate before cutover'
+bash -n "${repo_root}/infra/deploy/scripts/check-production-world-certificate.sh"
 # Demo World 는 demo.<root> 의 루트 WebSocket Upgrade 로 17777 에 들어간다. world.<root> 는 Production world-prod.conf 만 가진다 (Batch 1).
 demo_world_template="${repo_root}/infra/unity-server/nginx/world.conf.template"
 if grep -Fq 'world.${ROOT_DOMAIN}' "${demo_world_template}"; then fail 'dedicated Demo world vhost template still claims the Production World host'; fi

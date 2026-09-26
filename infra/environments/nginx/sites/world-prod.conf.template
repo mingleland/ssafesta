@@ -6,8 +6,8 @@ server {
 server {
     listen 443 ssl;
     server_name ${PRODUCTION_WORLD_HOST};
-    ssl_certificate ${NGINX_ORIGIN_CERTIFICATE_FILE};
-    ssl_certificate_key ${NGINX_ORIGIN_PRIVATE_KEY_FILE};
+    ssl_certificate ${PRODUCTION_WORLD_CERTIFICATE_FILE};
+    ssl_certificate_key ${PRODUCTION_WORLD_PRIVATE_KEY_FILE};
     location / {
         proxy_pass http://127.0.0.1:27777;
         proxy_http_version 1.1;
