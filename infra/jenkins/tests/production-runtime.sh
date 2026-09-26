@@ -95,7 +95,8 @@ grep -Fq 'default   http://127.0.0.1:18080;' "${demo_template}" || fail 'demo si
 if grep -Fq 'websocket http://127.0.0.1:27777' "${demo_template}"; then fail 'demo site must not route to the Production World'; fi
 grep -Fq 'proxy_pass $festa_demo_root_upstream;' "${demo_template}" || fail 'demo root location must dispatch by Upgrade header'
 grep -Fq 'DEMO_WORLD_HOST: ${DEMO_WORLD_HOST:-demo.${ROOT_DOMAIN' "${agents}" || fail 'deploy agent must inject DEMO_WORLD_HOST'
-grep -Fq 'WORLD_HOST: demo.${ROOT_DOMAIN' "${repo_root}/infra/environments/compose/demo/back.yaml" || fail 'Demo back must issue demo.<root> world tokens'
+# S15P21A604-958 — demo 월드 WSS 는 Cloudflare 를 거치지 않는 world-demo.<root> 직결로 발급한다 (T-295).
+grep -Fq 'WORLD_HOST: world-demo.${ROOT_DOMAIN' "${repo_root}/infra/environments/compose/demo/back.yaml" || fail 'Demo back must issue world-demo.<root> world tokens'
 grep -Fq 'WORLD_PUBLIC_HOST=${env.DEMO_WORLD_HOST}' "${repo_root}/infra/jenkins/pipelines/develop.groovy" || fail 'develop pipeline must pass the Demo World host to readiness'
 if grep -Eq 'proxy_pass[[:space:]]+http://127\.0\.0\.1:28(080|081|082)' "${maintenance_template}"; then fail 'maintenance config exposes candidate ports'; fi
 work="$(mktemp -d)"; trap 'rm -rf "${work}"' EXIT
