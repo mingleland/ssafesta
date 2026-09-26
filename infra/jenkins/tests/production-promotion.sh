@@ -347,6 +347,18 @@ fi
 
 cp "${work}/receipt-good.json" "${work}/receipt.json"
 
+# T-299 — 자리표시(전부 0) World 체크섬은 경고가 아니라 전환 전에 멈춘다.
+python3 - "${work}/receipt.json" <<'PY'
+import json, pathlib, sys
+path = pathlib.Path(sys.argv[1]); doc = json.loads(path.read_text())
+doc["world"]["archiveSha256"] = "0" * 64
+path.write_text(json.dumps(doc, indent=2) + "\n")
+PY
+if run_validator >/dev/null 2>&1; then
+  fail "placeholder World archive checksum was accepted"
+fi
+cp "${work}/receipt-good.json" "${work}/receipt.json"
+
 pipeline="${repo_root}/infra/jenkins/pipelines/production-promotion.groovy"
 python3 - "${pipeline}" <<'PY'
 import pathlib,re,sys
