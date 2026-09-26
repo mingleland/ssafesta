@@ -22,6 +22,9 @@ world_config="${PRODUCTION_WORLD_NGINX_CONFIG_PATH:-/etc/nginx/sites-enabled/wor
 ROOT_DOMAIN="${ROOT_DOMAIN:-ssafesta.world}"; : "${PRODUCTION_WORLD_HOST:?PRODUCTION_WORLD_HOST is required}"
 NGINX_ORIGIN_CERTIFICATE_FILE="${NGINX_ORIGIN_CERTIFICATE_FILE:-/etc/nginx/tls/world-dev-origin.pem}"
 NGINX_ORIGIN_PRIVATE_KEY_FILE="${NGINX_ORIGIN_PRIVATE_KEY_FILE:-/etc/nginx/tls/world-dev-origin.key}"
+# 월드 WSS 인증서는 사이트 인증서와 따로 둔다 — 직결 호스트는 Cloudflare 원본 인증서를 브라우저가 거부한다 (T-295).
+PRODUCTION_WORLD_CERTIFICATE_FILE="${PRODUCTION_WORLD_CERTIFICATE_FILE:-${NGINX_ORIGIN_CERTIFICATE_FILE}}"
+PRODUCTION_WORLD_PRIVATE_KEY_FILE="${PRODUCTION_WORLD_PRIVATE_KEY_FILE:-${NGINX_ORIGIN_PRIVATE_KEY_FILE}}"
 docker_bin="${DOCKER_BIN:-docker}"
 for path in "${receipt}" "${verification}" "${prepare}" "${prod_template}" "${world_template}"; do [[ -f "${path}" ]] || { echo "missing activation input: ${path}" >&2; exit 66; }; done
 [[ -L "${candidate}" ]] || { echo 'Production WebGL candidate is missing' >&2; exit 66; }
@@ -33,10 +36,10 @@ if len({r.get('receiptId'),v.get('receiptId'),p.get('receiptId')})!=1: raise Sys
 if v.get('receiptSha256')!=hashlib.sha256(pathlib.Path(sys.argv[1]).read_bytes()).hexdigest(): raise SystemExit('activation receipt checksum mismatch')
 PY
 mkdir -p "$(dirname "${activation}")" "$(dirname "${prod_current}")"
-render(){ ROOT_DOMAIN="${ROOT_DOMAIN}" PRODUCTION_WORLD_HOST="${PRODUCTION_WORLD_HOST}" NGINX_ORIGIN_CERTIFICATE_FILE="${NGINX_ORIGIN_CERTIFICATE_FILE}" NGINX_ORIGIN_PRIVATE_KEY_FILE="${NGINX_ORIGIN_PRIVATE_KEY_FILE}" python3 - "$1" "$2" <<'PY'
+render(){ ROOT_DOMAIN="${ROOT_DOMAIN}" PRODUCTION_WORLD_HOST="${PRODUCTION_WORLD_HOST}" NGINX_ORIGIN_CERTIFICATE_FILE="${NGINX_ORIGIN_CERTIFICATE_FILE}" NGINX_ORIGIN_PRIVATE_KEY_FILE="${NGINX_ORIGIN_PRIVATE_KEY_FILE}" PRODUCTION_WORLD_CERTIFICATE_FILE="${PRODUCTION_WORLD_CERTIFICATE_FILE}" PRODUCTION_WORLD_PRIVATE_KEY_FILE="${PRODUCTION_WORLD_PRIVATE_KEY_FILE}" python3 - "$1" "$2" <<'PY'
 import os,pathlib,sys
 text=pathlib.Path(sys.argv[1]).read_text(encoding='utf-8')
-for key in ('ROOT_DOMAIN','PRODUCTION_WORLD_HOST','NGINX_ORIGIN_CERTIFICATE_FILE','NGINX_ORIGIN_PRIVATE_KEY_FILE'): text=text.replace('${'+key+'}',os.environ[key])
+for key in ('ROOT_DOMAIN','PRODUCTION_WORLD_HOST','NGINX_ORIGIN_CERTIFICATE_FILE','NGINX_ORIGIN_PRIVATE_KEY_FILE','PRODUCTION_WORLD_CERTIFICATE_FILE','PRODUCTION_WORLD_PRIVATE_KEY_FILE'): text=text.replace('${'+key+'}',os.environ[key])
 if '${' in text: raise SystemExit('unresolved Production Nginx template variable')
 pathlib.Path(sys.argv[2]).write_text(text,encoding='utf-8')
 PY
