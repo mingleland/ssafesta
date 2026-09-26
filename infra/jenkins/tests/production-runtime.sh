@@ -89,6 +89,7 @@ grep -Fq 'proxy_pass http://127.0.0.1:27777' "${world_template}"
 # T-295 — 월드 WSS 인증서는 사이트 인증서와 분리되고, 전환 전에 호스트·만료를 검사한다.
 grep -Fq 'ssl_certificate ${PRODUCTION_WORLD_CERTIFICATE_FILE};' "${world_template}" || fail 'Production World vhost must use its own certificate variable'
 grep -Fq 'check-production-world-certificate.sh' "${pipeline}" || fail 'Production promotion must check the World certificate before cutover'
+grep -Fq 'location /.well-known/acme-challenge/ { root /var/www/certbot; }' "${world_template}" || fail 'Production World vhost must keep the Lets Encrypt renewal path'
 bash -n "${repo_root}/infra/deploy/scripts/check-production-world-certificate.sh"
 # Demo World 는 demo.<root> 의 루트 WebSocket Upgrade 로 17777 에 들어간다. world.<root> 는 Production world-prod.conf 만 가진다 (Batch 1).
 demo_world_template="${repo_root}/infra/unity-server/nginx/world.conf.template"

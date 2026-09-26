@@ -1,7 +1,9 @@
 server {
     listen 80;
     server_name ${PRODUCTION_WORLD_HOST};
-    return 301 https://$host$request_uri;
+    # 직결 호스트는 Let's Encrypt webroot 로 갱신한다 — Cloudflare 뒤의 world.<root> 에는 요청이 오지 않아 무해하다 (T-295).
+    location /.well-known/acme-challenge/ { root /var/www/certbot; }
+    location / { return 301 https://$host$request_uri; }
 }
 server {
     listen 443 ssl;
