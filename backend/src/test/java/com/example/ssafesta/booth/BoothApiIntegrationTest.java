@@ -1,6 +1,7 @@
 package com.example.ssafesta.booth;
 
 import static com.example.ssafesta.booth.BoothTestSupport.createMemberWithWallet;
+import static org.hamcrest.Matchers.nullValue;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -69,7 +70,10 @@ class BoothApiIntegrationTest {
         mockMvc.perform(get("/api/v1/booth-slots"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].slotId").value(1))
-                .andExpect(jsonPath("$[0].type").value("EVENT"));
+                .andExpect(jsonPath("$[0].type").value("EVENT"))
+                // 간판·슬롯 지도가 읽는 이름 — 부스가 없어도 "1번 부스" 로 떨어지지 않는다.
+                .andExpect(jsonPath("$[0].boothName").value("이벤트 부스"))
+                .andExpect(jsonPath("$[0].boothId").value(nullValue()));
 
         Long userId = createMemberWithWallet(users, wallets, "이벤트슬롯");
         String bearer = bearerFor(userId);

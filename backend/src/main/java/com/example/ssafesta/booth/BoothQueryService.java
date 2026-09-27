@@ -247,9 +247,21 @@ public class BoothQueryService {
                            boolean entryAvailable, boolean mine,
                            BoothFacadeService.FacadeView facade) {
 
+        /**
+         * The name signs and the slot map show on the festival's own event slot.
+         *
+         * <p>An event slot has no booth, so every source the sign reads ({@code facade.signText},
+         * {@code boothName}, project name) was empty and Unity fell through to {@code "1번 부스"}.
+         * Saying it here keeps the name server-owned — Unity and the frontend already render
+         * {@code boothName} — and needs no client build. {@code boothId} stays {@code null}: there is
+         * still nothing to enter or lease, and both clients decide occupancy from {@code status}.
+         */
+        static final String EVENT_SLOT_NAME = "이벤트 부스";
+
         static SlotView available(BoothSlot slot) {
+            String name = slot.getSlotType() == SlotType.EVENT ? EVENT_SLOT_NAME : null;
             return new SlotView(slot.getId(), slot.getSlotCode(), slot.getFloorNo(), slot.getSlotType().name(),
-                    "AVAILABLE", null, null, null, null, false, false, null);
+                    "AVAILABLE", null, name, null, null, false, false, null);
         }
 
         /**
