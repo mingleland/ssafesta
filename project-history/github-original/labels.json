@@ -1,0 +1,167 @@
+[
+ {
+  "id": 11895576493,
+  "node_id": "LA_kwDOTz53T88AAAACxQgXrQ",
+  "url": "https://api.github.com/repos/kanghyunsoon/ssafesta/labels/ai",
+  "name": "ai",
+  "color": "671042",
+  "default": false,
+  "description": "ai(AI) 파트 소관",
+  "archived_at": null,
+  "archived_by": null
+ },
+ {
+  "id": 11872049898,
+  "node_id": "LA_kwDOTz53T88AAAACw6Ea6g",
+  "url": "https://api.github.com/repos/kanghyunsoon/ssafesta/labels/back",
+  "name": "back",
+  "color": "0E8A16",
+  "default": false,
+  "description": "backend(BE) 파트 소관",
+  "archived_at": null,
+  "archived_by": null
+ },
+ {
+  "id": 11861688298,
+  "node_id": "LA_kwDOTz53T88AAAACwwL_6g",
+  "url": "https://api.github.com/repos/kanghyunsoon/ssafesta/labels/blocker",
+  "name": "blocker",
+  "color": "B60205",
+  "default": false,
+  "description": "다른 파트 작업이 이걸 기다리는 중",
+  "archived_at": null,
+  "archived_by": null
+ },
+ {
+  "id": 11788265642,
+  "node_id": "LA_kwDOTz53T88AAAACvqKoqg",
+  "url": "https://api.github.com/repos/kanghyunsoon/ssafesta/labels/bug",
+  "name": "bug",
+  "color": "d73a4a",
+  "default": true,
+  "description": "Something isn't working",
+  "archived_at": null,
+  "archived_by": null
+ },
+ {
+  "id": 11788265650,
+  "node_id": "LA_kwDOTz53T88AAAACvqKosg",
+  "url": "https://api.github.com/repos/kanghyunsoon/ssafesta/labels/documentation",
+  "name": "documentation",
+  "color": "0075ca",
+  "default": true,
+  "description": "Improvements or additions to documentation",
+  "archived_at": null,
+  "archived_by": null
+ },
+ {
+  "id": 11788265655,
+  "node_id": "LA_kwDOTz53T88AAAACvqKotw",
+  "url": "https://api.github.com/repos/kanghyunsoon/ssafesta/labels/duplicate",
+  "name": "duplicate",
+  "color": "cfd3d7",
+  "default": true,
+  "description": "This issue or pull request already exists",
+  "archived_at": null,
+  "archived_by": null
+ },
+ {
+  "id": 11788265663,
+  "node_id": "LA_kwDOTz53T88AAAACvqKovw",
+  "url": "https://api.github.com/repos/kanghyunsoon/ssafesta/labels/enhancement",
+  "name": "enhancement",
+  "color": "a2eeef",
+  "default": true,
+  "description": "New feature or request",
+  "archived_at": null,
+  "archived_by": null
+ },
+ {
+  "id": 11863119584,
+  "node_id": "LA_kwDOTz53T88AAAACwxjW4A",
+  "url": "https://api.github.com/repos/kanghyunsoon/ssafesta/labels/front",
+  "name": "front",
+  "color": "1D76DB",
+  "default": false,
+  "description": "front(FE) 파트 소관",
+  "archived_at": null,
+  "archived_by": null
+ },
+ {
+  "id": 11861688405,
+  "node_id": "LA_kwDOTz53T88AAAACwwMAVQ",
+  "url": "https://api.github.com/repos/kanghyunsoon/ssafesta/labels/game",
+  "name": "game",
+  "color": "5319E7",
+  "default": false,
+  "description": "Unity/game 파트 소관",
+  "archived_at": null,
+  "archived_by": null
+ },
+ {
+  "id": 11788265685,
+  "node_id": "LA_kwDOTz53T88AAAACvqKo1Q",
+  "url": "https://api.github.com/repos/kanghyunsoon/ssafesta/labels/good%20first%20issue",
+  "name": "good first issue",
+  "color": "7057ff",
+  "default": true,
+  "description": "Good for newcomers",
+  "archived_at": null,
+  "archived_by": null
+ },
+ {
+  "id": 11788265674,
+  "node_id": "LA_kwDOTz53T88AAAACvqKoyg",
+  "url": "https://api.github.com/repos/kanghyunsoon/ssafesta/labels/help%20wanted",
+  "name": "help wanted",
+  "color": "008672",
+  "default": true,
+  "description": "Extra attention is needed",
+  "archived_at": null,
+  "archived_by": null
+ },
+ {
+  "id": 11904346370,
+  "node_id": "LA_kwDOTz53T88AAAACxY3pAg",
+  "url": "https://api.github.com/repos/kanghyunsoon/ssafesta/labels/infra",
+  "name": "infra",
+  "color": "5D4037",
+  "default": false,
+  "description": "infra 파트 소관",
+  "archived_at": null,
+  "archived_by": null
+ },
+ {
+  "id": 11788265698,
+  "node_id": "LA_kwDOTz53T88AAAACvqKo4g",
+  "url": "https://api.github.com/repos/kanghyunsoon/ssafesta/labels/invalid",
+  "name": "invalid",
+  "color": "e4e669",
+  "default": true,
+  "description": "This doesn't seem right",
+  "archived_at": null,
+  "archived_by": null
+ },
+ {
+  "id": 11788265711,
+  "node_id": "LA_kwDOTz53T88AAAACvqKo7w",
+  "url": "https://api.github.com/repos/kanghyunsoon/ssafesta/labels/question",
+  "name": "question",
+  "color": "d876e3",
+  "default": true,
+  "description": "Further information is requested",
+  "archived_at": null,
+  "archived_by": null
+ },
+ {
+  "id": 11788265720,
+  "node_id": "LA_kwDOTz53T88AAAACvqKo-A",
+  "url": "https://api.github.com/repos/kanghyunsoon/ssafesta/labels/wontfix",
+  "name": "wontfix",
+  "color": "ffffff",
+  "default": true,
+  "description": "This will not be worked on",
+  "archived_at": null,
+  "archived_by": null
+ }
+]

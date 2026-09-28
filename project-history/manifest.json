@@ -1,0 +1,373 @@
+{
+ "generated_at": "2026-09-28T06:02:29.578430+00:00",
+ "captured_at": "2026-09-28",
+ "sources": {
+  "gitlab": "lab.ssafy.com/s15-metaverse-game-sub1/S15P21A604 (GitLab 18.11.5 CE)",
+  "jira": "ssafy.atlassian.net project S15P21A604",
+  "github_original": "github.com/kanghyunsoon/ssafesta (비공개, 변경하지 않음)"
+ },
+ "counts": {
+  "gitlab": {
+   "merge_requests": {
+    "x_total": 1363,
+    "listed": 1363,
+    "detail_dumped": 1363,
+    "states": {
+     "merged": 1290,
+     "closed": 73
+    },
+    "notes": 3696,
+    "user_notes": 208,
+    "system_notes": 3488,
+    "diff_notes": 0,
+    "discussions": 3686,
+    "diff_versions": 1928,
+    "diff_version_details_dumped": 1928
+   },
+   "issues": {
+    "x_total": 264,
+    "listed": 264,
+    "states": {
+     "closed": 202,
+     "opened": 62
+    },
+    "notes": 3980,
+    "user_notes": 1163,
+    "discussions": 3968
+   },
+   "events": 9288,
+   "labels": 23,
+   "milestones": 0,
+   "releases": 0,
+   "branches": {
+    "api": 227,
+    "mirror": 227,
+    "sha_mismatch": []
+   },
+   "uploads": {
+    "listed": 52,
+    "downloaded_size_match": 52,
+    "bytes": 39353515,
+    "markdown_references": 44,
+    "references_resolved_to_upload": 44
+   },
+   "pipelines": 2059,
+   "jobs": 2557,
+   "packages": {
+    "files": 88,
+    "ok": 88,
+    "bytes": 4932060127
+   },
+   "commit_notes": {
+    "commits_checked": 6156,
+    "commits_with_discussions": 240
+   }
+  },
+  "jira": {
+   "issues_listed": 976,
+   "comments": {
+    "server_total": 7562,
+    "dumped": 7562
+   },
+   "changelog_histories": {
+    "server_total": 24287,
+    "dumped": 24287
+   },
+   "worklogs": {
+    "server_total": 0,
+    "dumped": 0
+   },
+   "attachments": {
+    "metadata": 2,
+    "metadata_bytes": 1447197,
+    "downloaded_size_match": 2,
+    "downloaded_bytes": 1447197
+   },
+   "boards": 1,
+   "sprints": 7,
+   "issue_types": {
+    "에픽": 17,
+    "작업": 667,
+    "스토리": 111,
+    "버그": 107,
+    "하위 작업": 74
+   }
+  },
+  "github_original": {
+   "items": 84,
+   "pulls": 47,
+   "issues": 37,
+   "pull_states": {
+    "merged": 40,
+    "closed": 2,
+    "open": 5
+   },
+   "issue_states": {
+    "closed": 25,
+    "open": 12
+   },
+   "issue_comments": {
+    "expected": 225,
+    "dumped": 225
+   },
+   "review_comments": {
+    "expected": 0,
+    "dumped": 0
+   },
+   "reviews": 7,
+   "pr_commits": {
+    "expected": 180,
+    "dumped": 180
+   },
+   "labels": 15,
+   "http_status_counts": {
+    "200": 786
+   }
+  },
+  "git": {
+   "github_commits": 707,
+   "gitlab_commits": 6160,
+   "shared": 647,
+   "github_only": 60
+  },
+  "pushed_refs": {
+   "total_refs": 3081,
+   "heads": 227,
+   "tags": 1,
+   "github_original": 27,
+   "archive_deleted": 10,
+   "pr_temp": 2816,
+   "pr_temp_missing": []
+  }
+ },
+ "new_repository_items": {
+  "total": 1628,
+  "by_origin_kind_state": {
+   "github|issue|closed": 34,
+   "github|pr|closed": 19,
+   "github|pr|merged": 27,
+   "github|issue|open": 3,
+   "github|pr|open": 1,
+   "gitlab-issue|issue|closed": 122,
+   "gitlab-mr|pr|merged": 165,
+   "gitlab-mr|pr|closed": 1196,
+   "gitlab-issue|issue|open": 59,
+   "gitlab-mr|issue|closed": 2
+  }
+ },
+ "jira_links": {
+  "jira_issues": 976,
+  "with_commit": 789,
+  "with_develop_commit": 754,
+  "with_closing_commit": 536,
+  "with_branch": 717,
+  "with_gitlab_mr": 793,
+  "with_gitlab_issue": 362,
+  "with_devstatus_link": 791,
+  "with_any_link": 827,
+  "without_any_link_by_type": {
+   "에픽": 15,
+   "작업": 85,
+   "스토리": 33,
+   "버그": 10,
+   "하위 작업": 6
+  },
+  "gitlab_mrs_with_jira_key": 1340,
+  "gitlab_mrs": 1363,
+  "devstatus_mrs_missed_by_text": 0,
+  "unknown_keys_in_commits": [
+   "S15P21A604-245",
+   "S15P21A604-727"
+  ]
+ },
+ "known_gaps": {
+  "gitlab_system_notes_hidden_by_server": [
+   {
+    "dir": "api/issues/196/notes",
+    "x_total": 11,
+    "dumped": 10
+   },
+   {
+    "dir": "api/issues/196/discussions",
+    "x_total": 11,
+    "dumped": 10
+   },
+   {
+    "dir": "api/merge_requests/19/notes",
+    "x_total": 10,
+    "dumped": 9
+   },
+   {
+    "dir": "api/merge_requests/19/discussions",
+    "x_total": 10,
+    "dumped": 9
+   },
+   {
+    "dir": "api/merge_requests/576/notes",
+    "x_total": 8,
+    "dumped": 7
+   },
+   {
+    "dir": "api/merge_requests/576/discussions",
+    "x_total": 8,
+    "dumped": 7
+   },
+   {
+    "dir": "api/merge_requests/826/notes",
+    "x_total": 6,
+    "dumped": 5
+   },
+   {
+    "dir": "api/merge_requests/826/discussions",
+    "x_total": 6,
+    "dumped": 5
+   },
+   {
+    "dir": "api/merge_requests/927/notes",
+    "x_total": 11,
+    "dumped": 10
+   },
+   {
+    "dir": "api/merge_requests/927/discussions",
+    "x_total": 11,
+    "dumped": 10
+   },
+   {
+    "dir": "api/merge_requests/929/notes",
+    "x_total": 9,
+    "dumped": 8
+   },
+   {
+    "dir": "api/merge_requests/929/discussions",
+    "x_total": 9,
+    "dumped": 8
+   },
+   {
+    "dir": "api/merge_requests/930/notes",
+    "x_total": 8,
+    "dumped": 7
+   },
+   {
+    "dir": "api/merge_requests/930/discussions",
+    "x_total": 8,
+    "dumped": 7
+   },
+   {
+    "dir": "api/merge_requests/932/notes",
+    "x_total": 7,
+    "dumped": 6
+   },
+   {
+    "dir": "api/merge_requests/932/discussions",
+    "x_total": 7,
+    "dumped": 6
+   },
+   {
+    "dir": "api/merge_requests/934/notes",
+    "x_total": 6,
+    "dumped": 5
+   },
+   {
+    "dir": "api/merge_requests/934/discussions",
+    "x_total": 6,
+    "dumped": 5
+   },
+   {
+    "dir": "api/merge_requests/937/notes",
+    "x_total": 6,
+    "dumped": 5
+   },
+   {
+    "dir": "api/merge_requests/937/discussions",
+    "x_total": 6,
+    "dumped": 5
+   },
+   {
+    "dir": "api/merge_requests/938/notes",
+    "x_total": 6,
+    "dumped": 5
+   },
+   {
+    "dir": "api/merge_requests/938/discussions",
+    "x_total": 6,
+    "dumped": 5
+   },
+   {
+    "dir": "api/merge_requests/1173/notes",
+    "x_total": 13,
+    "dumped": 11
+   },
+   {
+    "dir": "api/merge_requests/1173/discussions",
+    "x_total": 13,
+    "dumped": 11
+   },
+   {
+    "dir": "api/merge_requests/1241/notes",
+    "x_total": 5,
+    "dumped": 4
+   },
+   {
+    "dir": "api/merge_requests/1241/discussions",
+    "x_total": 5,
+    "dumped": 4
+   },
+   {
+    "dir": "api/merge_requests/1273/notes",
+    "x_total": 7,
+    "dumped": 6
+   },
+   {
+    "dir": "api/merge_requests/1273/discussions",
+    "x_total": 7,
+    "dumped": 6
+   },
+   {
+    "dir": "api/merge_requests/1274/notes",
+    "x_total": 6,
+    "dumped": 5
+   },
+   {
+    "dir": "api/merge_requests/1274/discussions",
+    "x_total": 6,
+    "dumped": 5
+   },
+   {
+    "dir": "api/merge_requests/1325/notes",
+    "x_total": 6,
+    "dumped": 5
+   },
+   {
+    "dir": "api/merge_requests/1325/discussions",
+    "x_total": 6,
+    "dumped": 5
+   },
+   {
+    "dir": "api/commits/ee024077565604042f2ba70ff6fa7f480bcc6dab/discussions",
+    "x_total": 1,
+    "dumped": 0
+   },
+   {
+    "dir": "api/commits/45e365033071b623703a069bdb382d7dc2386814/discussions",
+    "x_total": 3,
+    "dumped": 2
+   }
+  ],
+  "gitlab_mr_1220_related_issues": "외부(Jira) 연동 이슈 목록이 마지막 페이지에서 끊겨 896건 중 800건만 받음. MR 본문·커밋은 전부 보존",
+  "unrecoverable_deleted_branch_commits": [
+   "f258fa35b80af0f8c1ee6559f43a4c572d0372b6",
+   "4bee0e0e1dccd631a6e9295bfb17a637657f1724",
+   "01d302cfdc7d10348fba8a64539a07a0c5d1c2f0",
+   "574d2ef9b6e0fef9d81b6b460d807a4cbc2ab1fe",
+   "97096951f4661963962eca8acb3d9a02ac228555"
+  ],
+  "gitlab_lfs_unidentified_bytes": 124031,
+  "gitlab_project_export": "서버에서 비활성(404). API 원본 덤프와 Git mirror 를 정본으로 사용",
+  "jira_official_backup": "사이트 관리자 권한 없음"
+ },
+ "private_original_archive": {
+  "file": "ssafesta-original-private-20260928.tar",
+  "sha256": "0a1b2c787146d49b61825c21cd0854aafdf16aebded4b60d4b914d9f728683db",
+  "note": "가공 전 API 응답·첨부·package 원본. 개인정보·웹훅 URL 등을 포함해 공개하지 않고 팀이 오프라인으로 보관한다."
+ }
+}

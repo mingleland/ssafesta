@@ -1,0 +1,75 @@
+[
+ {
+  "name": "강형순",
+  "github": "kanghyunsoon",
+  "gitlab": "gudtnslwkd",
+  "jira_display_name": "강형순",
+  "git_author_names": [
+   "강형순",
+   "KHS",
+   "kanghyunsoon"
+  ]
+ },
+ {
+  "name": "이정헌",
+  "github": "colosair",
+  "gitlab": "colosair",
+  "jira_display_name": "이정헌",
+  "git_author_names": [
+   "이정헌",
+   "colosair"
+  ]
+ },
+ {
+  "name": "황덕",
+  "github": "strdeok",
+  "gitlab": "ejraks1548",
+  "jira_display_name": "황덕",
+  "git_author_names": [
+   "황덕",
+   "Deok",
+   "strdeok"
+  ]
+ },
+ {
+  "name": "김가현",
+  "github": "ghkim1632",
+  "gitlab": "dream_hyeon",
+  "jira_display_name": "김가현",
+  "git_author_names": [
+   "김가현",
+   "ghkim1632",
+   "Gahyeon Kim"
+  ]
+ },
+ {
+  "name": "정승욱",
+  "github": "Alexjung0115",
+  "gitlab": "powerful7305",
+  "jira_display_name": "정승욱",
+  "git_author_names": [
+   "정승욱",
+   "Alexjung0115"
+  ]
+ },
+ {
+  "name": "박준우",
+  "github": "busypark",
+  "gitlab": "rammerg",
+  "jira_display_name": "박준우",
+  "git_author_names": [
+   "박준우",
+   "busypark"
+  ]
+ },
+ {
+  "name": "(자동화)",
+  "git_author_names": [
+   "Codex",
+   "ci",
+   "Ubuntu",
+   "GitHub"
+  ],
+  "note": "도구·CI·서버에서 만든 커밋"
+ }
+]

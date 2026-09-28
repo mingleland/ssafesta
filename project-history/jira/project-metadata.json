@@ -1,0 +1,2815 @@
+{
+ "project": {
+  "expand": "description,lead,issueTypes,url,projectKeys,permissions,insight",
+  "id": "22528",
+  "key": "S15P21A604",
+  "description": "",
+  "lead": {
+   "user": "강형순",
+   "displayName": "강형순",
+   "active": true
+  },
+  "components": [
+   {
+    "id": "17803",
+    "name": "AI (FastAPI/RAG)",
+    "isAssigneeTypeValid": false
+   },
+   {
+    "id": "17801",
+    "name": "Backend (Spring)",
+    "isAssigneeTypeValid": false
+   },
+   {
+    "id": "17805",
+    "name": "Docs/Process",
+    "isAssigneeTypeValid": false
+   },
+   {
+    "id": "17800",
+    "name": "Frontend (React)",
+    "isAssigneeTypeValid": false
+   },
+   {
+    "id": "17804",
+    "name": "Infra (AWS/Docker)",
+    "isAssigneeTypeValid": false
+   },
+   {
+    "id": "17965",
+    "name": "Unity Client",
+    "isAssigneeTypeValid": false
+   },
+   {
+    "id": "17802",
+    "name": "Unity Client/Server",
+    "isAssigneeTypeValid": false
+   }
+  ],
+  "issueTypes": [
+   {
+    "id": "10002",
+    "description": "소규모 개별 업무입니다.",
+    "iconUrl": "https://ssafy.atlassian.net/rest/api/2/universal_avatar/view/type/issuetype/avatar/10318?size=medium",
+    "name": "작업",
+    "subtask": false,
+    "avatarId": 10318,
+    "hierarchyLevel": 0
+   },
+   {
+    "id": "10003",
+    "description": "A small piece of work that's part of a larger task.",
+    "iconUrl": "https://ssafy.atlassian.net/rest/api/2/universal_avatar/view/type/issuetype/avatar/10316?size=medium",
+    "name": "하위 작업",
+    "subtask": true,
+    "avatarId": 10316,
+    "hierarchyLevel": -1
+   },
+   {
+    "id": "10001",
+    "description": "Jira Agile에서 만듦 - 편집 또는 삭제하지 마세요. 사용자 스토리에 대한 이슈 유형입니다.",
+    "iconUrl": "https://ssafy.atlassian.net/rest/api/2/universal_avatar/view/type/issuetype/avatar/10315?size=medium",
+    "name": "스토리",
+    "subtask": false,
+    "avatarId": 10315,
+    "hierarchyLevel": 0
+   },
+   {
+    "id": "10004",
+    "description": "문제 또는 오류.",
+    "iconUrl": "https://ssafy.atlassian.net/rest/api/2/universal_avatar/view/type/issuetype/avatar/10303?size=medium",
+    "name": "버그",
+    "subtask": false,
+    "avatarId": 10303,
+    "hierarchyLevel": 0
+   },
+   {
+    "id": "10000",
+    "description": "A big user story that needs to be broken down. Created by Jira Software - do not edit or delete.",
+    "iconUrl": "https://ssafy.atlassian.net/images/icons/issuetypes/epic.svg",
+    "name": "에픽",
+    "subtask": false,
+    "hierarchyLevel": 1
+   }
+  ],
+  "assigneeType": "UNASSIGNED",
+  "versions": [
+   {
+    "id": "11301",
+    "description": "POC — Multiplayer + Booth Runtime (git 태그 v0.0.1-poc, 기준선 동결)",
+    "name": "v0.0.1-poc",
+    "archived": false,
+    "released": true,
+    "releaseDate": "2026-08-16",
+    "userReleaseDate": "2026/08/16",
+    "projectId": 22528
+   },
+   {
+    "id": "11302",
+    "name": "v0.1.0-mvp1",
+    "archived": false,
+    "released": false,
+    "releaseDate": "2026-09-22",
+    "overdue": true,
+    "userReleaseDate": "2026/09/22",
+    "projectId": 22528
+   },
+   {
+    "id": "11303",
+    "name": "v0.3.0-mvp2",
+    "archived": false,
+    "released": false,
+    "releaseDate": "2026-09-24",
+    "overdue": true,
+    "userReleaseDate": "2026/09/24",
+    "projectId": 22528
+   },
+   {
+    "id": "11304",
+    "name": "v1.0.0",
+    "archived": false,
+    "released": false,
+    "releaseDate": "2026-09-25",
+    "overdue": true,
+    "userReleaseDate": "2026/09/25",
+    "projectId": 22528
+   },
+   {
+    "id": "11305",
+    "name": "v0.2.0",
+    "archived": false,
+    "released": false,
+    "releaseDate": "2026-09-23",
+    "overdue": true,
+    "userReleaseDate": "2026/09/23",
+    "projectId": 22528
+   }
+  ],
+  "name": "[A604]SSAFESTA",
+  "roles": {
+   "Administrators (migrated)": "https://ssafy.atlassian.net/rest/api/3/project/22528/role/10005",
+   "atlassian-addons-project-access": "https://ssafy.atlassian.net/rest/api/3/project/22528/role/10003",
+   "Service Desk Team": "https://ssafy.atlassian.net/rest/api/3/project/22528/role/10011",
+   "Developers": "https://ssafy.atlassian.net/rest/api/3/project/22528/role/10004",
+   "jira-guest-member": "https://ssafy.atlassian.net/rest/api/3/project/22528/role/10213",
+   "Service Desk Customers": "https://ssafy.atlassian.net/rest/api/3/project/22528/role/10010",
+   "Administrators": "https://ssafy.atlassian.net/rest/api/3/project/22528/role/10002"
+  },
+  "projectKeys": [
+   "S15P21A604"
+  ],
+  "projectTypeKey": "software",
+  "simplified": false,
+  "style": "classic",
+  "isPrivate": false,
+  "permissions": {
+   "canEdit": false
+  },
+  "properties": {}
+ },
+ "project-components": [
+  {
+   "id": "17803",
+   "name": "AI (FastAPI/RAG)",
+   "assigneeType": "PROJECT_DEFAULT",
+   "realAssigneeType": "PROJECT_DEFAULT",
+   "isAssigneeTypeValid": false,
+   "project": "S15P21A604",
+   "projectId": 22528
+  },
+  {
+   "id": "17801",
+   "name": "Backend (Spring)",
+   "assigneeType": "PROJECT_DEFAULT",
+   "realAssigneeType": "PROJECT_DEFAULT",
+   "isAssigneeTypeValid": false,
+   "project": "S15P21A604",
+   "projectId": 22528
+  },
+  {
+   "id": "17805",
+   "name": "Docs/Process",
+   "assigneeType": "PROJECT_DEFAULT",
+   "realAssigneeType": "PROJECT_DEFAULT",
+   "isAssigneeTypeValid": false,
+   "project": "S15P21A604",
+   "projectId": 22528
+  },
+  {
+   "id": "17800",
+   "name": "Frontend (React)",
+   "assigneeType": "PROJECT_DEFAULT",
+   "realAssigneeType": "PROJECT_DEFAULT",
+   "isAssigneeTypeValid": false,
+   "project": "S15P21A604",
+   "projectId": 22528
+  },
+  {
+   "id": "17804",
+   "name": "Infra (AWS/Docker)",
+   "assigneeType": "PROJECT_DEFAULT",
+   "realAssigneeType": "PROJECT_DEFAULT",
+   "isAssigneeTypeValid": false,
+   "project": "S15P21A604",
+   "projectId": 22528
+  },
+  {
+   "id": "17965",
+   "name": "Unity Client",
+   "assigneeType": "PROJECT_DEFAULT",
+   "realAssigneeType": "PROJECT_DEFAULT",
+   "isAssigneeTypeValid": false,
+   "project": "S15P21A604",
+   "projectId": 22528
+  },
+  {
+   "id": "17802",
+   "name": "Unity Client/Server",
+   "assigneeType": "PROJECT_DEFAULT",
+   "realAssigneeType": "PROJECT_DEFAULT",
+   "isAssigneeTypeValid": false,
+   "project": "S15P21A604",
+   "projectId": 22528
+  }
+ ],
+ "project-versions": [
+  {
+   "expand": "operations",
+   "id": "11301",
+   "description": "POC — Multiplayer + Booth Runtime (git 태그 v0.0.1-poc, 기준선 동결)",
+   "name": "v0.0.1-poc",
+   "archived": false,
+   "released": true,
+   "releaseDate": "2026-08-16",
+   "userReleaseDate": "2026/08/16",
+   "projectId": 22528,
+   "operations": [
+    {
+     "id": "com.atlassian.jira.jira-projects-plugin:edit_version_dialog",
+     "styleClass": "version-edit-dialog",
+     "label": "편집",
+     "href": "/secure/VersionEdit!default.jspa?versionId=11301",
+     "weight": 100
+    }
+   ]
+  },
+  {
+   "expand": "operations",
+   "id": "11302",
+   "name": "v0.1.0-mvp1",
+   "archived": false,
+   "released": false,
+   "releaseDate": "2026-09-22",
+   "overdue": true,
+   "userReleaseDate": "2026/09/22",
+   "projectId": 22528,
+   "operations": [
+    {
+     "id": "com.atlassian.jira.jira-projects-plugin:edit_version_dialog",
+     "styleClass": "version-edit-dialog",
+     "label": "편집",
+     "href": "/secure/VersionEdit!default.jspa?versionId=11302",
+     "weight": 100
+    }
+   ]
+  },
+  {
+   "expand": "operations",
+   "id": "11303",
+   "name": "v0.3.0-mvp2",
+   "archived": false,
+   "released": false,
+   "releaseDate": "2026-09-24",
+   "overdue": true,
+   "userReleaseDate": "2026/09/24",
+   "projectId": 22528,
+   "operations": [
+    {
+     "id": "com.atlassian.jira.jira-projects-plugin:edit_version_dialog",
+     "styleClass": "version-edit-dialog",
+     "label": "편집",
+     "href": "/secure/VersionEdit!default.jspa?versionId=11303",
+     "weight": 100
+    }
+   ]
+  },
+  {
+   "expand": "operations",
+   "id": "11304",
+   "name": "v1.0.0",
+   "archived": false,
+   "released": false,
+   "releaseDate": "2026-09-25",
+   "overdue": true,
+   "userReleaseDate": "2026/09/25",
+   "projectId": 22528,
+   "operations": [
+    {
+     "id": "com.atlassian.jira.jira-projects-plugin:edit_version_dialog",
+     "styleClass": "version-edit-dialog",
+     "label": "편집",
+     "href": "/secure/VersionEdit!default.jspa?versionId=11304",
+     "weight": 100
+    }
+   ]
+  },
+  {
+   "expand": "operations",
+   "id": "11305",
+   "name": "v0.2.0",
+   "archived": false,
+   "released": false,
+   "releaseDate": "2026-09-23",
+   "overdue": true,
+   "userReleaseDate": "2026/09/23",
+   "projectId": 22528,
+   "operations": [
+    {
+     "id": "com.atlassian.jira.jira-projects-plugin:edit_version_dialog",
+     "styleClass": "version-edit-dialog",
+     "label": "편집",
+     "href": "/secure/VersionEdit!default.jspa?versionId=11305",
+     "weight": 100
+    }
+   ]
+  }
+ ],
+ "project-statuses": [
+  {
+   "id": "10002",
+   "name": "Task",
+   "subtask": false,
+   "statuses": [
+    {
+     "description": "",
+     "iconUrl": "https://ssafy.atlassian.net/",
+     "name": "완료",
+     "untranslatedName": "Done",
+     "id": "10001",
+     "statusCategory": {
+      "id": 3,
+      "key": "done",
+      "colorName": "green",
+      "name": "완료"
+     }
+    },
+    {
+     "description": "",
+     "iconUrl": "https://ssafy.atlassian.net/",
+     "name": "해야 할 일",
+     "untranslatedName": "To Do",
+     "id": "10000",
+     "statusCategory": {
+      "id": 2,
+      "key": "new",
+      "colorName": "blue-gray",
+      "name": "해야 할 일"
+     }
+    },
+    {
+     "description": "현재 담당자가 이 업무 항목에 작업 중입니다.",
+     "iconUrl": "https://ssafy.atlassian.net/images/icons/statuses/inprogress.png",
+     "name": "진행 중",
+     "untranslatedName": "In Progress",
+     "id": "3",
+     "statusCategory": {
+      "id": 4,
+      "key": "indeterminate",
+      "colorName": "yellow",
+      "name": "진행 중"
+     }
+    }
+   ]
+  },
+  {
+   "id": "10003",
+   "name": "Sub-task",
+   "subtask": true,
+   "statuses": [
+    {
+     "description": "",
+     "iconUrl": "https://ssafy.atlassian.net/",
+     "name": "완료",
+     "untranslatedName": "Done",
+     "id": "10001",
+     "statusCategory": {
+      "id": 3,
+      "key": "done",
+      "colorName": "green",
+      "name": "완료"
+     }
+    },
+    {
+     "description": "",
+     "iconUrl": "https://ssafy.atlassian.net/",
+     "name": "해야 할 일",
+     "untranslatedName": "To Do",
+     "id": "10000",
+     "statusCategory": {
+      "id": 2,
+      "key": "new",
+      "colorName": "blue-gray",
+      "name": "해야 할 일"
+     }
+    },
+    {
+     "description": "현재 담당자가 이 업무 항목에 작업 중입니다.",
+     "iconUrl": "https://ssafy.atlassian.net/images/icons/statuses/inprogress.png",
+     "name": "진행 중",
+     "untranslatedName": "In Progress",
+     "id": "3",
+     "statusCategory": {
+      "id": 4,
+      "key": "indeterminate",
+      "colorName": "yellow",
+      "name": "진행 중"
+     }
+    }
+   ]
+  },
+  {
+   "id": "10001",
+   "name": "Story",
+   "subtask": false,
+   "statuses": [
+    {
+     "description": "",
+     "iconUrl": "https://ssafy.atlassian.net/",
+     "name": "완료",
+     "untranslatedName": "Done",
+     "id": "10001",
+     "statusCategory": {
+      "id": 3,
+      "key": "done",
+      "colorName": "green",
+      "name": "완료"
+     }
+    },
+    {
+     "description": "",
+     "iconUrl": "https://ssafy.atlassian.net/",
+     "name": "해야 할 일",
+     "untranslatedName": "To Do",
+     "id": "10000",
+     "statusCategory": {
+      "id": 2,
+      "key": "new",
+      "colorName": "blue-gray",
+      "name": "해야 할 일"
+     }
+    },
+    {
+     "description": "현재 담당자가 이 업무 항목에 작업 중입니다.",
+     "iconUrl": "https://ssafy.atlassian.net/images/icons/statuses/inprogress.png",
+     "name": "진행 중",
+     "untranslatedName": "In Progress",
+     "id": "3",
+     "statusCategory": {
+      "id": 4,
+      "key": "indeterminate",
+      "colorName": "yellow",
+      "name": "진행 중"
+     }
+    }
+   ]
+  },
+  {
+   "id": "10004",
+   "name": "Bug",
+   "subtask": false,
+   "statuses": [
+    {
+     "description": "",
+     "iconUrl": "https://ssafy.atlassian.net/",
+     "name": "완료",
+     "untranslatedName": "Done",
+     "id": "10001",
+     "statusCategory": {
+      "id": 3,
+      "key": "done",
+      "colorName": "green",
+      "name": "완료"
+     }
+    },
+    {
+     "description": "",
+     "iconUrl": "https://ssafy.atlassian.net/",
+     "name": "해야 할 일",
+     "untranslatedName": "To Do",
+     "id": "10000",
+     "statusCategory": {
+      "id": 2,
+      "key": "new",
+      "colorName": "blue-gray",
+      "name": "해야 할 일"
+     }
+    },
+    {
+     "description": "현재 담당자가 이 업무 항목에 작업 중입니다.",
+     "iconUrl": "https://ssafy.atlassian.net/images/icons/statuses/inprogress.png",
+     "name": "진행 중",
+     "untranslatedName": "In Progress",
+     "id": "3",
+     "statusCategory": {
+      "id": 4,
+      "key": "indeterminate",
+      "colorName": "yellow",
+      "name": "진행 중"
+     }
+    }
+   ]
+  },
+  {
+   "id": "10000",
+   "name": "Epic",
+   "subtask": false,
+   "statuses": [
+    {
+     "description": "",
+     "iconUrl": "https://ssafy.atlassian.net/",
+     "name": "완료",
+     "untranslatedName": "Done",
+     "id": "10001",
+     "statusCategory": {
+      "id": 3,
+      "key": "done",
+      "colorName": "green",
+      "name": "완료"
+     }
+    },
+    {
+     "description": "",
+     "iconUrl": "https://ssafy.atlassian.net/",
+     "name": "해야 할 일",
+     "untranslatedName": "To Do",
+     "id": "10000",
+     "statusCategory": {
+      "id": 2,
+      "key": "new",
+      "colorName": "blue-gray",
+      "name": "해야 할 일"
+     }
+    },
+    {
+     "description": "현재 담당자가 이 업무 항목에 작업 중입니다.",
+     "iconUrl": "https://ssafy.atlassian.net/images/icons/statuses/inprogress.png",
+     "name": "진행 중",
+     "untranslatedName": "In Progress",
+     "id": "3",
+     "statusCategory": {
+      "id": 4,
+      "key": "indeterminate",
+      "colorName": "yellow",
+      "name": "진행 중"
+     }
+    }
+   ]
+  }
+ ],
+ "fields": [
+  {
+   "id": "statuscategorychangedate",
+   "key": "statuscategorychangedate",
+   "name": "상태 범주 변경됨",
+   "custom": false,
+   "orderable": false,
+   "navigable": true,
+   "searchable": true,
+   "clauseNames": [
+    "statusCategoryChangedDate"
+   ],
+   "schema": {
+    "type": "datetime",
+    "system": "statuscategorychangedate"
+   }
+  },
+  {
+   "id": "customfield_10193",
+   "key": "customfield_10193",
+   "name": "에이전트 세션",
+   "untranslatedName": "에이전트 세션",
+   "custom": true,
+   "orderable": true,
+   "navigable": true,
+   "searchable": true,
+   "clauseNames": [
+    "에이전트 세션",
+    "cf[10193]"
+   ],
+   "schema": {
+    "type": "array",
+    "items": "admin.customfield.type.agent.sessions.name",
+    "custom": "com.atlassian.jira.plugin.system.customfieldtypes:agent-sessions",
+    "customId": 10193
+   }
+  },
+  {
+   "id": "fixVersions",
+   "key": "fixVersions",
+   "name": "수정 버전",
+   "custom": false,
+   "orderable": true,
+   "navigable": true,
+   "searchable": true,
+   "clauseNames": [
+    "fixVersion"
+   ],
+   "schema": {
+    "type": "array",
+    "items": "version",
+    "system": "fixVersions"
+   }
+  },
+  {
+   "id": "statusCategory",
+   "key": "statusCategory",
+   "name": "상태 범주",
+   "custom": false,
+   "orderable": false,
+   "navigable": true,
+   "searchable": true,
+   "clauseNames": [
+    "statusCategory"
+   ],
+   "schema": {
+    "type": "statusCategory",
+    "system": "statusCategory"
+   }
+  },
+  {
+   "id": "parent",
+   "key": "parent",
+   "name": "상위 항목",
+   "custom": false,
+   "orderable": true,
+   "navigable": true,
+   "searchable": true,
+   "clauseNames": [
+    "parent"
+   ]
+  },
+  {
+   "id": "resolution",
+   "key": "resolution",
+   "name": "해결",
+   "custom": false,
+   "orderable": true,
+   "navigable": true,
+   "searchable": true,
+   "clauseNames": [
+    "resolution"
+   ],
+   "schema": {
+    "type": "resolution",
+    "system": "resolution"
+   }
+  },
+  {
+   "id": "customfield_10226",
+   "key": "customfield_10226",
+   "name": "Incident manager",
+   "untranslatedName": "Incident manager",
+   "custom": true,
+   "orderable": true,
+   "navigable": true,
+   "searchable": true,
+   "clauseNames": [
+    "cf[10226]",
+    "Incident manager[User Picker (single user)]",
+    "Incident manager"
+   ],
+   "schema": {
+    "type": "user",
+    "custom": "com.atlassian.jira.plugin.system.customfieldtypes:userpicker",
+    "customId": 10226
+   }
+  },
+  {
+   "id": "lastViewed",
+   "key": "lastViewed",
+   "name": "최근에 봄",
+   "custom": false,
+   "orderable": false,
+   "navigable": true,
+   "searchable": false,
+   "clauseNames": [
+    "lastViewed"
+   ],
+   "schema": {
+    "type": "datetime",
+    "system": "lastViewed"
+   }
+  },
+  {
+   "id": "customfield_10060",
+   "key": "customfield_10060",
+   "name": "포커스 영역",
+   "untranslatedName": "포커스 영역",
+   "custom": true,
+   "orderable": true,
+   "navigable": true,
+   "searchable": true,
+   "clauseNames": [
+    "cf[10060]",
+    "포커스 영역",
+    "포커스 영역[FocusAreas]"
+   ],
+   "schema": {
+    "type": "array",
+    "items": "포커스 영역",
+    "custom": "com.atlassian.jira.plugin.system.customfieldtypes:focus-areas",
+    "customId": 10060
+   }
+  },
+  {
+   "id": "priority",
+   "key": "priority",
+   "name": "우선 순위",
+   "custom": false,
+   "orderable": true,
+   "navigable": true,
+   "searchable": true,
+   "clauseNames": [
+    "priority"
+   ],
+   "schema": {
+    "type": "priority",
+    "system": "priority"
+   }
+  },
+  {
+   "id": "labels",
+   "key": "labels",
+   "name": "레이블",
+   "custom": false,
+   "orderable": true,
+   "navigable": true,
+   "searchable": true,
+   "clauseNames": [
+    "labels"
+   ],
+   "schema": {
+    "type": "array",
+    "items": "string",
+    "system": "labels"
+   }
+  },
+  {
+   "id": "timeestimate",
+   "key": "timeestimate",
+   "name": "남은 추정치",
+   "custom": false,
+   "orderable": false,
+   "navigable": true,
+   "searchable": false,
+   "clauseNames": [
+    "remainingEstimate",
+    "timeestimate"
+   ],
+   "schema": {
+    "type": "number",
+    "system": "timeestimate"
+   }
+  },
+  {
+   "id": "aggregatetimeoriginalestimate",
+   "key": "aggregatetimeoriginalestimate",
+   "name": "초기 추정의 합",
+   "custom": false,
+   "orderable": false,
+   "navigable": true,
+   "searchable": false,
+   "clauseNames": [],
+   "schema": {
+    "type": "number",
+    "system": "aggregatetimeoriginalestimate"
+   }
+  },
+  {
+   "id": "versions",
+   "key": "versions",
+   "name": "영향을 받는 버전",
+   "custom": false,
+   "orderable": true,
+   "navigable": true,
+   "searchable": true,
+   "clauseNames": [
+    "affectedVersion"
+   ],
+   "schema": {
+    "type": "array",
+    "items": "version",
+    "system": "versions"
+   }
+  },
+  {
+   "id": "issuelinks",
+   "key": "issuelinks",
+   "name": "연결된 이슈",
+   "custom": false,
+   "orderable": true,
+   "navigable": true,
+   "searchable": true,
+   "clauseNames": [
+    "issueLink",
+    "workItemLink"
+   ],
+   "schema": {
+    "type": "array",
+    "items": "issuelinks",
+    "system": "issuelinks"
+   }
+  },
+  {
+   "id": "assignee",
+   "key": "assignee",
+   "name": "담당자",
+   "custom": false,
+   "orderable": true,
+   "navigable": true,
+   "searchable": true,
+   "clauseNames": [
+    "assignee"
+   ],
+   "schema": {
+    "type": "user",
+    "system": "assignee"
+   }
+  },
+  {
+   "id": "status",
+   "key": "status",
+   "name": "상태",
+   "custom": false,
+   "orderable": false,
+   "navigable": true,
+   "searchable": true,
+   "clauseNames": [
+    "status"
+   ],
+   "schema": {
+    "type": "status",
+    "system": "status"
+   }
+  },
+  {
+   "id": "components",
+   "key": "components",
+   "name": "컴포넌트",
+   "custom": false,
+   "orderable": true,
+   "navigable": true,
+   "searchable": true,
+   "clauseNames": [
+    "component"
+   ],
+   "schema": {
+    "type": "array",
+    "items": "component",
+    "system": "components"
+   }
+  },
+  {
+   "id": "issuekey",
+   "key": "issuekey",
+   "name": "키",
+   "custom": false,
+   "orderable": false,
+   "navigable": true,
+   "searchable": false,
+   "clauseNames": [
+    "id",
+    "issue",
+    "issuekey",
+    "key",
+    "workItem",
+    "workItemKey"
+   ]
+  },
+  {
+   "id": "customfield_10050",
+   "key": "customfield_10050",
+   "name": "긴급도",
+   "untranslatedName": "긴급도",
+   "custom": true,
+   "orderable": true,
+   "navigable": true,
+   "searchable": true,
+   "clauseNames": [
+    "긴급도",
+    "긴급도[Dropdown]",
+    "cf[10050]"
+   ],
+   "schema": {
+    "type": "option",
+    "custom": "com.atlassian.jira.plugin.system.customfieldtypes:select",
+    "customId": 10050
+   }
+  },
+  {
+   "id": "customfield_10051",
+   "key": "customfield_10051",
+   "name": "보류 중인 이유",
+   "untranslatedName": "보류 중인 이유",
+   "custom": true,
+   "orderable": true,
+   "navigable": true,
+   "searchable": true,
+   "clauseNames": [
+    "보류 중인 이유[Dropdown]",
+    "보류 중인 이유",
+    "cf[10051]"
+   ],
+   "schema": {
+    "type": "option",
+    "custom": "com.atlassian.jira.plugin.system.customfieldtypes:select",
+    "customId": 10051
+   }
+  },
+  {
+   "id": "customfield_10052",
+   "key": "customfield_10052",
+   "name": "승인자 그룹",
+   "untranslatedName": "승인자 그룹",
+   "custom": true,
+   "orderable": true,
+   "navigable": true,
+   "searchable": true,
+   "clauseNames": [
+    "승인자 그룹[Group Picker (multiple groups)]",
+    "cf[10052]",
+    "승인자 그룹"
+   ],
+   "schema": {
+    "type": "array",
+    "items": "group",
+    "custom": "com.atlassian.jira.plugin.system.customfieldtypes:multigrouppicker",
+    "customId": 10052
+   }
+  },
+  {
+   "id": "customfield_10053",
+   "key": "customfield_10053",
+   "name": "주요 인시던트",
+   "untranslatedName": "주요 인시던트",
+   "custom": true,
+   "orderable": true,
+   "navigable": true,
+   "searchable": true,
+   "clauseNames": [
+    "cf[10053]",
+    "주요 인시던트"
+   ],
+   "schema": {
+    "type": "string",
+    "custom": "com.atlassian.jira.modules.servicemanagement.major-incident-entity:major-incident-entity-field-cftype",
+    "customId": 10053
+   }
+  },
+  {
+   "id": "customfield_10054",
+   "key": "customfield_10054",
+   "name": "대응자",
+   "untranslatedName": "대응자",
+   "custom": true,
+   "orderable": true,
+   "navigable": true,
+   "searchable": true,
+   "clauseNames": [],
+   "schema": {
+    "type": "array",
+    "items": "string",
+    "custom": "com.atlassian.jira.modules.servicemanagement.responders-entity:responders-entity-field-cftype",
+    "customId": 10054
+   }
+  },
+  {
+   "id": "customfield_10055",
+   "key": "customfield_10055",
+   "name": "심각도",
+   "untranslatedName": "심각도",
+   "custom": true,
+   "orderable": true,
+   "navigable": true,
+   "searchable": true,
+   "clauseNames": [
+    "심각도[Dropdown]",
+    "cf[10055]",
+    "심각도"
+   ],
+   "schema": {
+    "type": "option",
+    "custom": "com.atlassian.jira.plugin.system.customfieldtypes:select",
+    "customId": 10055
+   }
+  },
+  {
+   "id": "customfield_10056",
+   "key": "customfield_10056",
+   "name": "영향을 받은 하드웨어",
+   "untranslatedName": "영향을 받은 하드웨어",
+   "custom": true,
+   "orderable": true,
+   "navigable": true,
+   "searchable": true,
+   "clauseNames": [
+    "영향을 받은 하드웨어",
+    "cf[10056]",
+    "영향을 받은 하드웨어[Short text]"
+   ],
+   "schema": {
+    "type": "string",
+    "custom": "com.atlassian.jira.plugin.system.customfieldtypes:textfield",
+    "customId": 10056
+   }
+  },
+  {
+   "id": "customfield_10057",
+   "key": "customfield_10057",
+   "name": "해결까지 시간",
+   "untranslatedName": "해결까지 시간",
+   "custom": true,
+   "orderable": true,
+   "navigable": true,
+   "searchable": true,
+   "clauseNames": [
+    "cf[10057]",
+    "해결까지 시간"
+   ],
+   "schema": {
+    "type": "sd-servicelevelagreement",
+    "custom": "com.atlassian.servicedesk:sd-sla-field",
+    "customId": 10057
+   }
+  },
+  {
+   "id": "customfield_10058",
+   "key": "customfield_10058",
+   "name": "최초 응답 시간",
+   "untranslatedName": "최초 응답 시간",
+   "custom": true,
+   "orderable": true,
+   "navigable": true,
+   "searchable": true,
+   "clauseNames": [
+    "cf[10058]",
+    "최초 응답 시간"
+   ],
+   "schema": {
+    "type": "sd-servicelevelagreement",
+    "custom": "com.atlassian.servicedesk:sd-sla-field",
+    "customId": 10058
+   }
+  },
+  {
+   "id": "customfield_10059",
+   "key": "customfield_10059",
+   "name": "해결 후 종료할 시간",
+   "untranslatedName": "해결 후 종료할 시간",
+   "custom": true,
+   "orderable": true,
+   "navigable": true,
+   "searchable": true,
+   "clauseNames": [
+    "해결 후 종료할 시간",
+    "cf[10059]"
+   ],
+   "schema": {
+    "type": "sd-servicelevelagreement",
+    "custom": "com.atlassian.servicedesk:sd-sla-field",
+    "customId": 10059
+   }
+  },
+  {
+   "id": "customfield_10049",
+   "key": "customfield_10049",
+   "name": "승인",
+   "untranslatedName": "승인",
+   "custom": true,
+   "orderable": true,
+   "navigable": true,
+   "searchable": true,
+   "clauseNames": [
+    "cf[10049]",
+    "승인[Approvals]",
+    "승인"
+   ],
+   "schema": {
+    "type": "sd-approvals",
+    "custom": "com.atlassian.servicedesk.approvals-plugin:sd-approvals",
+    "customId": 10049
+   }
+  },
+  {
+   "id": "aggregatetimeestimate",
+   "key": "aggregatetimeestimate",
+   "name": "Σ 남은 추정치",
+   "custom": false,
+   "orderable": false,
+   "navigable": true,
+   "searchable": false,
+   "clauseNames": [],
+   "schema": {
+    "type": "number",
+    "system": "aggregatetimeestimate"
+   }
+  },
+  {
+   "id": "creator",
+   "key": "creator",
+   "name": "작성자",
+   "custom": false,
+   "orderable": false,
+   "navigable": true,
+   "searchable": true,
+   "clauseNames": [
+    "creator"
+   ],
+   "schema": {
+    "type": "user",
+    "system": "creator"
+   }
+  },
+  {
+   "id": "subtasks",
+   "key": "subtasks",
+   "name": "하위 작업",
+   "custom": false,
+   "orderable": false,
+   "navigable": true,
+   "searchable": false,
+   "clauseNames": [
+    "subtasks"
+   ],
+   "schema": {
+    "type": "array",
+    "items": "issuelinks",
+    "system": "subtasks"
+   }
+  },
+  {
+   "id": "customfield_10160",
+   "key": "customfield_10160",
+   "name": "업무 항목 만듦 양식",
+   "untranslatedName": "업무 항목 만듦 양식",
+   "custom": true,
+   "orderable": true,
+   "navigable": true,
+   "searchable": true,
+   "clauseNames": [],
+   "schema": {
+    "type": "array",
+    "items": "양식",
+    "custom": "com.atlassian.jira.plugins.proforma-managed-fields:proforma-forms-field-cftype",
+    "customId": 10160
+   }
+  },
+  {
+   "id": "customfield_10042",
+   "key": "customfield_10042",
+   "name": "디자인",
+   "untranslatedName": "디자인",
+   "custom": true,
+   "orderable": true,
+   "navigable": true,
+   "searchable": true,
+   "clauseNames": [
+    "cf[10042]",
+    "디자인"
+   ],
+   "schema": {
+    "type": "array",
+    "items": "design.field.name",
+    "custom": "com.atlassian.jira.plugins.jira-development-integration-plugin:designcf",
+    "customId": 10042
+   }
+  },
+  {
+   "id": "reporter",
+   "key": "reporter",
+   "name": "보고자",
+   "custom": false,
+   "orderable": true,
+   "navigable": true,
+   "searchable": true,
+   "clauseNames": [
+    "reporter"
+   ],
+   "schema": {
+    "type": "user",
+    "system": "reporter"
+   }
+  },
+  {
+   "id": "customfield_10043",
+   "key": "customfield_10043",
+   "name": "취약성",
+   "untranslatedName": "취약성",
+   "custom": true,
+   "orderable": true,
+   "navigable": true,
+   "searchable": true,
+   "clauseNames": [
+    "취약성",
+    "cf[10043]"
+   ],
+   "schema": {
+    "type": "any",
+    "custom": "com.atlassian.jira.plugins.jira-development-integration-plugin:vulnerabilitycf",
+    "customId": 10043
+   }
+  },
+  {
+   "id": "aggregateprogress",
+   "key": "aggregateprogress",
+   "name": "진행 시간의 합",
+   "custom": false,
+   "orderable": false,
+   "navigable": true,
+   "searchable": false,
+   "clauseNames": [],
+   "schema": {
+    "type": "progress",
+    "system": "aggregateprogress"
+   }
+  },
+  {
+   "id": "customfield_10044",
+   "key": "com.atlassian.atlas.jira__project-key",
+   "name": "Project overview key",
+   "untranslatedName": "Project overview key",
+   "custom": true,
+   "orderable": true,
+   "navigable": true,
+   "searchable": true,
+   "clauseNames": [
+    "Project overview key",
+    "cf[10044]"
+   ],
+   "schema": {
+    "type": "string",
+    "custom": "read-only-string-issue-field",
+    "customId": 10044
+   }
+  },
+  {
+   "id": "customfield_10045",
+   "key": "com.atlassian.atlas.jira__project-status",
+   "name": "Project overview status",
+   "untranslatedName": "Project overview status",
+   "custom": true,
+   "orderable": true,
+   "navigable": true,
+   "searchable": true,
+   "clauseNames": [
+    "cf[10045]",
+    "Project overview status"
+   ],
+   "schema": {
+    "type": "string",
+    "custom": "read-only-string-issue-field",
+    "customId": 10045
+   }
+  },
+  {
+   "id": "customfield_10046",
+   "key": "customfield_10046",
+   "name": "감정",
+   "untranslatedName": "감정",
+   "custom": true,
+   "orderable": true,
+   "navigable": true,
+   "searchable": true,
+   "clauseNames": [
+    "cf[10046]",
+    "감정"
+   ],
+   "schema": {
+    "type": "array",
+    "items": "sd-sentiment",
+    "custom": "com.atlassian.servicedesk.sentiment:sd-sentiment",
+    "customId": 10046
+   }
+  },
+  {
+   "id": "customfield_10047",
+   "key": "customfield_10047",
+   "name": "목표",
+   "untranslatedName": "목표",
+   "custom": true,
+   "orderable": true,
+   "navigable": true,
+   "searchable": true,
+   "clauseNames": [
+    "목표[Goals]",
+    "목표",
+    "cf[10047]"
+   ],
+   "schema": {
+    "type": "array",
+    "items": "목표",
+    "custom": "com.atlassian.jira.plugin.system.customfieldtypes:goals",
+    "customId": 10047
+   }
+  },
+  {
+   "id": "customfield_10048",
+   "key": "customfield_10048",
+   "name": "작업 범주",
+   "untranslatedName": "작업 범주",
+   "custom": true,
+   "orderable": true,
+   "navigable": true,
+   "searchable": true,
+   "clauseNames": [
+    "cf[10048]",
+    "작업 범주"
+   ],
+   "schema": {
+    "type": "string",
+    "custom": "com.atlassian.jira.plugins.work-category-field:work-category-field-cftype",
+    "customId": 10048
+   }
+  },
+  {
+   "id": "customfield_10038",
+   "key": "customfield_10038",
+   "name": "Request language",
+   "untranslatedName": "Request language",
+   "custom": true,
+   "orderable": true,
+   "navigable": true,
+   "searchable": true,
+   "clauseNames": [
+    "cf[10038]",
+    "Request language"
+   ],
+   "schema": {
+    "type": "sd-request-lang",
+    "custom": "com.atlassian.servicedesk.servicedesk-lingo-integration-plugin:sd-request-language",
+    "customId": 10038
+   }
+  },
+  {
+   "id": "customfield_10039",
+   "key": "customfield_10039",
+   "name": "Affected services",
+   "untranslatedName": "Affected services",
+   "custom": true,
+   "orderable": true,
+   "navigable": true,
+   "searchable": true,
+   "clauseNames": [
+    "cf[10039]",
+    "Affected services"
+   ],
+   "schema": {
+    "type": "array",
+    "items": "service-entity-field",
+    "custom": "com.atlassian.jira.plugins.service-entity:service-entity-field-cftype",
+    "customId": 10039
+   }
+  },
+  {
+   "id": "progress",
+   "key": "progress",
+   "name": "진행률",
+   "custom": false,
+   "orderable": false,
+   "navigable": true,
+   "searchable": false,
+   "clauseNames": [
+    "progress"
+   ],
+   "schema": {
+    "type": "progress",
+    "system": "progress"
+   }
+  },
+  {
+   "id": "votes",
+   "key": "votes",
+   "name": "투표",
+   "custom": false,
+   "orderable": false,
+   "navigable": true,
+   "searchable": false,
+   "clauseNames": [
+    "votes"
+   ],
+   "schema": {
+    "type": "votes",
+    "system": "votes"
+   }
+  },
+  {
+   "id": "worklog",
+   "key": "worklog",
+   "name": "로그 작업",
+   "custom": false,
+   "orderable": true,
+   "navigable": false,
+   "searchable": true,
+   "clauseNames": [],
+   "schema": {
+    "type": "array",
+    "items": "worklog",
+    "system": "worklog"
+   }
+  },
+  {
+   "id": "issuetype",
+   "key": "issuetype",
+   "name": "이슈 유형",
+   "custom": false,
+   "orderable": true,
+   "navigable": true,
+   "searchable": true,
+   "clauseNames": [
+    "issuetype",
+    "type",
+    "worktype"
+   ],
+   "schema": {
+    "type": "issuetype",
+    "system": "issuetype"
+   }
+  },
+  {
+   "id": "timespent",
+   "key": "timespent",
+   "name": "사용한 시간",
+   "custom": false,
+   "orderable": false,
+   "navigable": true,
+   "searchable": false,
+   "clauseNames": [
+    "timespent"
+   ],
+   "schema": {
+    "type": "number",
+    "system": "timespent"
+   }
+  },
+  {
+   "id": "customfield_10030",
+   "key": "customfield_10030",
+   "name": "Category",
+   "untranslatedName": "Category",
+   "custom": true,
+   "orderable": true,
+   "navigable": true,
+   "searchable": true,
+   "clauseNames": [
+    "Category[Category]",
+    "cf[10030]"
+   ],
+   "schema": {
+    "type": "option",
+    "custom": "com.atlassian.jira.plugin.system.customfieldtypes:jwm-category",
+    "customId": 10030
+   }
+  },
+  {
+   "id": "project",
+   "key": "project",
+   "name": "프로젝트",
+   "custom": false,
+   "orderable": false,
+   "navigable": true,
+   "searchable": true,
+   "clauseNames": [
+    "project",
+    "spaceJira"
+   ],
+   "schema": {
+    "type": "project",
+    "system": "project"
+   }
+  },
+  {
+   "id": "customfield_10031",
+   "key": "customfield_10031",
+   "name": "Story Points",
+   "untranslatedName": "Story Points",
+   "custom": true,
+   "orderable": true,
+   "navigable": true,
+   "searchable": true,
+   "clauseNames": [
+    "cf[10031]",
+    "Story Points[Number]",
+    "Story Points"
+   ],
+   "schema": {
+    "type": "number",
+    "custom": "com.atlassian.jira.plugin.system.customfieldtypes:float",
+    "customId": 10031
+   }
+  },
+  {
+   "id": "aggregatetimespent",
+   "key": "aggregatetimespent",
+   "name": "할애한 시간의 합",
+   "custom": false,
+   "orderable": false,
+   "navigable": true,
+   "searchable": false,
+   "clauseNames": [],
+   "schema": {
+    "type": "number",
+    "system": "aggregatetimespent"
+   }
+  },
+  {
+   "id": "customfield_10035",
+   "key": "customfield_10035",
+   "name": "Request participants",
+   "untranslatedName": "Request participants",
+   "custom": true,
+   "orderable": true,
+   "navigable": true,
+   "searchable": true,
+   "clauseNames": [
+    "cf[10035]",
+    "Request participants"
+   ],
+   "schema": {
+    "type": "array",
+    "items": "user",
+    "custom": "com.atlassian.servicedesk:sd-request-participants",
+    "customId": 10035
+   }
+  },
+  {
+   "id": "customfield_10036",
+   "key": "customfield_10036",
+   "name": "Satisfaction",
+   "untranslatedName": "Satisfaction",
+   "custom": true,
+   "orderable": true,
+   "navigable": true,
+   "searchable": true,
+   "clauseNames": [
+    "cf[10036]",
+    "Satisfaction"
+   ],
+   "schema": {
+    "type": "sd-feedback",
+    "custom": "com.atlassian.servicedesk:sd-request-feedback",
+    "customId": 10036
+   }
+  },
+  {
+   "id": "customfield_10037",
+   "key": "customfield_10037",
+   "name": "Satisfaction date",
+   "untranslatedName": "Satisfaction date",
+   "custom": true,
+   "orderable": true,
+   "navigable": true,
+   "searchable": true,
+   "clauseNames": [
+    "Satisfaction date",
+    "cf[10037]"
+   ],
+   "schema": {
+    "type": "datetime",
+    "custom": "com.atlassian.servicedesk:sd-request-feedback-date",
+    "customId": 10037
+   }
+  },
+  {
+   "id": "customfield_10027",
+   "key": "customfield_10027",
+   "name": "Open forms",
+   "untranslatedName": "Open forms",
+   "custom": true,
+   "orderable": true,
+   "navigable": true,
+   "searchable": true,
+   "clauseNames": [
+    "cf[10027]",
+    "Open forms"
+   ],
+   "schema": {
+    "type": "number",
+    "custom": "com.atlassian.jira.plugins.proforma-managed-fields:forms-open-field-cftype",
+    "customId": 10027
+   }
+  },
+  {
+   "id": "customfield_10028",
+   "key": "customfield_10028",
+   "name": "Submitted forms",
+   "untranslatedName": "Submitted forms",
+   "custom": true,
+   "orderable": true,
+   "navigable": true,
+   "searchable": true,
+   "clauseNames": [
+    "cf[10028]",
+    "Submitted forms"
+   ],
+   "schema": {
+    "type": "number",
+    "custom": "com.atlassian.jira.plugins.proforma-managed-fields:forms-submitted-field-cftype",
+    "customId": 10028
+   }
+  },
+  {
+   "id": "customfield_10029",
+   "key": "customfield_10029",
+   "name": "Total forms",
+   "untranslatedName": "Total forms",
+   "custom": true,
+   "orderable": true,
+   "navigable": true,
+   "searchable": true,
+   "clauseNames": [
+    "cf[10029]",
+    "Total forms"
+   ],
+   "schema": {
+    "type": "number",
+    "custom": "com.atlassian.jira.plugins.proforma-managed-fields:forms-total-field-cftype",
+    "customId": 10029
+   }
+  },
+  {
+   "id": "resolutiondate",
+   "key": "resolutiondate",
+   "name": "해결됨",
+   "custom": false,
+   "orderable": false,
+   "navigable": true,
+   "searchable": true,
+   "clauseNames": [
+    "resolutiondate",
+    "resolved"
+   ],
+   "schema": {
+    "type": "datetime",
+    "system": "resolutiondate"
+   }
+  },
+  {
+   "id": "workratio",
+   "key": "workratio",
+   "name": "작업율",
+   "custom": false,
+   "orderable": false,
+   "navigable": true,
+   "searchable": true,
+   "clauseNames": [
+    "workratio"
+   ],
+   "schema": {
+    "type": "number",
+    "system": "workratio"
+   }
+  },
+  {
+   "id": "watches",
+   "key": "watches",
+   "name": "지켜보는 사람",
+   "custom": false,
+   "orderable": false,
+   "navigable": true,
+   "searchable": false,
+   "clauseNames": [
+    "watchers"
+   ],
+   "schema": {
+    "type": "watches",
+    "system": "watches"
+   }
+  },
+  {
+   "id": "issuerestriction",
+   "key": "issuerestriction",
+   "name": "다음으로 제한",
+   "custom": false,
+   "orderable": true,
+   "navigable": false,
+   "searchable": true,
+   "clauseNames": [],
+   "schema": {
+    "type": "issuerestriction",
+    "system": "issuerestriction"
+   }
+  },
+  {
+   "id": "thumbnail",
+   "key": "thumbnail",
+   "name": "그림",
+   "custom": false,
+   "orderable": false,
+   "navigable": true,
+   "searchable": false,
+   "clauseNames": []
+  },
+  {
+   "id": "created",
+   "key": "created",
+   "name": "만듦",
+   "custom": false,
+   "orderable": false,
+   "navigable": true,
+   "searchable": true,
+   "clauseNames": [
+    "created",
+    "createdDate"
+   ],
+   "schema": {
+    "type": "datetime",
+    "system": "created"
+   }
+  },
+  {
+   "id": "customfield_10020",
+   "key": "customfield_10020",
+   "name": "스프린트",
+   "untranslatedName": "Sprint",
+   "custom": true,
+   "orderable": true,
+   "navigable": true,
+   "searchable": true,
+   "clauseNames": [
+    "cf[10020]",
+    "Sprint"
+   ],
+   "schema": {
+    "type": "array",
+    "items": "json",
+    "custom": "com.pyxis.greenhopper.jira:gh-sprint",
+    "customId": 10020
+   }
+  },
+  {
+   "id": "customfield_10021",
+   "key": "customfield_10021",
+   "name": "Flagged",
+   "untranslatedName": "Flagged",
+   "custom": true,
+   "orderable": true,
+   "navigable": true,
+   "searchable": true,
+   "clauseNames": [
+    "Flagged",
+    "Flagged[Checkboxes]",
+    "cf[10021]"
+   ],
+   "schema": {
+    "type": "array",
+    "items": "option",
+    "custom": "com.atlassian.jira.plugin.system.customfieldtypes:multicheckboxes",
+    "customId": 10021
+   }
+  },
+  {
+   "id": "customfield_10022",
+   "key": "customfield_10022",
+   "name": "Target start",
+   "untranslatedName": "Target start",
+   "custom": true,
+   "orderable": true,
+   "navigable": true,
+   "searchable": true,
+   "clauseNames": [
+    "Target start",
+    "cf[10022]"
+   ],
+   "schema": {
+    "type": "date",
+    "custom": "com.atlassian.jpo:jpo-custom-field-baseline-start",
+    "customId": 10022
+   }
+  },
+  {
+   "id": "customfield_10023",
+   "key": "customfield_10023",
+   "name": "Target end",
+   "untranslatedName": "Target end",
+   "custom": true,
+   "orderable": true,
+   "navigable": true,
+   "searchable": true,
+   "clauseNames": [
+    "cf[10023]",
+    "Target end"
+   ],
+   "schema": {
+    "type": "date",
+    "custom": "com.atlassian.jpo:jpo-custom-field-baseline-end",
+    "customId": 10023
+   }
+  },
+  {
+   "id": "customfield_10024",
+   "key": "customfield_10024",
+   "name": "[CHART] Date of First Response",
+   "untranslatedName": "[CHART] Date of First Response",
+   "custom": true,
+   "orderable": true,
+   "navigable": true,
+   "searchable": true,
+   "clauseNames": [
+    "cf[10024]",
+    "[CHART] Date of First Response[Date of first response]",
+    "[CHART] Date of First Response"
+   ],
+   "schema": {
+    "type": "datetime",
+    "custom": "com.atlassian.jira.ext.charting:firstresponsedate",
+    "customId": 10024
+   }
+  },
+  {
+   "id": "customfield_10025",
+   "key": "customfield_10025",
+   "name": "[CHART] Time in Status",
+   "untranslatedName": "[CHART] Time in Status",
+   "custom": true,
+   "orderable": true,
+   "navigable": true,
+   "searchable": true,
+   "clauseNames": [
+    "[CHART] Time in Status[Time in Status]",
+    "cf[10025]",
+    "[CHART] Time in Status"
+   ],
+   "schema": {
+    "type": "any",
+    "custom": "com.atlassian.jira.ext.charting:timeinstatus",
+    "customId": 10025
+   }
+  },
+  {
+   "id": "customfield_10026",
+   "key": "customfield_10026",
+   "name": "Locked forms",
+   "untranslatedName": "Locked forms",
+   "custom": true,
+   "orderable": true,
+   "navigable": true,
+   "searchable": true,
+   "clauseNames": [
+    "cf[10026]",
+    "Locked forms"
+   ],
+   "schema": {
+    "type": "number",
+    "custom": "com.atlassian.jira.plugins.proforma-managed-fields:forms-locked-field-cftype",
+    "customId": 10026
+   }
+  },
+  {
+   "id": "customfield_10016",
+   "key": "customfield_10016",
+   "name": "Story point estimate",
+   "untranslatedName": "Story point estimate",
+   "custom": true,
+   "orderable": true,
+   "navigable": true,
+   "searchable": true,
+   "clauseNames": [
+    "cf[10016]",
+    "Story point estimate"
+   ],
+   "schema": {
+    "type": "number",
+    "custom": "com.pyxis.greenhopper.jira:jsw-story-points",
+    "customId": 10016
+   }
+  },
+  {
+   "id": "customfield_10017",
+   "key": "customfield_10017",
+   "name": "이슈 색상",
+   "untranslatedName": "Issue color",
+   "custom": true,
+   "orderable": true,
+   "navigable": true,
+   "searchable": true,
+   "clauseNames": [
+    "cf[10017]",
+    "Issue color"
+   ],
+   "schema": {
+    "type": "string",
+    "custom": "com.pyxis.greenhopper.jira:jsw-issue-color",
+    "customId": 10017
+   }
+  },
+  {
+   "id": "customfield_10018",
+   "key": "customfield_10018",
+   "name": "Parent Link",
+   "untranslatedName": "Parent Link",
+   "custom": true,
+   "orderable": true,
+   "navigable": true,
+   "searchable": true,
+   "clauseNames": [
+    "Parent Link",
+    "cf[10018]"
+   ],
+   "schema": {
+    "type": "any",
+    "custom": "com.atlassian.jpo:jpo-custom-field-parent",
+    "customId": 10018
+   }
+  },
+  {
+   "id": "customfield_10019",
+   "key": "customfield_10019",
+   "name": "순위",
+   "untranslatedName": "Rank",
+   "custom": true,
+   "orderable": true,
+   "navigable": true,
+   "searchable": true,
+   "clauseNames": [
+    "cf[10019]",
+    "Rank"
+   ],
+   "schema": {
+    "type": "any",
+    "custom": "com.pyxis.greenhopper.jira:gh-lexo-rank",
+    "customId": 10019
+   }
+  },
+  {
+   "id": "updated",
+   "key": "updated",
+   "name": "업데이트",
+   "custom": false,
+   "orderable": false,
+   "navigable": true,
+   "searchable": true,
+   "clauseNames": [
+    "updated",
+    "updatedDate"
+   ],
+   "schema": {
+    "type": "datetime",
+    "system": "updated"
+   }
+  },
+  {
+   "id": "customfield_10093",
+   "key": "customfield_10093",
+   "name": "Atlassian Project",
+   "untranslatedName": "프로젝트",
+   "custom": true,
+   "orderable": true,
+   "navigable": true,
+   "searchable": true,
+   "clauseNames": [
+    "cf[10093]",
+    "프로젝트",
+    "프로젝트[AtlassianProject]"
+   ],
+   "schema": {
+    "type": "atlas-project",
+    "custom": "com.atlassian.jira.plugin.system.customfieldtypes:atlas-project",
+    "customId": 10093
+   }
+  },
+  {
+   "id": "timeoriginalestimate",
+   "key": "timeoriginalestimate",
+   "name": "최초 추정치",
+   "custom": false,
+   "orderable": false,
+   "navigable": true,
+   "searchable": false,
+   "clauseNames": [
+    "originalEstimate",
+    "timeoriginalestimate"
+   ],
+   "schema": {
+    "type": "number",
+    "system": "timeoriginalestimate"
+   }
+  },
+  {
+   "id": "description",
+   "key": "description",
+   "name": "설명",
+   "custom": false,
+   "orderable": true,
+   "navigable": true,
+   "searchable": true,
+   "clauseNames": [
+    "description"
+   ],
+   "schema": {
+    "type": "string",
+    "system": "description"
+   }
+  },
+  {
+   "id": "customfield_10010",
+   "key": "customfield_10010",
+   "name": "Request Type",
+   "untranslatedName": "Request Type",
+   "custom": true,
+   "orderable": true,
+   "navigable": true,
+   "searchable": true,
+   "clauseNames": [
+    "Request Type",
+    "cf[10010]"
+   ],
+   "schema": {
+    "type": "sd-customerrequesttype",
+    "custom": "com.atlassian.servicedesk:vp-origin",
+    "customId": 10010
+   }
+  },
+  {
+   "id": "customfield_10011",
+   "key": "customfield_10011",
+   "name": "에픽의 이름",
+   "untranslatedName": "Epic Name",
+   "custom": true,
+   "orderable": true,
+   "navigable": true,
+   "searchable": true,
+   "clauseNames": [
+    "Epic Name",
+    "cf[10011]"
+   ],
+   "schema": {
+    "type": "string",
+    "custom": "com.pyxis.greenhopper.jira:gh-epic-label",
+    "customId": 10011
+   }
+  },
+  {
+   "id": "customfield_10012",
+   "key": "customfield_10012",
+   "name": "에픽 상태",
+   "untranslatedName": "Epic Status",
+   "custom": true,
+   "orderable": true,
+   "navigable": true,
+   "searchable": true,
+   "clauseNames": [
+    "Epic Status",
+    "cf[10012]"
+   ],
+   "schema": {
+    "type": "option",
+    "custom": "com.pyxis.greenhopper.jira:gh-epic-status",
+    "customId": 10012
+   }
+  },
+  {
+   "id": "customfield_10013",
+   "key": "customfield_10013",
+   "name": "Epic Color",
+   "untranslatedName": "Epic Color",
+   "custom": true,
+   "orderable": true,
+   "navigable": true,
+   "searchable": true,
+   "clauseNames": [
+    "cf[10013]",
+    "Epic Color"
+   ],
+   "schema": {
+    "type": "string",
+    "custom": "com.pyxis.greenhopper.jira:gh-epic-color",
+    "customId": 10013
+   }
+  },
+  {
+   "id": "customfield_10014",
+   "key": "customfield_10014",
+   "name": "에픽 링크",
+   "untranslatedName": "Epic Link",
+   "custom": true,
+   "orderable": true,
+   "navigable": true,
+   "searchable": true,
+   "clauseNames": [
+    "cf[10014]",
+    "Epic Link"
+   ],
+   "schema": {
+    "type": "any",
+    "custom": "com.pyxis.greenhopper.jira:gh-epic-link",
+    "customId": 10014
+   }
+  },
+  {
+   "id": "timetracking",
+   "key": "timetracking",
+   "name": "시간 추적",
+   "custom": false,
+   "orderable": true,
+   "navigable": false,
+   "searchable": true,
+   "clauseNames": [],
+   "schema": {
+    "type": "timetracking",
+    "system": "timetracking"
+   }
+  },
+  {
+   "id": "customfield_10015",
+   "key": "customfield_10015",
+   "name": "시작 날짜",
+   "untranslatedName": "Start date",
+   "custom": true,
+   "orderable": true,
+   "navigable": true,
+   "searchable": true,
+   "clauseNames": [
+    "cf[10015]",
+    "Start date",
+    "Start date[Date]"
+   ],
+   "schema": {
+    "type": "date",
+    "custom": "com.atlassian.jira.plugin.system.customfieldtypes:datepicker",
+    "customId": 10015
+   }
+  },
+  {
+   "id": "customfield_10126",
+   "key": "customfield_10126",
+   "name": "디자인",
+   "untranslatedName": "Design",
+   "custom": true,
+   "orderable": true,
+   "navigable": true,
+   "searchable": true,
+   "clauseNames": [
+    "Design",
+    "cf[10126]"
+   ],
+   "schema": {
+    "type": "array",
+    "items": "design.field.name",
+    "custom": "com.atlassian.jira.plugins.jira-development-integration-plugin:designcf",
+    "customId": 10126
+   }
+  },
+  {
+   "id": "customfield_10005",
+   "key": "customfield_10005",
+   "name": "Change type",
+   "untranslatedName": "Change type",
+   "custom": true,
+   "orderable": true,
+   "navigable": true,
+   "searchable": true,
+   "clauseNames": [
+    "Change type[Dropdown]",
+    "cf[10005]",
+    "Change type"
+   ],
+   "schema": {
+    "type": "option",
+    "custom": "com.atlassian.jira.plugin.system.customfieldtypes:select",
+    "customId": 10005
+   }
+  },
+  {
+   "id": "customfield_10127",
+   "key": "customfield_10127",
+   "name": "취약성",
+   "untranslatedName": "Vulnerability",
+   "custom": true,
+   "orderable": true,
+   "navigable": true,
+   "searchable": true,
+   "clauseNames": [
+    "cf[10127]",
+    "Vulnerability"
+   ],
+   "schema": {
+    "type": "any",
+    "custom": "com.atlassian.jira.plugins.jira-development-integration-plugin:vulnerabilitycf",
+    "customId": 10127
+   }
+  },
+  {
+   "id": "customfield_10006",
+   "key": "customfield_10006",
+   "name": "Change risk",
+   "untranslatedName": "Change risk",
+   "custom": true,
+   "orderable": true,
+   "navigable": true,
+   "searchable": true,
+   "clauseNames": [
+    "cf[10006]",
+    "Change risk",
+    "Change risk[Dropdown]"
+   ],
+   "schema": {
+    "type": "option",
+    "custom": "com.atlassian.jira.plugin.system.customfieldtypes:select",
+    "customId": 10006
+   }
+  },
+  {
+   "id": "security",
+   "key": "security",
+   "name": "보안 등급",
+   "custom": false,
+   "orderable": true,
+   "navigable": true,
+   "searchable": true,
+   "clauseNames": [
+    "level"
+   ],
+   "schema": {
+    "type": "securitylevel",
+    "system": "security"
+   }
+  },
+  {
+   "id": "customfield_10007",
+   "key": "customfield_10007",
+   "name": "Change reason",
+   "untranslatedName": "Change reason",
+   "custom": true,
+   "orderable": true,
+   "navigable": true,
+   "searchable": true,
+   "clauseNames": [
+    "Change reason",
+    "Change reason[Dropdown]",
+    "cf[10007]"
+   ],
+   "schema": {
+    "type": "option",
+    "custom": "com.atlassian.jira.plugin.system.customfieldtypes:select",
+    "customId": 10007
+   }
+  },
+  {
+   "id": "customfield_10008",
+   "key": "customfield_10008",
+   "name": "Actual start",
+   "untranslatedName": "Actual start",
+   "custom": true,
+   "orderable": true,
+   "navigable": true,
+   "searchable": true,
+   "clauseNames": [
+    "Actual start[Time stamp]",
+    "cf[10008]",
+    "Actual start"
+   ],
+   "schema": {
+    "type": "datetime",
+    "custom": "com.atlassian.jira.plugin.system.customfieldtypes:datetime",
+    "customId": 10008
+   }
+  },
+  {
+   "id": "attachment",
+   "key": "attachment",
+   "name": "첨부 파일",
+   "custom": false,
+   "orderable": true,
+   "navigable": false,
+   "searchable": true,
+   "clauseNames": [
+    "attachments"
+   ],
+   "schema": {
+    "type": "array",
+    "items": "attachment",
+    "system": "attachment"
+   }
+  },
+  {
+   "id": "customfield_10009",
+   "key": "customfield_10009",
+   "name": "Actual end",
+   "untranslatedName": "Actual end",
+   "custom": true,
+   "orderable": true,
+   "navigable": true,
+   "searchable": true,
+   "clauseNames": [
+    "Actual end[Time stamp]",
+    "cf[10009]",
+    "Actual end"
+   ],
+   "schema": {
+    "type": "datetime",
+    "custom": "com.atlassian.jira.plugin.system.customfieldtypes:datetime",
+    "customId": 10009
+   }
+  },
+  {
+   "id": "summary",
+   "key": "summary",
+   "name": "요약",
+   "custom": false,
+   "orderable": true,
+   "navigable": true,
+   "searchable": true,
+   "clauseNames": [
+    "summary"
+   ],
+   "schema": {
+    "type": "string",
+    "system": "summary"
+   }
+  },
+  {
+   "id": "customfield_10000",
+   "key": "customfield_10000",
+   "name": "development",
+   "untranslatedName": "development",
+   "custom": true,
+   "orderable": true,
+   "navigable": true,
+   "searchable": true,
+   "clauseNames": [
+    "cf[10000]",
+    "development"
+   ],
+   "schema": {
+    "type": "any",
+    "custom": "com.atlassian.jira.plugins.jira-development-integration-plugin:devsummarycf",
+    "customId": 10000
+   }
+  },
+  {
+   "id": "customfield_10001",
+   "key": "customfield_10001",
+   "name": "Team",
+   "untranslatedName": "Team",
+   "custom": true,
+   "orderable": true,
+   "navigable": true,
+   "searchable": true,
+   "clauseNames": [
+    "Team[Team]",
+    "cf[10001]",
+    "Team"
+   ],
+   "schema": {
+    "type": "team",
+    "custom": "com.atlassian.jira.plugin.system.customfieldtypes:atlassian-team",
+    "customId": 10001,
+    "configuration": {
+     "com.atlassian.jira.plugin.system.customfieldtypes:atlassian-team": true
+    }
+   }
+  },
+  {
+   "id": "customfield_10002",
+   "key": "customfield_10002",
+   "name": "Organizations",
+   "untranslatedName": "Organizations",
+   "custom": true,
+   "orderable": true,
+   "navigable": true,
+   "searchable": true,
+   "clauseNames": [
+    "cf[10002]",
+    "Organizations"
+   ],
+   "schema": {
+    "type": "array",
+    "items": "sd-customerorganization",
+    "custom": "com.atlassian.servicedesk:sd-customer-organizations",
+    "customId": 10002
+   }
+  },
+  {
+   "id": "customfield_10003",
+   "key": "customfield_10003",
+   "name": "Approvers",
+   "untranslatedName": "Approvers",
+   "custom": true,
+   "orderable": true,
+   "navigable": true,
+   "searchable": true,
+   "clauseNames": [
+    "Approvers[User Picker (multiple users)]",
+    "cf[10003]",
+    "Approvers"
+   ],
+   "schema": {
+    "type": "array",
+    "items": "user",
+    "custom": "com.atlassian.jira.plugin.system.customfieldtypes:multiuserpicker",
+    "customId": 10003
+   }
+  },
+  {
+   "id": "customfield_10004",
+   "key": "customfield_10004",
+   "name": "Impact",
+   "untranslatedName": "Impact",
+   "custom": true,
+   "orderable": true,
+   "navigable": true,
+   "searchable": true,
+   "clauseNames": [
+    "Impact",
+    "cf[10004]",
+    "Impact[Dropdown]"
+   ],
+   "schema": {
+    "type": "option",
+    "custom": "com.atlassian.jira.plugin.system.customfieldtypes:select",
+    "customId": 10004
+   }
+  },
+  {
+   "id": "environment",
+   "key": "environment",
+   "name": "환경",
+   "custom": false,
+   "orderable": true,
+   "navigable": true,
+   "searchable": true,
+   "clauseNames": [
+    "environment"
+   ],
+   "schema": {
+    "type": "string",
+    "system": "environment"
+   }
+  },
+  {
+   "id": "duedate",
+   "key": "duedate",
+   "name": "기한",
+   "custom": false,
+   "orderable": true,
+   "navigable": true,
+   "searchable": true,
+   "clauseNames": [
+    "due",
+    "duedate"
+   ],
+   "schema": {
+    "type": "date",
+    "system": "duedate"
+   }
+  },
+  {
+   "id": "comment",
+   "key": "comment",
+   "name": "댓글",
+   "custom": false,
+   "orderable": true,
+   "navigable": false,
+   "searchable": true,
+   "clauseNames": [
+    "comment"
+   ],
+   "schema": {
+    "type": "comments-page",
+    "system": "comment"
+   }
+  }
+ ],
+ "priorities": [
+  {
+   "statusColor": "#d04437",
+   "description": "This problem will block progress.",
+   "iconUrl": "https://ssafy.atlassian.net/images/icons/priorities/highest_new.svg",
+   "name": "Highest",
+   "id": "1"
+  },
+  {
+   "statusColor": "#f15C75",
+   "description": "Serious problem that could block progress.",
+   "iconUrl": "https://ssafy.atlassian.net/images/icons/priorities/high_new.svg",
+   "name": "High",
+   "id": "2"
+  },
+  {
+   "statusColor": "#f79232",
+   "description": "Has the potential to affect progress.",
+   "iconUrl": "https://ssafy.atlassian.net/images/icons/priorities/medium_new.svg",
+   "name": "Medium",
+   "id": "3"
+  },
+  {
+   "statusColor": "#707070",
+   "description": "Minor problem or easily worked around.",
+   "iconUrl": "https://ssafy.atlassian.net/images/icons/priorities/low_new.svg",
+   "name": "Low",
+   "id": "4"
+  },
+  {
+   "statusColor": "#999999",
+   "description": "Trivial problem with little or no impact on progress.",
+   "iconUrl": "https://ssafy.atlassian.net/images/icons/priorities/lowest_new.svg",
+   "name": "Lowest",
+   "id": "5"
+  }
+ ],
+ "resolutions": [
+  {
+   "id": "10000",
+   "description": "Work has been completed on this work item.",
+   "name": "완료"
+  },
+  {
+   "id": "10001",
+   "description": "This issue won't be actioned.",
+   "name": "Won't Do"
+  },
+  {
+   "id": "10002",
+   "description": "이 문제는 기존 업무 항목을 복제한 것입니다.",
+   "name": "복제"
+  },
+  {
+   "id": "10003",
+   "description": "이 업무 항목을 재현하기 위한 모든 시도에 실패했거나, 이 업무 항목을 재현할 수 있는 정보가 충분하지 않습니다. 코드를 분석한 결과 이 동작이 발생하는 원인을 예측할 수 없습니다. 나중에 자세한 정보가 표시되면 작업 항목을 다시 여세요.",
+   "name": "재현 불가"
+  },
+  {
+   "id": "10004",
+   "description": "이 이슈에 대한 작업이 완료되었습니다.",
+   "name": "완료"
+  },
+  {
+   "id": "10005",
+   "description": "이러한 이슈는 동작을 취하지 않습니다.",
+   "name": "실행하지 않음"
+  },
+  {
+   "id": "10006",
+   "description": "이 문제는 기존 이슈의 중복입니다.",
+   "name": "중복"
+  },
+  {
+   "id": "10007",
+   "description": "이 이슈의 문제를 재현하기 위한 모든 방법이 실패했습니다. 또는 이 문제를 재현하기 위한 충분한 정보가 없었을 수 있습니다. 코드를 분석한 결과 이 문제를 일으킬만한 원인을 예측할 수 없었습니다. 더 많은 정보가 수집되면 이슈를 다시 여십시오.",
+   "name": "재현 불가"
+  },
+  {
+   "id": "10008",
+   "description": "이 문제는 기존 이슈의 중복입니다.",
+   "name": "복제"
+  },
+  {
+   "id": "10009",
+   "description": "이 이슈가 승인되지 않았습니다.",
+   "name": "거부됨"
+  }
+ ],
+ "issueLinkTypes": {
+  "issueLinkTypes": [
+   {
+    "id": "10006",
+    "name": "이슈 분할",
+    "inward": "다음에서 분할:",
+    "outward": "다음으로 분할:"
+   },
+   {
+    "id": "10000",
+    "name": "Blocks",
+    "inward": "is blocked by",
+    "outward": "blocks"
+   },
+   {
+    "id": "10001",
+    "name": "Cloners",
+    "inward": "is cloned by",
+    "outward": "clones"
+   },
+   {
+    "id": "10002",
+    "name": "Duplicate",
+    "inward": "is duplicated by",
+    "outward": "duplicates"
+   },
+   {
+    "id": "10007",
+    "name": "Issue split",
+    "inward": "split from",
+    "outward": "split to"
+   },
+   {
+    "id": "10010",
+    "name": "Merged",
+    "inward": "merged from",
+    "outward": "merged into"
+   },
+   {
+    "id": "10008",
+    "name": "Polaris work item link",
+    "inward": "is implemented by",
+    "outward": "implements"
+   },
+   {
+    "id": "10009",
+    "name": "Problem/Incident",
+    "inward": "is caused by",
+    "outward": "causes"
+   },
+   {
+    "id": "10003",
+    "name": "Relates",
+    "inward": "relates to",
+    "outward": "relates to"
+   }
+  ]
+ },
+ "issuetypes-project": [
+  {
+   "id": "10002",
+   "description": "소규모 개별 업무입니다.",
+   "iconUrl": "https://ssafy.atlassian.net/rest/api/2/universal_avatar/view/type/issuetype/avatar/10318?size=medium",
+   "name": "작업",
+   "untranslatedName": "Task",
+   "subtask": false,
+   "avatarId": 10318,
+   "hierarchyLevel": 0
+  },
+  {
+   "id": "10003",
+   "description": "A small piece of work that's part of a larger task.",
+   "iconUrl": "https://ssafy.atlassian.net/rest/api/2/universal_avatar/view/type/issuetype/avatar/10316?size=medium",
+   "name": "하위 작업",
+   "untranslatedName": "Sub-task",
+   "subtask": true,
+   "avatarId": 10316,
+   "hierarchyLevel": -1
+  },
+  {
+   "id": "10001",
+   "description": "Jira Agile에서 만듦 - 편집 또는 삭제하지 마세요. 사용자 스토리에 대한 이슈 유형입니다.",
+   "iconUrl": "https://ssafy.atlassian.net/rest/api/2/universal_avatar/view/type/issuetype/avatar/10315?size=medium",
+   "name": "스토리",
+   "untranslatedName": "Story",
+   "subtask": false,
+   "avatarId": 10315,
+   "hierarchyLevel": 0
+  },
+  {
+   "id": "10004",
+   "description": "문제 또는 오류.",
+   "iconUrl": "https://ssafy.atlassian.net/rest/api/2/universal_avatar/view/type/issuetype/avatar/10303?size=medium",
+   "name": "버그",
+   "untranslatedName": "Bug",
+   "subtask": false,
+   "avatarId": 10303,
+   "hierarchyLevel": 0
+  },
+  {
+   "id": "10000",
+   "description": "A big user story that needs to be broken down. Created by Jira Software - do not edit or delete.",
+   "iconUrl": "https://ssafy.atlassian.net/images/icons/issuetypes/epic.svg",
+   "name": "에픽",
+   "untranslatedName": "Epic",
+   "subtask": false,
+   "hierarchyLevel": 1
+  }
+ ],
+ "boards": [
+  {
+   "id": 15273,
+   "name": "[A604]SSAFESTA",
+   "type": "scrum",
+   "location": {
+    "type": "project",
+    "key": "S15P21A604",
+    "id": "22528",
+    "name": "[A604]SSAFESTA"
+   },
+   "filter": {
+    "id": "36535"
+   },
+   "columnConfig": {
+    "columns": [
+     {
+      "name": "해야 할 일",
+      "statuses": [
+       {
+        "id": "10000"
+       }
+      ]
+     },
+     {
+      "name": "진행 중",
+      "statuses": [
+       {
+        "id": "3"
+       }
+      ]
+     },
+     {
+      "name": "완료",
+      "statuses": [
+       {
+        "id": "10001"
+       }
+      ]
+     }
+    ],
+    "constraintType": "none"
+   },
+   "estimation": {
+    "type": "field",
+    "field": {
+     "fieldId": "customfield_10031",
+     "displayName": "Story Points"
+    }
+   },
+   "ranking": {
+    "rankCustomFieldId": 10019
+   }
+  }
+ ],
+ "sprints": [
+  {
+   "id": 53978,
+   "state": "closed",
+   "name": "Sprint 1",
+   "startDate": "2026-08-09T15:00:00.000Z",
+   "endDate": "2026-08-16T14:59:00.000Z",
+   "completeDate": "2026-08-24T04:11:50.854Z",
+   "createdDate": "2026-08-24T04:10:07.011Z",
+   "originBoardId": 15273,
+   "goal": "기획 확정 + Multiplayer/Booth/AI/Deployment POC"
+  },
+  {
+   "id": 53979,
+   "state": "closed",
+   "name": "Sprint 2",
+   "startDate": "2026-08-16T15:00:00.000Z",
+   "endDate": "2026-08-23T14:59:00.000Z",
+   "completeDate": "2026-08-24T04:11:51.721Z",
+   "createdDate": "2026-08-24T04:10:08.450Z",
+   "originBoardId": 15273,
+   "goal": "기반 시스템: World, Auth, Booth, Lease, Coin, Studio, 아바타"
+  },
+  {
+   "id": 53980,
+   "state": "closed",
+   "name": "Sprint 3",
+   "startDate": "2026-08-23T15:00:00.000Z",
+   "endDate": "2026-08-30T14:59:00.000Z",
+   "completeDate": "2026-08-31T03:34:03.392Z",
+   "createdDate": "2026-08-24T04:10:08.919Z",
+   "originBoardId": 15273,
+   "goal": "1차 MVP — 임대→Studio→Publish→Unity 방문 + wss 종단 실측 + AI 스캐폴드"
+  },
+  {
+   "id": 53981,
+   "state": "closed",
+   "name": "Sprint 4",
+   "startDate": "2026-08-31T05:18:06.212Z",
+   "endDate": "2026-09-06T14:59:00.000Z",
+   "completeDate": "2026-09-06T21:54:35.109Z",
+   "createdDate": "2026-08-24T04:10:09.562Z",
+   "originBoardId": 15273,
+   "goal": "콘텐츠 기능 — AI Document 파이프라인, Game Studio 수직, Project 전시"
+  },
+  {
+   "id": 53982,
+   "state": "closed",
+   "name": "Sprint 5",
+   "startDate": "2026-09-06T21:54:47.000Z",
+   "endDate": "2026-09-13T14:59:00.000Z",
+   "completeDate": "2026-09-13T21:35:02.242Z",
+   "createdDate": "2026-08-24T04:10:10.004Z",
+   "originBoardId": 15273,
+   "goal": "AI Conversation·SSE 완성, Survey, Game Studio 연동 마감"
+  },
+  {
+   "id": 53983,
+   "state": "closed",
+   "name": "Sprint 6",
+   "startDate": "2026-09-14T01:34:12.788Z",
+   "endDate": "2026-09-18T14:59:00.000Z",
+   "completeDate": "2026-09-20T23:45:01.649Z",
+   "createdDate": "2026-08-24T04:10:10.545Z",
+   "originBoardId": 15273,
+   "goal": "개발 마감(09-18) — Game Studio 완성, 통합 QA, 부하 실측, 아키텍처 동결"
+  },
+  {
+   "id": 53984,
+   "state": "closed",
+   "name": "Sprint 7",
+   "startDate": "2026-09-20T23:46:14.744Z",
+   "endDate": "2026-09-25T14:59:00.000Z",
+   "completeDate": "2026-09-27T07:01:51.777Z",
+   "createdDate": "2026-08-24T04:10:10.977Z",
+   "originBoardId": 15273,
+   "goal": "발표 준비 — 발표 자료·시연·영상·README·리허설 (개발은 버그 수정만)"
+  }
+ ]
+}

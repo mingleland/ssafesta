@@ -1,0 +1,42 @@
+[
+ {
+  "username": "gudtnslwkd",
+  "name": "강형순",
+  "access_level": 40
+ },
+ {
+  "username": "dream_hyeon",
+  "name": "김가현",
+  "access_level": 40
+ },
+ {
+  "username": "rammerg",
+  "name": "박준우",
+  "access_level": 40
+ },
+ {
+  "username": "colosair",
+  "name": "이정헌",
+  "access_level": 40
+ },
+ {
+  "username": "powerful7305",
+  "name": "정승욱",
+  "access_level": 40
+ },
+ {
+  "username": "ejraks1548",
+  "name": "황덕",
+  "access_level": 40
+ },
+ {
+  "username": "project_1443023_bot_17795cd9c47495c18d8102f5660a7238",
+  "name": "jenkins-checkout",
+  "access_level": 20
+ },
+ {
+  "username": "project_1443023_bot_bbeb650642e9e710eff90323e8425f85",
+  "name": "jenkins-world-package-write",
+  "access_level": 30
+ }
+]
