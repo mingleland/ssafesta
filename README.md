@@ -16,7 +16,7 @@ SSAFY 구성원이 가상 공간에서 만나 프로젝트와 AI 서비스를 �
 
 개발은 GitHub(초기) → SSAFY GitLab(본 개발) → 이 저장소 순서로 옮겨 왔고, 일정·작업 관리는 Jira 로 했다. 세 곳의 기록을 모두 이 저장소로 모았다.
 
-- **Pull requests / Issues**: 최초 GitHub 의 PR·이슈(#1~#84)와 GitLab 의 MR·이슈(#85~)를 원래 작성자·시각·원본 번호와 함께 옮겼다.
+- **Pull requests / Issues**: GitLab MR 은 같은 번호의 PR(#1~#1363)로, 최초 GitHub PR 은 #1364~#1410 으로, 이슈는 원래 번호 + 1410 으로 옮겼다. 작성자·댓글·리뷰·병합 기록은 원래 구성원 계정에 귀속된다.
 - **[project-history/](project-history/README.md)**: Jira 이슈 976건 전체 기록, GitLab·GitHub 원본 데이터, 원본 번호 대응표, Jira ↔ 커밋·MR 연결, 수량 검증 결과.
 - **커밋**: GitLab 의 전체 history 를 커밋 SHA 그대로 옮겼다. 기본 브랜치는 `develop`, 최종 발표본은 `main` 이다.
 

@@ -4,17 +4,17 @@
 
 | 원본 | 기간 | 이 저장소에서 보는 곳 |
 |---|---|---|
-| 최초 GitHub (`kanghyunsoon/ssafesta`, 비공개) | 2026-08-10 ~ 08-25 | Issues·PR **#1~#84** (원래 번호 그대로) |
-| SSAFY GitLab (`S15P21A604`) | 2026-08-24 ~ 09-27 | Issues·PR **#85~#1628** (생성 시각 순), [gitlab/](gitlab/) |
+| 최초 GitHub (`kanghyunsoon/ssafesta`, 비공개) | 2026-08-10 ~ 08-25 | PR **#1364~#1410**, Issue **#1411~#1494** 중 원래 GitHub 번호 + 1410 |
+| SSAFY GitLab (`S15P21A604`) | 2026-08-24 ~ 09-27 | PR **#1~#1363** (MR 번호 그대로), Issue **#(GitLab 번호 + 1410)** |
 | Jira (`S15P21A604`) | 같은 기간 | [jira/](jira/README.md) — 이슈 976건 전부 |
 
 ## 번호와 원본 ID
 
-- 원본 ID 와 새 번호의 대응은 [mappings/items.json](mappings/items.json) 에 있다. 모든 이전 항목의 본문 첫머리에도 원본 ID(`GitLab !1013`, `GitLab #269`, `kanghyunsoon/ssafesta#12`)와 원래 작성자·시각을 적었다.
-- GitLab 이슈 #1~#83 은 최초 GitHub #1~#83 을 2026-08-24 에 옮긴 사본이라 새 저장소에서는 하나로 합쳤다. 사본에 나중에 달린 댓글은 "GitLab 이관본 추가 댓글" 로 붙어 있다.
-- 새 저장소의 PR 작성자·생성 시각·병합 주체는 이전 시점의 이전 계정이다. 원래 값은 본문 머리말에 있다.
-- 원본에서 merge commit 으로 병합된 MR·PR 은 실제 병합 커밋을 이용해 **Merged** 로 보인다. squash 로 병합된 것은 원래 head 커밋이 병합 커밋의 조상이 아니어서 커밋을 새로 만들지 않는 한 Merged 가 될 수 없으므로 **Closed** 로 두고 `original: merged` 라벨과 실제 병합·squash 커밋을 본문에 적었다.
-- PR 은 원래 대상 브랜치 대신 원래 base 커밋에 고정한 임시 브랜치(`gl-mr/N/base`, `gh-pr/N/base`)를 기준으로 만들어, 당시 diff 를 그대로 보여 준다.
+- 이슈·PR·댓글·리뷰·승인·병합 주체는 GitHub Enterprise Importer 로 옮겨 원래 작성자의 계정(또는 계정 연결 전에는 원래 GitLab 사용자명의 mannequin)에 귀속된다. 시각도 원본 값이다. 원본 ID ↔ 새 번호는 [mappings/items.json](mappings/items.json).
+- GitLab 이슈 #1~#83 은 최초 GitHub #1~#83 을 2026-08-24 에 옮긴 사본이라, 새 저장소에는 GitHub 원본(작성자·댓글·리뷰·커밋)으로 넣고 GitLab 에서 나중에 달린 댓글을 더했다.
+- GitLab MR !1167(diff 없음)·!1212(커밋 없음)는 Importer 가 PR 로 만들 수 없어 기록만 [gitlab/merge_requests.jsonl](gitlab/merge_requests.jsonl) 에 남는다.
+- 병합된 MR·PR 은 GitHub 에서도 Merged 로 보이며 원래 병합 시각·병합한 사람이 유지된다.
+- GitLab 이 내부적으로 남긴 교차 참조 시스템 기록("mentioned in ...")은 Importer 가 옮기지 않으며 원본은 [gitlab/notes.jsonl](gitlab/notes.jsonl) 에 있다.
 
 ## Git 이력
 

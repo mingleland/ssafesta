@@ -35,7 +35,13 @@ def log(*a):
 def save():
     tmp = STATE_P + ".tmp"
     json.dump(STATE, open(tmp, "w", encoding="utf-8"), ensure_ascii=False, indent=1)
-    os.replace(tmp, STATE_P)
+    for attempt in range(20):  # Windows 백신·색인기가 잠깐 파일을 잡으면 replace 가 실패한다
+        try:
+            os.replace(tmp, STATE_P)
+            return
+        except PermissionError:
+            time.sleep(0.5)
+    raise SystemExit("state.json 저장 실패")
 
 
 def api(method, path, body=None, kind="other"):
